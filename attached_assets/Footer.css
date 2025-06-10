@@ -1,0 +1,23 @@
+/* Footer */
+.footer {
+  background-color: #0A0A0A; /* Jet Black */
+  color: #FFFFFF; /* Cool White */
+  text-align: center;
+  padding: 20px;
+  border-top: 2px solid #FFFFFF;
+  margin-top: 300px;
+}
+
+/* Footer Navigation Links */
+.footer nav a {
+  color: #FFFFFF;
+  text-decoration: none;
+  margin: 0 10px;
+  font-weight: bold;
+  transition: color 0.3s ease;
+}
+
+.footer nav a:hover {
+  color: #FF4C4C; /* Crimson Red */
+  text-decoration: underline;
+}

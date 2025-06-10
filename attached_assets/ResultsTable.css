@@ -1,0 +1,80 @@
+/* Results Table */
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: #0A0A0A; /* Jet Black */
+  color: #FFFFFF; /* Cool White */
+  margin: 20px auto;
+  border-radius: 5px;
+  overflow: hidden;
+  max-height: 300px; 
+  overflow-y: auto; 
+  overflow-x: auto;
+  border: 1px solid #FFFFFF;
+}
+
+/* Table Header */
+.results-table th {
+  background-color: #0A0A0A; /* Jet Black */
+  color: #FFFFFF; /* Cool White */
+  padding: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 1.5;
+  border-bottom: 1px solid #FFFFFF;
+}
+
+/* Table Rows */
+.results-table td {
+  border: 1px solid #FFFFFF;
+  padding: 10px;
+}
+
+/* Results Container */
+.results-container {
+  max-height: 300px;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+.results-container::-webkit-scrollbar {
+  display: none;
+}
+
+/* Export Buttons */
+.export-buttons {
+  margin-top: 15px;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.black-button {
+  background-color: #FFFFFF; /* Cool White */
+  color: #0A0A0A; /* Jet Black */
+  border: 1px solid #FFFFFF;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  text-decoration: none;
+}
+
+.black-button:hover {
+  background-color: #FF4C4C; /* Crimson Red */
+  color: #FFFFFF;
+}
+
+/* Hover Effect for Table Rows */
+.results-table tr:hover {
+  background-color: #FF4C4C; /* Crimson Red */
+  color: #FFFFFF;
+}
+
+/* Results Section */
+.results-section {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}

@@ -1,0 +1,94 @@
+/* Edit User Page Container */
+.edit-user-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 20px;
+  width: 100%;
+  min-height: 85vh;
+  margin-left: 25px;
+  background-color: #0A0A0A; /* Jet Black */
+}
+
+/* Title and Subtitle */
+.edit-user-container h1 {
+  color: #FFFFFF; /* Cool White */
+  margin-top: -5px;
+  margin-left: -3px;
+}
+
+.edit-user-container p {
+  color: #FFFFFF; /* Cool White */
+}
+
+/* ✅ Match the same container style as Change Password */
+.edit-user-box {
+  width: 96%;
+  border: 2px solid #FFFFFF; /* Cool White */
+  border-radius: 10px;
+  padding: 15px;
+  margin: 10px 0;
+  background-color: #1C1C1C; /* Slight contrast with Jet Black */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* Label & Input Styling */
+.setting-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 250px;
+  margin-bottom: 10px;
+}
+
+.setting-option label {
+  font-size: 1rem;
+  color: #FFFFFF; /* Cool White */
+  margin-bottom: 5px;
+}
+
+.setting-option input {
+  width: 250px;
+  padding: 8px;
+  border: 1px solid #FFFFFF; /* Cool White */
+  border-radius: 5px;
+  font-size: 1rem;
+  background-color: #0A0A0A; /* Jet Black */
+  color: #FFFFFF; /* Cool White */
+}
+
+/* ✅ Ensure form layout matches Change Password section */
+.edit-user-box form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+}
+
+/* ✅ Match button style to 'restore-button' */
+.save-button {
+  width: 150px;
+  padding: 8px;
+  background-color: #FFFFFF; /* Cool White */
+  color: #0A0A0A; /* Jet Black */
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 1rem;
+  margin-top: 10px;
+  font-weight: bold;
+}
+
+.save-button:hover {
+  background-color: #FF4C4C; /* Crimson Red */
+  color: #FFFFFF;
+}
+
+/* Error Message */
+.error-message {
+  color: #FF4C4C; /* Crimson Red */
+  font-size: 1rem;
+}

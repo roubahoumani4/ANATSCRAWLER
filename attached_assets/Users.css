@@ -1,0 +1,136 @@
+/* Users Container */
+.users-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+    padding: 20px;
+    background-color: #0A0A0A; /* Jet Black */
+}
+
+/* Title */
+h1 {
+    color: #FFFFFF; /* Cool White */
+    text-align: left;
+    margin-bottom: 10px;
+    margin-left: 10px;
+    margin-top: -140px;
+}
+
+/* ✅ New User Button & Filter Styling */
+.users-actions {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-left: 10px;
+    margin-bottom: 15px;
+}
+
+/* ✅ New User Button */
+.new-user-btn {
+    background-color: #FFFFFF; /* Cool White */
+    color: #0A0A0A; /* Jet Black */
+    border: none;
+    padding: 10px 15px;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background 0.3s;
+}
+
+.new-user-btn:hover {
+    background-color: #FF4C4C; /* Crimson Red */
+    color: #FFFFFF;
+}
+
+.btn-icon {
+    font-size: 18px;
+}
+
+/* ✅ Search Filter */
+.search-filter {
+    display: flex;
+    align-items: center;
+    background-color: rgba(255, 255, 255, 0.1);
+    padding: 8px;
+    border-radius: 10px;
+    width: 1624px;
+}
+
+.filter-icon {
+    font-size: 16px;
+    color: #FFFFFF;
+    margin-right: 5px;
+}
+
+.filter-input {
+    border: none;
+    background: none;
+    color: #FFFFFF; /* Cool White */
+    font-size: 14px;
+    outline: none;
+    padding: 5px;
+}
+
+.filter-input::placeholder {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+/* ✅ Make table span the full width */
+.users-table {
+    width: 97%;
+    max-width: none;
+    border-collapse: collapse;
+    background-color: #0A0A0A; /* Jet Black */
+    border-radius: 10px;
+    border: 1px solid #FFFFFF;
+    margin-top: 10px;
+    margin-left: 10px;
+}
+
+/* ✅ Improve table cell padding & text alignment */
+.users-table th, 
+.users-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #FFFFFF;
+    color: #FFFFFF; /* Cool White */
+}
+
+/* ✅ Improve header styling */
+.users-table th {
+    background-color: #0A0A0A; /* Jet Black */
+    color: #FFFFFF; /* Cool White */
+    text-transform: uppercase;
+}
+
+/* ✅ Align username & icon */
+.username-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.user-icon {
+    font-size: 18px;
+    color: #FFFFFF;
+}
+
+/* ✅ Add a hover effect */
+.users-table tr:hover {
+    background-color: #FF4C4C; /* Crimson Red */
+    color: #FFFFFF;
+}
+
+/* ✅ Error Message */
+.error-message {
+    color: #FF4C4C; /* Crimson Red */
+    font-size: 1.2rem;
+    margin-top: 10px;
+    text-align: left;
+    margin-left: 10px;
+}
