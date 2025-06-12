@@ -311,7 +311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { query } = req.body;
       
-      // Get all available indices
+      // First, get all available indices
       const indicesResponse = await fetch(`${ELASTICSEARCH_URI}/_cat/indices?format=json`, {
         method: 'GET',
         headers: {
@@ -319,7 +319,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
-      let targetIndices = "*";
+      let targetIndices = "filesearchdb.fs.chunks,fs_chunks_index";
       
       if (indicesResponse.ok) {
         const indices = await indicesResponse.json();
@@ -330,18 +330,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (availableIndices) {
           targetIndices = availableIndices;
+          console.log(`Searching in indices: ${targetIndices}`);
         }
       }
 
-      // Simple multi-match query
+      // Split query into words for better name matching
+      const queryWords = query.toLowerCase().split(/\s+/).filter(word => word.length > 0);
+      const queryWildcards = queryWords.map(word => `*${word}*`);
+      
+      // Improved query that handles name variations and different formats
       const searchBody = {
         query: {
-          multi_match: {
-            query: query,
-            fields: ["*"]
+          bool: {
+            should: [
+              // Exact phrase matches with highest boost
+              { match_phrase: { data: { query: query, boost: 15 } } },
+              { match_phrase: { content: { query: query, boost: 15 } } },
+              { match_phrase: { text: { query: query, boost: 15 } } },
+              { match_phrase: { body: { query: query, boost: 15 } } },
+              
+              // Individual word matches for names (handles "Hadi Houmani" vs "Hadi,Houmani")
+              ...queryWords.map(word => ({
+                match: { data: { query: word, boost: 8 } }
+              })),
+              ...queryWords.map(word => ({
+                match: { content: { query: word, boost: 8 } }
+              })),
+              
+              // Wildcard searches for each word (handles partial matches)
+              ...queryWildcards.map(wildcard => ({
+                wildcard: { data: { value: wildcard, boost: 6 } }
+              })),
+              ...queryWildcards.map(wildcard => ({
+                wildcard: { content: { value: wildcard, boost: 6 } }
+              })),
+              
+              // Cross-field search for names (searches across multiple fields)
+              {
+                multi_match: {
+                  query: query,
+                  type: "cross_fields",
+                  fields: ["data", "content", "text", "body"],
+                  operator: "and",
+                  boost: 10
+                }
+              },
+              
+              // Regular matches with medium boost
+              { match: { data: { query: query, boost: 5 } } },
+              { match: { content: { query: query, boost: 5 } } },
+              { match: { text: { query: query, boost: 5 } } },
+              { match: { body: { query: query, boost: 5 } } },
+              
+              // Filename matches
+              { match_phrase: { filename: { query: query, boost: 8 } } },
+              { match_phrase: { fileName: { query: query, boost: 8 } } },
+              { match_phrase: { title: { query: query, boost: 8 } } },
+              { match_phrase: { name: { query: query, boost: 8 } } },
+              
+              // Wildcard searches for filenames
+              { wildcard: { filename: { value: `*${query.toLowerCase()}*`, boost: 4 } } },
+              { wildcard: { fileName: { value: `*${query.toLowerCase()}*`, boost: 4 } } },
+              
+              // Fuzzy search as fallback (lowest boost)
+              {
+                multi_match: {
+                  query: query,
+                  type: "best_fields",
+                  fields: ["data", "content", "text", "body", "filename", "fileName", "title", "name"],
+                  fuzziness: "AUTO",
+                  boost: 2
+                }
+              }
+            ],
+            minimum_should_match: 1
           }
         },
-        size: 100
+        size: 100,
+        sort: [
+          { "_score": { "order": "desc" } }
+        ],
+        highlight: {
+          fields: {
+            "data": { fragment_size: 200, number_of_fragments: 3 },
+            "content": { fragment_size: 200, number_of_fragments: 3 },
+            "text": { fragment_size: 200, number_of_fragments: 3 },
+            "body": { fragment_size: 200, number_of_fragments: 3 },
+            "filename": { fragment_size: 50, number_of_fragments: 1 },
+            "fileName": { fragment_size: 50, number_of_fragments: 1 }
+          }
+        },
+        _source: {
+          includes: ["data", "content", "text", "body", "filename", "fileName", "title", "name", "uploadDate", "timestamp", "created", "url", "collection", "folder", "folderName"]
+        }
       };
 
       // Make request to Elasticsearch
@@ -360,17 +441,205 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const elasticsearchData = await elasticsearchResponse.json();
+      console.log(`Elasticsearch returned ${elasticsearchData.hits?.total?.value || 0} results`);
       
-      // Transform results
+      // Helper function to parse structured data from content
+      const parseStructuredData = (content: string) => {
+        if (!content || typeof content !== 'string') return null;
+        
+        // Initialize parsed data object
+        let parsedData = {
+          id: '',
+          phone: '',
+          firstName: '',
+          lastName: '',
+          name: '',
+          gender: '',
+          locale: '',
+          location: '',
+          additionalLocation: '',
+          rawData: content
+        };
+        
+        // Method 1: Try to parse JSON-like structure
+        try {
+          if (content.includes('{') && content.includes('}')) {
+            // Handle JSON-like data
+            const jsonMatch = content.match(/\{[^}]+\}/);
+            if (jsonMatch) {
+              const jsonStr = jsonMatch[0];
+              const parsed = JSON.parse(jsonStr);
+              if (parsed.field1) parsedData.id = parsed.field1;
+              if (parsed.field2) parsedData.phone = parsed.field2;
+              // Add more field mappings as needed
+            }
+          }
+        } catch (e) {
+          // Continue with other parsing methods
+        }
+        
+        // Method 2: Try to parse comma-separated data
+        const parts = content.split(',');
+        if (parts.length >= 4) {
+          parsedData.id = parts[0]?.trim() || '';
+          parsedData.phone = parts[1]?.trim() || '';
+          parsedData.firstName = parts[2]?.trim() || '';
+          parsedData.lastName = parts[3]?.trim() || '';
+          if (parts.length > 6) parsedData.gender = parts[6]?.trim() || '';
+          if (parts.length > 7) parsedData.locale = parts[7]?.trim() || '';
+          if (parts.length > 8) parsedData.location = parts[8]?.trim() || '';
+          if (parts.length > 10) parsedData.additionalLocation = parts[10]?.trim() || '';
+        }
+        
+        // Method 3: Try to extract phone numbers using regex
+        if (!parsedData.phone) {
+          const phoneMatch = content.match(/(\+?[\d\s\-\(\)]{7,15})/);
+          if (phoneMatch) {
+            parsedData.phone = phoneMatch[1].trim();
+          }
+        }
+        
+        // Method 4: Try to extract names using common patterns
+        if (!parsedData.firstName && !parsedData.lastName) {
+          // Look for patterns like "Name: John Doe" or "john.doe"
+          const namePatterns = [
+            /name[:\s]*([a-zA-Z]+[\s]+[a-zA-Z]+)/i,
+            /([a-zA-Z]+)[\s]+([a-zA-Z]+)/,
+            /([a-zA-Z]+)\.([a-zA-Z]+)/
+          ];
+          
+          for (const pattern of namePatterns) {
+            const match = content.match(pattern);
+            if (match) {
+              parsedData.firstName = match[1]?.trim() || '';
+              parsedData.lastName = match[2]?.trim() || '';
+              break;
+            }
+          }
+        }
+        
+        // Method 5: Try to extract location information
+        if (!parsedData.location) {
+          const locationPatterns = [
+            /location[:\s]*([a-zA-Z\s,]+)/i,
+            /address[:\s]*([a-zA-Z\s,]+)/i,
+            /city[:\s]*([a-zA-Z\s]+)/i
+          ];
+          
+          for (const pattern of locationPatterns) {
+            const match = content.match(pattern);
+            if (match) {
+              parsedData.location = match[1]?.trim() || '';
+              break;
+            }
+          }
+        }
+        
+        // Method 6: Try to extract gender
+        if (!parsedData.gender) {
+          const genderMatch = content.match(/\b(male|female|m|f|man|woman)\b/i);
+          if (genderMatch) {
+            parsedData.gender = genderMatch[1].toLowerCase();
+          }
+        }
+        
+        // Combine first and last name into full name
+        if (parsedData.firstName || parsedData.lastName) {
+          parsedData.name = `${parsedData.firstName} ${parsedData.lastName}`.trim();
+        }
+        
+        // Return parsed data if we found at least some useful information
+        if (parsedData.phone || parsedData.name || parsedData.location || parsedData.id) {
+          return parsedData;
+        }
+        
+        return null;
+      };
+
+      // Transform Elasticsearch results for frontend - remove restrictive filtering since Elasticsearch already scored results
       const results = elasticsearchData.hits?.hits?.map((hit: any) => {
         const source = hit._source;
         
+        // Extract content from various possible fields
+        const content = source.data || source.content || source.text || source.body || 'No content available';
+        const filename = source.filename || source.fileName || source.title || source.name || hit._id;
+        
+        // Parse structured data if available
+        const structuredData = parseStructuredData(content);
+        
+        let displayContent = '';
+        let structuredInfo = null;
+        
+        if (structuredData) {
+          // Format structured data nicely
+          structuredInfo = {
+            name: structuredData.name || `${structuredData.firstName} ${structuredData.lastName}`.trim(),
+            phone: structuredData.phone,
+            location: structuredData.location,
+            additionalLocation: structuredData.additionalLocation,
+            gender: structuredData.gender,
+            locale: structuredData.locale,
+            id: structuredData.id
+          };
+          
+          // Build display content with available information
+          const parts = [];
+          if (structuredInfo.name && structuredInfo.name !== ' ') parts.push(`Name: ${structuredInfo.name}`);
+          if (structuredInfo.phone) parts.push(`Phone: ${structuredInfo.phone}`);
+          if (structuredInfo.location) parts.push(`Location: ${structuredInfo.location}`);
+          if (structuredInfo.gender) parts.push(`Gender: ${structuredInfo.gender}`);
+          if (structuredInfo.id) parts.push(`ID: ${structuredInfo.id}`);
+          
+          if (parts.length > 0) {
+            displayContent = parts.join(' | ');
+          } else {
+            // Fallback to showing raw content if no structured data could be parsed
+            displayContent = content.length > 200 ? content.substring(0, 200) + '...' : content;
+          }
+        } else if (typeof content === 'string') {
+          // Extract and highlight the relevant portion of content for non-structured data
+          const queryWords = query.toLowerCase().split(/\s+/).filter(word => word.length > 0);
+          const contentLower = content.toLowerCase();
+          
+          // Find the first match
+          let matchIndex = -1;
+          for (const word of queryWords) {
+            const index = contentLower.indexOf(word);
+            if (index !== -1) {
+              matchIndex = index;
+              break;
+            }
+          }
+          
+          if (matchIndex !== -1) {
+            // Extract context around the match
+            const start = Math.max(0, matchIndex - 100);
+            const end = Math.min(content.length, matchIndex + query.length + 100);
+            displayContent = (start > 0 ? '...' : '') + 
+                            content.substring(start, end) + 
+                            (end < content.length ? '...' : '');
+          } else {
+            displayContent = content.length > 300 ? content.substring(0, 300) + '...' : content;
+          }
+        } else {
+          displayContent = 'Binary or structured data';
+        }
+        
         return {
           id: hit._id,
-          source: hit._index,
-          content: JSON.stringify(source),
-          score: hit._score,
-          index: hit._index
+          source: filename,
+          timestamp: source.uploadDate || source.timestamp || source.created || new Date().toISOString(),
+          content: displayContent,
+          structuredInfo: structuredInfo,
+          title: filename,
+          url: source.url || filename,
+          score: hit._score?.toFixed(2),
+          highlight: hit.highlight,
+          index: hit._index,
+          collection: source.collection || hit._index,
+          folder: source.folder || source.folderName || 'Unknown',
+          fileName: source.fileName || filename,
+          rawContent: content
         };
       }) || [];
 
@@ -378,11 +647,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true,
         results: results,
         total: elasticsearchData.hits?.total?.value || 0,
-        query: query
+        query: query,
+        searchedIndices: targetIndices
       });
 
     } catch (error) {
       console.error("Dark web search error:", error);
+      
+      // Check if it's a connection error to Elasticsearch
+      if (error.message && (error.message.includes('fetch') || error.message.includes('ECONNREFUSED'))) {
+        return res.status(503).json({ 
+          error: "Unable to connect to Elasticsearch service",
+          details: "Please verify Elasticsearch is running at " + ELASTICSEARCH_URI
+        });
+      }
+      
       res.status(500).json({ 
         error: "Dark web search failed",
         details: error instanceof Error ? error.message : 'Unknown error'
