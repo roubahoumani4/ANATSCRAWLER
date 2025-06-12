@@ -311,7 +311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { query } = req.body;
       
-      // First, get all available indices
+      // Get all available indices
       const indicesResponse = await fetch(`${ELASTICSEARCH_URI}/_cat/indices?format=json`, {
         method: 'GET',
         headers: {
@@ -319,7 +319,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
-      let targetIndices = "filesearchdb.fs.chunks,fs_chunks_index";
+      let targetIndices = "*";
       
       if (indicesResponse.ok) {
         const indices = await indicesResponse.json();
@@ -330,58 +330,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (availableIndices) {
           targetIndices = availableIndices;
-          console.log(`Searching in indices: ${targetIndices}`);
         }
       }
 
-      // More flexible query that searches multiple possible field names
+      // Simple multi-match query
       const searchBody = {
         query: {
-          bool: {
-            should: [
-              // Search in common content fields
-              { match: { data: { query: query, fuzziness: "AUTO" } } },
-              { match: { content: { query: query, fuzziness: "AUTO" } } },
-              { match: { text: { query: query, fuzziness: "AUTO" } } },
-              { match: { body: { query: query, fuzziness: "AUTO" } } },
-              
-              // Search in filename/title fields with boost
-              { match: { filename: { query: query, boost: 2 } } },
-              { match: { fileName: { query: query, boost: 2 } } },
-              { match: { title: { query: query, boost: 2 } } },
-              { match: { name: { query: query, boost: 2 } } },
-              
-              // Wildcard searches for partial matches
-              { wildcard: { data: `*${query.toLowerCase()}*` } },
-              { wildcard: { content: `*${query.toLowerCase()}*` } },
-              { wildcard: { filename: `*${query.toLowerCase()}*` } },
-              { wildcard: { fileName: `*${query.toLowerCase()}*` } },
-              
-              // Multi-match query across all fields
-              {
-                multi_match: {
-                  query: query,
-                  type: "best_fields",
-                  fields: ["*"],
-                  fuzziness: "AUTO"
-                }
-              }
-            ],
-            minimum_should_match: 1
+          multi_match: {
+            query: query,
+            fields: ["*"]
           }
         },
-        size: 100,
-        sort: [
-          { "_score": { "order": "desc" } }
-        ],
-        highlight: {
-          fields: {
-            "*": {
-              fragment_size: 200,
-              number_of_fragments: 3
-            }
-          }
-        }
+        size: 100
       };
 
       // Make request to Elasticsearch
@@ -400,31 +360,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const elasticsearchData = await elasticsearchResponse.json();
-      console.log(`Elasticsearch returned ${elasticsearchData.hits?.total?.value || 0} results`);
       
-      // Transform Elasticsearch results for frontend
+      // Transform results
       const results = elasticsearchData.hits?.hits?.map((hit: any) => {
         const source = hit._source;
         
-        // Extract content from various possible fields
-        const content = source.data || source.content || source.text || source.body || 'No content available';
-        const filename = source.filename || source.fileName || source.title || source.name || hit._id;
-        
         return {
           id: hit._id,
-          source: filename,
-          timestamp: source.uploadDate || source.timestamp || source.created || new Date().toISOString(),
-          content: typeof content === 'string' ? 
-            (content.length > 500 ? content.substring(0, 500) + '...' : content) : 
-            'Binary or structured data',
-          title: filename,
-          url: source.url || filename,
-          score: hit._score?.toFixed(2),
-          highlight: hit.highlight,
-          index: hit._index,
-          collection: source.collection || hit._index,
-          folder: source.folder || source.folderName || 'Unknown',
-          fileName: source.fileName || filename
+          source: hit._index,
+          content: JSON.stringify(source),
+          score: hit._score,
+          index: hit._index
         };
       }) || [];
 
@@ -432,21 +378,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true,
         results: results,
         total: elasticsearchData.hits?.total?.value || 0,
-        query: query,
-        searchedIndices: targetIndices
+        query: query
       });
 
     } catch (error) {
       console.error("Dark web search error:", error);
-      
-      // Check if it's a connection error to Elasticsearch
-      if (error.message && (error.message.includes('fetch') || error.message.includes('ECONNREFUSED'))) {
-        return res.status(503).json({ 
-          error: "Unable to connect to Elasticsearch service",
-          details: "Please verify Elasticsearch is running at " + ELASTICSEARCH_URI
-        });
-      }
-      
       res.status(500).json({ 
         error: "Dark web search failed",
         details: error instanceof Error ? error.message : 'Unknown error'
