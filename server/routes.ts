@@ -334,36 +334,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // More flexible query that searches multiple possible field names
+      // Improved query that prioritizes exact matches and uses better scoring
       const searchBody = {
         query: {
           bool: {
             should: [
-              // Search in common content fields
-              { match: { data: { query: query, fuzziness: "AUTO" } } },
-              { match: { content: { query: query, fuzziness: "AUTO" } } },
-              { match: { text: { query: query, fuzziness: "AUTO" } } },
-              { match: { body: { query: query, fuzziness: "AUTO" } } },
+              // Exact phrase matches with highest boost
+              { match_phrase: { data: { query: query, boost: 10 } } },
+              { match_phrase: { content: { query: query, boost: 10 } } },
+              { match_phrase: { text: { query: query, boost: 10 } } },
+              { match_phrase: { body: { query: query, boost: 10 } } },
               
-              // Search in filename/title fields with boost
-              { match: { filename: { query: query, boost: 2 } } },
-              { match: { fileName: { query: query, boost: 2 } } },
-              { match: { title: { query: query, boost: 2 } } },
-              { match: { name: { query: query, boost: 2 } } },
+              // Exact matches in filename/title fields with high boost
+              { match_phrase: { filename: { query: query, boost: 8 } } },
+              { match_phrase: { fileName: { query: query, boost: 8 } } },
+              { match_phrase: { title: { query: query, boost: 8 } } },
+              { match_phrase: { name: { query: query, boost: 8 } } },
               
-              // Wildcard searches for partial matches
-              { wildcard: { data: `*${query.toLowerCase()}*` } },
-              { wildcard: { content: `*${query.toLowerCase()}*` } },
-              { wildcard: { filename: `*${query.toLowerCase()}*` } },
-              { wildcard: { fileName: `*${query.toLowerCase()}*` } },
+              // Regular matches with medium boost
+              { match: { data: { query: query, boost: 5 } } },
+              { match: { content: { query: query, boost: 5 } } },
+              { match: { text: { query: query, boost: 5 } } },
+              { match: { body: { query: query, boost: 5 } } },
               
-              // Multi-match query across all fields
+              // Filename matches with medium boost
+              { match: { filename: { query: query, boost: 3 } } },
+              { match: { fileName: { query: query, boost: 3 } } },
+              { match: { title: { query: query, boost: 3 } } },
+              { match: { name: { query: query, boost: 3 } } },
+              
+              // Wildcard searches for partial matches (lower boost)
+              { wildcard: { data: { value: `*${query.toLowerCase()}*`, boost: 2 } } },
+              { wildcard: { content: { value: `*${query.toLowerCase()}*`, boost: 2 } } },
+              { wildcard: { filename: { value: `*${query.toLowerCase()}*`, boost: 2 } } },
+              { wildcard: { fileName: { value: `*${query.toLowerCase()}*`, boost: 2 } } },
+              
+              // Fuzzy search as fallback (lowest boost)
               {
                 multi_match: {
                   query: query,
                   type: "best_fields",
-                  fields: ["*"],
-                  fuzziness: "AUTO"
+                  fields: ["data", "content", "text", "body", "filename", "fileName", "title", "name"],
+                  fuzziness: "AUTO",
+                  boost: 1
                 }
               }
             ],
@@ -376,11 +389,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ],
         highlight: {
           fields: {
-            "*": {
-              fragment_size: 200,
-              number_of_fragments: 3
-            }
+            "data": { fragment_size: 200, number_of_fragments: 3 },
+            "content": { fragment_size: 200, number_of_fragments: 3 },
+            "text": { fragment_size: 200, number_of_fragments: 3 },
+            "body": { fragment_size: 200, number_of_fragments: 3 },
+            "filename": { fragment_size: 50, number_of_fragments: 1 },
+            "fileName": { fragment_size: 50, number_of_fragments: 1 }
           }
+        },
+        _source: {
+          includes: ["data", "content", "text", "body", "filename", "fileName", "title", "name", "uploadDate", "timestamp", "created", "url", "collection", "folder", "folderName"]
         }
       };
 
@@ -402,21 +420,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const elasticsearchData = await elasticsearchResponse.json();
       console.log(`Elasticsearch returned ${elasticsearchData.hits?.total?.value || 0} results`);
       
-      // Transform Elasticsearch results for frontend
-      const results = elasticsearchData.hits?.hits?.map((hit: any) => {
+      // Transform Elasticsearch results for frontend and filter for relevance
+      const results = elasticsearchData.hits?.hits?.filter((hit: any) => {
+        const source = hit._source;
+        const content = source.data || source.content || source.text || source.body || '';
+        const filename = source.filename || source.fileName || source.title || source.name || '';
+        
+        // Only include results that actually contain the search term
+        const searchTerm = query.toLowerCase();
+        const contentMatch = typeof content === 'string' && content.toLowerCase().includes(searchTerm);
+        const filenameMatch = typeof filename === 'string' && filename.toLowerCase().includes(searchTerm);
+        
+        return contentMatch || filenameMatch;
+      }).map((hit: any) => {
         const source = hit._source;
         
         // Extract content from various possible fields
         const content = source.data || source.content || source.text || source.body || 'No content available';
         const filename = source.filename || source.fileName || source.title || source.name || hit._id;
         
+        // Extract and highlight the relevant portion of content
+        let displayContent = '';
+        if (typeof content === 'string') {
+          const searchTerm = query.toLowerCase();
+          const contentLower = content.toLowerCase();
+          const matchIndex = contentLower.indexOf(searchTerm);
+          
+          if (matchIndex !== -1) {
+            // Extract context around the match
+            const start = Math.max(0, matchIndex - 100);
+            const end = Math.min(content.length, matchIndex + query.length + 100);
+            displayContent = (start > 0 ? '...' : '') + 
+                            content.substring(start, end) + 
+                            (end < content.length ? '...' : '');
+          } else {
+            displayContent = content.length > 300 ? content.substring(0, 300) + '...' : content;
+          }
+        } else {
+          displayContent = 'Binary or structured data';
+        }
+        
         return {
           id: hit._id,
           source: filename,
           timestamp: source.uploadDate || source.timestamp || source.created || new Date().toISOString(),
-          content: typeof content === 'string' ? 
-            (content.length > 500 ? content.substring(0, 500) + '...' : content) : 
-            'Binary or structured data',
+          content: displayContent,
           title: filename,
           url: source.url || filename,
           score: hit._score?.toFixed(2),
