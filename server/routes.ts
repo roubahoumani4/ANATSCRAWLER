@@ -334,49 +334,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Improved query that prioritizes exact matches and uses better scoring
+      // More flexible query that searches multiple possible field names
       const searchBody = {
         query: {
           bool: {
             should: [
-              // Exact phrase matches with highest boost
-              { match_phrase: { data: { query: query, boost: 10 } } },
-              { match_phrase: { content: { query: query, boost: 10 } } },
-              { match_phrase: { text: { query: query, boost: 10 } } },
-              { match_phrase: { body: { query: query, boost: 10 } } },
+              // Search in common content fields
+              { match: { data: { query: query, fuzziness: "AUTO" } } },
+              { match: { content: { query: query, fuzziness: "AUTO" } } },
+              { match: { text: { query: query, fuzziness: "AUTO" } } },
+              { match: { body: { query: query, fuzziness: "AUTO" } } },
               
-              // Exact matches in filename/title fields with high boost
-              { match_phrase: { filename: { query: query, boost: 8 } } },
-              { match_phrase: { fileName: { query: query, boost: 8 } } },
-              { match_phrase: { title: { query: query, boost: 8 } } },
-              { match_phrase: { name: { query: query, boost: 8 } } },
+              // Search in filename/title fields with boost
+              { match: { filename: { query: query, boost: 2 } } },
+              { match: { fileName: { query: query, boost: 2 } } },
+              { match: { title: { query: query, boost: 2 } } },
+              { match: { name: { query: query, boost: 2 } } },
               
-              // Regular matches with medium boost
-              { match: { data: { query: query, boost: 5 } } },
-              { match: { content: { query: query, boost: 5 } } },
-              { match: { text: { query: query, boost: 5 } } },
-              { match: { body: { query: query, boost: 5 } } },
+              // Wildcard searches for partial matches
+              { wildcard: { data: `*${query.toLowerCase()}*` } },
+              { wildcard: { content: `*${query.toLowerCase()}*` } },
+              { wildcard: { filename: `*${query.toLowerCase()}*` } },
+              { wildcard: { fileName: `*${query.toLowerCase()}*` } },
               
-              // Filename matches with medium boost
-              { match: { filename: { query: query, boost: 3 } } },
-              { match: { fileName: { query: query, boost: 3 } } },
-              { match: { title: { query: query, boost: 3 } } },
-              { match: { name: { query: query, boost: 3 } } },
-              
-              // Wildcard searches for partial matches (lower boost)
-              { wildcard: { data: { value: `*${query.toLowerCase()}*`, boost: 2 } } },
-              { wildcard: { content: { value: `*${query.toLowerCase()}*`, boost: 2 } } },
-              { wildcard: { filename: { value: `*${query.toLowerCase()}*`, boost: 2 } } },
-              { wildcard: { fileName: { value: `*${query.toLowerCase()}*`, boost: 2 } } },
-              
-              // Fuzzy search as fallback (lowest boost)
+              // Multi-match query across all fields
               {
                 multi_match: {
                   query: query,
                   type: "best_fields",
-                  fields: ["data", "content", "text", "body", "filename", "fileName", "title", "name"],
-                  fuzziness: "AUTO",
-                  boost: 1
+                  fields: ["*"],
+                  fuzziness: "AUTO"
                 }
               }
             ],
@@ -389,16 +376,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ],
         highlight: {
           fields: {
-            "data": { fragment_size: 200, number_of_fragments: 3 },
-            "content": { fragment_size: 200, number_of_fragments: 3 },
-            "text": { fragment_size: 200, number_of_fragments: 3 },
-            "body": { fragment_size: 200, number_of_fragments: 3 },
-            "filename": { fragment_size: 50, number_of_fragments: 1 },
-            "fileName": { fragment_size: 50, number_of_fragments: 1 }
+            "*": {
+              fragment_size: 200,
+              number_of_fragments: 3
+            }
           }
-        },
-        _source: {
-          includes: ["data", "content", "text", "body", "filename", "fileName", "title", "name", "uploadDate", "timestamp", "created", "url", "collection", "folder", "folderName"]
         }
       };
 
@@ -420,107 +402,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const elasticsearchData = await elasticsearchResponse.json();
       console.log(`Elasticsearch returned ${elasticsearchData.hits?.total?.value || 0} results`);
       
-      // Transform Elasticsearch results for frontend - keep all results from Elasticsearch
+      // Transform Elasticsearch results for frontend
       const results = elasticsearchData.hits?.hits?.map((hit: any) => {
         const source = hit._source;
         
         // Extract content from various possible fields
-        const rawContent = source.data || source.content || source.text || source.body || 'No content available';
+        const content = source.data || source.content || source.text || source.body || 'No content available';
         const filename = source.filename || source.fileName || source.title || source.name || hit._id;
-        
-        // Enhanced data parsing for structured information
-        const parseStructuredData = (content: string) => {
-          if (typeof content !== 'string') return { content, parsedData: null };
-          
-          // Try to parse comma-separated values (like the Facebook data format)
-          const commaSeparatedPattern = /^[^,]*,([^,]*),([^,]*),([^,]*),([^,]*),([^,]*),([^,]*),([^,]*),([^,]*),(.*)$/;
-          const match = content.match(commaSeparatedPattern);
-          
-          if (match) {
-            const [, phone, firstName, lastName, , , gender, , location] = match;
-            return {
-              content,
-              parsedData: {
-                name: `${firstName?.trim() || ''} ${lastName?.trim() || ''}`.trim(),
-                phone: phone?.trim() || '',
-                location: location?.trim() || '',
-                gender: gender?.trim() || '',
-                type: 'structured'
-              }
-            };
-          }
-          
-          // Try to extract phone numbers and names from text
-          const phonePattern = /\+?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}/g;
-          const phones = content.match(phonePattern) || [];
-          
-          // Try to extract names (basic pattern matching)
-          const namePattern = /\b([A-Z][a-z]+)\s+([A-Z][a-z]+)\b/g;
-          const nameMatches = Array.from(content.matchAll(namePattern));
-          
-          if (phones.length > 0 || nameMatches.length > 0) {
-            return {
-              content,
-              parsedData: {
-                name: nameMatches.length > 0 ? `${nameMatches[0][1]} ${nameMatches[0][2]}` : '',
-                phone: phones[0] || '',
-                location: '', // Could be enhanced with location extraction
-                gender: '',
-                type: 'extracted'
-              }
-            };
-          }
-          
-          return { content, parsedData: null };
-        };
-        
-        const { content: processedContent, parsedData } = parseStructuredData(rawContent);
-        
-        // Create display content
-        let displayContent = '';
-        if (parsedData && parsedData.type === 'structured') {
-          // Format structured data nicely
-          const parts = [];
-          if (parsedData.name) parts.push(`Name: ${parsedData.name}`);
-          if (parsedData.phone) parts.push(`Phone: ${parsedData.phone}`);
-          if (parsedData.location) parts.push(`Location: ${parsedData.location}`);
-          if (parsedData.gender) parts.push(`Gender: ${parsedData.gender}`);
-          displayContent = parts.join(' | ');
-        } else if (parsedData && parsedData.type === 'extracted') {
-          // Format extracted data
-          const parts = [];
-          if (parsedData.name) parts.push(`Name: ${parsedData.name}`);
-          if (parsedData.phone) parts.push(`Phone: ${parsedData.phone}`);
-          displayContent = parts.length > 0 ? parts.join(' | ') : processedContent;
-        } else {
-          // Regular content processing
-          if (typeof processedContent === 'string') {
-            const searchTerm = query.toLowerCase();
-            const contentLower = processedContent.toLowerCase();
-            const matchIndex = contentLower.indexOf(searchTerm);
-            
-            if (matchIndex !== -1) {
-              // Extract context around the match
-              const start = Math.max(0, matchIndex - 100);
-              const end = Math.min(processedContent.length, matchIndex + query.length + 100);
-              displayContent = (start > 0 ? '...' : '') + 
-                              processedContent.substring(start, end) + 
-                              (end < processedContent.length ? '...' : '');
-            } else {
-              displayContent = processedContent.length > 300 ? processedContent.substring(0, 300) + '...' : processedContent;
-            }
-          } else {
-            displayContent = 'Binary or structured data';
-          }
-        }
         
         return {
           id: hit._id,
           source: filename,
           timestamp: source.uploadDate || source.timestamp || source.created || new Date().toISOString(),
-          content: displayContent,
-          rawContent: rawContent,
-          parsedData: parsedData,
+          content: typeof content === 'string' ? 
+            (content.length > 500 ? content.substring(0, 500) + '...' : content) : 
+            'Binary or structured data',
           title: filename,
           url: source.url || filename,
           score: hit._score?.toFixed(2),
