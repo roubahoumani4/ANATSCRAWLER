@@ -1,0 +1,264 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Base colors - Light Theme */
+  --background: 0 0% 100%;
+  --foreground: 240 10% 3.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 240 10% 3.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 10% 3.9%;
+  --primary: 240 5.9% 10%;
+  --primary-foreground: 0 0% 98%;
+  --secondary: 240 4.8% 95.9%;
+  --secondary-foreground: 240 5.9% 10%;
+  --muted: 240 4.8% 95.9%;
+  --muted-foreground: 240 5% 64.9%;
+  --accent: 240 4.8% 95.9%;
+  --accent-foreground: 240 5.9% 10%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 240 5.9% 90%;
+  --input: 240 5.9% 90%;
+  --ring: 240 5.9% 10%;
+  --radius: 0.5rem;
+  
+  /* Custom ANAT Security Colors - Light Theme */
+  --jetBlack: 0 0% 100%;
+  --coolWhite: 0 0% 4%;
+  --crimsonRed: 0 100% 65%;
+  --darkGray: 0 0% 95%;
+  --midGray: 0 0% 80%;
+  --lightGray: 0 0% 90%;
+}
+
+.dark {
+  /* Base colors - Dark Theme */
+  --background: 240 10% 3.9%;
+  --foreground: 0 0% 98%;
+  --card: 240 10% 3.9%;
+  --card-foreground: 0 0% 98%;
+  --popover: 240 10% 3.9%;
+  --popover-foreground: 0 0% 98%;
+  --primary: 0 0% 98%;
+  --primary-foreground: 240 5.9% 10%;
+  --secondary: 240 3.7% 15.9%;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 240 3.7% 15.9%;
+  --muted-foreground: 240 5% 64.9%;
+  --accent: 240 3.7% 15.9%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 240 3.7% 15.9%;
+  --input: 240 3.7% 15.9%;
+  --ring: 240 4.9% 83.9%;
+  
+  /* Custom ANAT Security Colors - Dark Theme */
+  --jetBlack: 0 0% 4%;
+  --coolWhite: 0 0% 100%;
+  --crimsonRed: 0 100% 65%;
+  --darkGray: 0 0% 11%;
+  --midGray: 0 0% 20%;
+  --lightGray: 0 0% 90%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+/* Custom utility classes */
+.bg-jetBlack {
+  background-color: hsl(var(--jetBlack));
+}
+
+.text-coolWhite {
+  color: hsl(var(--coolWhite));
+}
+
+.text-crimsonRed {
+  color: hsl(var(--crimsonRed));
+}
+
+.bg-coolWhite {
+  background-color: hsl(var(--coolWhite));
+}
+
+.bg-crimsonRed {
+  background-color: hsl(var(--crimsonRed));
+}
+
+.bg-darkGray {
+  background-color: hsl(var(--darkGray));
+}
+
+.border-coolWhite {
+  border-color: hsl(var(--coolWhite));
+}
+
+.border-crimsonRed {
+  border-color: hsl(var(--crimsonRed));
+}
+
+.hover\:bg-crimsonRed:hover {
+  background-color: hsl(var(--crimsonRed));
+}
+
+.hover\:text-coolWhite:hover {
+  color: hsl(var(--coolWhite));
+}
+
+.hover\:border-crimsonRed:hover {
+  border-color: hsl(var(--crimsonRed));
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+.animate-slideUp {
+  animation: slideUp 0.5s ease-out forwards;
+}
+
+.animate-slideDown {
+  animation: slideDown 0.5s ease-out forwards;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Table Styles */
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.results-table th,
+.results-table td {
+  padding: 0.75rem;
+  border: 1px solid hsl(var(--coolWhite));
+}
+
+.results-table th {
+  background-color: hsl(var(--darkGray));
+  text-align: left;
+}
+
+.results-table tr:hover {
+  background-color: hsl(var(--crimsonRed));
+  color: hsl(var(--coolWhite));
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Form Styles */
+.form-input {
+  width: 100%;
+  padding: 0.5rem;
+  background-color: hsl(var(--jetBlack));
+  color: hsl(var(--coolWhite));
+  border: 1px solid hsl(var(--coolWhite));
+  border-radius: 0.25rem;
+}
+
+.form-select {
+  width: 100%;
+  padding: 0.5rem;
+  background-color: hsl(var(--jetBlack));
+  color: hsl(var(--coolWhite));
+  border: 1px solid hsl(var(--coolWhite));
+  border-radius: 0.25rem;
+}
+
+.form-button {
+  padding: 0.5rem 1rem;
+  background-color: hsl(var(--coolWhite));
+  color: hsl(var(--jetBlack));
+  border: none;
+  border-radius: 0.25rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.form-button:hover {
+  background-color: hsl(var(--crimsonRed));
+  color: hsl(var(--coolWhite));
+}
+
+/* Toggle Switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 24px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: hsl(var(--coolWhite));
+  border-radius: 24px;
+  transition: 0.4s;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: hsl(var(--jetBlack));
+  border-radius: 50%;
+  transition: 0.4s;
+}
+
+input:checked + .toggle-slider {
+  background-color: hsl(var(--crimsonRed));
+}
+
+input:checked + .toggle-slider:before {
+  transform: translateX(26px);
+}
