@@ -420,44 +420,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const elasticsearchData = await elasticsearchResponse.json();
       console.log(`Elasticsearch returned ${elasticsearchData.hits?.total?.value || 0} results`);
       
-      // Transform Elasticsearch results for frontend and filter for relevance
-      const results = elasticsearchData.hits?.hits?.filter((hit: any) => {
-        const source = hit._source;
-        const content = source.data || source.content || source.text || source.body || '';
-        const filename = source.filename || source.fileName || source.title || source.name || '';
-        
-        // Only include results that actually contain the search term
-        const searchTerm = query.toLowerCase();
-        const contentMatch = typeof content === 'string' && content.toLowerCase().includes(searchTerm);
-        const filenameMatch = typeof filename === 'string' && filename.toLowerCase().includes(searchTerm);
-        
-        return contentMatch || filenameMatch;
-      }).map((hit: any) => {
+      // Transform Elasticsearch results for frontend - keep all results from Elasticsearch
+      const results = elasticsearchData.hits?.hits?.map((hit: any) => {
         const source = hit._source;
         
         // Extract content from various possible fields
-        const content = source.data || source.content || source.text || source.body || 'No content available';
+        const rawContent = source.data || source.content || source.text || source.body || 'No content available';
         const filename = source.filename || source.fileName || source.title || source.name || hit._id;
         
-        // Extract and highlight the relevant portion of content
-        let displayContent = '';
-        if (typeof content === 'string') {
-          const searchTerm = query.toLowerCase();
-          const contentLower = content.toLowerCase();
-          const matchIndex = contentLower.indexOf(searchTerm);
+        // Enhanced data parsing for structured information
+        const parseStructuredData = (content: string) => {
+          if (typeof content !== 'string') return { content, parsedData: null };
           
-          if (matchIndex !== -1) {
-            // Extract context around the match
-            const start = Math.max(0, matchIndex - 100);
-            const end = Math.min(content.length, matchIndex + query.length + 100);
-            displayContent = (start > 0 ? '...' : '') + 
-                            content.substring(start, end) + 
-                            (end < content.length ? '...' : '');
-          } else {
-            displayContent = content.length > 300 ? content.substring(0, 300) + '...' : content;
+          // Try to parse comma-separated values (like the Facebook data format)
+          const commaSeparatedPattern = /^[^,]*,([^,]*),([^,]*),([^,]*),([^,]*),([^,]*),([^,]*),([^,]*),([^,]*),(.*)$/;
+          const match = content.match(commaSeparatedPattern);
+          
+          if (match) {
+            const [, phone, firstName, lastName, , , gender, , location] = match;
+            return {
+              content,
+              parsedData: {
+                name: `${firstName?.trim() || ''} ${lastName?.trim() || ''}`.trim(),
+                phone: phone?.trim() || '',
+                location: location?.trim() || '',
+                gender: gender?.trim() || '',
+                type: 'structured'
+              }
+            };
           }
+          
+          // Try to extract phone numbers and names from text
+          const phonePattern = /\+?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}/g;
+          const phones = content.match(phonePattern) || [];
+          
+          // Try to extract names (basic pattern matching)
+          const namePattern = /\b([A-Z][a-z]+)\s+([A-Z][a-z]+)\b/g;
+          const nameMatches = Array.from(content.matchAll(namePattern));
+          
+          if (phones.length > 0 || nameMatches.length > 0) {
+            return {
+              content,
+              parsedData: {
+                name: nameMatches.length > 0 ? `${nameMatches[0][1]} ${nameMatches[0][2]}` : '',
+                phone: phones[0] || '',
+                location: '', // Could be enhanced with location extraction
+                gender: '',
+                type: 'extracted'
+              }
+            };
+          }
+          
+          return { content, parsedData: null };
+        };
+        
+        const { content: processedContent, parsedData } = parseStructuredData(rawContent);
+        
+        // Create display content
+        let displayContent = '';
+        if (parsedData && parsedData.type === 'structured') {
+          // Format structured data nicely
+          const parts = [];
+          if (parsedData.name) parts.push(`Name: ${parsedData.name}`);
+          if (parsedData.phone) parts.push(`Phone: ${parsedData.phone}`);
+          if (parsedData.location) parts.push(`Location: ${parsedData.location}`);
+          if (parsedData.gender) parts.push(`Gender: ${parsedData.gender}`);
+          displayContent = parts.join(' | ');
+        } else if (parsedData && parsedData.type === 'extracted') {
+          // Format extracted data
+          const parts = [];
+          if (parsedData.name) parts.push(`Name: ${parsedData.name}`);
+          if (parsedData.phone) parts.push(`Phone: ${parsedData.phone}`);
+          displayContent = parts.length > 0 ? parts.join(' | ') : processedContent;
         } else {
-          displayContent = 'Binary or structured data';
+          // Regular content processing
+          if (typeof processedContent === 'string') {
+            const searchTerm = query.toLowerCase();
+            const contentLower = processedContent.toLowerCase();
+            const matchIndex = contentLower.indexOf(searchTerm);
+            
+            if (matchIndex !== -1) {
+              // Extract context around the match
+              const start = Math.max(0, matchIndex - 100);
+              const end = Math.min(processedContent.length, matchIndex + query.length + 100);
+              displayContent = (start > 0 ? '...' : '') + 
+                              processedContent.substring(start, end) + 
+                              (end < processedContent.length ? '...' : '');
+            } else {
+              displayContent = processedContent.length > 300 ? processedContent.substring(0, 300) + '...' : processedContent;
+            }
+          } else {
+            displayContent = 'Binary or structured data';
+          }
         }
         
         return {
@@ -465,6 +519,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           source: filename,
           timestamp: source.uploadDate || source.timestamp || source.created || new Date().toISOString(),
           content: displayContent,
+          rawContent: rawContent,
+          parsedData: parsedData,
           title: filename,
           url: source.url || filename,
           score: hit._score?.toFixed(2),
