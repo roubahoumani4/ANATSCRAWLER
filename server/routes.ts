@@ -334,51 +334,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // More flexible query that searches multiple possible field names
+      // Enhanced query with exact match prioritization and tiered scoring
       const searchBody = {
         query: {
           bool: {
             should: [
-              // Search in common content fields
+              // Exact phrase matches (highest priority - 10x boost)
+              { match_phrase: { data: { query: query, boost: 10 } } },
+              { match_phrase: { content: { query: query, boost: 10 } } },
+              { match_phrase: { text: { query: query, boost: 10 } } },
+              { match_phrase: { body: { query: query, boost: 10 } } },
+              { match_phrase: { filename: { query: query, boost: 15 } } },
+              { match_phrase: { fileName: { query: query, boost: 15 } } },
+              { match_phrase: { title: { query: query, boost: 15 } } },
+              { match_phrase: { name: { query: query, boost: 15 } } },
+              
+              // Regular matches (high priority - 5x boost)
+              { match: { data: { query: query, boost: 5 } } },
+              { match: { content: { query: query, boost: 5 } } },
+              { match: { text: { query: query, boost: 5 } } },
+              { match: { body: { query: query, boost: 5 } } },
+              { match: { filename: { query: query, boost: 8 } } },
+              { match: { fileName: { query: query, boost: 8 } } },
+              { match: { title: { query: query, boost: 8 } } },
+              { match: { name: { query: query, boost: 8 } } },
+              
+              // Wildcard searches (medium priority - 2x boost)
+              { wildcard: { data: { value: `*${query.toLowerCase()}*`, boost: 2 } } },
+              { wildcard: { content: { value: `*${query.toLowerCase()}*`, boost: 2 } } },
+              { wildcard: { text: { value: `*${query.toLowerCase()}*`, boost: 2 } } },
+              { wildcard: { body: { value: `*${query.toLowerCase()}*`, boost: 2 } } },
+              { wildcard: { filename: { value: `*${query.toLowerCase()}*`, boost: 3 } } },
+              { wildcard: { fileName: { value: `*${query.toLowerCase()}*`, boost: 3 } } },
+              { wildcard: { title: { value: `*${query.toLowerCase()}*`, boost: 3 } } },
+              { wildcard: { name: { value: `*${query.toLowerCase()}*`, boost: 3 } } },
+              
+              // Fuzzy matches (lowest priority - no boost)
               { match: { data: { query: query, fuzziness: "AUTO" } } },
               { match: { content: { query: query, fuzziness: "AUTO" } } },
               { match: { text: { query: query, fuzziness: "AUTO" } } },
               { match: { body: { query: query, fuzziness: "AUTO" } } },
-              
-              // Search in filename/title fields with boost
-              { match: { filename: { query: query, boost: 2 } } },
-              { match: { fileName: { query: query, boost: 2 } } },
-              { match: { title: { query: query, boost: 2 } } },
-              { match: { name: { query: query, boost: 2 } } },
-              
-              // Wildcard searches for partial matches
-              { wildcard: { data: `*${query.toLowerCase()}*` } },
-              { wildcard: { content: `*${query.toLowerCase()}*` } },
-              { wildcard: { filename: `*${query.toLowerCase()}*` } },
-              { wildcard: { fileName: `*${query.toLowerCase()}*` } },
-              
-              // Multi-match query across all fields
+              { match: { filename: { query: query, fuzziness: "AUTO" } } },
+              { match: { fileName: { query: query, fuzziness: "AUTO" } } },
+              { match: { title: { query: query, fuzziness: "AUTO" } } },
+              { match: { name: { query: query, fuzziness: "AUTO" } } }
+            ],
+            minimum_should_match: 1,
+            // Filter to only return results that actually contain the search term
+            filter: [
               {
-                multi_match: {
-                  query: query,
-                  type: "best_fields",
-                  fields: ["*"],
-                  fuzziness: "AUTO"
+                bool: {
+                  should: [
+                    { wildcard: { data: `*${query.toLowerCase()}*` } },
+                    { wildcard: { content: `*${query.toLowerCase()}*` } },
+                    { wildcard: { text: `*${query.toLowerCase()}*` } },
+                    { wildcard: { body: `*${query.toLowerCase()}*` } },
+                    { wildcard: { filename: `*${query.toLowerCase()}*` } },
+                    { wildcard: { fileName: `*${query.toLowerCase()}*` } },
+                    { wildcard: { title: `*${query.toLowerCase()}*` } },
+                    { wildcard: { name: `*${query.toLowerCase()}*` } }
+                  ],
+                  minimum_should_match: 1
                 }
               }
-            ],
-            minimum_should_match: 1
+            ]
           }
         },
+        _source: ["data", "content", "text", "body", "filename", "fileName", "title", "name", "url", "uploadDate", "timestamp", "created", "collection", "folder", "folderName"],
         size: 100,
         sort: [
           { "_score": { "order": "desc" } }
         ],
         highlight: {
           fields: {
-            "*": {
-              fragment_size: 200,
-              number_of_fragments: 3
+            "data": {
+              fragment_size: 300,
+              number_of_fragments: 2,
+              pre_tags: ["<mark>"],
+              post_tags: ["</mark>"]
+            },
+            "content": {
+              fragment_size: 300,
+              number_of_fragments: 2,
+              pre_tags: ["<mark>"],
+              post_tags: ["</mark>"]
+            },
+            "text": {
+              fragment_size: 300,
+              number_of_fragments: 2,
+              pre_tags: ["<mark>"],
+              post_tags: ["</mark>"]
+            },
+            "body": {
+              fragment_size: 300,
+              number_of_fragments: 2,
+              pre_tags: ["<mark>"],
+              post_tags: ["</mark>"]
+            },
+            "filename": {
+              fragment_size: 100,
+              number_of_fragments: 1,
+              pre_tags: ["<mark>"],
+              post_tags: ["</mark>"]
+            },
+            "fileName": {
+              fragment_size: 100,
+              number_of_fragments: 1,
+              pre_tags: ["<mark>"],
+              post_tags: ["</mark>"]
             }
           }
         }
@@ -402,21 +465,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const elasticsearchData = await elasticsearchResponse.json();
       console.log(`Elasticsearch returned ${elasticsearchData.hits?.total?.value || 0} results`);
       
-      // Transform Elasticsearch results for frontend
+      // Transform Elasticsearch results with enhanced context extraction
       const results = elasticsearchData.hits?.hits?.map((hit: any) => {
         const source = hit._source;
         
         // Extract content from various possible fields
-        const content = source.data || source.content || source.text || source.body || 'No content available';
+        const rawContent = source.data || source.content || source.text || source.body || '';
         const filename = source.filename || source.fileName || source.title || source.name || hit._id;
+        
+        // Extract context around the search term
+        let displayContent = 'No content available';
+        let contextSnippet = '';
+        
+        if (typeof rawContent === 'string' && rawContent.length > 0) {
+          // First, try to use highlighted content if available
+          if (hit.highlight) {
+            const highlights = Object.values(hit.highlight).flat().join(' ... ');
+            if (highlights.length > 0) {
+              contextSnippet = highlights;
+            }
+          }
+          
+          // If no highlights, extract context manually
+          if (!contextSnippet) {
+            const lowerContent = rawContent.toLowerCase();
+            const lowerQuery = query.toLowerCase();
+            const queryIndex = lowerContent.indexOf(lowerQuery);
+            
+            if (queryIndex !== -1) {
+              // Extract 200 characters before and after the match
+              const start = Math.max(0, queryIndex - 200);
+              const end = Math.min(rawContent.length, queryIndex + query.length + 200);
+              contextSnippet = rawContent.substring(start, end);
+              
+              // Add ellipsis if we're not at the beginning/end
+              if (start > 0) contextSnippet = '...' + contextSnippet;
+              if (end < rawContent.length) contextSnippet = contextSnippet + '...';
+              
+              // Highlight the search term
+              const regex = new RegExp(`(${query})`, 'gi');
+              contextSnippet = contextSnippet.replace(regex, '<mark>$1</mark>');
+            } else {
+              // Fallback to first 500 characters
+              contextSnippet = rawContent.length > 500 ? rawContent.substring(0, 500) + '...' : rawContent;
+            }
+          }
+          
+          displayContent = contextSnippet || (rawContent.length > 500 ? rawContent.substring(0, 500) + '...' : rawContent);
+        }
         
         return {
           id: hit._id,
           source: filename,
           timestamp: source.uploadDate || source.timestamp || source.created || new Date().toISOString(),
-          content: typeof content === 'string' ? 
-            (content.length > 500 ? content.substring(0, 500) + '...' : content) : 
-            'Binary or structured data',
+          content: displayContent,
           title: filename,
           url: source.url || filename,
           score: hit._score?.toFixed(2),
@@ -424,7 +526,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           index: hit._index,
           collection: source.collection || hit._index,
           folder: source.folder || source.folderName || 'Unknown',
-          fileName: source.fileName || filename
+          fileName: source.fileName || filename,
+          matchedField: hit.highlight ? Object.keys(hit.highlight)[0] : 'content'
         };
       }) || [];
 
