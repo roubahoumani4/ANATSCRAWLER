@@ -447,117 +447,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const parseStructuredData = (content: string) => {
         if (!content || typeof content !== 'string') return null;
         
-        // Initialize parsed data object
-        let parsedData = {
-          id: '',
-          phone: '',
-          firstName: '',
-          lastName: '',
-          name: '',
-          gender: '',
-          locale: '',
-          location: '',
-          additionalLocation: '',
-          rawData: content
-        };
-        
-        // Method 1: Try to parse JSON-like structure
-        try {
-          if (content.includes('{') && content.includes('}')) {
-            // Handle JSON-like data
-            const jsonMatch = content.match(/\{[^}]+\}/);
-            if (jsonMatch) {
-              const jsonStr = jsonMatch[0];
-              const parsed = JSON.parse(jsonStr);
-              if (parsed.field1) parsedData.id = parsed.field1;
-              if (parsed.field2) parsedData.phone = parsed.field2;
-              // Add more field mappings as needed
-            }
-          }
-        } catch (e) {
-          // Continue with other parsing methods
-        }
-        
-        // Method 2: Try to parse comma-separated data
+        // Try to parse comma-separated data (like the example: ID,Phone,FirstName,LastName,etc.)
         const parts = content.split(',');
         if (parts.length >= 4) {
-          parsedData.id = parts[0]?.trim() || '';
-          parsedData.phone = parts[1]?.trim() || '';
-          parsedData.firstName = parts[2]?.trim() || '';
-          parsedData.lastName = parts[3]?.trim() || '';
-          if (parts.length > 6) parsedData.gender = parts[6]?.trim() || '';
-          if (parts.length > 7) parsedData.locale = parts[7]?.trim() || '';
-          if (parts.length > 8) parsedData.location = parts[8]?.trim() || '';
-          if (parts.length > 10) parsedData.additionalLocation = parts[10]?.trim() || '';
+          return {
+            id: parts[0]?.trim() || '',
+            phone: parts[1]?.trim() || '',
+            firstName: parts[2]?.trim() || '',
+            lastName: parts[3]?.trim() || '',
+            gender: parts[6]?.trim() || '',
+            locale: parts[7]?.trim() || '',
+            location: parts[8]?.trim() || '',
+            additionalLocation: parts[10]?.trim() || '',
+            rawData: content
+          };
         }
-        
-        // Method 3: Try to extract phone numbers using regex
-        if (!parsedData.phone) {
-          const phoneMatch = content.match(/(\+?[\d\s\-\(\)]{7,15})/);
-          if (phoneMatch) {
-            parsedData.phone = phoneMatch[1].trim();
-          }
-        }
-        
-        // Method 4: Try to extract names using common patterns
-        if (!parsedData.firstName && !parsedData.lastName) {
-          // Look for patterns like "Name: John Doe" or "john.doe"
-          const namePatterns = [
-            /name[:\s]*([a-zA-Z]+[\s]+[a-zA-Z]+)/i,
-            /([a-zA-Z]+)[\s]+([a-zA-Z]+)/,
-            /([a-zA-Z]+)\.([a-zA-Z]+)/
-          ];
-          
-          for (const pattern of namePatterns) {
-            const match = content.match(pattern);
-            if (match) {
-              parsedData.firstName = match[1]?.trim() || '';
-              parsedData.lastName = match[2]?.trim() || '';
-              break;
-            }
-          }
-        }
-        
-        // Method 5: Try to extract location information
-        if (!parsedData.location) {
-          const locationPatterns = [
-            /location[:\s]*([a-zA-Z\s,]+)/i,
-            /address[:\s]*([a-zA-Z\s,]+)/i,
-            /city[:\s]*([a-zA-Z\s]+)/i
-          ];
-          
-          for (const pattern of locationPatterns) {
-            const match = content.match(pattern);
-            if (match) {
-              parsedData.location = match[1]?.trim() || '';
-              break;
-            }
-          }
-        }
-        
-        // Method 6: Try to extract gender
-        if (!parsedData.gender) {
-          const genderMatch = content.match(/\b(male|female|m|f|man|woman)\b/i);
-          if (genderMatch) {
-            parsedData.gender = genderMatch[1].toLowerCase();
-          }
-        }
-        
-        // Combine first and last name into full name
-        if (parsedData.firstName || parsedData.lastName) {
-          parsedData.name = `${parsedData.firstName} ${parsedData.lastName}`.trim();
-        }
-        
-        // Return parsed data if we found at least some useful information
-        if (parsedData.phone || parsedData.name || parsedData.location || parsedData.id) {
-          return parsedData;
-        }
-        
         return null;
       };
 
-      // Transform Elasticsearch results for frontend - remove restrictive filtering since Elasticsearch already scored results
-      const results = elasticsearchData.hits?.hits?.map((hit: any) => {
+      // Transform Elasticsearch results for frontend and filter for relevance
+      const results = elasticsearchData.hits?.hits?.filter((hit: any) => {
+        const source = hit._source;
+        const content = source.data || source.content || source.text || source.body || '';
+        const filename = source.filename || source.fileName || source.title || source.name || '';
+        
+        // Check if any query word matches the content (more flexible matching)
+        const queryWords = query.toLowerCase().split(/\s+/).filter(word => word.length > 0);
+        const contentLower = typeof content === 'string' ? content.toLowerCase() : '';
+        const filenameLower = typeof filename === 'string' ? filename.toLowerCase() : '';
+        
+        const contentMatch = queryWords.some(word => contentLower.includes(word));
+        const filenameMatch = queryWords.some(word => filenameLower.includes(word));
+        
+        return contentMatch || filenameMatch;
+      }).map((hit: any) => {
         const source = hit._source;
         
         // Extract content from various possible fields
@@ -573,7 +496,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (structuredData) {
           // Format structured data nicely
           structuredInfo = {
-            name: structuredData.name || `${structuredData.firstName} ${structuredData.lastName}`.trim(),
+            name: `${structuredData.firstName} ${structuredData.lastName}`.trim(),
             phone: structuredData.phone,
             location: structuredData.location,
             additionalLocation: structuredData.additionalLocation,
@@ -582,20 +505,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             id: structuredData.id
           };
           
-          // Build display content with available information
-          const parts = [];
-          if (structuredInfo.name && structuredInfo.name !== ' ') parts.push(`Name: ${structuredInfo.name}`);
-          if (structuredInfo.phone) parts.push(`Phone: ${structuredInfo.phone}`);
-          if (structuredInfo.location) parts.push(`Location: ${structuredInfo.location}`);
-          if (structuredInfo.gender) parts.push(`Gender: ${structuredInfo.gender}`);
-          if (structuredInfo.id) parts.push(`ID: ${structuredInfo.id}`);
-          
-          if (parts.length > 0) {
-            displayContent = parts.join(' | ');
-          } else {
-            // Fallback to showing raw content if no structured data could be parsed
-            displayContent = content.length > 200 ? content.substring(0, 200) + '...' : content;
-          }
+          displayContent = `Name: ${structuredInfo.name}${structuredInfo.phone ? ` | Phone: ${structuredInfo.phone}` : ''}${structuredInfo.location ? ` | Location: ${structuredInfo.location}` : ''}${structuredInfo.gender ? ` | Gender: ${structuredInfo.gender}` : ''}`;
         } else if (typeof content === 'string') {
           // Extract and highlight the relevant portion of content for non-structured data
           const queryWords = query.toLowerCase().split(/\s+/).filter(word => word.length > 0);
