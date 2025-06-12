@@ -465,22 +465,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return null;
       };
 
-      // Transform Elasticsearch results for frontend and filter for relevance
-      const results = elasticsearchData.hits?.hits?.filter((hit: any) => {
-        const source = hit._source;
-        const content = source.data || source.content || source.text || source.body || '';
-        const filename = source.filename || source.fileName || source.title || source.name || '';
-        
-        // Check if any query word matches the content (more flexible matching)
-        const queryWords = query.toLowerCase().split(/\s+/).filter(word => word.length > 0);
-        const contentLower = typeof content === 'string' ? content.toLowerCase() : '';
-        const filenameLower = typeof filename === 'string' ? filename.toLowerCase() : '';
-        
-        const contentMatch = queryWords.some(word => contentLower.includes(word));
-        const filenameMatch = queryWords.some(word => filenameLower.includes(word));
-        
-        return contentMatch || filenameMatch;
-      }).map((hit: any) => {
+      // Transform Elasticsearch results for frontend - remove restrictive filtering since Elasticsearch already scored results
+      const results = elasticsearchData.hits?.hits?.map((hit: any) => {
         const source = hit._source;
         
         // Extract content from various possible fields
