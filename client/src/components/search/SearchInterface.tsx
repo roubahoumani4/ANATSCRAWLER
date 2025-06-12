@@ -27,7 +27,7 @@ const SearchInterface = () => {
     queryKey: ['/api/search', searchQuery],
     queryFn: async () => {
       if (!searchQuery.trim()) return [];
-
+      
       const response = await apiRequest("GET", `/api/search?query=${encodeURIComponent(searchQuery)}`);
       return response.json();
     },
@@ -57,7 +57,7 @@ const SearchInterface = () => {
     try {
       await apiRequest("POST", "/api/export", { results: filteredResults });
       setIsExported(true);
-
+      
       // Download the Excel file
       window.location.href = "/api/download-excel";
     } catch (error) {
@@ -86,7 +86,7 @@ const SearchInterface = () => {
            language === "Spanish" ? "Búsqueda de datos" : 
            "Data Search"}
         </h1>
-
+        
         <form onSubmit={handleSearch} className="mb-6">
           <div className="relative">
             <input
@@ -104,7 +104,7 @@ const SearchInterface = () => {
               <Search className="h-5 w-5 text-gray-400" />
             </div>
           </div>
-
+          
           <div className="flex items-center justify-between mt-4">
             <button
               type="button"
@@ -123,7 +123,7 @@ const SearchInterface = () => {
                 <ChevronDown className="h-4 w-4 ml-1" />
               )}
             </button>
-
+            
             <button
               type="submit"
               disabled={!searchQuery.trim() || isLoading}
@@ -149,7 +149,7 @@ const SearchInterface = () => {
             </button>
           </div>
         </form>
-
+        
         <AnimatePresence>
           {isFiltersOpen && (
             <motion.div
@@ -181,7 +181,7 @@ const SearchInterface = () => {
                   ))}
                 </div>
               </div>
-
+              
               <div className="border-t border-gray-700 pt-4 pb-2 mt-4">
                 <h3 className="text-sm font-medium text-gray-300 mb-3">
                   {language === "French" ? "Période de temps" : 
@@ -217,7 +217,7 @@ const SearchInterface = () => {
                   </div>
                 </div>
               </div>
-
+              
               <div className="flex justify-end mt-4">
                 <button
                   type="button"
@@ -245,7 +245,7 @@ const SearchInterface = () => {
           )}
         </AnimatePresence>
       </motion.div>
-
+      
       {isError && (
         <motion.div 
           className="bg-red-900/30 border border-red-700 text-coolWhite p-4 rounded-lg mb-6"
@@ -266,7 +266,7 @@ const SearchInterface = () => {
           </p>
         </motion.div>
       )}
-
+      
       {searchQuery && !isLoading && !isError && (
         <motion.div
           variants={containerVariants}
@@ -282,7 +282,7 @@ const SearchInterface = () => {
                 ({filteredResults.length})
               </span>
             </h2>
-
+            
             {filteredResults.length > 0 && (
               <button
                 onClick={handleExport}
@@ -301,7 +301,7 @@ const SearchInterface = () => {
               </button>
             )}
           </div>
-
+          
           {filteredResults.length === 0 ? (
             <motion.div 
               className="bg-darkGray rounded-lg p-8 text-center"
@@ -323,91 +323,35 @@ const SearchInterface = () => {
             </motion.div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
-              {results.map((result, index) => (
-                <motion.div
-                  key={result.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  className="bg-gray-800 rounded-lg p-4 border border-gray-700 hover:border-blue-500 transition-colors"
+              {filteredResults.map((result: SearchResult) => (
+                <motion.div 
+                  key={result.id} 
+                  className="bg-darkGray rounded-lg overflow-hidden hover:shadow-lg transition-shadow duration-300"
+                  variants={itemVariants}
                 >
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="text-lg font-semibold text-white truncate">
-                      {result.title || result.fileName || 'Unknown'}
-                    </h3>
-                    <span className="text-xs text-gray-400 ml-2">
-                      Score: {result.score}
-                    </span>
-                  </div>
-
-                  {result.structuredInfo ? (
-                    <div className="space-y-2 mb-3">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                        {result.structuredInfo.name && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-blue-400 font-medium">Name:</span>
-                            <span className="text-white">{result.structuredInfo.name}</span>
-                          </div>
-                        )}
-                        {result.structuredInfo.phone && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-green-400 font-medium">Phone:</span>
-                            <span className="text-white">{result.structuredInfo.phone}</span>
-                          </div>
-                        )}
-                        {result.structuredInfo.location && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-purple-400 font-medium">Location:</span>
-                            <span className="text-white">{result.structuredInfo.location}</span>
-                          </div>
-                        )}
-                        {result.structuredInfo.additionalLocation && result.structuredInfo.additionalLocation !== result.structuredInfo.location && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-purple-400 font-medium">Additional:</span>
-                            <span className="text-white">{result.structuredInfo.additionalLocation}</span>
-                          </div>
-                        )}
-                        {result.structuredInfo.gender && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-orange-400 font-medium">Gender:</span>
-                            <span className="text-white">{result.structuredInfo.gender}</span>
-                          </div>
-                        )}
-                        {result.structuredInfo.locale && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-cyan-400 font-medium">Locale:</span>
-                            <span className="text-white">{result.structuredInfo.locale}</span>
-                          </div>
-                        )}
-                        {result.structuredInfo.id && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-gray-400 font-medium">ID:</span>
-                            <span className="text-white">{result.structuredInfo.id}</span>
-                          </div>
-                        )}
+                  <div className="p-5">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <span className="inline-block px-2 py-1 text-xs font-medium rounded-full bg-midGray text-gray-300 mr-2">
+                          {result.collection}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {result.folder}
+                        </span>
                       </div>
-
-                      <details className="mt-2">
-                        <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-300">
-                          View raw data
-                        </summary>
-                        <p className="text-xs text-gray-500 mt-1 p-2 bg-gray-900 rounded border-l-2 border-gray-600 overflow-x-auto">
-                          {result.rawContent}
-                        </p>
-                      </details>
                     </div>
-                  ) : (
-                    <p className="text-sm text-gray-300 mb-2 line-clamp-3">
-                      {result.content}
-                    </p>
-                  )}
-
-                  <div className="flex flex-wrap gap-2 text-xs text-gray-400">
-                    <span>Collection: {result.collection}</span>
-                    <span>•</span>
-                    <span>Folder: {result.folder}</span>
-                    <span>•</span>
-                    <span>{new Date(result.timestamp).toLocaleDateString()}</span>
+                    
+                    <h3 className="text-lg font-medium text-coolWhite mb-2">
+                      {result.fileName}
+                    </h3>
+                    
+                    <div className="bg-midGray rounded p-3 font-mono text-sm text-gray-300 overflow-x-auto">
+                      {result.content.split('\n').map((line, index) => (
+                        <div key={index} className="mb-1">
+                          {line}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </motion.div>
               ))}

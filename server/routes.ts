@@ -334,47 +334,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Split query into words for better name matching
-      const queryWords = query.toLowerCase().split(/\s+/).filter(word => word.length > 0);
-      const queryWildcards = queryWords.map(word => `*${word}*`);
-      
-      // Improved query that handles name variations and different formats
+      // Improved query that prioritizes exact matches and uses better scoring
       const searchBody = {
         query: {
           bool: {
             should: [
               // Exact phrase matches with highest boost
-              { match_phrase: { data: { query: query, boost: 15 } } },
-              { match_phrase: { content: { query: query, boost: 15 } } },
-              { match_phrase: { text: { query: query, boost: 15 } } },
-              { match_phrase: { body: { query: query, boost: 15 } } },
+              { match_phrase: { data: { query: query, boost: 10 } } },
+              { match_phrase: { content: { query: query, boost: 10 } } },
+              { match_phrase: { text: { query: query, boost: 10 } } },
+              { match_phrase: { body: { query: query, boost: 10 } } },
               
-              // Individual word matches for names (handles "Hadi Houmani" vs "Hadi,Houmani")
-              ...queryWords.map(word => ({
-                match: { data: { query: word, boost: 8 } }
-              })),
-              ...queryWords.map(word => ({
-                match: { content: { query: word, boost: 8 } }
-              })),
-              
-              // Wildcard searches for each word (handles partial matches)
-              ...queryWildcards.map(wildcard => ({
-                wildcard: { data: { value: wildcard, boost: 6 } }
-              })),
-              ...queryWildcards.map(wildcard => ({
-                wildcard: { content: { value: wildcard, boost: 6 } }
-              })),
-              
-              // Cross-field search for names (searches across multiple fields)
-              {
-                multi_match: {
-                  query: query,
-                  type: "cross_fields",
-                  fields: ["data", "content", "text", "body"],
-                  operator: "and",
-                  boost: 10
-                }
-              },
+              // Exact matches in filename/title fields with high boost
+              { match_phrase: { filename: { query: query, boost: 8 } } },
+              { match_phrase: { fileName: { query: query, boost: 8 } } },
+              { match_phrase: { title: { query: query, boost: 8 } } },
+              { match_phrase: { name: { query: query, boost: 8 } } },
               
               // Regular matches with medium boost
               { match: { data: { query: query, boost: 5 } } },
@@ -382,15 +357,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
               { match: { text: { query: query, boost: 5 } } },
               { match: { body: { query: query, boost: 5 } } },
               
-              // Filename matches
-              { match_phrase: { filename: { query: query, boost: 8 } } },
-              { match_phrase: { fileName: { query: query, boost: 8 } } },
-              { match_phrase: { title: { query: query, boost: 8 } } },
-              { match_phrase: { name: { query: query, boost: 8 } } },
+              // Filename matches with medium boost
+              { match: { filename: { query: query, boost: 3 } } },
+              { match: { fileName: { query: query, boost: 3 } } },
+              { match: { title: { query: query, boost: 3 } } },
+              { match: { name: { query: query, boost: 3 } } },
               
-              // Wildcard searches for filenames
-              { wildcard: { filename: { value: `*${query.toLowerCase()}*`, boost: 4 } } },
-              { wildcard: { fileName: { value: `*${query.toLowerCase()}*`, boost: 4 } } },
+              // Wildcard searches for partial matches (lower boost)
+              { wildcard: { data: { value: `*${query.toLowerCase()}*`, boost: 2 } } },
+              { wildcard: { content: { value: `*${query.toLowerCase()}*`, boost: 2 } } },
+              { wildcard: { filename: { value: `*${query.toLowerCase()}*`, boost: 2 } } },
+              { wildcard: { fileName: { value: `*${query.toLowerCase()}*`, boost: 2 } } },
               
               // Fuzzy search as fallback (lowest boost)
               {
@@ -399,7 +376,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   type: "best_fields",
                   fields: ["data", "content", "text", "body", "filename", "fileName", "title", "name"],
                   fuzziness: "AUTO",
-                  boost: 2
+                  boost: 1
                 }
               }
             ],
@@ -443,41 +420,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const elasticsearchData = await elasticsearchResponse.json();
       console.log(`Elasticsearch returned ${elasticsearchData.hits?.total?.value || 0} results`);
       
-      // Helper function to parse structured data from content
-      const parseStructuredData = (content: string) => {
-        if (!content || typeof content !== 'string') return null;
-        
-        // Try to parse comma-separated data (like the example: ID,Phone,FirstName,LastName,etc.)
-        const parts = content.split(',');
-        if (parts.length >= 4) {
-          return {
-            id: parts[0]?.trim() || '',
-            phone: parts[1]?.trim() || '',
-            firstName: parts[2]?.trim() || '',
-            lastName: parts[3]?.trim() || '',
-            gender: parts[6]?.trim() || '',
-            locale: parts[7]?.trim() || '',
-            location: parts[8]?.trim() || '',
-            additionalLocation: parts[10]?.trim() || '',
-            rawData: content
-          };
-        }
-        return null;
-      };
-
       // Transform Elasticsearch results for frontend and filter for relevance
       const results = elasticsearchData.hits?.hits?.filter((hit: any) => {
         const source = hit._source;
         const content = source.data || source.content || source.text || source.body || '';
         const filename = source.filename || source.fileName || source.title || source.name || '';
         
-        // Check if any query word matches the content (more flexible matching)
-        const queryWords = query.toLowerCase().split(/\s+/).filter(word => word.length > 0);
-        const contentLower = typeof content === 'string' ? content.toLowerCase() : '';
-        const filenameLower = typeof filename === 'string' ? filename.toLowerCase() : '';
-        
-        const contentMatch = queryWords.some(word => contentLower.includes(word));
-        const filenameMatch = queryWords.some(word => filenameLower.includes(word));
+        // Only include results that actually contain the search term
+        const searchTerm = query.toLowerCase();
+        const contentMatch = typeof content === 'string' && content.toLowerCase().includes(searchTerm);
+        const filenameMatch = typeof filename === 'string' && filename.toLowerCase().includes(searchTerm);
         
         return contentMatch || filenameMatch;
       }).map((hit: any) => {
@@ -487,39 +439,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const content = source.data || source.content || source.text || source.body || 'No content available';
         const filename = source.filename || source.fileName || source.title || source.name || hit._id;
         
-        // Parse structured data if available
-        const structuredData = parseStructuredData(content);
-        
+        // Extract and highlight the relevant portion of content
         let displayContent = '';
-        let structuredInfo = null;
-        
-        if (structuredData) {
-          // Format structured data nicely
-          structuredInfo = {
-            name: `${structuredData.firstName} ${structuredData.lastName}`.trim(),
-            phone: structuredData.phone,
-            location: structuredData.location,
-            additionalLocation: structuredData.additionalLocation,
-            gender: structuredData.gender,
-            locale: structuredData.locale,
-            id: structuredData.id
-          };
-          
-          displayContent = `Name: ${structuredInfo.name}${structuredInfo.phone ? ` | Phone: ${structuredInfo.phone}` : ''}${structuredInfo.location ? ` | Location: ${structuredInfo.location}` : ''}${structuredInfo.gender ? ` | Gender: ${structuredInfo.gender}` : ''}`;
-        } else if (typeof content === 'string') {
-          // Extract and highlight the relevant portion of content for non-structured data
-          const queryWords = query.toLowerCase().split(/\s+/).filter(word => word.length > 0);
+        if (typeof content === 'string') {
+          const searchTerm = query.toLowerCase();
           const contentLower = content.toLowerCase();
-          
-          // Find the first match
-          let matchIndex = -1;
-          for (const word of queryWords) {
-            const index = contentLower.indexOf(word);
-            if (index !== -1) {
-              matchIndex = index;
-              break;
-            }
-          }
+          const matchIndex = contentLower.indexOf(searchTerm);
           
           if (matchIndex !== -1) {
             // Extract context around the match
@@ -540,7 +465,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           source: filename,
           timestamp: source.uploadDate || source.timestamp || source.created || new Date().toISOString(),
           content: displayContent,
-          structuredInfo: structuredInfo,
           title: filename,
           url: source.url || filename,
           score: hit._score?.toFixed(2),
@@ -548,8 +472,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           index: hit._index,
           collection: source.collection || hit._index,
           folder: source.folder || source.folderName || 'Unknown',
-          fileName: source.fileName || filename,
-          rawContent: content
+          fileName: source.fileName || filename
         };
       }) || [];
 
