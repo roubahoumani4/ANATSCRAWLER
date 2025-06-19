@@ -27,6 +27,21 @@ jobs:
           BACKEND_PORT: 5000
           VITE_API_URL: https://horus.anatsecurity.fr/api
 
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh/
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "Host webapp
+            HostName 46.165.254.175
+            User ituu
+            Port 50105
+            StrictHostKeyChecking no
+            IdentityFile ~/.ssh/deploy_key" > ~/.ssh/config
+
+      - name: Test SSH Connection
+        run: ssh webapp 'echo "SSH Connection Successful"'
+
       - name: Deploy to WebApp VM through OpenSense
         uses: appleboy/scp-action@master
         with:
@@ -39,6 +54,7 @@ jobs:
           strip_components: 0
           overwrite: true
           debug: true
+          use_insecure_cipher: true
 
       - name: Configure and Start Application
         uses: appleboy/ssh-action@v1.0.0
@@ -47,6 +63,7 @@ jobs:
           port: 50105
           username: ituu
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          use_insecure_cipher: true
           script: |
             cd /var/www/anatscrawler
 
