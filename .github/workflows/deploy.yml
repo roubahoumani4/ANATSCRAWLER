@@ -32,19 +32,20 @@ jobs:
         with:
           host: 46.165.254.175
           port: 50105
-          username: ${{ secrets.WEBAPP_VM_USER }}
+          username: ituu
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: ".,!node_modules"
           target: "/var/www/anatscrawler"
           strip_components: 0
           overwrite: true
+          debug: true
 
       - name: Configure and Start Application
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: 46.165.254.175
           port: 50105
-          username: ${{ secrets.WEBAPP_VM_USER }}
+          username: ituu
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /var/www/anatscrawler
