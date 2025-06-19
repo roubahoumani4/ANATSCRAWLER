@@ -48,7 +48,7 @@ jobs:
             cd /var/www/anatscrawler
 
             # Fix permissions
-            sudo chown -R $USER:$USER /var/www/anatscrawler
+            sudo chown -R $USER:$USER .
 
             # Create/update .env file
             echo "ELASTICSEARCH_URL=http://192.168.1.110:9200" > .env
@@ -56,16 +56,41 @@ jobs:
             echo "BACKEND_PORT=5000" >> .env
             echo "VITE_API_URL=https://horus.anatsecurity.fr/api" >> .env
 
-            # Install production dependencies
+            # Install dependencies
             npm ci --production
 
             # Build the application
             npm run build
 
-            # Start/restart the application using PM2
-            pm2 describe anatscrawler > /dev/null
-            if [ $? -eq 0 ]; then
-              pm2 restart anatscrawler
-            else
-              pm2 start npm --name anatscrawler -- start
-            fi
+            # Create PM2 configuration file
+            cat > ecosystem.config.js << 'EOL'
+            module.exports = {
+              apps: [
+                {
+                  name: 'anatscrawler-backend',
+                  script: 'server/index.ts',
+                  env: {
+                    NODE_ENV: 'production',
+                    ELASTICSEARCH_URL: 'http://192.168.1.110:9200',
+                    MONGODB_URL: 'mongodb://192.168.1.110:27017/anatscrawler',
+                    BACKEND_PORT: '5000'
+                  }
+                },
+                {
+                  name: 'anatscrawler-frontend',
+                  script: 'npm',
+                  args: 'start',
+                  env: {
+                    NODE_ENV: 'production',
+                    PORT: '3000',
+                    VITE_API_URL: 'https://horus.anatsecurity.fr/api'
+                  }
+                }
+              ]
+            }
+            EOL
+
+            # Start/restart the applications using PM2
+            pm2 delete anatscrawler-backend anatscrawler-frontend || true
+            pm2 start ecosystem.config.js
+            pm2 save
