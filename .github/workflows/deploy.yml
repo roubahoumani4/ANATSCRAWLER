@@ -11,6 +11,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup SSH Debug
+        run: |
+          mkdir -p ~/.ssh/
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "Host *
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null" > ~/.ssh/config
+          
+          echo "Testing SSH connection with verbose output..."
+          ssh -vvv -p 50105 -i ~/.ssh/deploy_key ituu@46.165.254.175 'echo "SSH test successful"'
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -27,22 +39,7 @@ jobs:
           BACKEND_PORT: 5000
           VITE_API_URL: https://horus.anatsecurity.fr/api
 
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh/
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          echo "Host webapp
-            HostName 46.165.254.175
-            User ituu
-            Port 50105
-            StrictHostKeyChecking no
-            IdentityFile ~/.ssh/deploy_key" > ~/.ssh/config
-
-      - name: Test SSH Connection
-        run: ssh webapp 'echo "SSH Connection Successful"'
-
-      - name: Deploy to WebApp VM through OpenSense
+      - name: Deploy Files
         uses: appleboy/scp-action@master
         with:
           host: 46.165.254.175
