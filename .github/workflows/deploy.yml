@@ -1,0 +1,69 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          ELASTICSEARCH_URL: http://192.168.1.110:9200
+          MONGODB_URL: mongodb://192.168.1.110:27017/darkscrawler
+          BACKEND_PORT: 5000
+          VITE_API_URL: https://horus.anatsecurity.fr/api
+
+      - name: Deploy to WebApp VM through VPN
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: 192.168.1.105  # Internal webapp VM IP
+          username: ${{ secrets.WEBAPP_VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # Navigate to app directory
+            cd /var/www/darkscrawler
+
+            # Backup existing .env if it exists
+            if [ -f .env ]; then
+              cp .env .env.backup
+            fi
+
+            # Remove existing files except .env and node_modules
+            find . -mindepth 1 -maxdepth 1 ! -name '.env' ! -name 'node_modules' -exec rm -rf {} +
+
+            # Copy new files
+            cp -r $GITHUB_WORKSPACE/* .
+
+            # Restore .env if it was backed up
+            if [ -f .env.backup ]; then
+              mv .env.backup .env
+            else
+              # Create new .env file
+              echo "ELASTICSEARCH_URL=http://192.168.1.110:9200" > .env
+              echo "MONGODB_URL=mongodb://192.168.1.110:27017/darkscrawler" >> .env
+              echo "BACKEND_PORT=5000" >> .env
+              echo "VITE_API_URL=https://horus.anatsecurity.fr/api" >> .env
+            fi
+
+            # Install dependencies
+            npm ci --production
+
+            # Build the application (if needed for production)
+            npm run build
+
+            # Restart the application using PM2
+            pm2 restart darkscrawler || pm2 start npm --name darkscrawler -- start
