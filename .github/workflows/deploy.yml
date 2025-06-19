@@ -27,43 +27,42 @@ jobs:
           BACKEND_PORT: 5000
           VITE_API_URL: https://horus.anatsecurity.fr/api
 
-      - name: Deploy to WebApp VM through VPN
+      - name: Deploy to WebApp VM
+        uses: appleboy/scp-action@master
+        with:
+          host: 192.168.1.105
+          username: ${{ secrets.WEBAPP_VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: ".,!node_modules"
+          target: "/var/www/darkscrawler"
+          strip_components: 0
+          overwrite: true
+
+      - name: Configure and Start Application
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: 192.168.1.105  # Internal webapp VM IP
+          host: 192.168.1.105
           username: ${{ secrets.WEBAPP_VM_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Navigate to app directory
             cd /var/www/darkscrawler
 
-            # Backup existing .env if it exists
-            if [ -f .env ]; then
-              cp .env .env.backup
-            fi
+            # Create/update .env file
+            echo "ELASTICSEARCH_URL=http://192.168.1.110:9200" > .env
+            echo "MONGODB_URL=mongodb://192.168.1.110:27017/darkscrawler" >> .env
+            echo "BACKEND_PORT=5000" >> .env
+            echo "VITE_API_URL=https://horus.anatsecurity.fr/api" >> .env
 
-            # Remove existing files except .env and node_modules
-            find . -mindepth 1 -maxdepth 1 ! -name '.env' ! -name 'node_modules' -exec rm -rf {} +
-
-            # Copy new files
-            cp -r $GITHUB_WORKSPACE/* .
-
-            # Restore .env if it was backed up
-            if [ -f .env.backup ]; then
-              mv .env.backup .env
-            else
-              # Create new .env file
-              echo "ELASTICSEARCH_URL=http://192.168.1.110:9200" > .env
-              echo "MONGODB_URL=mongodb://192.168.1.110:27017/darkscrawler" >> .env
-              echo "BACKEND_PORT=5000" >> .env
-              echo "VITE_API_URL=https://horus.anatsecurity.fr/api" >> .env
-            fi
-
-            # Install dependencies
+            # Install production dependencies
             npm ci --production
 
-            # Build the application (if needed for production)
+            # Build the application
             npm run build
 
-            # Restart the application using PM2
-            pm2 restart darkscrawler || pm2 start npm --name darkscrawler -- start
+            # Start/restart the application using PM2
+            pm2 describe darkscrawler > /dev/null
+            if [ $? -eq 0 ]; then
+              pm2 restart darkscrawler
+            else
+              pm2 start npm --name darkscrawler -- start
+            fi
