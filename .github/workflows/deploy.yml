@@ -23,7 +23,7 @@ jobs:
         run: npm run build
         env:
           ELASTICSEARCH_URL: http://192.168.1.110:9200
-          MONGODB_URL: mongodb://192.168.1.110:27017/darkscrawler
+          MONGODB_URL: mongodb://192.168.1.110:27017/anatscrawler
           BACKEND_PORT: 5000
           VITE_API_URL: https://horus.anatsecurity.fr/api
 
@@ -34,7 +34,7 @@ jobs:
           username: ${{ secrets.WEBAPP_VM_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: ".,!node_modules"
-          target: "/var/www/darkscrawler"
+          target: "/var/www/anatscrawler"
           strip_components: 0
           overwrite: true
 
@@ -45,11 +45,14 @@ jobs:
           username: ${{ secrets.WEBAPP_VM_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /var/www/darkscrawler
+            cd /var/www/anatscrawler
+
+            # Fix permissions
+            sudo chown -R $USER:$USER /var/www/anatscrawler
 
             # Create/update .env file
             echo "ELASTICSEARCH_URL=http://192.168.1.110:9200" > .env
-            echo "MONGODB_URL=mongodb://192.168.1.110:27017/darkscrawler" >> .env
+            echo "MONGODB_URL=mongodb://192.168.1.110:27017/anatscrawler" >> .env
             echo "BACKEND_PORT=5000" >> .env
             echo "VITE_API_URL=https://horus.anatsecurity.fr/api" >> .env
 
@@ -60,9 +63,9 @@ jobs:
             npm run build
 
             # Start/restart the application using PM2
-            pm2 describe darkscrawler > /dev/null
+            pm2 describe anatscrawler > /dev/null
             if [ $? -eq 0 ]; then
-              pm2 restart darkscrawler
+              pm2 restart anatscrawler
             else
-              pm2 start npm --name darkscrawler -- start
+              pm2 start npm --name anatscrawler -- start
             fi
