@@ -27,10 +27,11 @@ jobs:
           BACKEND_PORT: 5000
           VITE_API_URL: https://horus.anatsecurity.fr/api
 
-      - name: Deploy to WebApp VM
+      - name: Deploy to WebApp VM through OpenSense
         uses: appleboy/scp-action@master
         with:
-          host: 192.168.1.105
+          host: 46.165.254.175
+          port: 50105
           username: ${{ secrets.WEBAPP_VM_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: ".,!node_modules"
@@ -41,7 +42,8 @@ jobs:
       - name: Configure and Start Application
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: 192.168.1.105
+          host: 46.165.254.175
+          port: 50105
           username: ${{ secrets.WEBAPP_VM_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
