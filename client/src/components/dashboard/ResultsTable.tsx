@@ -2,11 +2,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLanguage } from "@/context/LanguageContext";
 
 interface SearchResult {
-  id: number;
-  collection: string;
-  folder: string;
-  fileName: string;
-  content: string;
+  id?: string;
+  matchedTerms: string[];
+  score: number;
+  index: string;
+  context: string;
+  highlights: string[];
+  source: string;
 }
 
 interface ResultsTableProps {
@@ -37,6 +39,11 @@ const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
     }
   };
 
+  // Helper function to clean and format highlights
+  const formatHighlight = (highlight: string) => {
+    return highlight.replace(/<\/?mark>/g, '');
+  };
+
   return (
     <motion.section 
       className="results-section flex justify-center w-full mt-4"
@@ -55,9 +62,9 @@ const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
             <thead>
               <tr>
                 <th className="p-3 border border-coolWhite bg-darkGray sticky top-0 z-10 text-left">#</th>
-                <th className="p-3 border border-coolWhite bg-darkGray sticky top-0 z-10 text-left">Collection</th>
-                <th className="p-3 border border-coolWhite bg-darkGray sticky top-0 z-10 text-left">Folder</th>
-                <th className="p-3 border border-coolWhite bg-darkGray sticky top-0 z-10 text-left">File Name</th>
+                <th className="p-3 border border-coolWhite bg-darkGray sticky top-0 z-10 text-left">Index</th>
+                <th className="p-3 border border-coolWhite bg-darkGray sticky top-0 z-10 text-left">Score</th>
+                <th className="p-3 border border-coolWhite bg-darkGray sticky top-0 z-10 text-left">Matched Terms</th>
                 <th className="p-3 border border-coolWhite bg-darkGray sticky top-0 z-10 text-left">Content</th>
               </tr>
             </thead>
@@ -65,20 +72,40 @@ const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
               <AnimatePresence>
                 {results.map((result, index) => (
                   <motion.tr 
-                    key={result.id}
+                    key={result.id || index}
                     className="hover:bg-crimsonRed hover:text-coolWhite transition-colors duration-200"
                     variants={rowVariants}
                     initial="hidden"
                     animate="visible"
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.3 }}
-                    layoutId={`result-${result.id}`}
+                    layoutId={`result-${result.id || index}`}
                   >
                     <td className="p-3 border border-coolWhite">{index + 1}</td>
-                    <td className="p-3 border border-coolWhite">{result.collection}</td>
-                    <td className="p-3 border border-coolWhite">{result.folder}</td>
-                    <td className="p-3 border border-coolWhite">{result.fileName}</td>
-                    <td className="p-3 border border-coolWhite">{result.content}</td>
+                    <td className="p-3 border border-coolWhite">{result.index}</td>
+                    <td className="p-3 border border-coolWhite">{result.score.toFixed(2)}</td>
+                    <td className="p-3 border border-coolWhite">
+                      <div className="flex flex-wrap gap-1">
+                        {result.matchedTerms.map((term, i) => (
+                          <span key={i} className="bg-crimsonRed/20 px-2 py-1 rounded text-xs">
+                            {term}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="p-3 border border-coolWhite">
+                      <div className="space-y-2">
+                        {result.highlights?.length > 0 ? (
+                          result.highlights.map((highlight, i) => (
+                            <div key={i} className="text-sm" dangerouslySetInnerHTML={{ 
+                              __html: highlight 
+                            }} />
+                          ))
+                        ) : (
+                          <div className="text-sm">{result.context}</div>
+                        )}
+                      </div>
+                    </td>
                   </motion.tr>
                 ))}
               </AnimatePresence>
@@ -98,16 +125,12 @@ const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
           </motion.button>
           
           {isExported && (
-            <motion.a 
-              href="/api/download-excel" 
-              download="results.xlsx" 
-              className="bg-coolWhite text-jetBlack border border-coolWhite py-2 px-5 rounded-md font-bold hover:bg-crimsonRed hover:text-coolWhite transition-colors"
+            <motion.a
+              href="/api/download-excel"
+              className="bg-crimsonRed text-coolWhite border border-crimsonRed py-2 px-5 rounded-md font-bold hover:bg-opacity-90 transition-colors"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.3 }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
             >
               {translate("dashboard.downloadExcel")}
             </motion.a>
@@ -116,6 +139,6 @@ const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
       </div>
     </motion.section>
   );
-};
+}
 
 export default ResultsTable;

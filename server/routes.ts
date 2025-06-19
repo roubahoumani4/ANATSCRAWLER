@@ -1,80 +1,53 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
 import helmet from "helmet";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import xss from "xss-clean";
 import mongoSanitize from "express-mongo-sanitize";
+import { mongodb } from "./lib/mongodb";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { body, validationResult } from "express-validator";
-import { searchResults, credentials } from "./mockData";
-
-// Type for search results
-interface SearchResult {
-  id: number;
-  collection: string;
-  folder: string;
-  fileName: string;
-  content: string;
-}
+import { ObjectId } from 'mongodb';
+import { registerRoutes as registerSearchRoutes } from './routes/search';
 
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || "ANAT_SECURITY_JWT_SECRET_KEY";
-
-// Token expiration time
 const TOKEN_EXPIRATION = "24h";
 
-// MongoDB connection string for user data, authentication, etc.
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://46.165.254.175:50105/anat_security";
-
-// Elasticsearch connection for dark web search only
-const ELASTICSEARCH_URI = process.env.ELASTICSEARCH_URI || "http://46.165.254.175:50104";
-
-// Authentication middleware
-const authenticate = (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "Authentication required" });
+// Extend Express Request type
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: string;
+        username: string;
+        roles?: string[];
+      };
     }
-
-    const token = authHeader.split(" ")[1];
-
-    const decoded = jwt.verify(token, JWT_SECRET) as { id: number; username: string };
-    req.user = decoded;
-
-    next();
-  } catch (error) {
-    return res.status(401).json({ error: "Invalid token" });
   }
-};
+}
 
-export async function registerRoutes(app: Express): Promise<Server> {
-  // Trust proxy for rate limiting
-  app.set('trust proxy', 1);
+export async function registerRoutes(app: Express): Promise<void> {
+  // Register search routes
+  registerSearchRoutes(app);
 
-  // Apply security middleware
+  // Security middleware
   app.use(helmet({
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "https://kit.fontawesome.com", "https://cdn.tailwindcss.com"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.tailwindcss.com"],
-        imgSrc: ["'self'", "data:", "https://api.qrserver.com", "https://images.unsplash.com"],
-        fontSrc: ["'self'", "https://fonts.gstatic.com"],
-        connectSrc: ["'self'", ELASTICSEARCH_URI, "mongodb://46.165.254.175:50105"],
-      },
-    },
-    xssFilter: true,
-    noSniff: true,
-    referrerPolicy: { policy: "same-origin" }
+        scriptSrc: ["'self'", "'unsafe-inline'", "https:", "http:"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https:", "http:"],
+        imgSrc: ["'self'", "data:", "https:", "http:"],
+        connectSrc: ["'self'", "https:", "http:", "ws:", "wss:"]
+      }
+    }
   }));
 
   app.use(cors({
-    origin: process.env.CORS_ORIGIN || "http://46.165.254.175:50106",
+    origin: true,
     credentials: true
   }));
 
@@ -83,17 +56,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Rate limiting
   const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
-    message: { error: "Too many requests, please try again later." }
+    windowMs: 15 * 60 * 1000,
+    max: 100
   });
   app.use("/api", apiLimiter);
 
-  // Login route
+  // Simplified Signup endpoint
+  app.post("/api/signup", [
+    body("username")
+      .trim()
+      .isLength({ min: 3 })
+      .withMessage("Username must be at least 3 characters")
+      .matches(/^[a-zA-Z0-9_]+$/)
+      .withMessage("Username can only contain letters, numbers and underscore"),
+    body("password")
+      .trim()
+      .isLength({ min: 6 })
+      .withMessage("Password must be at least 6 characters"),
+    body("confirmPassword")
+      .trim()
+      .custom((value, { req }) => {
+        if (value !== req.body.password) {
+          throw new Error("Passwords do not match");
+        }
+        return true;
+      })
+  ], async (req: Request, res: Response) => {
+    console.log("[Auth] Received signup request");
+    
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ error: errors.array()[0].msg });
+    }
+
+    try {
+      const { username, password } = req.body;
+
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Create user in MongoDB
+      const result = await mongodb.createUser({
+        username,
+        password: hashedPassword,
+        createdAt: new Date(),
+        lastLogin: new Date()
+      });
+
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+
+      res.status(201).json({ 
+        message: "User registered successfully",
+        userId: result.userId
+      });
+    } catch (error) {
+      console.error("[Auth] Registration error:", error);
+      res.status(500).json({ error: "Registration failed" });
+    }
+  });
+
+  // Login endpoint
   app.post("/api/login", [
-    body("identifier").trim().notEmpty().withMessage("Username is required"),
+    body("identifier").trim().notEmpty().withMessage("Username or email is required"),
     body("password").trim().notEmpty().withMessage("Password is required")
   ], async (req: Request, res: Response) => {
+    console.log("[Auth] Received login request");
+    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ error: errors.array()[0].msg });
@@ -102,560 +132,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { identifier, password } = req.body;
 
-      // Log the login attempt (for debugging)
-      console.log(`Login attempt: ${identifier}`);
+      // Find user
+      const result = await mongodb.findUsers({
+        filters: {
+          $or: [
+            { username: identifier },
+            { email: identifier }
+          ]
+        }
+      });
 
-      // Check mock credentials for demo
-      const user = credentials.find(cred => 
-        cred.username === identifier || cred.email === identifier
-      );
-
-      if (!user) {
-        return res.status(401).json({ error: "Invalid credentials" });
+      if (!result.success || !result.users || result.users.length === 0) {
+        console.log("[Auth] User not found:", identifier);
+        return res.status(401).json({ error: "Invalid username/email or password" });
       }
 
-      // In a real app, we would use bcrypt.compare
-      // const isPasswordValid = await bcrypt.compare(password, user.password);
-      const isPasswordValid = password === user.password;
+      const user = result.users[0];
 
-      if (!isPasswordValid) {
-        return res.status(401).json({ error: "Invalid credentials" });
+      // Verify password
+      const isValidPassword = await bcrypt.compare(password, user.password);
+      if (!isValidPassword) {
+        console.log("[Auth] Invalid password for user:", identifier);
+        return res.status(401).json({ error: "Invalid username/email or password" });
       }
 
-      // Generate JWT token
+      // Create token
       const token = jwt.sign(
-        { id: user.id, username: user.username },
+        { 
+          id: user._id,
+          username: user.username,
+          roles: user.roles || ['user']
+        },
         JWT_SECRET,
         { expiresIn: TOKEN_EXPIRATION }
       );
 
-      // Log successful login
-      console.log(`Successful login: ${user.username}`);
+      console.log("[Auth] Login successful for user:", identifier);
 
+      // Return user data and token
       res.json({
         token,
+        id: user._id,
         username: user.username,
-        id: user.id,
-        fullName: user.fullName,
-        email: user.email,
-        organization: user.organization,
-        department: user.department,
-        jobPosition: user.jobPosition,
-        roles: user.roles
+        fullName: user.fullName || '',
+        email: user.email || '',
+        organization: user.organization || '',
+        department: user.department || '',
+        jobPosition: user.jobPosition || '',
+        roles: user.roles || ['user']
       });
     } catch (error) {
-      console.error("Login error:", error);
-      res.status(500).json({ error: "Server error" });
+      console.error("[Auth] Login error:", error);
+      res.status(500).json({ error: "Login failed" });
     }
   });
 
-  // Validate token route
-  app.get("/api/validate-token", authenticate, (req: Request, res: Response) => {
-    if (!req.user) {
-      return res.status(401).json({ error: "Authentication required" });
-    }
-
-    res.json({ 
-      id: req.user.id, 
-      username: req.user.username,
-      // In a real app, we would fetch the user from the database here
-    });
-  });
-
-  // User registration
-  app.post("/api/register-user", [
-    body("username").trim().isLength({ min: 3 }).withMessage("Username must be at least 3 characters"),
-    body("email").trim().isEmail().withMessage("Please provide a valid email"),
-    body("password").trim().isLength({ min: 6 }).withMessage("Password must be at least 6 characters")
-  ], async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ error: errors.array()[0].msg });
-    }
-
+  // Protected route example
+  app.get("/api/profile", authenticate, async (req: Request, res: Response) => {
     try {
-      const { username, email, password } = req.body;
-
-      // Check if username or email already exists
-      const userExists = credentials.some(user => 
-        user.username === username || user.email === email
-      );
-
-      if (userExists) {
-        return res.status(400).json({ error: "Username or email already exists" });
-      }
-
-      // In a real app, we would create a new user in the database
-      // const hashedPassword = await bcrypt.hash(password, 10);
-
-      // For this mock implementation, we'll just return success
-      res.status(201).json({ message: "User registered successfully" });
-    } catch (error) {
-      console.error("Registration error:", error);
-      res.status(500).json({ error: "Server error" });
-    }
-  });
-
-  // Edit user
-  app.post("/api/edit-user", authenticate, [
-    body("username").trim().isLength({ min: 3 }).withMessage("Username must be at least 3 characters"),
-    body("email").trim().isEmail().withMessage("Please provide a valid email")
-  ], async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ error: errors.array()[0].msg });
-    }
-
-    try {
-      // In a real app, we would update the user in the database
-      res.json({ message: "User updated successfully" });
-    } catch (error) {
-      console.error("Edit user error:", error);
-      res.status(500).json({ error: "Server error" });
-    }
-  });
-
-  // Change password
-  app.post("/api/change-password", authenticate, [
-    body("currentPassword").trim().notEmpty().withMessage("Current password is required"),
-    body("newPassword").trim().isLength({ min: 6 }).withMessage("New password must be at least 6 characters")
-  ], async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ error: errors.array()[0].msg });
-    }
-
-    try {
-      // In a real app, we would verify the current password and update with the new one
-      res.json({ message: "Password updated successfully" });
-    } catch (error) {
-      console.error("Change password error:", error);
-      res.status(500).json({ error: "Server error" });
-    }
-  });
-
-  // Get users
-  app.get("/api/users", authenticate, async (req: Request, res: Response) => {
-    try {
-      res.json(credentials.map(user => ({
-        id: user.id,
-        username: user.username,
-        fullName: user.fullName,
-        email: user.email,
-        organization: user.organization,
-        department: user.department,
-        jobPosition: user.jobPosition
-      })));
-    } catch (error) {
-      console.error("Get users error:", error);
-      res.status(500).json({ error: "Server error" });
-    }
-  });
-
-  // Search API
-  app.get("/api/search", authenticate, async (req: Request, res: Response) => {
-    try {
-      const { query } = req.query;
-
-      if (!query || typeof query !== "string") {
-        return res.status(400).json({ error: "Search query is required" });
-      }
-
-      // In a real app, we would search in Elasticsearch
-      // For this mock implementation, we'll filter the search results
-      const filteredResults = searchResults.filter(result => 
-        result.content.toLowerCase().includes(query.toLowerCase())
-      );
-
-      res.json(filteredResults);
-    } catch (error) {
-      console.error("Search error:", error);
-      res.status(500).json({ error: "Search failed" });
-    }
-  });
-
-  // Export to Excel
-  app.post("/api/export", authenticate, async (req: Request, res: Response) => {
-    try {
-      // In a real app, we would create an Excel file
-      res.json({ message: "Export successful" });
-    } catch (error) {
-      console.error("Export error:", error);
-      res.status(500).json({ error: "Export failed" });
-    }
-  });
-
-  // Download Excel
-  app.get("/api/download-excel", authenticate, (req: Request, res: Response) => {
-    try {
-      // In a real app, we would generate and stream an Excel file
-      // For now, we'll just send a mock response
-      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", "attachment; filename=search_results.xlsx");
-      res.status(200).end("Excel file content would go here");
-    } catch (error) {
-      console.error("Download Excel error:", error);
-      res.status(500).json({ error: "Download failed" });
-    }
-  });
-
-  // Dark Web Search API - connects to Elasticsearch (no auth required for basic search)
-  app.post("/api/darkweb-search", [
-    body("query").trim().notEmpty().withMessage("Search query is required")
-  ], async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ error: errors.array()[0].msg });
-    }
-
-    try {
-      const { query } = req.body;
-      
-      // First, get all available indices
-      const indicesResponse = await fetch(`${ELASTICSEARCH_URI}/_cat/indices?format=json`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        }
+      const result = await mongodb.findUsers({
+        filters: { _id: new ObjectId(req.user?.id) }
       });
 
-      let targetIndices = "filesearchdb.fs.chunks,fs_chunks_index";
-      
-      if (indicesResponse.ok) {
-        const indices = await indicesResponse.json();
-        const availableIndices = indices
-          .map((idx: any) => idx.index)
-          .filter((name: string) => !name.startsWith('.'))
-          .join(',');
-        
-        if (availableIndices) {
-          targetIndices = availableIndices;
-          console.log(`Searching in indices: ${targetIndices}`);
-        }
+      if (!result.success || !result.users || result.users.length === 0) {
+        return res.status(404).json({ error: "User not found" });
       }
 
-      // Enhanced query with exact match prioritization and tiered scoring
-      const searchBody = {
-        query: {
-          bool: {
-            should: [
-              // Exact phrase matches (highest priority - 10x boost)
-              { match_phrase: { data: { query: query, boost: 10 } } },
-              { match_phrase: { content: { query: query, boost: 10 } } },
-              { match_phrase: { text: { query: query, boost: 10 } } },
-              { match_phrase: { body: { query: query, boost: 10 } } },
-              { match_phrase: { filename: { query: query, boost: 15 } } },
-              { match_phrase: { fileName: { query: query, boost: 15 } } },
-              { match_phrase: { title: { query: query, boost: 15 } } },
-              { match_phrase: { name: { query: query, boost: 15 } } },
-              
-              // Regular matches (high priority - 5x boost)
-              { match: { data: { query: query, boost: 5 } } },
-              { match: { content: { query: query, boost: 5 } } },
-              { match: { text: { query: query, boost: 5 } } },
-              { match: { body: { query: query, boost: 5 } } },
-              { match: { filename: { query: query, boost: 8 } } },
-              { match: { fileName: { query: query, boost: 8 } } },
-              { match: { title: { query: query, boost: 8 } } },
-              { match: { name: { query: query, boost: 8 } } },
-              
-              // Wildcard searches (medium priority - 2x boost)
-              { wildcard: { data: { value: `*${query.toLowerCase()}*`, boost: 2 } } },
-              { wildcard: { content: { value: `*${query.toLowerCase()}*`, boost: 2 } } },
-              { wildcard: { text: { value: `*${query.toLowerCase()}*`, boost: 2 } } },
-              { wildcard: { body: { value: `*${query.toLowerCase()}*`, boost: 2 } } },
-              { wildcard: { filename: { value: `*${query.toLowerCase()}*`, boost: 3 } } },
-              { wildcard: { fileName: { value: `*${query.toLowerCase()}*`, boost: 3 } } },
-              { wildcard: { title: { value: `*${query.toLowerCase()}*`, boost: 3 } } },
-              { wildcard: { name: { value: `*${query.toLowerCase()}*`, boost: 3 } } },
-              
-              // Fuzzy matches (lowest priority - no boost)
-              { match: { data: { query: query, fuzziness: "AUTO" } } },
-              { match: { content: { query: query, fuzziness: "AUTO" } } },
-              { match: { text: { query: query, fuzziness: "AUTO" } } },
-              { match: { body: { query: query, fuzziness: "AUTO" } } },
-              { match: { filename: { query: query, fuzziness: "AUTO" } } },
-              { match: { fileName: { query: query, fuzziness: "AUTO" } } },
-              { match: { title: { query: query, fuzziness: "AUTO" } } },
-              { match: { name: { query: query, fuzziness: "AUTO" } } }
-            ],
-            minimum_should_match: 1,
-            // Filter to only return results that actually contain the search term
-            filter: [
-              {
-                bool: {
-                  should: [
-                    { wildcard: { data: `*${query.toLowerCase()}*` } },
-                    { wildcard: { content: `*${query.toLowerCase()}*` } },
-                    { wildcard: { text: `*${query.toLowerCase()}*` } },
-                    { wildcard: { body: `*${query.toLowerCase()}*` } },
-                    { wildcard: { filename: `*${query.toLowerCase()}*` } },
-                    { wildcard: { fileName: `*${query.toLowerCase()}*` } },
-                    { wildcard: { title: `*${query.toLowerCase()}*` } },
-                    { wildcard: { name: `*${query.toLowerCase()}*` } }
-                  ],
-                  minimum_should_match: 1
-                }
-              }
-            ]
-          }
-        },
-        _source: ["data", "content", "text", "body", "filename", "fileName", "title", "name", "url", "uploadDate", "timestamp", "created", "collection", "folder", "folderName"],
-        size: 100,
-        sort: [
-          { "_score": { "order": "desc" } }
-        ],
-        highlight: {
-          fields: {
-            "data": {
-              fragment_size: 300,
-              number_of_fragments: 2,
-              pre_tags: ["<mark>"],
-              post_tags: ["</mark>"]
-            },
-            "content": {
-              fragment_size: 300,
-              number_of_fragments: 2,
-              pre_tags: ["<mark>"],
-              post_tags: ["</mark>"]
-            },
-            "text": {
-              fragment_size: 300,
-              number_of_fragments: 2,
-              pre_tags: ["<mark>"],
-              post_tags: ["</mark>"]
-            },
-            "body": {
-              fragment_size: 300,
-              number_of_fragments: 2,
-              pre_tags: ["<mark>"],
-              post_tags: ["</mark>"]
-            },
-            "filename": {
-              fragment_size: 100,
-              number_of_fragments: 1,
-              pre_tags: ["<mark>"],
-              post_tags: ["</mark>"]
-            },
-            "fileName": {
-              fragment_size: 100,
-              number_of_fragments: 1,
-              pre_tags: ["<mark>"],
-              post_tags: ["</mark>"]
-            }
-          }
-        }
-      };
-
-      // Make request to Elasticsearch
-      const elasticsearchResponse = await fetch(`${ELASTICSEARCH_URI}/${targetIndices}/_search`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(searchBody)
-      });
-
-      if (!elasticsearchResponse.ok) {
-        const errorText = await elasticsearchResponse.text();
-        console.error(`Elasticsearch error (${elasticsearchResponse.status}):`, errorText);
-        throw new Error(`Elasticsearch responded with status: ${elasticsearchResponse.status}`);
-      }
-
-      const elasticsearchData = await elasticsearchResponse.json();
-      console.log(`Elasticsearch returned ${elasticsearchData.hits?.total?.value || 0} results`);
-      
-      // Transform Elasticsearch results with enhanced context extraction
-      const results = elasticsearchData.hits?.hits?.map((hit: any) => {
-        const source = hit._source;
-        
-        // Extract content from various possible fields
-        const rawContent = source.data || source.content || source.text || source.body || '';
-        const filename = source.filename || source.fileName || source.title || source.name || hit._id;
-        
-        // Extract context around the search term
-        let displayContent = 'No content available';
-        let contextSnippet = '';
-        
-        if (typeof rawContent === 'string' && rawContent.length > 0) {
-          // First, try to use highlighted content if available
-          if (hit.highlight) {
-            const highlights = Object.values(hit.highlight).flat().join(' ... ');
-            if (highlights.length > 0) {
-              contextSnippet = highlights;
-            }
-          }
-          
-          // If no highlights, extract context manually
-          if (!contextSnippet) {
-            const lowerContent = rawContent.toLowerCase();
-            const lowerQuery = query.toLowerCase();
-            const queryIndex = lowerContent.indexOf(lowerQuery);
-            
-            if (queryIndex !== -1) {
-              // Extract 200 characters before and after the match
-              const start = Math.max(0, queryIndex - 200);
-              const end = Math.min(rawContent.length, queryIndex + query.length + 200);
-              contextSnippet = rawContent.substring(start, end);
-              
-              // Add ellipsis if we're not at the beginning/end
-              if (start > 0) contextSnippet = '...' + contextSnippet;
-              if (end < rawContent.length) contextSnippet = contextSnippet + '...';
-              
-              // Highlight the search term
-              const regex = new RegExp(`(${query})`, 'gi');
-              contextSnippet = contextSnippet.replace(regex, '<mark>$1</mark>');
-            } else {
-              // Fallback to first 500 characters
-              contextSnippet = rawContent.length > 500 ? rawContent.substring(0, 500) + '...' : rawContent;
-            }
-          }
-          
-          displayContent = contextSnippet || (rawContent.length > 500 ? rawContent.substring(0, 500) + '...' : rawContent);
-        }
-        
-        return {
-          id: hit._id,
-          source: filename,
-          timestamp: source.uploadDate || source.timestamp || source.created || new Date().toISOString(),
-          content: displayContent,
-          title: filename,
-          url: source.url || filename,
-          score: hit._score?.toFixed(2),
-          highlight: hit.highlight,
-          index: hit._index,
-          collection: source.collection || hit._index,
-          folder: source.folder || source.folderName || 'Unknown',
-          fileName: source.fileName || filename,
-          matchedField: hit.highlight ? Object.keys(hit.highlight)[0] : 'content'
-        };
-      }) || [];
-
+      const user = result.users[0];
       res.json({
-        success: true,
-        results: results,
-        total: elasticsearchData.hits?.total?.value || 0,
-        query: query,
-        searchedIndices: targetIndices
-      });
-
-    } catch (error) {
-      console.error("Dark web search error:", error);
-      
-      // Check if it's a connection error to Elasticsearch
-      if (error.message && (error.message.includes('fetch') || error.message.includes('ECONNREFUSED'))) {
-        return res.status(503).json({ 
-          error: "Unable to connect to Elasticsearch service",
-          details: "Please verify Elasticsearch is running at " + ELASTICSEARCH_URI
-        });
-      }
-      
-      res.status(500).json({ 
-        error: "Dark web search failed",
-        details: error instanceof Error ? error.message : 'Unknown error'
-      });
-    }
-  });
-
-  // User Profile Management API Endpoints
-
-  // Update user profile information
-  app.patch("/api/user/update-profile", authenticate, [
-    body("fullName").optional().trim().isLength({ min: 1 }).withMessage("Full name cannot be empty"),
-    body("email").optional().trim().isEmail().withMessage("Please provide a valid email"),
-    body("organization").optional().trim(),
-    body("department").optional().trim(),
-    body("jobPosition").optional().trim()
-  ], async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ error: errors.array()[0].msg });
-    }
-
-    try {
-      const { fullName, email, organization, department, jobPosition } = req.body;
-      const userId = req.user?.id;
-
-      console.log(`Updating profile for user ${userId}:`, { fullName, email, organization, department, jobPosition });
-
-      res.json({ 
-        message: "Profile updated successfully",
-        user: {
-          id: userId,
-          username: req.user?.username,
-          fullName,
-          email,
-          organization,
-          department,
-          jobPosition
-        }
+        id: user._id,
+        username: user.username,
+        fullName: user.fullName || '',
+        email: user.email || '',
+        organization: user.organization || '',
+        department: user.department || '',
+        jobPosition: user.jobPosition || '',
+        roles: user.roles || ['user']
       });
     } catch (error) {
-      console.error("Profile update error:", error);
-      res.status(500).json({ error: "Failed to update profile" });
+      console.error("[Auth] Profile fetch error:", error);
+      res.status(500).json({ error: "Failed to fetch profile" });
     }
   });
-
-  // Update username
-  app.patch("/api/user/update-username", authenticate, [
-    body("username").trim().isLength({ min: 3 }).withMessage("Username must be at least 3 characters")
-  ], async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ error: errors.array()[0].msg });
-    }
-
-    try {
-      const { username } = req.body;
-      const userId = req.user?.id;
-
-      console.log(`Updating username for user ${userId} to: ${username}`);
-
-      res.json({ 
-        message: "Username updated successfully",
-        username 
-      });
-    } catch (error) {
-      console.error("Username update error:", error);
-      res.status(500).json({ error: "Failed to update username" });
-    }
-  });
-
-  // Change password
-  app.patch("/api/user/change-password", authenticate, [
-    body("currentPassword").trim().notEmpty().withMessage("Current password is required"),
-    body("newPassword").trim().isLength({ min: 6 }).withMessage("New password must be at least 6 characters")
-  ], async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ error: errors.array()[0].msg });
-    }
-
-    try {
-      const { currentPassword, newPassword } = req.body;
-      const userId = req.user?.id;
-
-      console.log(`Changing password for user ${userId}`);
-
-      res.json({ message: "Password changed successfully" });
-    } catch (error) {
-      console.error("Password change error:", error);
-      res.status(500).json({ error: "Failed to change password" });
-    }
-  });
-
-  const httpServer = createServer(app);
-  return httpServer;
-}
-
-// Add user property to Express Request interface
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        id: number;
-        username: string;
-      };
-    }
-  }
 }

@@ -52,8 +52,7 @@ const LandingPage = () => {
   };
 
   const handleSignup = () => {
-    // For now, redirect to login - you can create a separate signup page later
-    setLocation("/login");
+    setLocation("/signup");
   };
 
   const handleSubscribe = () => {

@@ -1,18 +1,27 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLanguage } from "@/context/LanguageContext";
-import { Skull, Globe, Shield, AlertTriangle, Eye, Database, Terminal, Activity, Zap, Clock, Search } from "lucide-react";
+import { Skull, Globe, Shield, AlertTriangle, Eye, Database, Terminal, Activity, Zap, Clock, Search, X } from "lucide-react";
 import BackButton from "@/components/ui/back-button";
 
+interface SearchResult {
+  id: string;
+  score: number;
+  snippet: string;
+  type: 'document' | 'user';
+}
+
+type LanguageType = "English" | "French" | "Spanish";
+
 const DarkwebMonitoringPage = () => {
-  const { language } = useLanguage();
+  const { language } = useLanguage() as { language: LanguageType };
   const [matrixChars, setMatrixChars] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchCount, setSearchCount] = useState(0);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
-  const [selectedResult, setSelectedResult] = useState<any>(null);
+  const [selectedResult, setSelectedResult] = useState<SearchResult | null>(null);
 
   useEffect(() => {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?".split("");
@@ -78,17 +87,25 @@ const DarkwebMonitoringPage = () => {
     setIsSearching(true);
     
     try {
+      const token = localStorage.getItem('authToken');
       const response = await fetch('/api/darkweb-search', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ query: searchQuery }),
       });
       
       if (response.ok) {
         const data = await response.json();
-        setSearchResults(data.results || []);
+        console.log('Search response:', data);
+        if (data.success && Array.isArray(data.results)) {
+          setSearchResults(data.results);
+        } else {
+          console.error('Invalid search response format:', data);
+          setSearchResults([]);
+        }
         
         // Increment search count for unsubscribed users
         const newCount = searchCount + 1;
@@ -106,7 +123,7 @@ const DarkwebMonitoringPage = () => {
     }
   };
 
-  const handleViewInfo = (result: any) => {
+  const handleViewInfo = (result: SearchResult) => {
     // Check if user exceeded search limit (assuming user is not subscribed for now)
     if (searchCount > 5) {
       setShowSubscriptionModal(true);
@@ -119,6 +136,11 @@ const DarkwebMonitoringPage = () => {
     // Add subscription logic here
     alert("Subscription feature coming soon!");
     setShowSubscriptionModal(false);
+  };
+
+  // Helper function for translations
+  const t = (key: { [key in LanguageType]: string }): string => {
+    return key[language] || key.English; // Fallback to English
   };
 
   return (
@@ -235,7 +257,11 @@ const DarkwebMonitoringPage = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={language === "French" ? "Rechercher des menaces, credentials, ou activités..." : "Search for threats, credentials, or activities..."}
+                placeholder={t({
+                  English: "Search for threats, credentials, or activities...",
+                  French: "Rechercher des menaces, credentials, ou activités...",
+                  Spanish: "Buscar amenazas, credenciales o actividades..."
+                })}
                 className="flex-1 bg-transparent border-none outline-none text-white placeholder-gray-400 text-lg"
               />
               <button 
@@ -243,14 +269,23 @@ const DarkwebMonitoringPage = () => {
                 disabled={isSearching}
                 className="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-6 py-2 rounded-lg hover:from-purple-600 hover:to-pink-700 transition-all duration-200 disabled:opacity-50"
               >
-                {isSearching ? "Searching..." : (language === "French" ? "Rechercher" : "Search")}
+                {isSearching ? t({
+                  English: "Searching...",
+                  French: "Recherche...",
+                  Spanish: "Buscando..."
+                }) : t({
+                  English: "Search",
+                  French: "Rechercher",
+                  Spanish: "Buscar"
+                })}
               </button>
             </div>
             <div className="mt-4 text-sm text-gray-400">
-              {language === "French" 
-                ? "🔗 Connecté à Elasticsearch (192.168.1.110:9200)"
-                : "🔗 Connected to Elasticsearch (192.168.1.110:9200)"
-              }
+              {t({
+                English: "🔗 Connected to Elasticsearch (192.168.1.110:9200)",
+                French: "🔗 Connecté à Elasticsearch (192.168.1.110:9200)",
+                Spanish: "🔗 Conectado a Elasticsearch (192.168.1.110:9200)"
+              })}
             </div>
           </div>
         </motion.div>
@@ -307,7 +342,7 @@ const DarkwebMonitoringPage = () => {
           ))}
         </motion.div>
 
-        {/* Search Results */}
+        {/* Search Results Section */}
         {searchResults.length > 0 && (
           <motion.div
             className="bg-gradient-to-br from-gray-900/60 to-black/80 border border-gray-700/50 rounded-2xl p-6 backdrop-blur-sm mb-8"
@@ -317,30 +352,46 @@ const DarkwebMonitoringPage = () => {
           >
             <h2 className="text-2xl font-bold text-green-400 mb-6 flex items-center">
               <Search className="w-6 h-6 mr-3" />
-              Search Results Found ({searchResults.length})
+              {t({
+                English: `Search Results Found (${searchResults.length})`,
+                French: `Résultats trouvés (${searchResults.length})`,
+                Spanish: `Resultados encontrados (${searchResults.length})`
+              })}
             </h2>
             
             <div className="space-y-4">
               {searchResults.map((result, index) => (
                 <motion.div
-                  key={index}
-                  className="p-4 bg-gray-800/50 border border-gray-600/30 rounded-lg"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                  key={result.id}
+                  className="bg-white/5 backdrop-blur-lg rounded-lg p-6 border border-purple-500/20"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: index * 0.1 }}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex justify-between items-start mb-4">
                     <div className="flex-1">
-                      <div className="text-purple-400 font-mono text-sm">Source: {result.source}</div>
-                      <div className="text-gray-300 text-sm mt-1">Score: {result.score}</div>
-                      <div className="text-gray-400 text-xs mt-1">{result.timestamp}</div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="text-purple-400 font-mono text-sm">
+                          Match Score: {Math.round(result.score * 100)}%
+                        </div>
+                      </div>
+                      
+                      <div 
+                        className="text-gray-200 font-mono text-sm mt-2"
+                        dangerouslySetInnerHTML={{ __html: result.snippet }}
+                      />
                     </div>
+                    
                     <button
                       onClick={() => handleViewInfo(result)}
-                      className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200"
+                      className="ml-4 p-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 transition-colors"
                     >
-                      View Info
+                      <Eye className="w-5 h-5" />
                     </button>
+                  </div>
+
+                  <div className="text-gray-400 text-xs">
+                    ID: {result.id.slice(0, 8)}...
                   </div>
                 </motion.div>
               ))}
@@ -382,41 +433,42 @@ const DarkwebMonitoringPage = () => {
           </div>
         )}
 
-        {/* Result Details Modal */}
+        {/* Result Detail Modal */}
         {selectedResult && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.div
-              className="bg-gradient-to-br from-gray-900 to-black border border-purple-500/50 rounded-2xl p-8 max-w-2xl mx-4 max-h-96 overflow-y-auto"
-              initial={{ opacity: 0, scale: 0.9 }}
+              initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-gray-900 rounded-xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto border border-purple-500/20"
             >
-              <h3 className="text-2xl font-bold text-purple-400 mb-4">Search Result Details</h3>
-              <div className="space-y-4">
+              <div className="mb-6 flex justify-between items-start">
                 <div>
-                  <label className="text-gray-400 text-sm">Source:</label>
-                  <div className="text-white font-mono">{selectedResult.source}</div>
-                </div>
-                <div>
-                  <label className="text-gray-400 text-sm">Content:</label>
-                  <div className="text-gray-300 bg-gray-800/50 p-3 rounded text-sm max-h-32 overflow-y-auto">
-                    {selectedResult.content}
+                  <h3 className="text-xl font-semibold mb-2">Search Result Details</h3>
+                  <div className="text-purple-400 font-mono">
+                    Match Score: {Math.round(selectedResult.score * 100)}%
                   </div>
                 </div>
-                <div>
-                  <label className="text-gray-400 text-sm">URL:</label>
-                  <div className="text-blue-400 text-sm">{selectedResult.url || 'N/A'}</div>
+                <button
+                  onClick={() => setSelectedResult(null)}
+                  className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="bg-black/50 rounded-lg p-4">
+                  <div 
+                    className="text-gray-200 font-mono text-sm whitespace-pre-wrap"
+                    dangerouslySetInnerHTML={{ __html: selectedResult.snippet }}
+                  />
                 </div>
-                <div>
-                  <label className="text-gray-400 text-sm">Timestamp:</label>
-                  <div className="text-gray-300 text-sm">{selectedResult.timestamp}</div>
+
+                <div className="text-gray-400 text-sm">
+                  ID: {selectedResult.id}
                 </div>
               </div>
-              <button
-                onClick={() => setSelectedResult(null)}
-                className="mt-6 w-full bg-gray-700 text-white py-2 rounded-lg hover:bg-gray-600 transition-all duration-200"
-              >
-                Close
-              </button>
             </motion.div>
           </div>
         )}

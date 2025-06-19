@@ -1,16 +1,26 @@
+import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
+import { createServer, type Server } from "http";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { mongodb } from "./lib/mongodb";
+import path from 'path';
+import cors from 'cors';
 
 const app = express();
+
+// Basic middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+app.use(cors());
 
+// Request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
+  console.log(`[${new Date().toLocaleTimeString()}] Incoming ${req.method} ${path}`);
+  
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {
     capturedJsonResponse = bodyJson;
@@ -22,13 +32,8 @@ app.use((req, res, next) => {
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        logLine += ` - Response: ${JSON.stringify(capturedJsonResponse)}`;
       }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
       log(logLine);
     }
   });
@@ -36,33 +41,48 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
-  const server = await registerRoutes(app);
+let server: Server | null = null;
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+async function startServer() {
+  try {
+    if (server) {
+      log('Server is already running');
+      return;
+    }
 
-    res.status(status).json({ message });
-    throw err;
-  });
+    // Test MongoDB connection first
+    const mongoConnection = await mongodb.testConnection();
+    if (!mongoConnection.connected) {
+      throw new Error(`MongoDB connection failed: ${mongoConnection.error}`);
+    }
+    log('MongoDB connected successfully');
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
+    // Register API routes first
+    await registerRoutes(app);
+    log('API routes registered');
+
+    // Create HTTP server
+    server = createServer(app);
+
+    // Development setup - after API routes
+    if (process.env.NODE_ENV === "development") {
+      await setupVite(app, server);
+      log('Vite middleware setup completed');
+    } else {
+      app.use('/', express.static(path.join(process.cwd(), 'dist/client')));
+    }
+
+    // Start server
+    const port = process.env.PORT || 5000;
+    server.listen(port, () => {
+      log(`Server running on port ${port}`);
+    });
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    log(`Server startup error: ${errorMessage}`);
+    process.exit(1);
   }
+}
 
-  // Serve the app on the specified backend port
-  const port = 50106;
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-  });
-})();
+startServer();

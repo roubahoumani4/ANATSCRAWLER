@@ -105,7 +105,7 @@ const EnhancedLoginPage = () => {
 
       {/* Main Content */}
       <motion.div
-        className="relative z-10 w-full max-w-md mx-auto p-8"
+        className="relative z-10 w-full max-w-lg mx-auto p-8"
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: isVisible ? 1 : 0, y: isVisible ? 0 : 30 }}
         transition={{ duration: 0.8, delay: 0.2 }}
@@ -218,17 +218,18 @@ const EnhancedLoginPage = () => {
                 <span>{translations.loginButton[language]}</span>
               )}
             </motion.button>
-          </form>
 
-          {/* Demo Credentials */}
-          <div className="mt-6 p-4 bg-gray-700/50 rounded-lg">
-            <p className="text-xs text-gray-400 mb-2 font-medium">Demo Credentials:</p>
-            <div className="text-xs text-gray-400 space-y-1">
-              <div>admin / admin123</div>
-              <div>jsmith / password123</div>
-              <div>mjohnson / secure456</div>
+            {/* Signup Link */}
+            <div className="mt-6 text-center">
+              <button
+                type="button"
+                onClick={() => setLocation("/signup")}
+                className="text-indigo-400 hover:text-indigo-300 text-sm"
+              >
+                {language === "English" ? "Need an account? Sign up" : "Besoin d'un compte? S'inscrire"}
+              </button>
             </div>
-          </div>
+          </form>
         </div>
       </motion.div>
     </div>

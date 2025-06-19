@@ -6,6 +6,7 @@ import { useAuth } from "./context/AuthContext";
 import DashboardPage from "@/pages/DashboardPage";
 import LandingPage from "@/pages/LandingPage";
 import EnhancedLoginPage from "@/pages/EnhancedLoginPage";
+import SignupPage from "@/pages/SignupPage";
 import NotFoundPage from "@/pages/NotFoundPage";
 import OsintFrameworkPage from "@/pages/OsintFrameworkPage";
 import DarkwebMonitoringPage from "@/pages/DarkwebMonitoringPage";
@@ -38,6 +39,7 @@ export default function AppContent() {
         <Switch>
           <Route path="/" component={LandingPage} />
           <Route path="/login" component={EnhancedLoginPage} />
+          <Route path="/signup" component={SignupPage} />
           <Route>
             <LandingPage />
           </Route>
