@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import express, { type Request, Response, NextFunction } from "express";
+import express, { type Request, Response, NextFunction, Router } from "express";
 import { createServer, type Server } from "http";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
@@ -9,14 +9,21 @@ import path from 'path';
 import cors from 'cors';
 
 const app = express();
+const secureRouter = Router();
 
 // Basic middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-app.use(cors());
+app.use(cors({
+  origin: 'http://127.0.0.1:5000',
+  credentials: true
+}));
 
-// Secure routes that require authentication
-app.use('/api/secure', authenticate);
+// Apply authentication middleware to secure router
+secureRouter.use(authenticate);
+
+// Mount secure router at /api/secure path
+app.use('/api/secure', secureRouter);
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -35,7 +42,7 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
+      if (capturedJsonResponse && !path.includes('password')) {
         logLine += ` - Response: ${JSON.stringify(capturedJsonResponse)}`;
       }
       log(logLine);
@@ -45,48 +52,51 @@ app.use((req, res, next) => {
   next();
 });
 
-let server: Server | null = null;
+let httpServer: Server | null = null;
 
 async function startServer() {
   try {
-    if (server) {
-      log('Server is already running');
-      return;
+    // Initialize database connection
+    if (!await mongodb.connect()) {
+      throw new Error('Failed to connect to MongoDB');
     }
-
-    // Test MongoDB connection first
-    const mongoConnection = await mongodb.testConnection();
-    if (!mongoConnection.connected) {
-      throw new Error(`MongoDB connection failed: ${mongoConnection.error}`);
-    }
-    log('MongoDB connected successfully');
-
-    // Register API routes first
-    await registerRoutes(app);
-    log('API routes registered');
 
     // Create HTTP server
-    server = createServer(app);
+    httpServer = createServer(app);
 
-    // Development setup - after API routes
-    if (process.env.NODE_ENV === "development") {
-      await setupVite(app, server);
-      log('Vite middleware setup completed');
+    // Register all routes
+    await registerRoutes(app);
+
+    // In development, set up Vite
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Setting up Vite development server...');
+      await setupVite(app, httpServer);
     } else {
-      app.use('/', express.static(path.join(process.cwd(), 'dist/client')));
+      // In production, serve static files
+      app.use(express.static(path.join(__dirname, '../client/dist')));
     }
 
-    // Start server
     const port = process.env.PORT || 5000;
-    server.listen(port, () => {
-      log(`Server running on port ${port}`);
+    httpServer.listen(port, () => {
+      console.log(`Server running at http://127.0.0.1:${port}`);
     });
 
+    httpServer.on('error', console.error);
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    log(`Server startup error: ${errorMessage}`);
+    console.error('Failed to start server:', error);
     process.exit(1);
   }
 }
+
+// Cleanup on exit
+process.on('SIGTERM', () => {
+  console.log('SIGTERM signal received: closing HTTP server');
+  if (httpServer) {
+    httpServer.close(() => {
+      console.log('HTTP server closed');
+      mongodb.close().catch(console.error);
+    });
+  }
+});
 
 startServer();
