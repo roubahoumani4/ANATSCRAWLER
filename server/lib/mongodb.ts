@@ -25,7 +25,7 @@ interface UserCreateResult {
 }
 
 // Use environment variable with fallback
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://46.165.254.175:50105/anat_security?directConnection=true";
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb://192.168.1.110:27017/anat_security?directConnection=true";
 const DB_NAME = 'anat_security';
 const COLLECTION_NAME = 'people';
 

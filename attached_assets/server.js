@@ -21,7 +21,7 @@ app.set('trust proxy', 1);
   // Security Middleware
   app.use(helmet());
   app.use(cors({
-    origin: "https://horus.anatsecurity.fr",
+    origin: "http://127.0.0.1:5000",
     credentials: true
   }));
   app.use(express.json());

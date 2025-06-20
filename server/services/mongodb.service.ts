@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://46.165.254.175:50105/anat_security";
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb://192.168.1.110:27017/anat_security";
 
 class MongoDBService {
   private static instance: MongoDBService;

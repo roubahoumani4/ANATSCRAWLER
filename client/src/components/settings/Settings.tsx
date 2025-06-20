@@ -15,7 +15,7 @@ const Settings = () => {
   const [autoLogout, setAutoLogout] = useState(30);
   const [notifications, setNotifications] = useState(true);
   const [elasticsearchUrl, setElasticsearchUrl] = useState("http://192.168.1.110:9200");
-  const [mongoUrl, setMongoUrl] = useState("mongodb://46.165.254.175:50105/anat_security");
+  const [mongoUrl, setMongoUrl] = useState("mongodb://192.168.1.110:27017/anat_security");
   const [isSaving, setIsSaving] = useState(false);
 
   // Translation object
