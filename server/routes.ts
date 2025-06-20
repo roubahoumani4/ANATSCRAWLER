@@ -1,4 +1,4 @@
-import type { Express, Request, Response, NextFunction } from "express";
+import type { Express, Request, Response, NextFunction, Router } from "express";
 import helmet from "helmet";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
@@ -12,12 +12,19 @@ import { ObjectId } from 'mongodb';
 import { registerRoutes as registerSearchRoutes } from './routes/search';
 import authenticate from './middleware/auth';
 import type { User } from './types/User';
+import express from 'express';
 
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || "ANAT_SECURITY_JWT_SECRET_KEY";
 const TOKEN_EXPIRATION = "24h";
 
 export async function registerRoutes(app: Express): Promise<void> {
+  // Create a new secure router
+  const secureRouter = express.Router();
+  
+  // Apply authentication middleware to secure router
+  secureRouter.use(authenticate);
+
   // Register search routes
   registerSearchRoutes(app);
 
@@ -99,14 +106,6 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  // Protected routes
-  const secureRouter = app._router.stack
-    .find((layer: any) => layer.regexp?.test('/api/secure'))?.handle;
-
-  if (!secureRouter) {
-    throw new Error('Secure router not found - ensure it is set up in index.ts');
-  }
-
   // Add protected routes to secure router
   secureRouter.get("/profile", async (req: Request, res: Response) => {
     try {
@@ -130,4 +129,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       res.status(500).json({ error: "Failed to fetch profile" });
     }
   });
+
+  // Mount secure router at /api/secure path
+  app.use('/api/secure', secureRouter);
 }

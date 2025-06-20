@@ -1,15 +1,13 @@
 import 'dotenv/config';
-import express, { type Request, Response, NextFunction, Router } from "express";
+import express, { type Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { mongodb } from "./lib/mongodb";
-import authenticate from './middleware/auth';
 import path from 'path';
 import cors from 'cors';
 
 const app = express();
-const secureRouter = Router();
 
 // Basic middleware
 app.use(express.json());
@@ -18,12 +16,6 @@ app.use(cors({
   origin: 'http://127.0.0.1:5000',
   credentials: true
 }));
-
-// Apply authentication middleware to secure router
-secureRouter.use(authenticate);
-
-// Mount secure router at /api/secure path
-app.use('/api/secure', secureRouter);
 
 // Request logging middleware
 app.use((req, res, next) => {
