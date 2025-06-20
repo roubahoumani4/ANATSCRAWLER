@@ -69,18 +69,26 @@ async function startServer() {
       console.log('Setting up Vite development server...');
       await setupVite(app, httpServer);
     } else {
-      // In production, serve static files from the client/dist directory
-      const clientDistPath = path.resolve(__dirname, '../client/dist');
+      // In production, serve static files from the dist/client directory
+      const clientDistPath = path.resolve(__dirname, '../dist/client');
       console.log('Serving static files from:', clientDistPath);
-      app.use(express.static(clientDistPath));
       
-      // Serve index.html for all non-API routes (SPA fallback)
+      // Serve static files
+      app.use(express.static(clientDistPath, {
+        index: false, // Don't immediately serve index.html for '/'
+        maxAge: '1d' // Cache static assets for 1 day
+      }));
+
+      // Handle SPA routing - serve index.html for all non-API routes
       app.get('*', (req, res, next) => {
-        if (!req.path.startsWith('/api')) {
-          res.sendFile(path.join(clientDistPath, 'index.html'));
-        } else {
-          next();
+        if (req.path.startsWith('/api')) {
+          return next(); // Let API routes be handled by the API router
         }
+        
+        // Send the index.html file for client-side routing
+        const indexPath = path.join(clientDistPath, 'index.html');
+        console.log('Serving index.html for:', req.path);
+        res.sendFile(indexPath);
       });
     }
 

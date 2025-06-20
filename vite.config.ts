@@ -10,27 +10,39 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "client", "src"),
+      "@": path.resolve(__dirname, "client/src"),
       "@shared": path.resolve(__dirname, "shared"),
       "@assets": path.resolve(__dirname, "attached_assets"),
     },
   },
   root: path.resolve(__dirname, "client"),
   build: {
-    outDir: path.resolve(__dirname, "dist", "client"),
+    outDir: path.resolve(__dirname, "dist/client"),
     emptyOutDir: true,
+    sourcemap: true,
     rollupOptions: {
       input: {
-        main: path.resolve(__dirname, "client", "index.html"),
+        main: path.resolve(__dirname, "client/index.html"),
       },
-    },
+      output: {
+        manualChunks: {
+          vendor: [
+            'react',
+            'react-dom',
+            'react-router-dom',
+            'framer-motion',
+            '@tanstack/react-query'
+          ]
+        }
+      }
+    }
   },
   server: {
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:5000',
-        changeOrigin: true,
-      },
-    },
-  },
+        changeOrigin: true
+      }
+    }
+  }
 });
