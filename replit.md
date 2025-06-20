@@ -1,7 +1,7 @@
 # ANAT Security - Web Application
 
 ## Overview
-This project is a full-stack web application for ANAT Security, focusing on credential search and user management. It uses a React frontend with a Node.js/Express backend, connected to a PostgreSQL database via Drizzle ORM. The application follows a modern architecture with component-based UI design using Shadcn UI components and implements features like authentication, dark/light theme switching, and multilingual support.
+This project is a full-stack web application for ANAT Security, focusing on credential search and user management. It uses a React frontend with a Node.js/Express backend, connected to MongoDB. The application follows a modern architecture with component-based UI design using Shadcn UI components and implements features like authentication, dark/light theme switching, and multilingual support.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -22,7 +22,7 @@ The application follows a client-server architecture with the following core com
    - Server-side rendering support during development with Vite
    - API route logging middleware
 
-3. **Database**: PostgreSQL with Drizzle ORM
+3. **Database**: MongoDB
    - Schema defined in `shared/schema.ts`
    - Tables for users, search history, search results, and user preferences
    - Connection handled via environment variables
@@ -71,7 +71,7 @@ The application follows a client-server architecture with the following core com
 
 3. **Storage Layer**
    - Database interactions abstracted through a storage interface
-   - Currently using both Drizzle ORM for PostgreSQL and a memory-based storage for development
+   - Using MongoDB for all data storage
 
 ## Data Flow
 
