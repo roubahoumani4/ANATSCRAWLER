@@ -102,15 +102,16 @@ jobs:
             npm ci --production
 
             # Build the application
+            export QT_QPA_PLATFORM=offscreen
             npm run build
 
             # Create PM2 configuration file
-            cat > ecosystem.config.js << 'EOL'
+            cat > ecosystem.config.cjs << 'EOL'
             module.exports = {
               apps: [
                 {
                   name: 'anatscrawler-backend',
-                  script: 'server/index.ts',
+                  script: 'dist/index.js',
                   env: {
                     NODE_ENV: 'production',
                     ELASTICSEARCH_URL: 'http://192.168.1.110:9200',
@@ -134,5 +135,8 @@ jobs:
             }
             EOL
 
+            # Install PM2 globally if not installed
+            npm install -g pm2
+            
             # Start/Restart the application using PM2
-            pm2 reload ecosystem.config.js
+            pm2 reload ecosystem.config.cjs
