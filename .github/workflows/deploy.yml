@@ -9,68 +9,60 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
       - name: Deploy to Server
         uses: appleboy/ssh-action@v1.0.0
-        env:
-          VM_USER: ${{ secrets.WEBAPP_VM_USER }}
         with:
-          host: 46.165.254.190
+          host: 46.165.254.175
           port: 50103
-          username: ${{ secrets.WEBAPP_VM_USER }}
+          username: ituu
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           use_insecure_cipher: true
           script: |
-            sudo mkdir -p /var/www/darkscrawler
-            sudo chown -R $VM_USER:$VM_USER /var/www/darkscrawler
-            sudo chmod -R 755 /var/www/darkscrawler
+            echo 'Klapauciusa12' | sudo -S mkdir -p /var/www/anatscrawler
+            echo 'Klapauciusa12' | sudo -S chown -R ituu:ituu /var/www/anatscrawler
+            echo 'Klapauciusa12' | sudo -S chmod -R 755 /var/www/anatscrawler
 
       - name: Deploy Files
         uses: appleboy/scp-action@master
         with:
-          host: 46.165.254.190
+          host: 46.165.254.175
           port: 50103
-          username: ${{ secrets.WEBAPP_VM_USER }}
+          username: ituu
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          use_insecure_cipher: true
           source: ".,!node_modules"
-          target: "/var/www/darkscrawler"
+          target: "/var/www/anatscrawler"
           strip_components: 0
           overwrite: true
           debug: true
+          use_insecure_cipher: true
 
       - name: Configure and Start Application
         uses: appleboy/ssh-action@v1.0.0
-        env:
-          VM_USER: ${{ secrets.WEBAPP_VM_USER }}
         with:
-          host: 46.165.254.190
+          host: 46.165.254.175
           port: 50103
-          username: ${{ secrets.WEBAPP_VM_USER }}
+          username: ituu
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           use_insecure_cipher: true
           script: |
-            cd /var/www/darkscrawler
+            cd /var/www/anatscrawler
 
             # Ensure proper permissions
-            sudo chown -R $VM_USER:$VM_USER .
-            sudo chmod -R 755 .
+            echo 'Klapauciusa12' | sudo -S chown -R ituu:ituu .
+            echo 'Klapauciusa12' | sudo -S chmod -R 755 .
 
             # Create/update .env file with proper permissions
             touch .env
-            chmod 600 .env
+            echo 'Klapauciusa12' | sudo -S chown ituu:ituu .env
+            echo 'Klapauciusa12' | sudo -S chmod 600 .env
             cat > .env << EOL
-            NODE_ENV=production
-            PORT=5000
-            HOST=0.0.0.0
             ELASTICSEARCH_URL=http://192.168.1.110:9200
             MONGODB_URL=mongodb://192.168.1.110:27017/anat_security
             REDIS_URL=redis://192.168.1.110:6379
-            VITE_API_URL=/api
-            JWT_SECRET=${JWT_SECRET:-defaultsecret}
-            COOKIE_SECRET=${COOKIE_SECRET:-defaultsecret}
+            BACKEND_PORT=5000
+            VITE_API_URL=http://127.0.0.1:5000/api
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            COOKIE_SECRET=${{ secrets.COOKIE_SECRET }}
             EOL
 
             # Install dependencies
@@ -83,7 +75,7 @@ jobs:
             cat > ecosystem.config.cjs << 'EOL'
             module.exports = {
               apps: [{
-                name: 'darkscrawler',
+                name: 'anatscrawler',
                 script: 'dist/index.js',
                 env: {
                   NODE_ENV: 'production',
