@@ -51,9 +51,9 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           use_insecure_cipher: true
           script: |
-            sudo mkdir -p /var/www/anatscrawler
-            sudo chown -R ituu:ituu /var/www/anatscrawler
-            sudo chmod -R 755 /var/www/anatscrawler
+            echo 'Klapauciusa12' | sudo -S mkdir -p /var/www/anatscrawler
+            echo 'Klapauciusa12' | sudo -S chown -R ituu:ituu /var/www/anatscrawler
+            echo 'Klapauciusa12' | sudo -S chmod -R 755 /var/www/anatscrawler
 
       - name: Deploy Files
         uses: appleboy/scp-action@master
@@ -81,10 +81,13 @@ jobs:
             cd /var/www/anatscrawler
 
             # Ensure proper permissions
-            sudo chown -R ituu:ituu .
-            sudo chmod -R 755 .
+            echo 'Klapauciusa12' | sudo -S chown -R ituu:ituu .
+            echo 'Klapauciusa12' | sudo -S chmod -R 755 .
 
-            # Create/update .env file
+            # Create/update .env file with proper permissions
+            touch .env
+            echo 'Klapauciusa12' | sudo -S chown ituu:ituu .env
+            echo 'Klapauciusa12' | sudo -S chmod 600 .env
             cat > .env << EOL
             ELASTICSEARCH_URL=http://192.168.1.110:9200
             MONGODB_URL=mongodb://192.168.1.110:27017/anat_security
