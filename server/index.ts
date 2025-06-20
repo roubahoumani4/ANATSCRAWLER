@@ -18,16 +18,11 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Use more permissive CORS in development
-const corsOptions = process.env.NODE_ENV === 'production' 
-  ? {
-      origin: 'http://127.0.0.1:5000',
-      credentials: true
-    }
-  : {
-      origin: true, // Allow all origins in development
-      credentials: true
-    };
+// Use more permissive CORS configuration
+const corsOptions = {
+  origin: true, // Allow all origins
+  credentials: true
+};
 
 app.use(cors(corsOptions));
 
