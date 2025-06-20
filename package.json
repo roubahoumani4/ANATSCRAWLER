@@ -45,7 +45,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.18",
     "@types/fast-levenshtein": "^0.0.4",
-    "@types/jsonwebtoken": "^9.0.9",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/mongoose": "^5.11.96",
     "bcryptjs": "^3.0.2",
     "class-variance-authority": "^0.7.1",

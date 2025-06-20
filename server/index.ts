@@ -4,6 +4,7 @@ import { createServer, type Server } from "http";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { mongodb } from "./lib/mongodb";
+import authenticate from './middleware/auth';
 import path from 'path';
 import cors from 'cors';
 
@@ -13,6 +14,9 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cors());
+
+// Secure routes that require authentication
+app.use('/api/secure', authenticate);
 
 // Request logging middleware
 app.use((req, res, next) => {
