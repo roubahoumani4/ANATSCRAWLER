@@ -9,100 +9,87 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
       - name: Deploy to Server
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: 46.165.254.175
+          host: 46.165.254.190
           port: 50103
-          username: ituu
+          username: ${{ secrets.WEBAPP_VM_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          use_insecure_cipher: true
           script: |
-            echo 'Klapauciusa12' | sudo -S mkdir -p /var/www/anatscrawler
-            echo 'Klapauciusa12' | sudo -S chown -R ituu:ituu /var/www/anatscrawler
-            echo 'Klapauciusa12' | sudo -S chmod -R 755 /var/www/anatscrawler
+            mkdir -p /var/www/darkscrawler
+            chown -R ${{ secrets.WEBAPP_VM_USER }}:${{ secrets.WEBAPP_VM_USER }} /var/www/darkscrawler
+            chmod -R 755 /var/www/darkscrawler
 
       - name: Deploy Files
         uses: appleboy/scp-action@master
         with:
-          host: 46.165.254.175
+          host: 46.165.254.190
           port: 50103
-          username: ituu
+          username: ${{ secrets.WEBAPP_VM_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: ".,!node_modules"
-          target: "/var/www/anatscrawler"
+          target: "/var/www/darkscrawler"
           strip_components: 0
           overwrite: true
           debug: true
-          use_insecure_cipher: true
 
       - name: Configure and Start Application
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: 46.165.254.175
+          host: 46.165.254.190
           port: 50103
-          username: ituu
+          username: ${{ secrets.WEBAPP_VM_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          use_insecure_cipher: true
           script: |
-            cd /var/www/anatscrawler
+            cd /var/www/darkscrawler
 
             # Ensure proper permissions
-            echo 'Klapauciusa12' | sudo -S chown -R ituu:ituu .
-            echo 'Klapauciusa12' | sudo -S chmod -R 755 .
+            chown -R ${{ secrets.WEBAPP_VM_USER }}:${{ secrets.WEBAPP_VM_USER }} .
+            chmod -R 755 .
 
             # Create/update .env file with proper permissions
             touch .env
-            echo 'Klapauciusa12' | sudo -S chown ituu:ituu .env
-            echo 'Klapauciusa12' | sudo -S chmod 600 .env
+            chmod 600 .env
             cat > .env << EOL
+            NODE_ENV=production
+            PORT=5000
+            HOST=0.0.0.0
             ELASTICSEARCH_URL=http://192.168.1.110:9200
             MONGODB_URL=mongodb://192.168.1.110:27017/anat_security
             REDIS_URL=redis://192.168.1.110:6379
-            BACKEND_PORT=5000
-            VITE_API_URL=http://127.0.0.1:5000/api
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
-            COOKIE_SECRET=${{ secrets.COOKIE_SECRET }}
+            VITE_API_URL=/api
+            JWT_SECRET=${JWT_SECRET:-defaultsecret}
+            COOKIE_SECRET=${COOKIE_SECRET:-defaultsecret}
             EOL
 
             # Install dependencies
             npm ci --production
 
             # Build the application
-            export QT_QPA_PLATFORM=offscreen
             npm run build
 
             # Create PM2 configuration file
             cat > ecosystem.config.cjs << 'EOL'
             module.exports = {
-              apps: [
-                {
-                  name: 'anatscrawler-backend',
-                  script: 'dist/index.js',
-                  env: {
-                    NODE_ENV: 'production',
-                    ELASTICSEARCH_URL: 'http://192.168.1.110:9200',
-                    MONGODB_URL: 'mongodb://192.168.1.110:27017/anat_security',
-                    REDIS_URL: 'redis://192.168.1.110:6379',
-                    BACKEND_PORT: '5000',
-                    JWT_SECRET: process.env.JWT_SECRET,
-                    COOKIE_SECRET: process.env.COOKIE_SECRET
-                  }
-                },
-                {
-                  name: 'anatscrawler-frontend',
-                  script: 'npm',
-                  args: 'start',
-                  env: {
-                    VITE_API_URL: 'https://horus.anatsecurity.fr/api'
-                  }
+              apps: [{
+                name: 'darkscrawler',
+                script: 'dist/index.js',
+                env: {
+                  NODE_ENV: 'production',
+                  PORT: '5000',
+                  HOST: '0.0.0.0',
+                  ELASTICSEARCH_URL: 'http://192.168.1.110:9200',
+                  MONGODB_URL: 'mongodb://192.168.1.110:27017/anat_security',
+                  REDIS_URL: 'redis://192.168.1.110:6379'
                 }
-              ]
+              }]
             }
             EOL
 
-            # Install PM2 globally if not installed
-            npm install -g pm2
-            
-            # Start/Restart the application using PM2
-            pm2 reload ecosystem.config.cjs
+            # Start/restart the application
+            pm2 reload ecosystem.config.cjs || pm2 start ecosystem.config.cjs
+            pm2 save
