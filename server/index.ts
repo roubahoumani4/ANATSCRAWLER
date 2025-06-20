@@ -92,9 +92,13 @@ async function startServer() {
       });
     }
 
-    const port = process.env.PORT || 5000;
-    httpServer.listen(port, () => {
-      console.log(`Server running at http://127.0.0.1:${port}`);
+    const port = parseInt(process.env.PORT || '5000', 10);
+    const host = '0.0.0.0';
+    httpServer.listen({ port, host }, () => {
+      console.log(`Server running at http://${host}:${port}`);
+      console.log('You can access the server at:');
+      console.log(`- Local: http://localhost:${port}`);
+      console.log(`- Network: http://${host}:${port}`);
     });
 
     httpServer.on('error', console.error);
