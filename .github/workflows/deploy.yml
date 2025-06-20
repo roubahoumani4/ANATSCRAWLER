@@ -36,8 +36,11 @@ jobs:
         env:
           ELASTICSEARCH_URL: http://192.168.1.110:9200
           MONGODB_URL: mongodb://192.168.1.110:27017/anatscrawler
+          REDIS_URL: redis://192.168.1.110:6379
           BACKEND_PORT: 5000
           VITE_API_URL: https://horus.anatsecurity.fr/api
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          COOKIE_SECRET: ${{ secrets.COOKIE_SECRET }}
 
       - name: Deploy Files
         uses: appleboy/scp-action@master
@@ -68,13 +71,23 @@ jobs:
             sudo chown -R $USER:$USER .
 
             # Create/update .env file
-            echo "ELASTICSEARCH_URL=http://192.168.1.110:9200" > .env
-            echo "MONGODB_URL=mongodb://192.168.1.110:27017/anatscrawler" >> .env
-            echo "BACKEND_PORT=5000" >> .env
-            echo "VITE_API_URL=https://horus.anatsecurity.fr/api" >> .env
+            cat > .env << EOL
+            ELASTICSEARCH_URL=http://192.168.1.110:9200
+            MONGODB_URL=mongodb://192.168.1.110:27017/anatscrawler
+            DATABASE_URL=postgresql://user:password@192.168.1.110:5432/darkscrawler
+            REDIS_URL=redis://192.168.1.110:6379
+            BACKEND_PORT=5000
+            VITE_API_URL=https://horus.anatsecurity.fr/api
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            COOKIE_SECRET=${{ secrets.COOKIE_SECRET }}
+            EOL
 
             # Install dependencies
             npm ci --production
+
+            # Run database migrations
+            npx drizzle-kit generate:pg
+            npx drizzle-kit push:pg
 
             # Build the application
             npm run build
@@ -90,7 +103,11 @@ jobs:
                     NODE_ENV: 'production',
                     ELASTICSEARCH_URL: 'http://192.168.1.110:9200',
                     MONGODB_URL: 'mongodb://192.168.1.110:27017/anatscrawler',
-                    BACKEND_PORT: '5000'
+                    DATABASE_URL: 'postgresql://user:password@192.168.1.110:5432/darkscrawler',
+                    REDIS_URL: 'redis://192.168.1.110:6379',
+                    BACKEND_PORT: '5000',
+                    JWT_SECRET: process.env.JWT_SECRET,
+                    COOKIE_SECRET: process.env.COOKIE_SECRET
                   }
                 },
                 {
@@ -98,8 +115,6 @@ jobs:
                   script: 'npm',
                   args: 'start',
                   env: {
-                    NODE_ENV: 'production',
-                    PORT: '3000',
                     VITE_API_URL: 'https://horus.anatsecurity.fr/api'
                   }
                 }
@@ -107,7 +122,5 @@ jobs:
             }
             EOL
 
-            # Start/restart the applications using PM2
-            pm2 delete anatscrawler-backend anatscrawler-frontend || true
-            pm2 start ecosystem.config.js
-            pm2 save
+            # Start/Restart the application using PM2
+            pm2 reload ecosystem.config.js

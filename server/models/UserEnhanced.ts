@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
+// User Schema
 const userSchema = new mongoose.Schema({
   username: {
     type: String,
@@ -139,7 +140,7 @@ const sessionSchema = new mongoose.Schema({
 });
 
 // Password hashing middleware
-userSchema.pre('save', async function(this: any, next: any) {
+userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
   
   try {
