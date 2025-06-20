@@ -75,9 +75,6 @@ async function startServer() {
     // Create HTTP server
     httpServer = createServer(app);
 
-    // Register all routes
-    await registerRoutes(app);
-
     // Register API routes first
     await registerRoutes(app);
 
@@ -86,18 +83,19 @@ async function startServer() {
     
     if (isDev) {
       // In development, dynamically import and setup Vite
-      const { setupVite } = await import('./vite');
-      console.log('Setting up Vite development server...');
-      await setupVite(app, httpServer);
+      const { setupDevServer } = await import('./middleware/devServer');
+      await setupDevServer(app, httpServer);
     } else {
       // In production, serve static files from the dist/client directory
-      const clientDistPath = path.resolve(__dirname, '../client');
+      const clientDistPath = path.resolve(__dirname, '../../dist/client');
       console.log('Serving static files from:', clientDistPath);
       
-      // Serve static files
+      // Serve static files with caching headers
       app.use(express.static(clientDistPath, {
         index: false, // Don't immediately serve index.html for '/'
-        maxAge: '1d' // Cache static assets for 1 day
+        maxAge: '1d', // Cache static assets for 1 day
+        etag: true,
+        lastModified: true
       }));
 
       // Handle SPA routing - serve index.html for all non-API routes
@@ -108,8 +106,12 @@ async function startServer() {
         
         // Send the index.html file for client-side routing
         const indexPath = path.join(clientDistPath, 'index.html');
-        console.log('Serving index.html for:', req.path);
-        res.sendFile(indexPath);
+        res.sendFile(indexPath, (err) => {
+          if (err) {
+            console.error('Error sending index.html:', err);
+            next(err);
+          }
+        });
       });
     }
 
@@ -120,6 +122,7 @@ async function startServer() {
       console.log('You can access the server at:');
       console.log(`- Local: http://localhost:${port}`);
       console.log(`- Network: http://${host}:${port}`);
+      console.log(`Environment: ${isDev ? 'development' : 'production'}`);
     });
 
     httpServer.on('error', console.error);
