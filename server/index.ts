@@ -2,7 +2,6 @@ import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
 import { mongodb } from "./lib/mongodb";
 import path from 'path';
 import cors from 'cors';
@@ -53,6 +52,17 @@ app.use((req, res, next) => {
   next();
 });
 
+// Logging function
+function log(message: string) {
+  console.log(`[${new Date().toLocaleTimeString()}] ${message}`);
+}
+
+// Error handling middleware
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+  console.error('Error:', err);
+  res.status(500).json({ error: 'Internal Server Error' });
+});
+
 let httpServer: Server | null = null;
 
 async function startServer() {
@@ -68,13 +78,20 @@ async function startServer() {
     // Register all routes
     await registerRoutes(app);
 
-    // In development, set up Vite
-    if (process.env.NODE_ENV !== 'production') {
+    // Register API routes first
+    await registerRoutes(app);
+
+    // Handle static files and client routing
+    const isDev = process.env.NODE_ENV !== 'production';
+    
+    if (isDev) {
+      // In development, dynamically import and setup Vite
+      const { setupVite } = await import('./vite');
       console.log('Setting up Vite development server...');
       await setupVite(app, httpServer);
     } else {
       // In production, serve static files from the dist/client directory
-      const clientDistPath = path.resolve(__dirname, '../dist/client');
+      const clientDistPath = path.resolve(__dirname, '../client');
       console.log('Serving static files from:', clientDistPath);
       
       // Serve static files
