@@ -419,18 +419,30 @@ var vite_config_default = defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "client", "src"),
+      "@": path.resolve(__dirname, "client/src"),
       "@shared": path.resolve(__dirname, "shared"),
       "@assets": path.resolve(__dirname, "attached_assets")
     }
   },
   root: path.resolve(__dirname, "client"),
   build: {
-    outDir: path.resolve(__dirname, "dist", "client"),
+    outDir: path.resolve(__dirname, "dist/client"),
     emptyOutDir: true,
+    sourcemap: true,
     rollupOptions: {
       input: {
-        main: path.resolve(__dirname, "client", "index.html")
+        main: path.resolve(__dirname, "client/index.html")
+      },
+      output: {
+        manualChunks: {
+          vendor: [
+            "react",
+            "react-dom",
+            "react-router-dom",
+            "framer-motion",
+            "@tanstack/react-query"
+          ]
+        }
       }
     }
   },
@@ -546,20 +558,30 @@ async function startServer() {
       console.log("Setting up Vite development server...");
       await setupVite(app, httpServer);
     } else {
-      const clientDistPath = path3.resolve(__dirname2, "../client/dist");
+      const clientDistPath = path3.resolve(__dirname2, "../dist/client");
       console.log("Serving static files from:", clientDistPath);
-      app.use(express3.static(clientDistPath));
+      app.use(express3.static(clientDistPath, {
+        index: false,
+        // Don't immediately serve index.html for '/'
+        maxAge: "1d"
+        // Cache static assets for 1 day
+      }));
       app.get("*", (req, res, next) => {
-        if (!req.path.startsWith("/api")) {
-          res.sendFile(path3.join(clientDistPath, "index.html"));
-        } else {
-          next();
+        if (req.path.startsWith("/api")) {
+          return next();
         }
+        const indexPath = path3.join(clientDistPath, "index.html");
+        console.log("Serving index.html for:", req.path);
+        res.sendFile(indexPath);
       });
     }
-    const port = process.env.PORT || 5e3;
-    httpServer.listen(port, () => {
-      console.log(`Server running at http://127.0.0.1:${port}`);
+    const port = parseInt(process.env.PORT || "5000", 10);
+    const host = "0.0.0.0";
+    httpServer.listen({ port, host }, () => {
+      console.log(`Server running at http://${host}:${port}`);
+      console.log("You can access the server at:");
+      console.log(`- Local: http://localhost:${port}`);
+      console.log(`- Network: http://${host}:${port}`);
     });
     httpServer.on("error", console.error);
   } catch (error) {

@@ -17,10 +17,19 @@ const app = express();
 // Basic middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-app.use(cors({
-  origin: 'http://127.0.0.1:5000',
-  credentials: true
-}));
+
+// Use more permissive CORS in development
+const corsOptions = process.env.NODE_ENV === 'production' 
+  ? {
+      origin: 'http://127.0.0.1:5000',
+      credentials: true
+    }
+  : {
+      origin: true, // Allow all origins in development
+      credentials: true
+    };
+
+app.use(cors(corsOptions));
 
 // Request logging middleware
 app.use((req, res, next) => {
