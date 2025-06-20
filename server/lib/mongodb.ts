@@ -3,7 +3,7 @@ import { MongoClient, MongoClientOptions, Document, WithId, ObjectId } from 'mon
 import bcrypt from 'bcryptjs';
 import dns from 'dns';
 
-// Update User interface to match the one in types/User.ts
+// Define User interface to match existing database structure
 interface User {
   _id?: string | ObjectId;
   username: string;
@@ -51,12 +51,17 @@ const MONGODB_URI = process.env.MONGODB_URI || "mongodb://192.168.1.110:27017/an
 const DB_NAME = 'anat_security';
 const COLLECTION_NAME = 'users';
 
-export class MongoDBClient {
+console.log('MongoDB URI being used:', MONGODB_URI);
+console.log('Database:', DB_NAME);
+console.log('Collection:', COLLECTION_NAME);
+
+class MongoDBClient {
   private static instance: MongoDBClient;
   private client: MongoClient | null = null;
   private isConnected: boolean = false;
   private db: any = null;
   private collection: any = null;
+  private connectionPromise: Promise<boolean> | null = null;
 
   private constructor() {}
 
@@ -72,23 +77,78 @@ export class MongoDBClient {
       return true;
     }
 
+    // Return existing connection attempt if one is in progress
+    if (this.connectionPromise) {
+      return this.connectionPromise;
+    }
+
+    this.connectionPromise = this._connect();
+    return this.connectionPromise;
+  }
+
+  private async _connect(): Promise<boolean> {
     try {
+      // Check DNS resolution first
+      console.log('Checking DNS resolution for MongoDB host...');
+      const mongoUrl = new URL(MONGODB_URI);
+      try {
+        await new Promise((resolve, reject) => {
+          dns.lookup(mongoUrl.hostname, (err, address) => {
+            if (err) reject(err);
+            else {
+              console.log(`MongoDB host resolves to: ${address}`);
+              resolve(address);
+            }
+          });
+        });
+      } catch (error) {
+        console.error('DNS resolution failed:', error);
+      }
+
       const options: MongoClientOptions = {
         connectTimeoutMS: 10000,
+        serverSelectionTimeoutMS: 10000,
         socketTimeoutMS: 45000,
+        maxPoolSize: 10,
+        minPoolSize: 1,
         retryWrites: true,
-        w: 'majority'
+        retryReads: true,
+        w: 'majority',
+        directConnection: true,
       };
+
+      console.log('Attempting to connect to MongoDB at:', MONGODB_URI);
+      console.log('Connecting with options:', JSON.stringify(options, null, 2));
 
       this.client = await MongoClient.connect(MONGODB_URI, options);
       this.db = this.client.db(DB_NAME);
       this.collection = this.db.collection(COLLECTION_NAME);
       this.isConnected = true;
 
-      console.log('Successfully connected to MongoDB');
+      // Verify connection with a ping
+      await this.db.command({ ping: 1 });
+      console.log(`MongoDB connection verified via ping on database: ${DB_NAME}`);
+
+      // Set up connection monitoring
+      this.client.on('serverHeartbeatSucceeded', () => {
+        this.isConnected = true;
+      });
+
+      this.client.on('serverHeartbeatFailed', () => {
+        console.warn('MongoDB heartbeat failed');
+      });
+
+      this.client.on('close', () => {
+        console.warn('MongoDB connection closed');
+        this.isConnected = false;
+      });
+
       return true;
     } catch (error) {
       console.error('MongoDB connection error:', error);
+      this.isConnected = false;
+      this.client = null;
+      this.connectionPromise = null;
       return false;
     }
   }

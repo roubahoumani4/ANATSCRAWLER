@@ -6,6 +6,11 @@ import { setupVite, serveStatic, log } from "./vite";
 import { mongodb } from "./lib/mongodb";
 import path from 'path';
 import cors from 'cors';
+import { fileURLToPath } from 'url';
+
+// ES Module dirname equivalent
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
@@ -64,8 +69,19 @@ async function startServer() {
       console.log('Setting up Vite development server...');
       await setupVite(app, httpServer);
     } else {
-      // In production, serve static files
-      app.use(express.static(path.join(__dirname, '../client/dist')));
+      // In production, serve static files from the client/dist directory
+      const clientDistPath = path.resolve(__dirname, '../client/dist');
+      console.log('Serving static files from:', clientDistPath);
+      app.use(express.static(clientDistPath));
+      
+      // Serve index.html for all non-API routes (SPA fallback)
+      app.get('*', (req, res, next) => {
+        if (!req.path.startsWith('/api')) {
+          res.sendFile(path.join(clientDistPath, 'index.html'));
+        } else {
+          next();
+        }
+      });
     }
 
     const port = process.env.PORT || 5000;
