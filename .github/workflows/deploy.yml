@@ -14,15 +14,18 @@ jobs:
 
       - name: Deploy to Server
         uses: appleboy/ssh-action@v1.0.0
+        env:
+          VM_USER: ${{ secrets.WEBAPP_VM_USER }}
         with:
           host: 46.165.254.190
           port: 50103
           username: ${{ secrets.WEBAPP_VM_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          use_insecure_cipher: true
           script: |
-            mkdir -p /var/www/darkscrawler
-            chown -R ${{ secrets.WEBAPP_VM_USER }}:${{ secrets.WEBAPP_VM_USER }} /var/www/darkscrawler
-            chmod -R 755 /var/www/darkscrawler
+            sudo mkdir -p /var/www/darkscrawler
+            sudo chown -R $VM_USER:$VM_USER /var/www/darkscrawler
+            sudo chmod -R 755 /var/www/darkscrawler
 
       - name: Deploy Files
         uses: appleboy/scp-action@master
@@ -31,6 +34,7 @@ jobs:
           port: 50103
           username: ${{ secrets.WEBAPP_VM_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          use_insecure_cipher: true
           source: ".,!node_modules"
           target: "/var/www/darkscrawler"
           strip_components: 0
@@ -39,17 +43,20 @@ jobs:
 
       - name: Configure and Start Application
         uses: appleboy/ssh-action@v1.0.0
+        env:
+          VM_USER: ${{ secrets.WEBAPP_VM_USER }}
         with:
           host: 46.165.254.190
           port: 50103
           username: ${{ secrets.WEBAPP_VM_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          use_insecure_cipher: true
           script: |
             cd /var/www/darkscrawler
 
             # Ensure proper permissions
-            chown -R ${{ secrets.WEBAPP_VM_USER }}:${{ secrets.WEBAPP_VM_USER }} .
-            chmod -R 755 .
+            sudo chown -R $VM_USER:$VM_USER .
+            sudo chmod -R 755 .
 
             # Create/update .env file with proper permissions
             touch .env
