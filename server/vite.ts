@@ -4,7 +4,10 @@ import path from "path";
 import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
 import viteConfig from "../vite.config";
-import { nanoid } from "nanoid";
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const viteLogger = createLogger();
 
@@ -20,34 +23,48 @@ export function log(message: string, source = "express") {
 }
 
 export async function setupVite(app: Express, server: Server) {
-  const serverOptions = {
-    middlewareMode: true,
-    hmr: { server },
-    allowedHosts: true,
-  };
-
   const vite = await createViteServer({
     ...viteConfig,
     configFile: false,
-    customLogger: {
-      ...viteLogger,
-      error: (msg, options) => {
-        viteLogger.error(msg, options);
-        process.exit(1);
-      },
+    server: {
+      middlewareMode: true,
+      hmr: { server },
+      watch: {
+        usePolling: true,
+        interval: 100
+      }
     },
-    server: serverOptions,
-    appType: "custom",
+    appType: 'custom',
   });
 
   app.use(vite.middlewares);
+  
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
+    
+    if (url.startsWith('/api')) {
+      return next();
+    }
 
     try {
-      const clientTemplate = path.resolve(
-        import.meta.dirname,
-        "..",
+      console.log(`[Vite] Handling request for: ${url}`);
+      
+      // Read index.html
+      const template = await fs.promises.readFile(
+        path.resolve(process.cwd(), 'client/index.html'),
+        'utf-8'
+      );
+
+      // Apply Vite HTML transforms
+      const html = await vite.transformIndexHtml(url, template);
+      
+      console.log(`[Vite] Sending transformed HTML for: ${url}`);
+      res.status(200).set({ 'Content-Type': 'text/html' }).end(html);
+    } catch (e) {
+      console.error(`[Vite] Error processing ${url}:`, e);
+      vite.ssrFixStacktrace(e as Error);
+      next(e);
+    }
         "client",
         "index.html",
       );
