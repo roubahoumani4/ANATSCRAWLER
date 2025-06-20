@@ -104,7 +104,7 @@ The application follows a client-server architecture with the following core com
 2. **Data Management**
    - TanStack React Query for server state management
    - Zod for schema validation
-   - Drizzle ORM for database operations
+   - MongoDB client for database operations
 
 3. **Authentication**
    - JWT for token-based authentication
@@ -129,10 +129,10 @@ The application is configured for deployment on Replit with the following approa
    - Backend bundled with ESBuild
    - Static assets served from `/dist/public`
 
-3. **Database**
-   - PostgreSQL 16 used as the database
-   - Connection string provided via environment variables
-   - Database migrations handled by Drizzle Kit
+3. **Database and Search**
+   - MongoDB used as the main database
+   - Elasticsearch for full-text search capabilities
+   - Native MongoDB driver for direct database operations
 
 4. **Environment Configuration**
    - Separate development and production settings
