@@ -9,40 +9,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup SSH Debug
-        run: |
-          mkdir -p ~/.ssh/
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          echo "Host *
-            StrictHostKeyChecking no
-            UserKnownHostsFile=/dev/null" > ~/.ssh/config
-          
-          echo "Testing SSH connection with verbose output..."
-          ssh -vvv -p 50103 -i ~/.ssh/deploy_key ituu@46.165.254.175 'echo "SSH test successful"'
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install Dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-        env:
-          ELASTICSEARCH_URL: http://192.168.1.110:9200
-          MONGODB_URL: mongodb://192.168.1.110:27017/anatscrawler
-          REDIS_URL: redis://192.168.1.110:6379
-          BACKEND_PORT: 5000
-          VITE_API_URL: http://127.0.0.1:5000/api
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          COOKIE_SECRET: ${{ secrets.COOKIE_SECRET }}
-
-      - name: Prepare Remote Directory
+      - name: Deploy to Server
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: 46.165.254.175
