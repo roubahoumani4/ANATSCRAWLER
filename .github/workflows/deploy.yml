@@ -151,6 +151,13 @@ jobs:
             fi
             sudo ln -sf "$DEPLOY_DIR" "$CURRENT_LINK"
 
+            # Move client dist files to the right place
+            if [ -d "$DEPLOY_DIR/client/dist" ]; then
+              echo "Moving client dist files to the correct location..."
+              mv $DEPLOY_DIR/client/dist/* $DEPLOY_DIR/client/
+              rm -rf $DEPLOY_DIR/client/dist
+            fi
+
             # Clean up old deployments (keep last 5)
             cd /var/www
             ls -1dt anatscrawler-* | tail -n +6 | xargs -r sudo rm -rf

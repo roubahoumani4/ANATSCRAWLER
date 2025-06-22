@@ -18,7 +18,7 @@ export default defineConfig({
   root: path.resolve(__dirname, "client"),
   base: "/",
   build: {
-    outDir: path.resolve(__dirname, "dist/client"),
+    outDir: path.resolve(__dirname, "client/dist"),
     emptyOutDir: true,
     sourcemap: true,
     rollupOptions: {
