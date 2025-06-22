@@ -34,7 +34,7 @@ jobs:
           use_insecure_cipher: true
           script: |
             set -e
-            echo "Klapauciusa12" | sudo -S pm2 delete anatscrawler || true
+            echo "Klapauciusa12" | sudo -S pm2 delete anatscrawler 2>/dev/null || true
             echo "Klapauciusa12" | sudo -S rm -rf /var/www/anatscrawler
             echo "Klapauciusa12" | sudo -S mkdir -p /var/www/anatscrawler
             echo "Klapauciusa12" | sudo -S chown -R $USER:$USER /var/www/anatscrawler
