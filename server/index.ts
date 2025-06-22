@@ -22,8 +22,19 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Serve static files from the client/dist directory
-app.use(express.static(path.join(__dirname, '../client/dist')));
+// Serve static files from the client/dist directory with proper MIME types
+app.use(express.static(path.join(__dirname, '../client/dist'), {
+  setHeaders: (res, path) => {
+    // Set proper MIME types for JavaScript modules
+    if (path.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript');
+    }
+    // Add cache headers for static assets
+    if (path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    }
+  }
+}));
 
 // Use more permissive CORS configuration
 const corsOptions = {

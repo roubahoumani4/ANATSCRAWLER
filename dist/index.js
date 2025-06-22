@@ -76778,7 +76778,16 @@ if (process.env.NODE_ENV !== "production") {
 var app = (0, import_express2.default)();
 app.use(import_express2.default.json());
 app.use(import_express2.default.urlencoded({ extended: false }));
-app.use(import_express2.default.static(import_path.default.join(__dirname, "../client/dist")));
+app.use(import_express2.default.static(import_path.default.join(__dirname, "../client/dist"), {
+  setHeaders: (res, path2) => {
+    if (path2.endsWith(".js")) {
+      res.setHeader("Content-Type", "application/javascript");
+    }
+    if (path2.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    }
+  }
+}));
 var corsOptions = {
   origin: true,
   // Allow all origins

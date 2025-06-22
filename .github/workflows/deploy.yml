@@ -5,6 +5,10 @@ on:
     branches:
       - main
 
+env:
+  DEPLOY_BASE_DIR: /var/www/anatscrawler
+  KEEP_VERSIONS: 2
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -18,86 +22,156 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
-      - name: Prepare deployment directory
+      - name: Create new deployment directory
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: 46.165.254.175
-          port: 50103
-          username: ituu
+          host: ${{ secrets.DEPLOY_HOST }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           use_insecure_cipher: true
+          envs: DEPLOY_BASE_DIR
           script: |
-            DEPLOY_DIR="/var/www/anatscrawler-$(date +%Y%m%d%H%M%S)"
+            # Create timestamp-based deployment directory
+            TIMESTAMP=$(date +%Y%m%d%H%M%S)
+            DEPLOY_DIR="${DEPLOY_BASE_DIR}-${TIMESTAMP}"
             echo "Creating deployment directory: $DEPLOY_DIR"
-            echo 'Klapauciusa12' | sudo -S mkdir -p $DEPLOY_DIR
-            echo 'Klapauciusa12' | sudo -S chown ituu:ituu $DEPLOY_DIR
-            echo 'Klapauciusa12' | sudo -S chmod 755 $DEPLOY_DIR
-            echo "export DEPLOY_DIR=$DEPLOY_DIR" > /tmp/deploy_dir.sh
+            sudo -S mkdir -p $DEPLOY_DIR
+            sudo -S chown $USER:$USER $DEPLOY_DIR
+            sudo -S chmod 755 $DEPLOY_DIR
+            echo "DEPLOY_DIR=$DEPLOY_DIR" > /tmp/deploy_vars
+            echo "TIMESTAMP=$TIMESTAMP" >> /tmp/deploy_vars
 
       - name: Deploy Files
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: 46.165.254.175
-          port: 50103
-          username: ituu
+          host: ${{ secrets.DEPLOY_HOST }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           use_insecure_cipher: true
           script: |
-            source /tmp/deploy_dir.sh
+            source /tmp/deploy_vars
             TEMP_DIR=$(mktemp -d)
-            git clone https://github.com/roubahoumani4/ANATSCRAWLER.git $TEMP_DIR
-            echo 'Klapauciusa12' | sudo -S cp -r $TEMP_DIR/* $DEPLOY_DIR/
-            echo 'Klapauciusa12' | sudo -S cp -r $TEMP_DIR/.* $DEPLOY_DIR/ 2>/dev/null || true
+            
+            echo "Cloning repository..."
+            git clone https://github.com/${{ github.repository }}.git $TEMP_DIR
+            
+            echo "Copying files..."
+            sudo -S cp -r $TEMP_DIR/* $DEPLOY_DIR/
+            sudo -S cp -r $TEMP_DIR/.* $DEPLOY_DIR/ 2>/dev/null || true
             rm -rf $TEMP_DIR
-            echo 'Klapauciusa12' | sudo -S chown -R ituu:ituu $DEPLOY_DIR
-            echo 'Klapauciusa12' | sudo -S chmod -R 755 $DEPLOY_DIR
+            
+            sudo -S chown -R $USER:$USER $DEPLOY_DIR
+            sudo -S chmod -R 755 $DEPLOY_DIR
 
-      - name: Configure and Start Application
+      - name: Configure and Build Application
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: 46.165.254.175
-          port: 50103
-          username: ituu
+          host: ${{ secrets.DEPLOY_HOST }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           use_insecure_cipher: true
           script: |
-            source /tmp/deploy_dir.sh
+            source /tmp/deploy_vars
             cd $DEPLOY_DIR
 
-            echo 'Klapauciusa12' | sudo -S chown -R ituu:ituu .
-            echo 'Klapauciusa12' | sudo -S chmod -R 755 .
-
             # Setup environment file
-            echo "NODE_ENV=production" > .env
-            echo "PORT=5000" >> .env
-            echo "HOST=0.0.0.0" >> .env
-            echo "ELASTICSEARCH_URL=http://192.168.1.110:9200" >> .env
-            echo "MONGODB_URL=mongodb://192.168.1.110:27017/anat_security" >> .env
-            echo "REDIS_URL=redis://192.168.1.110:6379" >> .env
-            echo "VITE_API_URL=/api" >> .env
-            echo "JWT_SECRET=NWagPsTDSNKzcgJQvYouOyTwCbQ0ZTG+zE3/8eTPqQM=" >> .env
-            echo "COOKIE_SECRET=NnnQPZ8wazuVR26qNCZ9wRXAdUipV/sE/jC+mKizTXg=" >> .env
+            cat << EOF > .env
+            NODE_ENV=production
+            PORT=${{ secrets.APP_PORT }}
+            HOST=0.0.0.0
+            ELASTICSEARCH_URL=${{ secrets.ELASTICSEARCH_URL }}
+            MONGODB_URL=${{ secrets.MONGODB_URL }}
+            REDIS_URL=${{ secrets.REDIS_URL }}
+            VITE_API_URL=/api
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            COOKIE_SECRET=${{ secrets.COOKIE_SECRET }}
+            EOF
             
-            echo 'Klapauciusa12' | sudo -S chown ituu:ituu .env
-            echo 'Klapauciusa12' | sudo -S chmod 600 .env
+            chmod 600 .env
 
             # Install dependencies and build
+            echo "Installing dependencies..."
             npm ci
-            echo 'Klapauciusa12' | sudo -S apt-get update
-            echo 'Klapauciusa12' | sudo -S apt-get install -y xvfb
+            
+            # Install system dependencies
+            sudo -S apt-get update
+            sudo -S apt-get install -y xvfb
 
+            # Setup display for tests
             export DISPLAY=:99
             export QT_QPA_PLATFORM=offscreen
             export NODE_ENV=production
 
-            echo 'Klapauciusa12' | sudo -S Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+            sudo -S Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
             sleep 3
 
+            echo "Building application..."
             npm run build
 
-            # Validate server build
+            # Validate build
             if [ ! -f "dist/index.js" ]; then
-              echo "❌ Server build failed: dist/index.js not found"
+              echo "❌ Build failed: dist/index.js not found"
+              exit 1
+            fi
+
+      - name: Update Service and Cleanup
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          use_insecure_cipher: true
+          envs: DEPLOY_BASE_DIR,KEEP_VERSIONS
+          script: |
+            source /tmp/deploy_vars
+            
+            # Update PM2 service
+            cd $DEPLOY_DIR
+            
+            echo "Updating PM2 service..."
+            if pm2 list | grep -q "anatscrawler"; then
+              pm2 delete anatscrawler
+            fi
+            
+            pm2 start dist/index.js --name anatscrawler
+            pm2 save
+            
+            # Create/Update symlink
+            CURRENT_LINK="${DEPLOY_BASE_DIR}-current"
+            sudo -S rm -f $CURRENT_LINK
+            sudo -S ln -s $DEPLOY_DIR $CURRENT_LINK
+            
+            # Cleanup old deployments
+            echo "Cleaning up old deployments..."
+            cd /var/www
+            ls -1dt ${DEPLOY_BASE_DIR}-* | grep -v "${DEPLOY_BASE_DIR}-current" | tail -n +$((KEEP_VERSIONS + 1)) | while read dir; do
+              echo "Removing old deployment: $dir"
+              sudo -S rm -rf "$dir"
+            done
+            
+            # Validate deployment
+            if ! curl -s http://localhost:${{ secrets.APP_PORT }}/health | grep -q "ok"; then
+              echo "❌ Health check failed"
+              
+              # Rollback to previous version if available
+              PREV_DEPLOY=$(ls -1dt ${DEPLOY_BASE_DIR}-* | grep -v "${DEPLOY_BASE_DIR}-current" | head -n 1)
+              if [ -n "$PREV_DEPLOY" ]; then
+                echo "Rolling back to: $PREV_DEPLOY"
+                sudo -S ln -sf $PREV_DEPLOY $CURRENT_LINK
+                cd $PREV_DEPLOY
+                pm2 delete anatscrawler
+                pm2 start dist/index.js --name anatscrawler
+                pm2 save
+              fi
+              
+              exit 1
+            fi
+            
+            echo "✅ Deployment successful"
               echo "Contents of project root:"
               ls -la
               echo "Contents of dist directory (if exists):"
