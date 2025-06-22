@@ -1,5 +1,5 @@
 {
-  "name": "rest-express",
+  "name": "anatscrawler",
   "version": "1.0.0",
   "license": "MIT",
   "scripts": {
@@ -11,7 +11,9 @@
     "check": "tsc",
     "prod:clean": "rm -rf dist node_modules package-lock.json",
     "prod:install": "npm ci --omit=dev",
-    "prod:build": "NODE_ENV=production npm run build"
+    "prod:build": "NODE_ENV=production npm run build",
+    "seed": "tsx server/scripts/seed.ts",
+    "migrate": "tsx server/scripts/migrate.ts"
   },
   "dependencies": {
     "@fortawesome/free-solid-svg-icons": "^6.7.2",

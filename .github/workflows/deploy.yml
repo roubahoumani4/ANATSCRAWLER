@@ -18,20 +18,13 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
-      - name: Build Application
+      - name: Build and Prepare
         run: |
-          echo "Installing dependencies..."
           npm ci
-          
-          echo "Building client..."
           npm run build:client
-          
-          echo "Building server..."
           npm run build:server
-          
-          echo "Build completed successfully!"
 
-      - name: Deploy to Server
+      - name: Deploy, Migrate, and Seed
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -41,42 +34,16 @@ jobs:
           use_insecure_cipher: true
           envs: SUDO_PASSWORD
           script: |
-            echo "🚀 Starting deployment..."
-            
-            # Stop existing service first
-            echo "Stopping existing service..."
-            echo "$SUDO_PASSWORD" | sudo -S pm2 delete anatscrawler || echo "No existing service to stop"
-            
-            # Clean deployment directory
-            echo "Cleaning deployment directory..."
+            set -e
+            echo "$SUDO_PASSWORD" | sudo -S pm2 delete anatscrawler || true
             echo "$SUDO_PASSWORD" | sudo -S rm -rf /var/www/anatscrawler
             echo "$SUDO_PASSWORD" | sudo -S mkdir -p /var/www/anatscrawler
             cd /var/www/anatscrawler
-            
-            # Clone or update repository
-            if [ ! -d ".git" ]; then
-              echo "Cloning repository..."
-              git clone git@github.com:roubahoumani4/ANATSCRAWLER.git . || {
-                echo "Failed to clone repository"
-                exit 1
-              }
-            else
-              echo "Repository exists, pulling latest changes..."
-              git pull origin main || {
-                echo "Failed to pull latest changes"
-                exit 1
-              }
-            fi
-            
-            # Install dependencies and build
-            echo "Installing production dependencies..."
+            git clone git@github.com:roubahoumani4/ANATSCRAWLER.git . || git pull origin main
             npm ci --omit=dev
-            
-            echo "Building application..."
             npm run build
-            
-            # Create environment file
-            echo "Setting up environment..."
+            npm run migrate
+            npm run seed
             cat << EOF > .env
             NODE_ENV=production
             PORT=${{ secrets.APP_PORT }}
@@ -89,286 +56,8 @@ jobs:
             COOKIE_SECRET=${{ secrets.COOKIE_SECRET }}
             EOF
             chmod 600 .env
-            
-            # Verify build outputs
-            if [ ! -f "dist/index.js" ]; then
-              echo "❌ Server build failed: dist/index.js not found"
-              exit 1
-            fi
-            
-            if [ ! -f "client/dist/index.html" ]; then
-              echo "❌ Client build failed: client/dist/index.html not found"
-              exit 1
-            fi
-            
-            echo "✅ Build verification passed"
-            
-            # Start the service
-            echo "Starting service with PM2 using ecosystem.config.cjs..."
-            cd /var/www/anatscrawler
+            [ -f dist/index.js ] && [ -f client/dist/index.html ]
             echo "$SUDO_PASSWORD" | sudo -S pm2 start ecosystem.config.cjs
             echo "$SUDO_PASSWORD" | sudo -S pm2 save
-            
-            # Wait for service to start
             sleep 5
-            
-            # Health check
-            echo "Performing health check..."
-            if curl -s http://localhost:${{ secrets.APP_PORT }}/api/health | grep -q "healthy"; then
-              echo "✅ Deployment successful! Health check passed."
-            else
-              echo "⚠️  Health check failed, but service is running. Check logs with: pm2 logs anatscrawler"
-            fi
-            
-            # Show final status
-            echo "📊 Final status:"
-            echo "$SUDO_PASSWORD" | sudo -S pm2 show anatscrawler
-            echo "🎉 Deployment completed!"
-
-      - name: Deployment Failed Cleanup
-        if: failure()
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          port: ${{ secrets.DEPLOY_PORT }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          use_insecure_cipher: true
-          script: |
-            echo "🚨 Deployment failed! Gathering debug info..."
-            
-            echo "📊 PM2 Status:"
-            pm2 ls
-            
-            echo "📊 PM2 Logs:"
-            pm2 logs anatscrawler --lines 30 || echo "No logs available"
-            
-            echo "📊 Directory contents:"
-            ls -la /var/www/anatscrawler/ || echo "Directory not found"
-            
-            echo "📊 Build outputs:"
-            ls -la /var/www/anatscrawler/client/dist/ || echo "No client/dist directory"
-            export DISPLAY=:99
-            export QT_QPA_PLATFORM=offscreen
-            export NODE_ENV=production
-
-            if command -v Xvfb >/dev/null 2>&1; then
-              Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
-              sleep 3
-            fi
-
-            echo "Building application..."
-            npm run build
-
-            # Validate build
-            if [ ! -f "dist/index.js" ]; then
-              echo "❌ Build failed: dist/index.js not found"
-              exit 1
-            fi
-
-      - name: Update Service and Cleanup
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          port: ${{ secrets.DEPLOY_PORT }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          use_insecure_cipher: true
-          envs: DEPLOY_BASE_DIR,KEEP_VERSIONS
-          script: |
-            source /tmp/deploy_vars
-            
-            # Update PM2 service
-            cd $DEPLOY_DIR
-            
-            echo "Updating PM2 service..."
-            if pm2 list | grep -q "anatscrawler"; then
-              pm2 delete anatscrawler
-            fi
-            
-            pm2 start dist/index.js --name anatscrawler
-            pm2 save
-            
-            # Create/Update symlink
-            CURRENT_LINK="${DEPLOY_BASE_DIR}-current"
-            rm -f $CURRENT_LINK || echo "Could not remove existing symlink"
-            ln -s $DEPLOY_DIR $CURRENT_LINK || {
-              echo "Warning: Could not create symlink. This may require elevated permissions."
-              echo "Manual symlink creation may be needed: ln -s $DEPLOY_DIR $CURRENT_LINK"
-            }
-            
-            # Cleanup old deployments
-            echo "Cleaning up old deployments..."
-            cd /var/www
-            ls -1dt ${DEPLOY_BASE_DIR}-* | grep -v "${DEPLOY_BASE_DIR}-current" | tail -n +$((KEEP_VERSIONS + 1)) | while read dir; do
-              echo "Removing old deployment: $dir"
-              rm -rf "$dir" || echo "Warning: Could not remove old deployment directory: $dir"
-            done
-            
-            # Validate deployment
-            echo "🔍 Validating deployment..."
-            sleep 5  # Give the server time to fully start
-            
-            HEALTH_CHECK_URL="http://localhost:${{ secrets.APP_PORT }}/api/health"
-            echo "Testing health endpoint: $HEALTH_CHECK_URL"
-            
-            if curl -s "$HEALTH_CHECK_URL" | grep -q "healthy"; then
-              echo "✅ Health check passed"
-            else
-              echo "❌ Health check failed"
-              echo "Health check response:"
-              curl -s "$HEALTH_CHECK_URL" || echo "No response from health endpoint"
-              
-              # Rollback to previous version if available
-              PREV_DEPLOY=$(ls -1dt ${DEPLOY_BASE_DIR}-* | grep -v "${DEPLOY_BASE_DIR}-current" | head -n 1)
-              if [ -n "$PREV_DEPLOY" ]; then
-                echo "Rolling back to: $PREV_DEPLOY"
-                ln -sf $PREV_DEPLOY $CURRENT_LINK || echo "Warning: Could not create rollback symlink"
-                cd $PREV_DEPLOY
-                pm2 delete anatscrawler || echo "Warning: Could not delete PM2 process"
-                pm2 start dist/index.js --name anatscrawler || echo "Warning: Could not start rollback PM2 process"
-                pm2 save || echo "Warning: Could not save PM2 config"
-              fi
-              
-              exit 1
-            fi
-            
-            echo "✅ Deployment successful"
-            
-            # Final PM2 status check
-            echo "📊 Final PM2 status:"
-            pm2 ls
-            pm2 show anatscrawler
-
-      - name: Final Validation and Cleanup
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          port: ${{ secrets.DEPLOY_PORT }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          use_insecure_cipher: true
-          envs: DEPLOY_BASE_DIR,KEEP_VERSIONS
-          script: |
-            source /tmp/deploy_vars
-            echo "module.exports = {" > ecosystem.config.cjs
-            echo "  apps: [{" >> ecosystem.config.cjs
-            
-            # Test comprehensive server functionality
-            echo "🔍 Running comprehensive server tests..."
-            
-            # Test health endpoint
-            HEALTH_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${{ secrets.APP_PORT }}/api/health --connect-timeout 10 || echo "000")
-            if [ "$HEALTH_RESPONSE" = "200" ]; then
-              echo "✅ Health endpoint responding correctly"
-            else
-              echo "⚠️  Health endpoint issue (HTTP $HEALTH_RESPONSE)"
-            fi
-            
-            # Test root endpoint (should serve client app)
-            ROOT_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${{ secrets.APP_PORT }}/ --connect-timeout 10 || echo "000")
-            if [ "$ROOT_RESPONSE" = "200" ]; then
-              echo "✅ Root endpoint serving client files correctly"
-            else
-              echo "⚠️  Root endpoint response: HTTP $ROOT_RESPONSE"
-            fi
-            
-            # Update main symlink for zero-downtime deployment
-            MAIN_LINK="/var/www/anatscrawler"
-            if [ -L "$MAIN_LINK" ]; then
-              echo "Updating main symlink: $MAIN_LINK"
-              rm -f "$MAIN_LINK" || echo "Warning: Could not remove main symlink"
-            fi
-            ln -sf "$DEPLOY_DIR" "$MAIN_LINK" || {
-              echo "Warning: Could not create main symlink. Manual creation may be needed."
-            }
-            
-            # Clean up old deployments (keep last few versions)
-            echo "🧹 Cleaning up old deployments..."
-            cd /var/www
-            OLD_DEPLOYMENTS=$(ls -1dt anatscrawler-* 2>/dev/null | tail -n +$((KEEP_VERSIONS + 1)))
-            if [ -n "$OLD_DEPLOYMENTS" ]; then
-              echo "Removing old deployments:"
-              echo "$OLD_DEPLOYMENTS"
-              echo "$OLD_DEPLOYMENTS" | xargs -r rm -rf || echo "Warning: Could not remove some old deployment directories"
-            else
-              echo "No old deployments to clean up"
-            fi
-            
-            # Final deployment summary
-            echo "🎉 Deployment completed successfully!"
-            echo "📊 Deployment Summary:"
-            echo "  - Deployment dir: $DEPLOY_DIR"
-            echo "  - Main symlink: $MAIN_LINK -> $(readlink $MAIN_LINK 2>/dev/null || echo 'Not found')"
-            echo "  - PM2 status: $(pm2 show anatscrawler | grep 'status' | head -1 || echo 'Unknown')"
-            echo "  - Server port: ${{ secrets.APP_PORT }}"
-            echo "  - Health check: HTTP $HEALTH_RESPONSE"
-            echo "  - Root endpoint: HTTP $ROOT_RESPONSE"
-
-      - name: Health Check
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          port: ${{ secrets.DEPLOY_PORT }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          use_insecure_cipher: true
-          script: |
-            echo "🏥 Performing final health check..."
-            
-            # Test health endpoint
-            HEALTH_CHECK=$(curl -s http://localhost:${{ secrets.APP_PORT }}/api/health --connect-timeout 10 || echo "failed")
-            if echo "$HEALTH_CHECK" | grep -q "healthy"; then
-              echo "✅ Health check passed!"
-              echo "🌐 Application is accessible"
-            else
-              echo "⚠️  Health check response: $HEALTH_CHECK"
-            fi
-            
-            # Display final status
-            echo "� Final deployment status:"
-            echo "  - PM2 Status: $(pm2 show anatscrawler | grep 'status' | awk '{print $4}' 2>/dev/null || echo 'unknown')"
-            echo "  - Port listening: $(netstat -tln | grep ':${{ secrets.APP_PORT }}' | wc -l) process(es)"
-            echo "  - Deployment complete!"
-
-      - name: Deployment Failed - Debug Info
-        if: failure()
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          port: ${{ secrets.DEPLOY_PORT }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          use_insecure_cipher: true
-          script: |
-            echo "🚨 Deployment failed! Gathering debug information..."
-            
-            source /tmp/deploy_vars 2>/dev/null || echo "Warning: Could not source deploy variables"
-            
-            echo "📁 Current deployment directory: ${DEPLOY_DIR:-'unknown'}"
-            
-            if [ -n "$DEPLOY_DIR" ] && [ -d "$DEPLOY_DIR" ]; then
-              cd "$DEPLOY_DIR"
-              echo "📋 Deployment directory contents:"
-              ls -la
-              
-              echo "📋 Build outputs:"
-              ls -la dist/ 2>/dev/null || echo "No dist directory"
-              ls -la client/dist/ 2>/dev/null || echo "No client/dist directory"
-            fi
-            
-            echo "📊 PM2 Status:"
-            pm2 ls
-            
-            echo "📊 PM2 Logs (last 50 lines):"
-            pm2 logs anatscrawler --lines 50 2>/dev/null || echo "No PM2 logs available"
-            
-            echo "📊 System processes on port ${{ secrets.APP_PORT }}:"
-            lsof -i :${{ secrets.APP_PORT }} 2>/dev/null || echo "No processes on port ${{ secrets.APP_PORT }}"
-            
-            echo "📊 Network listeners:"
-            netstat -tln | grep LISTEN
-            
-            echo "📊 System resources:"
-            free -h
-            df -h /var/www
+            curl -s http://localhost:${{ secrets.APP_PORT }}/api/health | grep -q "healthy" && echo "✅ Health check passed." || echo "⚠️ Health check failed."
