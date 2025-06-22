@@ -75,17 +75,15 @@ jobs:
             echo 'Klapauciusa12' | sudo -S chmod -R 755 .
 
             # Setup environment file
-            cat > .env << 'ENV_EOF'
-NODE_ENV=production
-PORT=5000
-HOST=0.0.0.0
-ELASTICSEARCH_URL=http://192.168.1.110:9200
-MONGODB_URL=mongodb://192.168.1.110:27017/anat_security
-REDIS_URL=redis://192.168.1.110:6379
-VITE_API_URL=/api
-JWT_SECRET=NWagPsTDSNKzcgJQvYouOyTwCbQ0ZTG+zE3/8eTPqQM=
-COOKIE_SECRET=NnnQPZ8wazuVR26qNCZ9wRXAdUipV/sE/jC+mKizTXg=
-ENV_EOF
+            echo "NODE_ENV=production" > .env
+            echo "PORT=5000" >> .env
+            echo "HOST=0.0.0.0" >> .env
+            echo "ELASTICSEARCH_URL=http://192.168.1.110:9200" >> .env
+            echo "MONGODB_URL=mongodb://192.168.1.110:27017/anat_security" >> .env
+            echo "REDIS_URL=redis://192.168.1.110:6379" >> .env
+            echo "VITE_API_URL=/api" >> .env
+            echo "JWT_SECRET=NWagPsTDSNKzcgJQvYouOyTwCbQ0ZTG+zE3/8eTPqQM=" >> .env
+            echo "COOKIE_SECRET=NnnQPZ8wazuVR26qNCZ9wRXAdUipV/sE/jC+mKizTXg=" >> .env
             
             echo 'Klapauciusa12' | sudo -S chown ituu:ituu .env
             echo 'Klapauciusa12' | sudo -S chmod 600 .env
@@ -114,35 +112,33 @@ ENV_EOF
             npm ci --omit=dev
 
             # Setup PM2 configuration with proper CommonJS syntax
-            cat > ecosystem.config.cjs << 'PM2_EOF'
-module.exports = {
-  apps: [{
-    name: 'anatscrawler',
-    script: 'dist/index.js',
-    env: {
-      NODE_ENV: 'production',
-      PORT: '5000',
-      HOST: '0.0.0.0',
-      TRUST_PROXY: 'true',
-      ELASTICSEARCH_URL: 'http://192.168.1.110:9200',
-      MONGODB_URL: 'mongodb://192.168.1.110:27017/anat_security',
-      REDIS_URL: 'redis://192.168.1.110:6379',
-      JWT_SECRET: 'NWagPsTDSNKzcgJQvYouOyTwCbQ0ZTG+zE3/8eTPqQM=',
-      COOKIE_SECRET: 'NnnQPZ8wazuVR26qNCZ9wRXAdUipV/sE/jC+mKizTXg='
-    },
-    instances: 1,
-    exec_mode: 'fork',
-    max_memory_restart: '1G',
-    watch: false,
-    error_file: 'logs/err.log',
-    out_file: 'logs/out.log',
-    merge_logs: true,
-    log_date_format: 'YYYY-MM-DD HH:mm:ss',
-    listen_timeout: 10000,
-    kill_timeout: 5000
-  }]
-}
-PM2_EOF
+            echo "module.exports = {" > ecosystem.config.cjs
+            echo "  apps: [{" >> ecosystem.config.cjs
+            echo "    name: 'anatscrawler'," >> ecosystem.config.cjs
+            echo "    script: 'dist/index.js'," >> ecosystem.config.cjs
+            echo "    env: {" >> ecosystem.config.cjs
+            echo "      NODE_ENV: 'production'," >> ecosystem.config.cjs
+            echo "      PORT: '5000'," >> ecosystem.config.cjs
+            echo "      HOST: '0.0.0.0'," >> ecosystem.config.cjs
+            echo "      TRUST_PROXY: 'true'," >> ecosystem.config.cjs
+            echo "      ELASTICSEARCH_URL: 'http://192.168.1.110:9200'," >> ecosystem.config.cjs
+            echo "      MONGODB_URL: 'mongodb://192.168.1.110:27017/anat_security'," >> ecosystem.config.cjs
+            echo "      REDIS_URL: 'redis://192.168.1.110:6379'," >> ecosystem.config.cjs
+            echo "      JWT_SECRET: 'NWagPsTDSNKzcgJQvYouOyTwCbQ0ZTG+zE3/8eTPqQM='," >> ecosystem.config.cjs
+            echo "      COOKIE_SECRET: 'NnnQPZ8wazuVR26qNCZ9wRXAdUipV/sE/jC+mKizTXg='" >> ecosystem.config.cjs
+            echo "    }," >> ecosystem.config.cjs
+            echo "    instances: 1," >> ecosystem.config.cjs
+            echo "    exec_mode: 'fork'," >> ecosystem.config.cjs
+            echo "    max_memory_restart: '1G'," >> ecosystem.config.cjs
+            echo "    watch: false," >> ecosystem.config.cjs
+            echo "    error_file: 'logs/err.log'," >> ecosystem.config.cjs
+            echo "    out_file: 'logs/out.log'," >> ecosystem.config.cjs
+            echo "    merge_logs: true," >> ecosystem.config.cjs
+            echo "    log_date_format: 'YYYY-MM-DD HH:mm:ss'," >> ecosystem.config.cjs
+            echo "    listen_timeout: 10000," >> ecosystem.config.cjs
+            echo "    kill_timeout: 5000" >> ecosystem.config.cjs
+            echo "  }]" >> ecosystem.config.cjs
+            echo "}" >> ecosystem.config.cjs
 
             mkdir -p logs
             
