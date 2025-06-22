@@ -1,1 +1,28 @@
 node_modules
+# Build outputs
+dist/
+client/dist/
+
+# Environment files
+.env
+.env.*
+
+# Logs
+*.log
+
+# OS/Editor files
+.DS_Store
+*.swp
+.vscode/
+
+# Dependency lock (optional, keep if you want lockfile in repo)
+# package-lock.json
+
+# Coverage/test outputs
+coverage/
+
+# Misc
+*.local
+*.zip
+*.tgz
+*.bak
