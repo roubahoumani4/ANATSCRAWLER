@@ -145,8 +145,8 @@ pm2 ls
 pm2 logs anatscrawler
 
 # Test endpoints
-curl http://localhost:5000/api/health
-curl -I http://localhost:5000/
+curl http://192.168.1.110:5000/api/health
+curl -I http://192.168.1.110:5000/
 ```
 
 ## Troubleshooting
@@ -179,7 +179,7 @@ curl -I http://localhost:5000/
 ls -la /var/www/anatscrawler/
 
 # Test local connections
-curl http://localhost:5000/api/health
+curl http://192.168.1.110:5000/api/health
 
 # Check system resources
 df -h /var/www

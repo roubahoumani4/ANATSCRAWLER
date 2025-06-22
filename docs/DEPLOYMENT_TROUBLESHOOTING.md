@@ -24,7 +24,7 @@ This guide helps troubleshoot common deployment issues with the DarkScrawler app
 
 3. Test the health endpoint manually:
    ```bash
-   curl -v http://localhost:5000/api/health
+   curl -v http://192.168.1.110:5000/api/health
    ```
 
 4. Check if the port is being used:
@@ -65,7 +65,7 @@ This guide helps troubleshoot common deployment issues with the DarkScrawler app
 
 3. Test static file serving:
    ```bash
-   curl -I http://localhost:5000/
+   curl -I http://192.168.1.110:5000/
    ```
 
 ### 4. Permission Issues
@@ -148,7 +148,7 @@ If deployment fails completely, you can manually recover:
 3. **Check application status:**
    ```bash
    pm2 ls
-   curl http://localhost:5000/api/health
+   curl http://192.168.1.110:5000/api/health
    ```
 
 ## Best Practices

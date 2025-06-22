@@ -7,7 +7,7 @@ export PORT=5000
 export ELASTICSEARCH_URL=http://192.168.1.110:9200
 export MONGODB_URL=mongodb://192.168.1.110:27017/anat_security
 export REDIS_URL=redis://192.168.1.110:6379
-export VITE_API_URL=http://localhost:5000/api
+export VITE_API_URL=http://192.168.1.105:5000/api
 
 # Install dependencies
 npm ci

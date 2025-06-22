@@ -8,7 +8,7 @@ set -e
 echo "🔍 Validating deployment..."
 
 # Configuration
-SERVER_URL="http://localhost:5000"
+SERVER_URL="http://192.168.1.105:5000"
 HEALTH_ENDPOINT="$SERVER_URL/api/health"
 TIMEOUT=30
 

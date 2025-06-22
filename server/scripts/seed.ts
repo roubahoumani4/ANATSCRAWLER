@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { User } from '../models/User';
 
-const MONGODB_URI = process.env.MONGODB_URL || 'mongodb://localhost:27017/anat_security';
+const MONGODB_URI = process.env.MONGODB_URL || 'mongodb://192.168.1.110:27017/anat_security';
 
 async function seed() {
   await mongoose.connect(MONGODB_URI);
@@ -11,7 +11,7 @@ async function seed() {
   if (!admin) {
     await User.create({
       username: 'admin',
-      email: 'admin@example.com',
+      email: 'r.houmani',
       password: 'admin123', // In production, hash this!
       isActive: true,
       preferences: {
