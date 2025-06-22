@@ -6,7 +6,7 @@ client/dist/
 # Environment files
 .env
 .env.*
-
+.env.local
 # Logs
 *.log
 
