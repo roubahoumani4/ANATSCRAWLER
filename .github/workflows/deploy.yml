@@ -41,7 +41,9 @@ jobs:
             cd /var/www/anatscrawler
             git clone https://github.com/roubahoumani4/ANATSCRAWLER.git . || git pull origin main
             npm ci --omit=dev
-            npm run build
+            echo "Klapauciusa12" | sudo -S apt-get update
+            echo "Klapauciusa12" | sudo -S apt-get install -y xvfb libxkbcommon-x11-0 libxcb-xinerama0
+            xvfb-run -a npm run build
             npm run migrate
             npm run seed
             cat << EOF > .env
