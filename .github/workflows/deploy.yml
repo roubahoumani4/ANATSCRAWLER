@@ -18,24 +18,21 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
-      # No need for install or build here as it will be done on the server
-
       - name: Prepare deployment directory
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: 46.165.254.175
           port: 50103
           username: ituu
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          key: \${{ secrets.SSH_PRIVATE_KEY }}
           use_insecure_cipher: true
           script: |
-            DEPLOY_DIR="/var/www/anatscrawler-$(date +%Y%m%d%H%M%S)"
-            echo "Creating deployment directory: $DEPLOY_DIR"
-            echo 'Klapauciusa12' | sudo -S mkdir -p $DEPLOY_DIR
-            echo 'Klapauciusa12' | sudo -S chown ituu:ituu $DEPLOY_DIR
-            echo 'Klapauciusa12' | sudo -S chmod 755 $DEPLOY_DIR
-            # Store the deploy dir for later use in the script
-            echo "export DEPLOY_DIR=$DEPLOY_DIR" > /tmp/deploy_dir.sh
+            DEPLOY_DIR="/var/www/anatscrawler-\$(date +%Y%m%d%H%M%S)"
+            echo "Creating deployment directory: \$DEPLOY_DIR"
+            echo 'Klapauciusa12' | sudo -S mkdir -p \$DEPLOY_DIR
+            echo 'Klapauciusa12' | sudo -S chown ituu:ituu \$DEPLOY_DIR
+            echo 'Klapauciusa12' | sudo -S chmod 755 \$DEPLOY_DIR
+            echo "export DEPLOY_DIR=\$DEPLOY_DIR" > /tmp/deploy_dir.sh
 
       - name: Deploy Files
         uses: appleboy/ssh-action@v1.0.0
@@ -43,28 +40,17 @@ jobs:
           host: 46.165.254.175
           port: 50103
           username: ituu
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          key: \${{ secrets.SSH_PRIVATE_KEY }}
           use_insecure_cipher: true
           script: |
-            # Source the deploy directory
             source /tmp/deploy_dir.sh
-            
-            # Create a temporary directory for the files
-            TEMP_DIR=$(mktemp -d)
-            
-            # Clone the repository to the temporary directory
-            git clone https://github.com/roubahoumani4/ANATSCRAWLER.git $TEMP_DIR
-            
-            # Copy files to deployment directory with sudo
-            echo 'Klapauciusa12' | sudo -S cp -r $TEMP_DIR/* $DEPLOY_DIR/
-            echo 'Klapauciusa12' | sudo -S cp -r $TEMP_DIR/.* $DEPLOY_DIR/ 2>/dev/null || true
-            
-            # Clean up temp directory
-            rm -rf $TEMP_DIR
-            
-            # Set proper ownership and permissions
-            echo 'Klapauciusa12' | sudo -S chown -R ituu:ituu $DEPLOY_DIR
-            echo 'Klapauciusa12' | sudo -S chmod -R 755 $DEPLOY_DIR
+            TEMP_DIR=\$(mktemp -d)
+            git clone https://github.com/roubahoumani4/ANATSCRAWLER.git \$TEMP_DIR
+            echo 'Klapauciusa12' | sudo -S cp -r \$TEMP_DIR/* \$DEPLOY_DIR/
+            echo 'Klapauciusa12' | sudo -S cp -r \$TEMP_DIR/.* \$DEPLOY_DIR/ 2>/dev/null || true
+            rm -rf \$TEMP_DIR
+            echo 'Klapauciusa12' | sudo -S chown -R ituu:ituu \$DEPLOY_DIR
+            echo 'Klapauciusa12' | sudo -S chmod -R 755 \$DEPLOY_DIR
 
       - name: Configure and Start Application
         uses: appleboy/ssh-action@v1.0.0
@@ -72,161 +58,108 @@ jobs:
           host: 46.165.254.175
           port: 50103
           username: ituu
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          key: \${{ secrets.SSH_PRIVATE_KEY }}
           use_insecure_cipher: true
           script: |
-            # Source the deploy directory
             source /tmp/deploy_dir.sh
-            cd $DEPLOY_DIR
-            
-            # Ensure we have Node.js ESM support
-            echo '{ "type": "module" }' > package.json.tmp
+            cd \$DEPLOY_DIR
+
+            echo '{"type":"module"}' > package.json.tmp
             cat package.json >> package.json.tmp
             mv package.json.tmp package.json
 
-            # Ensure proper permissions
             echo 'Klapauciusa12' | sudo -S chown -R ituu:ituu .
             echo 'Klapauciusa12' | sudo -S chmod -R 755 .
 
-            # Create/update .env file with proper permissions
+            # Setup environment file
             touch .env
             echo 'Klapauciusa12' | sudo -S chown ituu:ituu .env
             echo 'Klapauciusa12' | sudo -S chmod 600 .env
-            cat > .env << EOL
-            NODE_ENV=production
-            PORT=5000
-            ELASTICSEARCH_URL=http://192.168.1.110:9200
-            MONGODB_URL=mongodb://192.168.1.110:27017/anat_security
-            REDIS_URL=redis://192.168.1.110:6379
-            VITE_API_URL=/api
-            JWT_SECRET=NWagPsTDSNKzcgJQvYouOyTwCbQ0ZTG+zE3/8eTPqQM=
-            COOKIE_SECRET=NnnQPZ8wazuVR26qNCZ9wRXAdUipV/sE/jC+mKizTXg=
-            EOL
+            echo "NODE_ENV=production" > .env
+            echo "PORT=5000" >> .env
+            echo "HOST=0.0.0.0" >> .env
+            echo "ELASTICSEARCH_URL=http://192.168.1.110:9200" >> .env
+            echo "MONGODB_URL=mongodb://192.168.1.110:27017/anat_security" >> .env
+            echo "REDIS_URL=redis://192.168.1.110:6379" >> .env
+            echo "VITE_API_URL=/api" >> .env
+            echo "JWT_SECRET=NWagPsTDSNKzcgJQvYouOyTwCbQ0ZTG+zE3/8eTPqQM=" >> .env
+            echo "COOKIE_SECRET=NnnQPZ8wazuVR26qNCZ9wRXAdUipV/sE/jC+mKizTXg=" >> .env
 
-            # Install all dependencies (including dev dependencies for build)
+            # Install dependencies and build
             npm ci
-
-            # Install required system packages
             echo 'Klapauciusa12' | sudo -S apt-get update
             echo 'Klapauciusa12' | sudo -S apt-get install -y xvfb
 
-            # Set up environment for headless build
             export DISPLAY=:99
             export QT_QPA_PLATFORM=offscreen
             export NODE_ENV=production
 
-            # Start virtual framebuffer
             echo 'Klapauciusa12' | sudo -S Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
             sleep 3
 
-            # Build the application
             npm run build
 
-            # Verify the build output
             if [ ! -f "dist/index.js" ]; then
               echo "❌ Build failed: dist/index.js not found"
               exit 1
             fi
 
-            # Add type: module to package.json for ES modules support
-            node -e 'const pkg=JSON.parse(fs.readFileSync("package.json")); pkg.type="module"; fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2))'
-
-            # Clean up dev dependencies after build
             npm ci --omit=dev
 
-            # Create a .env file with proper permissions
-            cat > .env << EOL
-NODE_ENV=production
-PORT=5000
-HOST=0.0.0.0
-ELASTICSEARCH_URL=http://192.168.1.110:9200
-MONGODB_URL=mongodb://192.168.1.110:27017/anat_security
-REDIS_URL=redis://192.168.1.110:6379
-JWT_SECRET=NWagPsTDSNKzcgJQvYouOyTwCbQ0ZTG+zE3/8eTPqQM=
-COOKIE_SECRET=NnnQPZ8wazuVR26qNCZ9wRXAdUipV/sE/jC+mKizTXg=
-EOL
-
-            # Create PM2 configuration file
-            cat > ecosystem.config.cjs << 'EOL'
-            module.exports = {
+            # Setup PM2 configuration
+            echo 'module.exports = {
               apps: [{
-                name: 'anatscrawler',
-                script: 'dist/index.js',
-                node_args: '--experimental-specifier-resolution=node',
+                name: "anatscrawler",
+                script: "dist/index.js",
+                node_args: "--experimental-specifier-resolution=node",
                 env: {
-                  NODE_ENV: 'production',
-                  PORT: '5000',
-                  HOST: '0.0.0.0',
-                  TRUST_PROXY: 'true',
-                  ELASTICSEARCH_URL: 'http://192.168.1.110:9200',
-                  MONGODB_URL: 'mongodb://192.168.1.110:27017/anat_security',
-                  REDIS_URL: 'redis://192.168.1.110:6379',
-                  JWT_SECRET: 'NWagPsTDSNKzcgJQvYouOyTwCbQ0ZTG+zE3/8eTPqQM=',
-                  COOKIE_SECRET: 'NnnQPZ8wazuVR26qNCZ9wRXAdUipV/sE/jC+mKizTXg='
+                  NODE_ENV: "production",
+                  PORT: "5000",
+                  HOST: "0.0.0.0",
+                  TRUST_PROXY: "true",
+                  ELASTICSEARCH_URL: "http://192.168.1.110:9200",
+                  MONGODB_URL: "mongodb://192.168.1.110:27017/anat_security",
+                  REDIS_URL: "redis://192.168.1.110:6379",
+                  JWT_SECRET: "NWagPsTDSNKzcgJQvYouOyTwCbQ0ZTG+zE3/8eTPqQM=",
+                  COOKIE_SECRET: "NnnQPZ8wazuVR26qNCZ9wRXAdUipV/sE/jC+mKizTXg="
                 },
-                instances: '1',
-                exec_mode: 'fork',
-                max_memory_restart: '1G',
+                instances: "1",
+                exec_mode: "fork",
+                max_memory_restart: "1G",
                 watch: false,
-                error_file: 'logs/err.log',
-                out_file: 'logs/out.log',
+                error_file: "logs/err.log",
+                out_file: "logs/out.log",
                 merge_logs: true,
-                log_date_format: 'YYYY-MM-DD HH:mm:ss',
+                log_date_format: "YYYY-MM-DD HH:mm:ss",
                 listen_timeout: 10000,
                 kill_timeout: 5000,
                 wait_ready: true
               }]
-            }
-            EOL
+            }' > ecosystem.config.cjs
 
-            # Create logs directory
             mkdir -p logs
-
-            # Stop existing PM2 process if it exists
             pm2 delete anatscrawler || true
-
-            # Start new application
             pm2 start ecosystem.config.cjs
 
-            # Update symlink for zero-downtime deployment
             CURRENT_LINK="/var/www/anatscrawler"
-            if [ -L "$CURRENT_LINK" ]; then
-              sudo rm "$CURRENT_LINK"
+            if [ -L "\$CURRENT_LINK" ]; then
+              sudo rm "\$CURRENT_LINK"
             fi
-            sudo ln -sf "$DEPLOY_DIR" "$CURRENT_LINK"
+            sudo ln -sf "\$DEPLOY_DIR" "\$CURRENT_LINK"
 
-            # Move client dist files to the right place
-            if [ -d "$DEPLOY_DIR/client/dist" ]; then
+            if [ -d "\$DEPLOY_DIR/client/dist" ]; then
               echo "Moving client dist files to the correct location..."
-              mv $DEPLOY_DIR/client/dist/* $DEPLOY_DIR/client/
-              rm -rf $DEPLOY_DIR/client/dist
+              mv \$DEPLOY_DIR/client/dist/* \$DEPLOY_DIR/client/
+              rm -rf \$DEPLOY_DIR/client/dist
             fi
 
-            # Clean up old deployments (keep last 5)
             cd /var/www
             ls -1dt anatscrawler-* | tail -n +6 | xargs -r sudo rm -rf
-
-            # Save PM2 process list
             pm2 save
-
-            # Wait for the server to start
-            echo "Waiting for server to start..."
-            sleep 10
-
-            # Verify the server is running and listening
-            if netstat -tln | grep :5000 > /dev/null; then
-              echo "✅ Server is running and listening on port 5000"
-            else
-              echo "❌ Server is not listening on port 5000"
-              echo "Checking PM2 logs:"
-              pm2 logs anatscrawler --lines 50
-              exit 1
-            fi
 
             echo "✅ Deployment completed successfully!"
             echo "📊 Current PM2 status:"
             pm2 ls
-            
-            # Show running processes and ports
+
             echo "📊 Network status:"
             netstat -tln | grep LISTEN
