@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # Nginx Setup Script for ANATSCRAWLER
-# Run this script on the proxy server (horus.anatsecurity.fr)
+# Run this script on the Nginx proxy server (192.168.1.104)
+# This will configure Nginx to proxy requests to the web app server (192.168.1.105:5000)
 
 set -e
 
@@ -147,7 +148,8 @@ show_status() {
     echo "  - Site: $NGINX_SITE_NAME"
     echo "  - Config: $NGINX_SITES_AVAILABLE/$NGINX_SITE_NAME"
     echo "  - Domain: horus.anatsecurity.fr"
-    echo "  - Backend: 192.168.1.105:5000"
+    echo "  - Proxy Server: 192.168.1.104 (this server)"
+    echo "  - Backend Server: 192.168.1.105:5000"
     echo "  - SSL: Configured (certificates required)"
     
     echo ""

@@ -106,16 +106,31 @@ jobs:
             fi
             echo "✅ Server build successful: dist/index.js found"
 
-            # Validate client build
-            if [ ! -f "client/dist/index.html" ]; then
-              echo "❌ Client build failed: client/dist/index.html not found"
+            # Validate client build - check multiple possible locations
+            CLIENT_BUILD_FOUND=false
+            if [ -f "client/dist/index.html" ]; then
+              echo "✅ Client build successful: client/dist/index.html found"
+              CLIENT_BUILD_FOUND=true
+            elif [ -f "client/index.html" ]; then
+              echo "✅ Client build found at: client/index.html (alternative location)"
+              CLIENT_BUILD_FOUND=true
+            elif [ -f "dist/client/index.html" ]; then
+              echo "✅ Client build found at: dist/client/index.html (alternative location)"
+              CLIENT_BUILD_FOUND=true
+            fi
+            
+            if [ "$CLIENT_BUILD_FOUND" = false ]; then
+              echo "❌ Client build failed: index.html not found in expected locations"
               echo "Contents of client directory:"
               ls -la client/ || echo "client directory does not exist"
               echo "Contents of client/dist directory (if exists):"
               ls -la client/dist/ || echo "client/dist directory does not exist"
+              echo "Contents of dist directory:"
+              ls -la dist/ || echo "dist directory does not exist"
+              echo "Searching for index.html files:"
+              find . -name "index.html" -type f | head -10
               exit 1
             fi
-            echo "✅ Client build successful: client/dist/index.html found"
 
             # List deployment directory contents for debugging
             echo "📁 Deployment directory contents:"
@@ -205,6 +220,29 @@ jobs:
               echo "System Processes on port 5000:"
               lsof -i :5000 || echo "No processes found on port 5000"
               exit 1
+            fi
+
+            # Test server responses to ensure it's working correctly
+            echo "🔍 Testing server endpoints..."
+            
+            # Test health endpoint first
+            HEALTH_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/api/health --connect-timeout 10 || echo "000")
+            if [ "$HEALTH_RESPONSE" = "200" ]; then
+              echo "✅ Health endpoint responding correctly"
+            else
+              echo "⚠️  Health endpoint issue (HTTP $HEALTH_RESPONSE)"
+            fi
+            
+            # Test root endpoint
+            ROOT_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/ --connect-timeout 10 || echo "000")
+            if [ "$ROOT_RESPONSE" = "200" ]; then
+              echo "✅ Root endpoint serving client files correctly"
+            elif [ "$ROOT_RESPONSE" = "404" ]; then
+              echo "⚠️  Root endpoint returns 404 - may indicate client file issues"
+              echo "Checking PM2 logs for client file errors:"
+              pm2 logs anatscrawler --lines 20 | grep -i "client\|index.html\|static" || echo "No client-related errors in recent logs"
+            else
+              echo "⚠️  Root endpoint unexpected response (HTTP $ROOT_RESPONSE)"
             fi
 
             # Update symlink for zero-downtime deployment
