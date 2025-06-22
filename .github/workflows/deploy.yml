@@ -29,7 +29,6 @@ jobs:
           port: ${{ secrets.DEPLOY_PORT }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          password: ${{ secrets.SUDO_PASSWORD }}
           use_insecure_cipher: true
           script: |
             # Create timestamp-based deployment directory
@@ -38,9 +37,10 @@ jobs:
             DEPLOY_DIR="${DEPLOY_BASE}-${TIMESTAMP}"
             
             echo "Setting up deployment directories..."
-            echo ${{ secrets.SUDO_PASSWORD }} | sudo -S mkdir -p /var/www
-            echo ${{ secrets.SUDO_PASSWORD }} | sudo -S chown -R $USER:$USER /var/www
-            echo ${{ secrets.SUDO_PASSWORD }} | sudo -S chmod 755 /var/www
+            mkdir -p /var/www || {
+              echo "Failed to create /var/www directory. Please ensure the user has proper permissions."
+              exit 1
+            }
             
             echo "Creating deployment directory: $DEPLOY_DIR"
             mkdir -p $DEPLOY_DIR || {
@@ -148,17 +148,23 @@ jobs:
             echo "Installing dependencies..."
             npm ci
             
-            # Install system dependencies
-            sudo -S apt-get update
-            sudo -S apt-get install -y xvfb
+            # Install system dependencies if needed
+            # Note: User should have proper permissions or use a user with sudo access
+            if command -v apt-get >/dev/null 2>&1; then
+              echo "Installing system dependencies..."
+              apt-get update || echo "Could not update packages - continuing without system dependencies"
+              apt-get install -y xvfb || echo "Could not install xvfb - continuing without virtual display"
+            fi
 
-            # Setup display for tests
+            # Setup display for tests (if xvfb is available)
             export DISPLAY=:99
             export QT_QPA_PLATFORM=offscreen
             export NODE_ENV=production
 
-            sudo -S Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
-            sleep 3
+            if command -v Xvfb >/dev/null 2>&1; then
+              Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+              sleep 3
+            fi
 
             echo "Building application..."
             npm run build
@@ -194,15 +200,18 @@ jobs:
             
             # Create/Update symlink
             CURRENT_LINK="${DEPLOY_BASE_DIR}-current"
-            sudo -S rm -f $CURRENT_LINK
-            sudo -S ln -s $DEPLOY_DIR $CURRENT_LINK
+            rm -f $CURRENT_LINK || echo "Could not remove existing symlink"
+            ln -s $DEPLOY_DIR $CURRENT_LINK || {
+              echo "Warning: Could not create symlink. This may require elevated permissions."
+              echo "Manual symlink creation may be needed: ln -s $DEPLOY_DIR $CURRENT_LINK"
+            }
             
             # Cleanup old deployments
             echo "Cleaning up old deployments..."
             cd /var/www
             ls -1dt ${DEPLOY_BASE_DIR}-* | grep -v "${DEPLOY_BASE_DIR}-current" | tail -n +$((KEEP_VERSIONS + 1)) | while read dir; do
               echo "Removing old deployment: $dir"
-              sudo -S rm -rf "$dir"
+              rm -rf "$dir" || echo "Warning: Could not remove old deployment directory: $dir"
             done
             
             # Validate deployment
@@ -213,11 +222,11 @@ jobs:
               PREV_DEPLOY=$(ls -1dt ${DEPLOY_BASE_DIR}-* | grep -v "${DEPLOY_BASE_DIR}-current" | head -n 1)
               if [ -n "$PREV_DEPLOY" ]; then
                 echo "Rolling back to: $PREV_DEPLOY"
-                sudo -S ln -sf $PREV_DEPLOY $CURRENT_LINK
+                ln -sf $PREV_DEPLOY $CURRENT_LINK || echo "Warning: Could not create rollback symlink"
                 cd $PREV_DEPLOY
-                pm2 delete anatscrawler
-                pm2 start dist/index.js --name anatscrawler
-                pm2 save
+                pm2 delete anatscrawler || echo "Warning: Could not delete PM2 process"
+                pm2 start dist/index.js --name anatscrawler || echo "Warning: Could not start rollback PM2 process"
+                pm2 save || echo "Warning: Could not save PM2 config"
               fi
               
               exit 1
@@ -375,10 +384,13 @@ jobs:
             CURRENT_LINK="/var/www/anatscrawler"
             if [ -L "$CURRENT_LINK" ]; then
               echo "Removing existing symlink: $CURRENT_LINK"
-              echo 'Klapauciusa12' | sudo -S rm "$CURRENT_LINK"
+              rm -f "$CURRENT_LINK" || echo "Warning: Could not remove current symlink"
             fi
             echo "Creating new symlink: $CURRENT_LINK -> $DEPLOY_DIR"
-            echo 'Klapauciusa12' | sudo -S ln -sf "$DEPLOY_DIR" "$CURRENT_LINK"
+            ln -sf "$DEPLOY_DIR" "$CURRENT_LINK" || {
+              echo "Warning: Could not create current symlink. This may require elevated permissions."
+              echo "Manual symlink creation may be needed: ln -s $DEPLOY_DIR $CURRENT_LINK"
+            }
 
             # Verify static files are accessible
             echo "🔍 Verifying static files are accessible..."
@@ -406,7 +418,7 @@ jobs:
             if [ -n "$OLD_DEPLOYMENTS" ]; then
               echo "Removing old deployments:"
               echo "$OLD_DEPLOYMENTS"
-              echo "$OLD_DEPLOYMENTS" | xargs -r echo 'Klapauciusa12' | sudo -S rm -rf
+              echo "$OLD_DEPLOYMENTS" | xargs -r rm -rf || echo "Warning: Could not remove some old deployment directories"
             else
               echo "No old deployments to clean up"
             fi

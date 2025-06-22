@@ -115,14 +115,22 @@ async function startServer() {
       });
     } else {
       // In production, serve static files - find the correct client directory
+      // Get the deployment root directory (where the server is running from)
+      const deploymentRoot = process.cwd();
+      
       const possibleClientPaths = [
-        path.resolve(process.cwd(), 'client/dist'),  // Expected build output
-        path.resolve(process.cwd(), 'client'),       // Fallback location
-        path.resolve(process.cwd(), 'dist/client'),  // Alternative build location
+        path.resolve(deploymentRoot, 'client/dist'),  // Expected build output
+        path.resolve(deploymentRoot, 'client'),       // Fallback location
+        path.resolve(deploymentRoot, 'dist/client'),  // Alternative build location
+        path.resolve(__dirname, '../client/dist'),    // Relative to bundled server
+        path.resolve(__dirname, '../client'),         // Relative to bundled server fallback
       ];
       
       let clientDistPath: string | null = null;
       let indexHtmlPath: string | null = null;
+      
+      console.log(`🔍 Looking for client files from deployment root: ${deploymentRoot}`);
+      console.log(`📁 Server location: ${__dirname}`);
       
       // Find the correct client path
       for (const clientPath of possibleClientPaths) {
@@ -134,9 +142,11 @@ async function startServer() {
             indexHtmlPath = potentialIndexPath;
             console.log(`✅ Found client files at: ${clientDistPath}`);
             break;
+          } else {
+            console.log(`❌ Not found: ${potentialIndexPath}`);
           }
         } catch (e) {
-          // Continue to next path
+          console.log(`❌ Error checking ${clientPath}:`, e instanceof Error ? e.message : String(e));
         }
       }
       
@@ -144,19 +154,20 @@ async function startServer() {
         console.error('❌ Client build files not found!');
         console.error('Searched in:');
         possibleClientPaths.forEach(p => console.error(`  - ${p}`));
-        console.error('Current working directory:', process.cwd());
+        console.error(`Deployment root: ${deploymentRoot}`);
+        console.error(`Server location: ${__dirname}`);
         
         // List contents for debugging
         try {
           const fs = require('fs');
-          console.log('Contents of current directory:');
-          fs.readdirSync(process.cwd()).forEach((file: string) => {
+          console.log('Contents of deployment root:');
+          fs.readdirSync(deploymentRoot).forEach((file: string) => {
             console.log(`  ${file}`);
           });
           
-          if (fs.existsSync('client')) {
+          if (fs.existsSync(path.join(deploymentRoot, 'client'))) {
             console.log('Contents of client directory:');
-            fs.readdirSync('client').forEach((file: string) => {
+            fs.readdirSync(path.join(deploymentRoot, 'client')).forEach((file: string) => {
               console.log(`  client/${file}`);
             });
           }
