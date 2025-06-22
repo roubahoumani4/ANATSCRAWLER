@@ -1,7 +1,7 @@
 # ANAT Security - Web Application
 
 ## Overview
-This project is a full-stack web application for ANAT Security, focusing on credential search and user management. It uses a React frontend with a Node.js/Express backend, connected to MongoDB. The application follows a modern architecture with component-based UI design using Shadcn UI components and implements features like authentication, dark/light theme switching, and multilingual support.
+This project is a full-stack web application for ANAT Security, focusing on credential search and user management. It uses a React frontend with a Node.js/Express backend, connected to MongoDB. The application follows a modern architecture with component-based UI design using Shadcn UI components and implements features like authentication, dark/light theme switching, and multilingual s.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
