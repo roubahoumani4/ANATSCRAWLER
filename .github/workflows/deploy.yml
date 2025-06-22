@@ -39,22 +39,23 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           use_insecure_cipher: true
+          envs: SUDO_PASSWORD
           script: |
             echo "🚀 Starting deployment..."
             
             # Stop existing service first
             echo "Stopping existing service..."
-            pm2 delete anatscrawler || echo "No existing service to stop"
+            echo "$SUDO_PASSWORD" | sudo -S pm2 delete anatscrawler || echo "No existing service to stop"
             
             # Clean deployment directory
             echo "Cleaning deployment directory..."
-            rm -rf /var/www/anatscrawler
-            mkdir -p /var/www/anatscrawler
+            echo "$SUDO_PASSWORD" | sudo -S rm -rf /var/www/anatscrawler
+            echo "$SUDO_PASSWORD" | sudo -S mkdir -p /var/www/anatscrawler
             cd /var/www/anatscrawler
             
             # Clone fresh copy
             echo "Cloning repository..."
-            git clone https://github.com/${{ github.repository }}.git . || {
+            git clone git@github.com:${{ github.repository }}.git . || {
               echo "Failed to clone repository"
               exit 1
             }
@@ -96,8 +97,8 @@ jobs:
             
             # Start the service
             echo "Starting service..."
-            pm2 start dist/index.js --name anatscrawler
-            pm2 save
+            echo "$SUDO_PASSWORD" | sudo -S pm2 start dist/index.js --name anatscrawler
+            echo "$SUDO_PASSWORD" | sudo -S pm2 save
             
             # Wait for service to start
             sleep 5
@@ -112,7 +113,7 @@ jobs:
             
             # Show final status
             echo "📊 Final status:"
-            pm2 show anatscrawler
+            echo "$SUDO_PASSWORD" | sudo -S pm2 show anatscrawler
             echo "🎉 Deployment completed!"
 
       - name: Deployment Failed Cleanup
