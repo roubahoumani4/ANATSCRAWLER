@@ -53,12 +53,20 @@ jobs:
             echo "$SUDO_PASSWORD" | sudo -S mkdir -p /var/www/anatscrawler
             cd /var/www/anatscrawler
             
-            # Clone fresh copy
-            echo "Cloning repository..."
-            git clone git@github.com:${{ github.repository }}.git . || {
-              echo "Failed to clone repository"
-              exit 1
-            }
+            # Clone or update repository
+            if [ ! -d ".git" ]; then
+              echo "Cloning repository..."
+              git clone git@github.com:roubahoumani4/ANATSCRAWLER.git . || {
+                echo "Failed to clone repository"
+                exit 1
+              }
+            else
+              echo "Repository exists, pulling latest changes..."
+              git pull origin main || {
+                echo "Failed to pull latest changes"
+                exit 1
+              }
+            fi
             
             # Install dependencies and build
             echo "Installing production dependencies..."
