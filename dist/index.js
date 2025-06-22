@@ -76778,6 +76778,7 @@ if (process.env.NODE_ENV !== "production") {
 var app = (0, import_express2.default)();
 app.use(import_express2.default.json());
 app.use(import_express2.default.urlencoded({ extended: false }));
+app.use(import_express2.default.static(import_path.default.join(__dirname, "../client/dist")));
 var corsOptions = {
   origin: true,
   // Allow all origins

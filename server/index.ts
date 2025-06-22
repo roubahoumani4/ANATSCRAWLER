@@ -22,6 +22,9 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Serve static files from the client/dist directory
+app.use(express.static(path.join(__dirname, '../client/dist')));
+
 // Use more permissive CORS configuration
 const corsOptions = {
   origin: true, // Allow all origins
