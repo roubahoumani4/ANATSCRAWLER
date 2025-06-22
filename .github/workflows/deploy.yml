@@ -10,56 +10,83 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      - name: Deploy to Server
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Prepare deployment directory
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: 46.165.254.175
           port: 50103
-          username: ${{ secrets.WEBAPP_VM_USER }}
+          username: ituu
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          command_timeout: 30m
+          use_insecure_cipher: true
           script: |
-            set -e
-            echo "Setting up deployment directory..."
-            mkdir -p /var/www/anatscrawler
-            echo "Klapauciusa12" | sudo -S chown -R ${{ secrets.WEBAPP_VM_USER }}:${{ secrets.WEBAPP_VM_USER }} /var/www/anatscrawler
-            echo "Klapauciusa12" | sudo -S chmod -R 755 /var/www/anatscrawler
+            DEPLOY_DIR="/var/www/anatscrawler-$(date +%Y%m%d%H%M%S)"
+            echo "Creating deployment directory: $DEPLOY_DIR"
+            mkdir -p $DEPLOY_DIR
+            echo "DEPLOY_DIR=$DEPLOY_DIR" >> $GITHUB_ENV
 
       - name: Deploy Files
         uses: appleboy/scp-action@master
         with:
           host: 46.165.254.175
           port: 50103
-          username: ${{ secrets.WEBAPP_VM_USER }}
+          username: ituu
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: ".,!node_modules,!.git,!.github"
-          target: "/var/www/anatscrawler"
+          target: "${{ env.DEPLOY_DIR }}"
           strip_components: 0
-          overwrite: true
-          timeout: 1800s
+          use_insecure_cipher: true
 
       - name: Configure and Start Application
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: 46.165.254.175
           port: 50103
-          username: ${{ secrets.WEBAPP_VM_USER }}
+          username: ituu
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          command_timeout: 30m
+          use_insecure_cipher: true
           script: |
-            set -e
-            cd /var/www/anatscrawler || exit 1
-            echo "Current directory: $(pwd)"
+            cd ${{ env.DEPLOY_DIR }}
 
             # Ensure proper permissions
-            echo "Setting permissions..."
-            echo "Klapauciusa12" | sudo -S chown -R ${{ secrets.WEBAPP_VM_USER }}:${{ secrets.WEBAPP_VM_USER }} .
-            echo "Klapauciusa12" | sudo -S chmod -R 755 .
+            echo 'Klapauciusa12' | sudo -S chown -R ituu:ituu .
+            echo 'Klapauciusa12' | sudo -S chmod -R 755 .
+
+            # Create/update .env file with proper permissions
+            touch .env
+            echo 'Klapauciusa12' | sudo -S chown ituu:ituu .env
+            echo 'Klapauciusa12' | sudo -S chmod 600 .env
+            cat > .env << EOL
+            NODE_ENV=production
+            PORT=5000
+            ELASTICSEARCH_URL=http://192.168.1.110:9200
+            MONGODB_URL=mongodb://192.168.1.110:27017/anat_security
+            REDIS_URL=redis://192.168.1.110:6379
+            VITE_API_URL=/api
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            COOKIE_SECRET=${{ secrets.COOKIE_SECRET }}
+            EOL
+
+            # Install dependencies
+            npm ci --production
+
+            # Build the application
+            npm run build
 
             # Create PM2 configuration file
-            echo "Creating PM2 config..."
             cat > ecosystem.config.cjs << 'EOL'
             module.exports = {
               apps: [{
@@ -69,53 +96,46 @@ jobs:
                   NODE_ENV: 'production',
                   PORT: '5000',
                   HOST: '0.0.0.0',
+                  TRUST_PROXY: 'true',
                   ELASTICSEARCH_URL: 'http://192.168.1.110:9200',
-                  MONGODB_URI: 'mongodb://192.168.1.110:27017/anat_security'
+                  MONGODB_URL: 'mongodb://192.168.1.110:27017/anat_security',
+                  REDIS_URL: 'redis://192.168.1.110:6379'
                 },
-                max_memory_restart: '500M',
-                max_restarts: 5,
-                min_uptime: '30s'
+                instances: 'max',
+                exec_mode: 'cluster',
+                max_memory_restart: '1G',
+                watch: false,
+                error_file: 'logs/err.log',
+                out_file: 'logs/out.log',
+                merge_logs: true,
+                log_date_format: 'YYYY-MM-DD HH:mm:ss'
               }]
             }
             EOL
 
-            # Start/restart the application
-            echo "Starting/restarting application with PM2..."
-            if pm2 list | grep -q "anatscrawler"; then
-              echo "Reloading existing PM2 process..."
-              pm2 reload ecosystem.config.cjs --update-env || exit 1
-            else
-              echo "Starting new PM2 process..."
-              pm2 start ecosystem.config.cjs || exit 1
+            # Create logs directory
+            mkdir -p logs
+
+            # Stop existing PM2 process if it exists
+            pm2 delete anatscrawler || true
+
+            # Start new application
+            pm2 start ecosystem.config.cjs
+
+            # Update symlink for zero-downtime deployment
+            CURRENT_LINK="/var/www/anatscrawler"
+            if [ -L "$CURRENT_LINK" ]; then
+              sudo rm "$CURRENT_LINK"
             fi
+            sudo ln -sf "$DEPLOY_DIR" "$CURRENT_LINK"
+
+            # Clean up old deployments (keep last 5)
+            cd /var/www
+            ls -1dt anatscrawler-* | tail -n +6 | xargs -r sudo rm -rf
+
+            # Save PM2 process list
             pm2 save
 
-            # Verify application status
-            echo "Checking application status..."
-            pm2 show anatscrawler
-            echo "Deployment complete!"
-            # Create/update .env file with proper permissions
-            echo "Creating .env file..."
-            touch .env
-            echo "Klapauciusa12" | sudo -S chown ${{ secrets.WEBAPP_VM_USER }}:${{ secrets.WEBAPP_VM_USER }} .env
-            echo "Klapauciusa12" | sudo -S chmod 600 .env
-            cat > .env << EOL
-            NODE_ENV=production
-            PORT=5000
-            HOST=0.0.0.0
-            ELASTICSEARCH_URL=http://192.168.1.110:9200
-            MONGODB_URI=mongodb://192.168.1.110:27017/anat_security
-            VITE_API_URL=/api
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
-            COOKIE_SECRET=${{ secrets.COOKIE_SECRET }}
-            EOL
-
-            # Install dependencies
-            echo "Installing dependencies..."
-            npm ci --no-audit --no-fund || exit 1
-
-            # Build the application
-            echo "Building application..."
-            npm run build || exit 1
-
-            
+            echo "✅ Deployment completed successfully!"
+            echo "📊 Current PM2 status:"
+            pm2 ls
