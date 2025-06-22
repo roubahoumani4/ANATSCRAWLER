@@ -29,18 +29,37 @@ jobs:
           port: ${{ secrets.DEPLOY_PORT }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          password: ${{ secrets.SUDO_PASSWORD }}
           use_insecure_cipher: true
-          envs: DEPLOY_BASE_DIR
           script: |
             # Create timestamp-based deployment directory
+            DEPLOY_BASE=/var/www/anatscrawler
             TIMESTAMP=$(date +%Y%m%d%H%M%S)
-            DEPLOY_DIR="${DEPLOY_BASE_DIR}-${TIMESTAMP}"
+            DEPLOY_DIR="${DEPLOY_BASE}-${TIMESTAMP}"
+            
+            echo "Setting up deployment directories..."
+            echo ${{ secrets.SUDO_PASSWORD }} | sudo -S mkdir -p /var/www
+            echo ${{ secrets.SUDO_PASSWORD }} | sudo -S chown -R $USER:$USER /var/www
+            echo ${{ secrets.SUDO_PASSWORD }} | sudo -S chmod 755 /var/www
+            
             echo "Creating deployment directory: $DEPLOY_DIR"
-            sudo -S mkdir -p $DEPLOY_DIR
-            sudo -S chown $USER:$USER $DEPLOY_DIR
-            sudo -S chmod 755 $DEPLOY_DIR
+            mkdir -p $DEPLOY_DIR || {
+              echo "Failed to create directory"
+              exit 1
+            }
+            
+            # Save deployment information
             echo "DEPLOY_DIR=$DEPLOY_DIR" > /tmp/deploy_vars
             echo "TIMESTAMP=$TIMESTAMP" >> /tmp/deploy_vars
+            echo "DEPLOY_BASE=$DEPLOY_BASE" >> /tmp/deploy_vars
+            
+            # Verify directory was created
+            if [ ! -d "$DEPLOY_DIR" ]; then
+              echo "Failed to create deployment directory"
+              exit 1
+            fi
+            
+            echo "Successfully created deployment directory: $DEPLOY_DIR"
 
       - name: Deploy Files
         uses: appleboy/ssh-action@v1.0.0
@@ -51,19 +70,52 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           use_insecure_cipher: true
           script: |
+            # Load deployment variables
+            if [ ! -f /tmp/deploy_vars ]; then
+              echo "Deployment variables file not found"
+              exit 1
+            fi
             source /tmp/deploy_vars
+            
+            if [ -z "$DEPLOY_DIR" ]; then
+              echo "DEPLOY_DIR variable not set"
+              exit 1
+            fi
+            
+            # Create temporary directory for cloning
             TEMP_DIR=$(mktemp -d)
+            echo "Created temporary directory: $TEMP_DIR"
             
+            # Clone repository
             echo "Cloning repository..."
-            git clone https://github.com/${{ github.repository }}.git $TEMP_DIR
+            git clone https://github.com/${{ github.repository }}.git $TEMP_DIR || {
+              echo "Failed to clone repository"
+              rm -rf $TEMP_DIR
+              exit 1
+            }
             
-            echo "Copying files..."
-            sudo -S cp -r $TEMP_DIR/* $DEPLOY_DIR/
-            sudo -S cp -r $TEMP_DIR/.* $DEPLOY_DIR/ 2>/dev/null || true
+            # Copy files
+            echo "Copying files to $DEPLOY_DIR..."
+            cp -r $TEMP_DIR/* $DEPLOY_DIR/ || {
+              echo "Failed to copy files"
+              rm -rf $TEMP_DIR
+              exit 1
+            }
+            
+            # Copy hidden files
+            cp -r $TEMP_DIR/.* $DEPLOY_DIR/ 2>/dev/null || true
+            
+            # Cleanup
             rm -rf $TEMP_DIR
+            echo "Cleaned up temporary directory"
             
-            sudo -S chown -R $USER:$USER $DEPLOY_DIR
-            sudo -S chmod -R 755 $DEPLOY_DIR
+            # Set permissions
+            chmod -R 755 $DEPLOY_DIR || {
+              echo "Failed to set permissions"
+              exit 1
+            }
+            
+            echo "Successfully deployed files to: $DEPLOY_DIR"
 
       - name: Configure and Build Application
         uses: appleboy/ssh-action@v1.0.0
