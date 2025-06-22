@@ -104,10 +104,9 @@ jobs:
             echo "✅ Build verification passed"
             
             # Start the service
-            echo "Starting service..."
-            # Ensure we are in the correct directory before starting PM2
+            echo "Starting service with PM2 using ecosystem.config.cjs..."
             cd /var/www/anatscrawler
-            echo "$SUDO_PASSWORD" | sudo -S pm2 start dist/index.js --name anatscrawler
+            echo "$SUDO_PASSWORD" | sudo -S pm2 start ecosystem.config.cjs
             echo "$SUDO_PASSWORD" | sudo -S pm2 save
             
             # Wait for service to start
