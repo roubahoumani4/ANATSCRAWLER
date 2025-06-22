@@ -35,20 +35,40 @@ jobs:
           script: |
             DEPLOY_DIR="/var/www/anatscrawler-$(date +%Y%m%d%H%M%S)"
             echo "Creating deployment directory: $DEPLOY_DIR"
-            mkdir -p $DEPLOY_DIR
-            echo "DEPLOY_DIR=$DEPLOY_DIR" >> $GITHUB_ENV
+            echo 'Klapauciusa12' | sudo -S mkdir -p $DEPLOY_DIR
+            echo 'Klapauciusa12' | sudo -S chown ituu:ituu $DEPLOY_DIR
+            echo 'Klapauciusa12' | sudo -S chmod 755 $DEPLOY_DIR
+            # Store the deploy dir for later use in the script
+            echo "export DEPLOY_DIR=$DEPLOY_DIR" > /tmp/deploy_dir.sh
 
       - name: Deploy Files
-        uses: appleboy/scp-action@master
+        uses: appleboy/ssh-action@v1.0.0
         with:
           host: 46.165.254.175
           port: 50103
           username: ituu
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: ".,!node_modules,!.git,!.github"
-          target: "${{ env.DEPLOY_DIR }}"
-          strip_components: 0
           use_insecure_cipher: true
+          script: |
+            # Source the deploy directory
+            source /tmp/deploy_dir.sh
+            
+            # Create a temporary directory for the files
+            TEMP_DIR=$(mktemp -d)
+            
+            # Clone the repository to the temporary directory
+            git clone https://github.com/roubahoumani4/ANATSCRAWLER.git $TEMP_DIR
+            
+            # Copy files to deployment directory with sudo
+            echo 'Klapauciusa12' | sudo -S cp -r $TEMP_DIR/* $DEPLOY_DIR/
+            echo 'Klapauciusa12' | sudo -S cp -r $TEMP_DIR/.* $DEPLOY_DIR/ 2>/dev/null || true
+            
+            # Clean up temp directory
+            rm -rf $TEMP_DIR
+            
+            # Set proper ownership and permissions
+            echo 'Klapauciusa12' | sudo -S chown -R ituu:ituu $DEPLOY_DIR
+            echo 'Klapauciusa12' | sudo -S chmod -R 755 $DEPLOY_DIR
 
       - name: Configure and Start Application
         uses: appleboy/ssh-action@v1.0.0
@@ -59,7 +79,9 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           use_insecure_cipher: true
           script: |
-            cd ${{ env.DEPLOY_DIR }}
+            # Source the deploy directory
+            source /tmp/deploy_dir.sh
+            cd $DEPLOY_DIR
 
             # Ensure proper permissions
             echo 'Klapauciusa12' | sudo -S chown -R ituu:ituu .
