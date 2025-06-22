@@ -21,7 +21,6 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: true,
     rollupOptions: {
-      external: ['react', 'react-dom', 'react-router-dom'],
       input: {
         main: path.resolve(__dirname, "client/index.html"),
       },
