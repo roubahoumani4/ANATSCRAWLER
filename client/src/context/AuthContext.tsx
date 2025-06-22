@@ -54,14 +54,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const validateToken = async (currentToken: string) => {
     try {
       setLoading(true);
-      const response = await fetch("/api/validate-token", {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${currentToken}`
-        },
-        credentials: "include"
-      });
-      
+      // Add timeout logic (e.g., 7 seconds)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 7000);
+      let response;
+      try {
+        response = await fetch("/api/validate-token", {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${currentToken}`
+          },
+          credentials: "include",
+          signal: controller.signal
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
       if (response.ok) {
         const userData = await response.json();
         setUser(userData);
