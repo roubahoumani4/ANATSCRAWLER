@@ -91,8 +91,8 @@ async function startServer() {
       const { setupDevServer } = await import('./middleware/devServer');
       await setupDevServer(app, httpServer);
     } else {
-      // In production, serve static files from the dist/client directory
-      const clientDistPath = path.resolve(__dirname, '../../dist/client');
+      // In production, serve static files from the client/dist directory
+      const clientDistPath = path.resolve(process.cwd(), 'client/dist');
       console.log('Serving static files from:', clientDistPath);
       
       // Serve static files with caching headers
