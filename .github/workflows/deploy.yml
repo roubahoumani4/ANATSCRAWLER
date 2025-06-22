@@ -18,11 +18,7 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build application
-        run: npm run build
+      # No need for install or build here as it will be done on the server
 
       - name: Prepare deployment directory
         uses: appleboy/ssh-action@v1.0.0
@@ -98,15 +94,31 @@ jobs:
             MONGODB_URL=mongodb://192.168.1.110:27017/anat_security
             REDIS_URL=redis://192.168.1.110:6379
             VITE_API_URL=/api
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
-            COOKIE_SECRET=${{ secrets.COOKIE_SECRET }}
+            JWT_SECRET=your_jwt_secret_here
+            COOKIE_SECRET=your_cookie_secret_here
             EOL
 
-            # Install dependencies
-            npm ci --production
+            # Install all dependencies (including dev dependencies for build)
+            npm ci
+
+            # Install required system packages
+            echo 'Klapauciusa12' | sudo -S apt-get update
+            echo 'Klapauciusa12' | sudo -S apt-get install -y xvfb
+
+            # Set up environment for headless build
+            export DISPLAY=:99
+            export QT_QPA_PLATFORM=offscreen
+            export NODE_ENV=production
+
+            # Start virtual framebuffer
+            echo 'Klapauciusa12' | sudo -S Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+            sleep 3
 
             # Build the application
             npm run build
+
+            # Clean up dev dependencies after build
+            npm ci --omit=dev
 
             # Create PM2 configuration file
             cat > ecosystem.config.cjs << 'EOL'
