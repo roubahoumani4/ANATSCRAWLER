@@ -152,7 +152,7 @@ The application follows a client-server architecture with the following core com
 ### GitHub Actions Workflow
 The application uses GitHub Actions for automated deployment. When code is pushed to the `main` branch, it triggers the following deployment process:
 
-1. **Build Process**:
+1. **Build Process***:
    - Checkout code
    - Install Node.js and dependencies
    - Build the application
