@@ -1,15 +1,20 @@
-import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { registerRoutes } from "./routes";
 import { mongodb } from "./lib/mongodb";
 import path from 'path';
 import cors from 'cors';
-import { fileURLToPath } from 'url';
 
-// ES Module dirname equivalent
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Simple environment loading that works with bundlers
+if (process.env.NODE_ENV !== 'production') {
+  try {
+    // Only try to load dotenv in development
+    const dotenv = require('dotenv');
+    dotenv.config();
+  } catch (e) {
+    console.log('dotenv not available, using environment variables');
+  }
+}
 
 const app = express();
 
