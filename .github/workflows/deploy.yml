@@ -95,11 +95,31 @@ jobs:
 
             npm run build
 
+            # Validate server build
             if [ ! -f "dist/index.js" ]; then
-              echo "❌ Build failed: dist/index.js not found"
-              ls -la dist/
+              echo "❌ Server build failed: dist/index.js not found"
+              echo "Contents of project root:"
+              ls -la
+              echo "Contents of dist directory (if exists):"
+              ls -la dist/ || echo "dist directory does not exist"
               exit 1
             fi
+            echo "✅ Server build successful: dist/index.js found"
+
+            # Validate client build
+            if [ ! -f "client/dist/index.html" ]; then
+              echo "❌ Client build failed: client/dist/index.html not found"
+              echo "Contents of client directory:"
+              ls -la client/ || echo "client directory does not exist"
+              echo "Contents of client/dist directory (if exists):"
+              ls -la client/dist/ || echo "client/dist directory does not exist"
+              exit 1
+            fi
+            echo "✅ Client build successful: client/dist/index.html found"
+
+            # List deployment directory contents for debugging
+            echo "📁 Deployment directory contents:"
+            find . -type f -name "*.html" -o -name "*.js" -o -name "*.css" | head -20
 
             # Clean up dev dependencies
             npm ci --omit=dev
@@ -142,62 +162,176 @@ jobs:
             pm2 start ecosystem.config.cjs
             
             # Wait for application to start
-            sleep 5
+            sleep 10
             
             # Verify the application is running and listening
             if pm2 show anatscrawler | grep -q "online"; then
               echo "✅ PM2 process is online"
+              pm2 show anatscrawler
             else
               echo "❌ PM2 process failed to start"
+              echo "PM2 Status:"
+              pm2 ls
+              echo "PM2 Logs:"
               pm2 logs anatscrawler --lines 50
               exit 1
             fi
             
-            # Check if port 5000 is listening
-            RETRIES=10
+            # Check if port 5000 is listening with more detailed output
+            RETRIES=15
+            PORT_LISTENING=false
             while [ $RETRIES -gt 0 ]; do
               if netstat -tln | grep -q ":5000"; then
                 echo "✅ Server is listening on port 5000"
+                PORT_LISTENING=true
                 break
               else
                 echo "⏳ Waiting for server to start listening on port 5000... ($RETRIES retries left)"
-                sleep 2
+                echo "Current listening ports:"
+                netstat -tln | grep LISTEN
+                sleep 3
                 RETRIES=$((RETRIES - 1))
               fi
             done
             
-            if [ $RETRIES -eq 0 ]; then
-              echo "❌ Server failed to listen on port 5000"
-              echo "PM2 Logs:"
-              pm2 logs anatscrawler --lines 50
-              echo "Process Status:"
+            if [ "$PORT_LISTENING" = false ]; then
+              echo "❌ Server failed to listen on port 5000 after waiting"
+              echo "Final PM2 Status:"
+              pm2 ls
+              echo "Final PM2 Logs:"
+              pm2 logs anatscrawler --lines 100
+              echo "Process Details:"
               pm2 show anatscrawler
+              echo "System Processes on port 5000:"
+              lsof -i :5000 || echo "No processes found on port 5000"
               exit 1
             fi
 
             # Update symlink for zero-downtime deployment
             CURRENT_LINK="/var/www/anatscrawler"
             if [ -L "$CURRENT_LINK" ]; then
-              sudo rm "$CURRENT_LINK"
+              echo "Removing existing symlink: $CURRENT_LINK"
+              echo 'Klapauciusa12' | sudo -S rm "$CURRENT_LINK"
             fi
-            sudo ln -sf "$DEPLOY_DIR" "$CURRENT_LINK"
+            echo "Creating new symlink: $CURRENT_LINK -> $DEPLOY_DIR"
+            echo 'Klapauciusa12' | sudo -S ln -sf "$DEPLOY_DIR" "$CURRENT_LINK"
 
-            # Move client dist files if needed
-            if [ -d "$DEPLOY_DIR/client/dist" ]; then
-              echo "Moving client dist files to the correct location..."
-              mv $DEPLOY_DIR/client/dist/* $DEPLOY_DIR/client/
-              rm -rf $DEPLOY_DIR/client/dist
+            # Verify static files are accessible
+            echo "🔍 Verifying static files are accessible..."
+            if [ -f "client/dist/index.html" ]; then
+              echo "✅ index.html found at: $(pwd)/client/dist/index.html"
+              ls -la client/dist/index.html
+            else
+              echo "⚠️  Warning: index.html not found in expected location"
+              find . -name "index.html" -type f | head -5
+            fi
+
+            # Test a simple HTTP request to the server
+            echo "🔍 Testing server response..."
+            CURL_TEST=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/ || echo "000")
+            if [ "$CURL_TEST" = "200" ] || [ "$CURL_TEST" = "404" ]; then
+              echo "✅ Server is responding (HTTP $CURL_TEST)"
+            else
+              echo "⚠️  Server response test: HTTP $CURL_TEST"
             fi
 
             # Clean up old deployments (keep last 5)
+            echo "🧹 Cleaning up old deployments..."
             cd /var/www
-            ls -1dt anatscrawler-* | tail -n +6 | xargs -r sudo rm -rf
+            OLD_DEPLOYMENTS=$(ls -1dt anatscrawler-* 2>/dev/null | tail -n +6)
+            if [ -n "$OLD_DEPLOYMENTS" ]; then
+              echo "Removing old deployments:"
+              echo "$OLD_DEPLOYMENTS"
+              echo "$OLD_DEPLOYMENTS" | xargs -r echo 'Klapauciusa12' | sudo -S rm -rf
+            else
+              echo "No old deployments to clean up"
+            fi
             
             # Save PM2 process list
             pm2 save
 
-            echo "✅ Deployment completed successfully!"
-            echo "📊 Current PM2 status:"
+            echo "🎉 Deployment completed successfully!"
+            echo "📊 Final PM2 status:"
             pm2 ls
-            echo "📊 Network status:"
+            echo "📊 Final network status:"
+            netstat -tln | grep LISTEN | grep 5000
+            echo "📊 Deployment summary:"
+            echo "  - Server: $(pm2 show anatscrawler | grep 'status' || echo 'Status unknown')"
+            echo "  - Port 5000: $(netstat -tln | grep ':5000' | wc -l) listener(s)"
+            echo "  - Deployment dir: $DEPLOY_DIR"
+            echo "  - Symlink: $CURRENT_LINK -> $(readlink $CURRENT_LINK)"
+
+      - name: Health Check
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: 46.165.254.175
+          port: 50103
+          username: ituu
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          use_insecure_cipher: true
+          script: |
+            echo "🏥 Performing health check..."
+            
+            # Make validation script executable and run it
+            chmod +x scripts/validate-deployment.sh
+            
+            # Run our comprehensive validation script
+            if ./scripts/validate-deployment.sh; then
+              echo "✅ Comprehensive health check passed!"
+              echo "🌐 Application should be accessible at: https://horus.anatsecurity.fr"
+            else
+              echo "⚠️  Health check completed with some issues"
+            fi
+            
+            # Additional manual checks for GitHub Actions context
+            echo ""
+            echo "📋 Additional deployment info:"
+            echo "  - PM2 Status: $(pm2 show anatscrawler | grep 'status' | awk '{print $4}' || echo 'unknown')"
+            echo "  - Port 5000 listeners: $(netstat -tln | grep ':5000' | wc -l)"
+            echo "  - Process uptime: $(pm2 show anatscrawler | grep 'uptime' || echo 'unknown')"
+            echo "  - Memory usage: $(pm2 show anatscrawler | grep 'memory' || echo 'unknown')"
+
+      - name: Deployment Failed - Debug Info
+        if: failure()
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: 46.165.254.175
+          port: 50103
+          username: ituu
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          use_insecure_cipher: true
+          script: |
+            echo "🚨 Deployment failed! Gathering debug information..."
+            
+            source /tmp/deploy_dir.sh || echo "Warning: Could not source deploy directory"
+            
+            echo "📁 Current deployment directory: ${DEPLOY_DIR:-'unknown'}"
+            
+            if [ -n "$DEPLOY_DIR" ] && [ -d "$DEPLOY_DIR" ]; then
+              cd "$DEPLOY_DIR"
+              echo "📋 Deployment directory contents:"
+              ls -la
+              
+              echo "📋 Build outputs:"
+              ls -la dist/ 2>/dev/null || echo "No dist directory"
+              ls -la client/dist/ 2>/dev/null || echo "No client/dist directory"
+            fi
+            
+            echo "📊 PM2 Status:"
+            pm2 ls
+            
+            echo "📊 PM2 Logs (last 50 lines):"
+            pm2 logs anatscrawler --lines 50 || echo "No PM2 logs available"
+            
+            echo "📊 System processes on port 5000:"
+            lsof -i :5000 || echo "No processes on port 5000"
+            
+            echo "📊 Network listeners:"
             netstat -tln | grep LISTEN
+            
+            echo "📊 System resources:"
+            free -h
+            df -h /var/www
+            
+            echo "📊 Recent system logs:"
+            journalctl -n 20 --no-pager || echo "Cannot access system logs"

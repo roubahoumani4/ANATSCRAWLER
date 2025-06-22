@@ -28,6 +28,17 @@ export async function registerRoutes(app: Express): Promise<void> {
   // Register search routes
   registerSearchRoutes(app);
 
+  // Health check endpoint - public, no auth needed
+  app.get("/api/health", (req: Request, res: Response) => {
+    res.json({
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || 'development',
+      port: process.env.PORT || 5000
+    });
+  });
+
   // Security middleware
   app.use(helmet({
     contentSecurityPolicy: {
