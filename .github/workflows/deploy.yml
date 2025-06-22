@@ -78,6 +78,11 @@ jobs:
             # Source the deploy directory
             source /tmp/deploy_dir.sh
             cd $DEPLOY_DIR
+            
+            # Ensure we have Node.js ESM support
+            echo '{ "type": "module" }' > package.json.tmp
+            cat package.json >> package.json.tmp
+            mv package.json.tmp package.json
 
             # Ensure proper permissions
             echo 'Klapauciusa12' | sudo -S chown -R ituu:ituu .
@@ -123,8 +128,23 @@ jobs:
               exit 1
             fi
 
+            # Add type: module to package.json for ES modules support
+            node -e 'const pkg=JSON.parse(fs.readFileSync("package.json")); pkg.type="module"; fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2))'
+
             # Clean up dev dependencies after build
             npm ci --omit=dev
+
+            # Create a .env file with proper permissions
+            cat > .env << EOL
+NODE_ENV=production
+PORT=5000
+HOST=0.0.0.0
+ELASTICSEARCH_URL=http://192.168.1.110:9200
+MONGODB_URL=mongodb://192.168.1.110:27017/anat_security
+REDIS_URL=redis://192.168.1.110:6379
+JWT_SECRET=NWagPsTDSNKzcgJQvYouOyTwCbQ0ZTG+zE3/8eTPqQM=
+COOKIE_SECRET=NnnQPZ8wazuVR26qNCZ9wRXAdUipV/sE/jC+mKizTXg=
+EOL
 
             # Create PM2 configuration file
             cat > ecosystem.config.cjs << 'EOL'
@@ -132,6 +152,7 @@ jobs:
               apps: [{
                 name: 'anatscrawler',
                 script: 'dist/index.js',
+                node_args: '--experimental-specifier-resolution=node',
                 env: {
                   NODE_ENV: 'production',
                   PORT: '5000',
@@ -143,8 +164,8 @@ jobs:
                   JWT_SECRET: 'NWagPsTDSNKzcgJQvYouOyTwCbQ0ZTG+zE3/8eTPqQM=',
                   COOKIE_SECRET: 'NnnQPZ8wazuVR26qNCZ9wRXAdUipV/sE/jC+mKizTXg='
                 },
-                instances: 'max',
-                exec_mode: 'cluster',
+                instances: '1',
+                exec_mode: 'fork',
                 max_memory_restart: '1G',
                 watch: false,
                 error_file: 'logs/err.log',
