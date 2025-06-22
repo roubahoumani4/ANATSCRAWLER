@@ -105,6 +105,8 @@ jobs:
             
             # Start the service
             echo "Starting service..."
+            # Ensure we are in the correct directory before starting PM2
+            cd /var/www/anatscrawler
             echo "$SUDO_PASSWORD" | sudo -S pm2 start dist/index.js --name anatscrawler
             echo "$SUDO_PASSWORD" | sudo -S pm2 save
             
