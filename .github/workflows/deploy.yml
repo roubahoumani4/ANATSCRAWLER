@@ -94,8 +94,8 @@ jobs:
             MONGODB_URL=mongodb://192.168.1.110:27017/anat_security
             REDIS_URL=redis://192.168.1.110:6379
             VITE_API_URL=/api
-            JWT_SECRET=your_jwt_secret_here
-            COOKIE_SECRET=your_cookie_secret_here
+            JWT_SECRET=NWagPsTDSNKzcgJQvYouOyTwCbQ0ZTG+zE3/8eTPqQM=
+            COOKIE_SECRET=NnnQPZ8wazuVR26qNCZ9wRXAdUipV/sE/jC+mKizTXg=
             EOL
 
             # Install all dependencies (including dev dependencies for build)
@@ -117,6 +117,12 @@ jobs:
             # Build the application
             npm run build
 
+            # Verify the build output
+            if [ ! -f "dist/index.js" ]; then
+              echo "❌ Build failed: dist/index.js not found"
+              exit 1
+            fi
+
             # Clean up dev dependencies after build
             npm ci --omit=dev
 
@@ -133,7 +139,9 @@ jobs:
                   TRUST_PROXY: 'true',
                   ELASTICSEARCH_URL: 'http://192.168.1.110:9200',
                   MONGODB_URL: 'mongodb://192.168.1.110:27017/anat_security',
-                  REDIS_URL: 'redis://192.168.1.110:6379'
+                  REDIS_URL: 'redis://192.168.1.110:6379',
+                  JWT_SECRET: 'NWagPsTDSNKzcgJQvYouOyTwCbQ0ZTG+zE3/8eTPqQM=',
+                  COOKIE_SECRET: 'NnnQPZ8wazuVR26qNCZ9wRXAdUipV/sE/jC+mKizTXg='
                 },
                 instances: 'max',
                 exec_mode: 'cluster',
@@ -142,7 +150,10 @@ jobs:
                 error_file: 'logs/err.log',
                 out_file: 'logs/out.log',
                 merge_logs: true,
-                log_date_format: 'YYYY-MM-DD HH:mm:ss'
+                log_date_format: 'YYYY-MM-DD HH:mm:ss',
+                listen_timeout: 10000,
+                kill_timeout: 5000,
+                wait_ready: true
               }]
             }
             EOL
@@ -177,6 +188,24 @@ jobs:
             # Save PM2 process list
             pm2 save
 
+            # Wait for the server to start
+            echo "Waiting for server to start..."
+            sleep 10
+
+            # Verify the server is running and listening
+            if netstat -tln | grep :5000 > /dev/null; then
+              echo "✅ Server is running and listening on port 5000"
+            else
+              echo "❌ Server is not listening on port 5000"
+              echo "Checking PM2 logs:"
+              pm2 logs anatscrawler --lines 50
+              exit 1
+            fi
+
             echo "✅ Deployment completed successfully!"
             echo "📊 Current PM2 status:"
             pm2 ls
+            
+            # Show running processes and ports
+            echo "📊 Network status:"
+            netstat -tln | grep LISTEN
