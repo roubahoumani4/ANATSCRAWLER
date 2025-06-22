@@ -24,15 +24,15 @@ jobs:
           host: 46.165.254.175
           port: 50103
           username: ituu
-          key: \${{ secrets.SSH_PRIVATE_KEY }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           use_insecure_cipher: true
           script: |
-            DEPLOY_DIR="/var/www/anatscrawler-\$(date +%Y%m%d%H%M%S)"
-            echo "Creating deployment directory: \$DEPLOY_DIR"
-            echo 'Klapauciusa12' | sudo -S mkdir -p \$DEPLOY_DIR
-            echo 'Klapauciusa12' | sudo -S chown ituu:ituu \$DEPLOY_DIR
-            echo 'Klapauciusa12' | sudo -S chmod 755 \$DEPLOY_DIR
-            echo "export DEPLOY_DIR=\$DEPLOY_DIR" > /tmp/deploy_dir.sh
+            DEPLOY_DIR="/var/www/anatscrawler-$(date +%Y%m%d%H%M%S)"
+            echo "Creating deployment directory: $DEPLOY_DIR"
+            echo 'Klapauciusa12' | sudo -S mkdir -p $DEPLOY_DIR
+            echo 'Klapauciusa12' | sudo -S chown ituu:ituu $DEPLOY_DIR
+            echo 'Klapauciusa12' | sudo -S chmod 755 $DEPLOY_DIR
+            echo "export DEPLOY_DIR=$DEPLOY_DIR" > /tmp/deploy_dir.sh
 
       - name: Deploy Files
         uses: appleboy/ssh-action@v1.0.0
@@ -40,17 +40,17 @@ jobs:
           host: 46.165.254.175
           port: 50103
           username: ituu
-          key: \${{ secrets.SSH_PRIVATE_KEY }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           use_insecure_cipher: true
           script: |
             source /tmp/deploy_dir.sh
-            TEMP_DIR=\$(mktemp -d)
-            git clone https://github.com/roubahoumani4/ANATSCRAWLER.git \$TEMP_DIR
-            echo 'Klapauciusa12' | sudo -S cp -r \$TEMP_DIR/* \$DEPLOY_DIR/
-            echo 'Klapauciusa12' | sudo -S cp -r \$TEMP_DIR/.* \$DEPLOY_DIR/ 2>/dev/null || true
-            rm -rf \$TEMP_DIR
-            echo 'Klapauciusa12' | sudo -S chown -R ituu:ituu \$DEPLOY_DIR
-            echo 'Klapauciusa12' | sudo -S chmod -R 755 \$DEPLOY_DIR
+            TEMP_DIR=$(mktemp -d)
+            git clone https://github.com/roubahoumani4/ANATSCRAWLER.git $TEMP_DIR
+            echo 'Klapauciusa12' | sudo -S cp -r $TEMP_DIR/* $DEPLOY_DIR/
+            echo 'Klapauciusa12' | sudo -S cp -r $TEMP_DIR/.* $DEPLOY_DIR/ 2>/dev/null || true
+            rm -rf $TEMP_DIR
+            echo 'Klapauciusa12' | sudo -S chown -R ituu:ituu $DEPLOY_DIR
+            echo 'Klapauciusa12' | sudo -S chmod -R 755 $DEPLOY_DIR
 
       - name: Configure and Start Application
         uses: appleboy/ssh-action@v1.0.0
@@ -58,32 +58,37 @@ jobs:
           host: 46.165.254.175
           port: 50103
           username: ituu
-          key: \${{ secrets.SSH_PRIVATE_KEY }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           use_insecure_cipher: true
           script: |
             source /tmp/deploy_dir.sh
-            cd \$DEPLOY_DIR
+            cd $DEPLOY_DIR
 
-            echo '{"type":"module"}' > package.json.tmp
-            cat package.json >> package.json.tmp
-            mv package.json.tmp package.json
+            # Fix package.json for ES modules
+            node -e "
+            const pkg = JSON.parse(require('fs').readFileSync('package.json', 'utf8'));
+            pkg.type = 'module';
+            require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+            "
 
             echo 'Klapauciusa12' | sudo -S chown -R ituu:ituu .
             echo 'Klapauciusa12' | sudo -S chmod -R 755 .
 
             # Setup environment file
-            touch .env
+            cat > .env << 'ENV_EOF'
+NODE_ENV=production
+PORT=5000
+HOST=0.0.0.0
+ELASTICSEARCH_URL=http://192.168.1.110:9200
+MONGODB_URL=mongodb://192.168.1.110:27017/anat_security
+REDIS_URL=redis://192.168.1.110:6379
+VITE_API_URL=/api
+JWT_SECRET=NWagPsTDSNKzcgJQvYouOyTwCbQ0ZTG+zE3/8eTPqQM=
+COOKIE_SECRET=NnnQPZ8wazuVR26qNCZ9wRXAdUipV/sE/jC+mKizTXg=
+ENV_EOF
+            
             echo 'Klapauciusa12' | sudo -S chown ituu:ituu .env
             echo 'Klapauciusa12' | sudo -S chmod 600 .env
-            echo "NODE_ENV=production" > .env
-            echo "PORT=5000" >> .env
-            echo "HOST=0.0.0.0" >> .env
-            echo "ELASTICSEARCH_URL=http://192.168.1.110:9200" >> .env
-            echo "MONGODB_URL=mongodb://192.168.1.110:27017/anat_security" >> .env
-            echo "REDIS_URL=redis://192.168.1.110:6379" >> .env
-            echo "VITE_API_URL=/api" >> .env
-            echo "JWT_SECRET=NWagPsTDSNKzcgJQvYouOyTwCbQ0ZTG+zE3/8eTPqQM=" >> .env
-            echo "COOKIE_SECRET=NnnQPZ8wazuVR26qNCZ9wRXAdUipV/sE/jC+mKizTXg=" >> .env
 
             # Install dependencies and build
             npm ci
@@ -101,65 +106,109 @@ jobs:
 
             if [ ! -f "dist/index.js" ]; then
               echo "❌ Build failed: dist/index.js not found"
+              ls -la dist/
               exit 1
             fi
 
+            # Clean up dev dependencies
             npm ci --omit=dev
 
-            # Setup PM2 configuration
-            echo 'module.exports = {
-              apps: [{
-                name: "anatscrawler",
-                script: "dist/index.js",
-                node_args: "--experimental-specifier-resolution=node",
-                env: {
-                  NODE_ENV: "production",
-                  PORT: "5000",
-                  HOST: "0.0.0.0",
-                  TRUST_PROXY: "true",
-                  ELASTICSEARCH_URL: "http://192.168.1.110:9200",
-                  MONGODB_URL: "mongodb://192.168.1.110:27017/anat_security",
-                  REDIS_URL: "redis://192.168.1.110:6379",
-                  JWT_SECRET: "NWagPsTDSNKzcgJQvYouOyTwCbQ0ZTG+zE3/8eTPqQM=",
-                  COOKIE_SECRET: "NnnQPZ8wazuVR26qNCZ9wRXAdUipV/sE/jC+mKizTXg="
-                },
-                instances: "1",
-                exec_mode: "fork",
-                max_memory_restart: "1G",
-                watch: false,
-                error_file: "logs/err.log",
-                out_file: "logs/out.log",
-                merge_logs: true,
-                log_date_format: "YYYY-MM-DD HH:mm:ss",
-                listen_timeout: 10000,
-                kill_timeout: 5000,
-                wait_ready: true
-              }]
-            }' > ecosystem.config.cjs
+            # Setup PM2 configuration with proper CommonJS syntax
+            cat > ecosystem.config.cjs << 'PM2_EOF'
+module.exports = {
+  apps: [{
+    name: 'anatscrawler',
+    script: 'dist/index.js',
+    env: {
+      NODE_ENV: 'production',
+      PORT: '5000',
+      HOST: '0.0.0.0',
+      TRUST_PROXY: 'true',
+      ELASTICSEARCH_URL: 'http://192.168.1.110:9200',
+      MONGODB_URL: 'mongodb://192.168.1.110:27017/anat_security',
+      REDIS_URL: 'redis://192.168.1.110:6379',
+      JWT_SECRET: 'NWagPsTDSNKzcgJQvYouOyTwCbQ0ZTG+zE3/8eTPqQM=',
+      COOKIE_SECRET: 'NnnQPZ8wazuVR26qNCZ9wRXAdUipV/sE/jC+mKizTXg='
+    },
+    instances: 1,
+    exec_mode: 'fork',
+    max_memory_restart: '1G',
+    watch: false,
+    error_file: 'logs/err.log',
+    out_file: 'logs/out.log',
+    merge_logs: true,
+    log_date_format: 'YYYY-MM-DD HH:mm:ss',
+    listen_timeout: 10000,
+    kill_timeout: 5000
+  }]
+}
+PM2_EOF
 
             mkdir -p logs
+            
+            # Stop existing PM2 process
             pm2 delete anatscrawler || true
+            
+            # Start new application
             pm2 start ecosystem.config.cjs
+            
+            # Wait for application to start
+            sleep 5
+            
+            # Verify the application is running and listening
+            if pm2 show anatscrawler | grep -q "online"; then
+              echo "✅ PM2 process is online"
+            else
+              echo "❌ PM2 process failed to start"
+              pm2 logs anatscrawler --lines 50
+              exit 1
+            fi
+            
+            # Check if port 5000 is listening
+            RETRIES=10
+            while [ $RETRIES -gt 0 ]; do
+              if netstat -tln | grep -q ":5000"; then
+                echo "✅ Server is listening on port 5000"
+                break
+              else
+                echo "⏳ Waiting for server to start listening on port 5000... ($RETRIES retries left)"
+                sleep 2
+                RETRIES=$((RETRIES - 1))
+              fi
+            done
+            
+            if [ $RETRIES -eq 0 ]; then
+              echo "❌ Server failed to listen on port 5000"
+              echo "PM2 Logs:"
+              pm2 logs anatscrawler --lines 50
+              echo "Process Status:"
+              pm2 show anatscrawler
+              exit 1
+            fi
 
+            # Update symlink for zero-downtime deployment
             CURRENT_LINK="/var/www/anatscrawler"
-            if [ -L "\$CURRENT_LINK" ]; then
-              sudo rm "\$CURRENT_LINK"
+            if [ -L "$CURRENT_LINK" ]; then
+              sudo rm "$CURRENT_LINK"
             fi
-            sudo ln -sf "\$DEPLOY_DIR" "\$CURRENT_LINK"
+            sudo ln -sf "$DEPLOY_DIR" "$CURRENT_LINK"
 
-            if [ -d "\$DEPLOY_DIR/client/dist" ]; then
+            # Move client dist files if needed
+            if [ -d "$DEPLOY_DIR/client/dist" ]; then
               echo "Moving client dist files to the correct location..."
-              mv \$DEPLOY_DIR/client/dist/* \$DEPLOY_DIR/client/
-              rm -rf \$DEPLOY_DIR/client/dist
+              mv $DEPLOY_DIR/client/dist/* $DEPLOY_DIR/client/
+              rm -rf $DEPLOY_DIR/client/dist
             fi
 
+            # Clean up old deployments (keep last 5)
             cd /var/www
             ls -1dt anatscrawler-* | tail -n +6 | xargs -r sudo rm -rf
+            
+            # Save PM2 process list
             pm2 save
 
             echo "✅ Deployment completed successfully!"
             echo "📊 Current PM2 status:"
             pm2 ls
-
             echo "📊 Network status:"
             netstat -tln | grep LISTEN
