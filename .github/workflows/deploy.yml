@@ -37,8 +37,9 @@ jobs:
             echo "Klapauciusa12" | sudo -S pm2 delete anatscrawler || true
             echo "Klapauciusa12" | sudo -S rm -rf /var/www/anatscrawler
             echo "Klapauciusa12" | sudo -S mkdir -p /var/www/anatscrawler
+            echo "Klapauciusa12" | sudo -S chown -R $USER:$USER /var/www/anatscrawler
             cd /var/www/anatscrawler
-            git clone git@github.com:roubahoumani4/ANATSCRAWLER.git . || git pull origin main
+            git clone https://github.com/roubahoumani4/ANATSCRAWLER.git . || git pull origin main
             npm ci --omit=dev
             npm run build
             npm run migrate
