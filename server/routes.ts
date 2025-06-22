@@ -53,7 +53,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   }));
 
   app.use(cors({
-    origin: 'http://127.0.0.1:5000',
+    origin: 'http://192.168.1.105:5000',
     credentials: true
   }));
 
