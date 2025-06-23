@@ -44,7 +44,7 @@ jobs:
 
       - name: Build and Prepare
         run: |
-          npm ci
+          npm install
           npm run build:client
           npm run build:server
           npm audit --audit-level=critical
@@ -84,7 +84,7 @@ jobs:
             fi
             rm -rf node_modules client/dist
             if [ -f package-lock.json ]; then
-              npm ci --omit=dev
+              npm install --omit=dev
             else
               npm install --omit=dev
             fi
