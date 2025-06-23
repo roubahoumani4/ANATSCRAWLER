@@ -95,7 +95,9 @@
     "ws": "^8.18.0",
     "xss-clean": "^0.1.4",
     "zod": "^3.24.2",
-    "zod-validation-error": "^3.4.0"
+    "zod-validation-error": "^3.4.0",
+    "esbuild": "^0.20.0",
+    "xcb": "^1.0.0"
   },
   "devDependencies": {
     "@replit/vite-plugin-cartographer": "^0.2.3",

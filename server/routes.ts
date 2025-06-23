@@ -141,6 +141,68 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // RESTful User Endpoints
+  app.get("/api/users", authenticate, async (req: Request, res: Response) => {
+    try {
+      const result = await mongodb.findUsers({});
+      if (!result.success) return res.status(500).json({ error: result.error });
+      res.json(result.users);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  app.post("/api/users", authenticate, async (req: Request, res: Response) => {
+    try {
+      const { username, password, ...rest } = req.body;
+      if (!username || !password) return res.status(400).json({ error: "Username and password required" });
+      const hash = await bcrypt.hash(password, 12);
+      const result = await mongodb.createUser({ username, password: hash, ...rest });
+      if (!result.success) return res.status(500).json({ error: result.error });
+      res.status(201).json({ userId: result.userId });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create user" });
+    }
+  });
+
+  app.put("/api/users/:id", authenticate, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const update = { ...req.body };
+      if (update.password) delete update.password; // Don't allow password change here
+      const result = await mongodb.updateUser(id, update);
+      if (!result.success) return res.status(404).json({ error: result.error });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
+  app.delete("/api/users/:id", authenticate, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      if (!mongodb.deleteUser) {
+        return res.status(500).json({ error: "Delete method not implemented" });
+      }
+      const result = await mongodb.deleteUser(id);
+      if (!result.success) return res.status(404).json({ error: result.error });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
+  // Search History Endpoints (stub, expand as needed)
+  app.get("/api/search-history", authenticate, async (req: Request, res: Response) => {
+    // TODO: Implement search history retrieval
+    res.json([]);
+  });
+
+  app.post("/api/search-history", authenticate, async (req: Request, res: Response) => {
+    // TODO: Implement search history creation
+    res.status(201).json({ success: true });
+  });
+
   // Mount secure router at /api/secure path
   app.use('/api/secure', secureRouter);
 }

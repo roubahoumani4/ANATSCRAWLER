@@ -222,6 +222,23 @@ class MongoDBClient {
     }
   }
 
+  public async deleteUser(userId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      await this.connect();
+      if (!this.isConnected) {
+        throw new Error('Not connected to database');
+      }
+      const result = await this.collection.deleteOne({ _id: new ObjectId(userId) });
+      if (result.deletedCount === 0) {
+        return { success: false, error: 'User not found' };
+      }
+      return { success: true };
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   public async close(): Promise<void> {
     if (this.client) {
       await this.client.close();
