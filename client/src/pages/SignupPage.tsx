@@ -144,7 +144,7 @@ const SignupPage = () => {
           scale: isVisible ? 1 : 0.95
         }}
         transition={{ duration: 0.5 }}
-        className="relative z-10 w-full max-w-lg mx-auto p-8"
+        className="max-w-md w-full p-8 bg-darkGray rounded-xl shadow-xl"
       >
         {/* Header */}
         <div className="text-center mb-8">
@@ -173,108 +173,106 @@ const SignupPage = () => {
         )}
 
         {/* Form Container */}
-        <div className="bg-gray-900/40 backdrop-blur-md rounded-lg shadow-2xl p-8 border border-gray-800/50">
-          <div className="bg-gray-900/60 rounded-lg p-6">
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Username Field */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  {translations.usernameLabel[language]}
-                </label>
-                <div className="relative">
-                  <User className="absolute left-3 top-2.5 h-5 w-5 text-indigo-400" />
-                  <input
-                    type="text"
-                    value={formData.username}
-                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    className="w-full pl-10 pr-4 py-3 bg-[#FFFBE6] border-0 rounded-lg text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 transition-all"
-                    placeholder="Enter your operator ID"
-                    required
-                  />
-                </div>
+        <div className="bg-gray-900/60 rounded-lg p-6">
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Username Field */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                {translations.usernameLabel[language]}
+              </label>
+              <div className="relative">
+                <User className="absolute left-3 top-2.5 h-5 w-5 text-indigo-400" />
+                <input
+                  type="text"
+                  value={formData.username}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                  className="w-full pl-10 pr-4 py-3 bg-[#FFFBE6] border-0 rounded-lg text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 transition-all"
+                  placeholder="Enter your operator ID"
+                  required
+                />
               </div>
+            </div>
 
-              {/* Password Field */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  {translations.passwordLabel[language]}
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-2.5 h-5 w-5 text-indigo-400" />
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full pl-10 pr-12 py-3 bg-[#FFFBE6] border-0 rounded-lg text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 transition-all"
-                    placeholder="Enter your access code"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-2.5 text-indigo-400 hover:text-indigo-300"
-                  >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Confirm Password Field */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  {translations.confirmPasswordLabel[language]}
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-2.5 h-5 w-5 text-indigo-400" />
-                  <input
-                    type={showConfirmPassword ? "text" : "password"}
-                    value={formData.confirmPassword}
-                    onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                    className="w-full pl-10 pr-12 py-3 bg-[#FFFBE6] border-0 rounded-lg text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 transition-all"
-                    placeholder="Confirm your password"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-2.5 text-indigo-400 hover:text-indigo-300"
-                  >
-                    {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Submit Button */}
-              <motion.button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-all"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                {isLoading ? (
-                  <div className="flex items-center justify-center space-x-2">
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    <span>Creating Account...</span>
-                  </div>
-                ) : (
-                  "CREATE ACCOUNT"
-                )}
-              </motion.button>
-
-              {/* Login Link */}
-              <div className="text-center">
+            {/* Password Field */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                {translations.passwordLabel[language]}
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-2.5 h-5 w-5 text-indigo-400" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className="w-full pl-10 pr-12 py-3 bg-[#FFFBE6] border-0 rounded-lg text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 transition-all"
+                  placeholder="Enter your access code"
+                  required
+                />
                 <button
                   type="button"
-                  onClick={() => setLocation("/login")}
-                  className="text-indigo-400 hover:text-indigo-300 text-sm"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-2.5 text-indigo-400 hover:text-indigo-300"
                 >
-                  {translations.loginLink[language]}
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
-            </form>
-          </div>
+            </div>
+
+            {/* Confirm Password Field */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                {translations.confirmPasswordLabel[language]}
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-2.5 h-5 w-5 text-indigo-400" />
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={formData.confirmPassword}
+                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                  className="w-full pl-10 pr-12 py-3 bg-[#FFFBE6] border-0 rounded-lg text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 transition-all"
+                  placeholder="Confirm your password"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-2.5 text-indigo-400 hover:text-indigo-300"
+                >
+                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <motion.button
+              type="submit"
+              disabled={isLoading}
+              className="w-full py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-all"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              {isLoading ? (
+                <div className="flex items-center justify-center space-x-2">
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <span>Creating Account...</span>
+                </div>
+              ) : (
+                "CREATE ACCOUNT"
+              )}
+            </motion.button>
+
+            {/* Login Link */}
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => setLocation("/login")}
+                className="text-indigo-400 hover:text-indigo-300 text-sm"
+              >
+                {translations.loginLink[language]}
+              </button>
+            </div>
+          </form>
         </div>
       </motion.div>
     </div>
