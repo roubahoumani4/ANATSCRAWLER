@@ -161,7 +161,12 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
 
     // Process and enhance search results
     const results = hits.map((hit: any) => {
-      const source = hit._source?.content || hit._source?.data?.content || hit._source?.data || '';
+      const source = hit._source?.data || '';
+      const fileName = hit._source?.file_name || '';
+      const filePath = hit._source?.file_path || '';
+      const fileType = hit._source?.file_type || '';
+      const filesId = hit._source?.files_id || '';
+      const n = hit._source?.n || null;
       const highlights = Object.values(hit.highlight || {})
         .flat()
         .map((h: unknown) => h?.toString() || '');
@@ -172,22 +177,21 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
         const terms = highlight.match(/<mark>([^<]+)<\/mark>/g) || [];
         terms.forEach(term => {
           const cleanTerm = term.replace(/<\/?mark>/g, '');
-          if (cleanTerm && cleanTerm.length > 2) { // Avoid very short terms
+          if (cleanTerm && cleanTerm.length > 2) {
             matchedTerms.add(cleanTerm);
           }
         });
       });
 
-      // If no highlights, try to find exact or fuzzy matches in the source
       if (matchedTerms.size === 0) {
-        const terms = source.split(/[,\s]+/);
+        const terms = source.split(/[\,\s]+/);
         terms.forEach((term: string) => {
           const normalizedTerm = term.toLowerCase();
           const normalizedQuery = searchQuery.toLowerCase();
           if (
             normalizedTerm.includes(normalizedQuery) ||
             normalizedQuery.includes(normalizedTerm) ||
-            (normalizedTerm.length > 3 && // Only apply fuzzy matching to longer terms
+            (normalizedTerm.length > 3 &&
              fastLevenshtein.get(normalizedTerm, normalizedQuery) <= 2)
           ) {
             matchedTerms.add(term.trim());
@@ -195,19 +199,25 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
         });
       }
 
-      // Get the best highlights or surrounding context
       const context = highlights.length > 0 ?
         highlights.map((h: string) => h.replace(/<\/?mark>/g, '')).join(' ... ') :
         source.length > 400 ? `${source.slice(0, 400)}...` : source;
       
+      // Map to frontend-expected fields
       return matchedTerms.size > 0 ? {
         id: hit._id,
-        matchedTerms: Array.from(matchedTerms),
         score: hit._score,
         index: hit._index,
+        source, // main content
+        content: source, // alias for frontend
+        file_name: fileName,
+        file_path: filePath,
+        file_type: fileType,
+        files_id: filesId,
+        n,
         context,
         highlights,
-        source // Include the full source for reference
+        matchedTerms: Array.from(matchedTerms)
       } : null;
     })
     .filter((result: any) => result !== null);
