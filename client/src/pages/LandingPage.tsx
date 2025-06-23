@@ -80,7 +80,16 @@ const LandingPage = () => {
         setSearchResults(data.results || []);
         setShowResults(true);
       } else {
-        console.error('Search failed:', response.statusText);
+        let errorMsg = response.statusText;
+        try {
+          const errorData = await response.json();
+          if (errorData && errorData.errors && errorData.errors[0] && errorData.errors[0].msg) {
+            errorMsg = errorData.errors[0].msg;
+          } else if (errorData && errorData.error) {
+            errorMsg = errorData.error;
+          }
+        } catch {}
+        console.error('Search failed:', errorMsg);
         setSearchResults([]);
       }
     } catch (error) {
