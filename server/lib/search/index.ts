@@ -218,19 +218,16 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
         highlights.map((h: string) => h.replace(/<\/?mark>/g, '')).join(' ... ') :
         (field1 + ' ' + field2).slice(0, 400) + ((field1 + field2).length > 400 ? '...' : '');
       
-      // Map to frontend-expected fields for fs_chunks_index and filesearchdb.fs.chunks
+      // Map to frontend-expected fields for all indices
       return matchedTerms.size > 0 ? {
         id: hit._id,
         score: hit._score,
         index: hit._index,
-        source: hit._source.file_name || field1 || 'Unknown Source',
+        source: field1 || 'Unknown Source',
         content: context || field1 || 'No content available',
-        timestamp: hit._source.timestamp || '',
-        file_name: fileName,
-        file_path: filePath,
-        file_type: fileType,
-        files_id: filesId,
-        n,
+        timestamp: '', // No timestamp in your data
+        field1,
+        field2,
         context,
         highlights,
         matchedTerms: Array.from(matchedTerms)
