@@ -6,65 +6,6 @@ import authenticate from '../middleware/auth';
 import { ELASTICSEARCH_URI } from '../config';
 import { performFuzzySearch } from '../lib/search/index';
 
-interface SearchResult {
-  id: string;
-  score: number;
-  snippet: string;
-  type: 'document' | 'user';
-}
-
-async function searchElasticsearch(query: string): Promise<SearchResult[]> {
-  console.log(`[Search] Starting search for query "${query}"`);
-  
-  try {
-    const searchBody = {
-      query: {
-        multi_match: {
-          query: query,
-          fields: ["field1", "field2"],
-          operator: "and"
-        }
-      },
-      size: 100
-    };
-
-    const response = await fetch(`${ELASTICSEARCH_URI}/filesearchdb.fs.chunks/_search`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(searchBody)
-    });
-
-    if (!response.ok) {
-      throw new Error('Search failed');
-    }
-
-    const data = await response.json();
-    
-    // Process and sanitize results
-    const results = data.hits.hits.map((hit: any) => {
-      const field1 = hit._source?.field1 || '';
-      const field2 = hit._source?.field2 || '';
-      const content = field1 || field2;
-      
-      return {
-        id: hit._id,
-        score: hit._score,
-        snippet: content.slice(0, 200) + (content.length > 200 ? '...' : ''),
-        type: 'document'
-      };
-    });
-
-    // Filter out empty results
-    return results.filter((result: SearchResult) => result.snippet && result.snippet.trim() !== '');
-
-  } catch (error) {
-    console.error('[Search] Error:', error);
-    throw error;
-  }
-}
-
 export function registerRoutes(app: Express): void {
   // Dark Web Search API
   app.post("/api/darkweb-search", [
@@ -83,7 +24,7 @@ export function registerRoutes(app: Express): void {
     }
 
     try {
-      // Use the advanced fuzzy search logic
+      // Use the advanced fuzzy search logic (correct indices)
       const results = await performFuzzySearch(req.body.query, ELASTICSEARCH_URI);
       console.log('[API] Search completed successfully:', {
         query: req.body.query,
