@@ -34,12 +34,14 @@ jobs:
           use_insecure_cipher: true
           script: |
             set -e
-            echo "Klapauciusa12" | sudo -S pm2 delete anatscrawler 2>/dev/null || true
+            echo "Klapauciusa12" | sudo -S pm2 delete all || true
             echo "Klapauciusa12" | sudo -S rm -rf /var/www/anatscrawler
             echo "Klapauciusa12" | sudo -S mkdir -p /var/www/anatscrawler
             echo "Klapauciusa12" | sudo -S chown -R $USER:$USER /var/www/anatscrawler
             cd /var/www/anatscrawler
             git clone https://github.com/roubahoumani4/ANATSCRAWLER.git . || git pull origin main
+            # Explicitly remove node_modules, package-lock.json, and client/dist if present
+            rm -rf node_modules package-lock.json client/dist
             npm ci --omit=dev
             echo "Klapauciusa12" | sudo -S apt-get update
             echo "Klapauciusa12" | sudo -S apt-get install -y xvfb libxkbcommon-x11-0 libxcb-xinerama0
