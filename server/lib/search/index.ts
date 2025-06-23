@@ -223,8 +223,9 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
         id: hit._id,
         score: hit._score,
         index: hit._index,
-        source: field1, // main content
-        content: field1, // alias for frontend
+        source: fileName || field1 || 'Unknown Source',
+        content: context || field1 || field2 || 'No content available',
+        timestamp: hit._source.timestamp || hit._source.date || null,
         field1,
         field2,
         file_name: fileName,
