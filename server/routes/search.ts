@@ -108,11 +108,11 @@ export function registerRoutes(app: Express): void {
         total: results.length
       });
     } catch (error) {
-      console.error('[Search] Error processing search:', error);
-      // Return the actual error message for debugging
+      console.error('[Search] Error processing search:', error, JSON.stringify(error));
+      // Return the full error object for debugging
       return res.status(500).json({ 
         success: false, 
-        error: error instanceof Error ? error.message : String(error)
+        error: error && typeof error === 'object' ? JSON.stringify(error) : String(error)
       });
     }
   });

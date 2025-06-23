@@ -7,22 +7,121 @@ import { apiRequest } from "@/lib/queryClient";
 import { containerVariants, itemVariants } from "@/utils/animations";
 
 interface SearchResult {
-  id: number;
-  collection: string;
-  folder: string;
-  fileName: string;
-  content: string;
+  id: string;
+  content?: string;
+  score?: number;
+  file_name?: string;
+  file_path?: string;
+  file_type?: string;
+  files_id?: string;
+  n?: number;
+  context?: string;
+  highlights?: string[];
+  matchedTerms?: string[];
+  index?: string;
 }
+
+// Translation object for all UI strings
+const translations = {
+  searchData: {
+    English: "Data Search",
+    French: "Recherche de données",
+    Spanish: "Búsqueda de datos"
+  },
+  searchPlaceholder: {
+    English: "Search for credentials...",
+    French: "Rechercher des identifiants...",
+    Spanish: "Buscar credenciales..."
+  },
+  filters: {
+    English: "Filters",
+    French: "Filtres",
+    Spanish: "Filtros"
+  },
+  searching: {
+    English: "Searching...",
+    French: "Recherche...",
+    Spanish: "Buscando..."
+  },
+  search: {
+    English: "Search",
+    French: "Rechercher",
+    Spanish: "Buscar"
+  },
+  collections: {
+    English: "Collections",
+    French: "Collections",
+    Spanish: "Colecciones"
+  },
+  timePeriod: {
+    English: "Time Period",
+    French: "Période de temps",
+    Spanish: "Rango de fechas"
+  },
+  from: {
+    English: "From",
+    French: "De",
+    Spanish: "Desde"
+  },
+  to: {
+    English: "To",
+    French: "À",
+    Spanish: "Hasta"
+  },
+  reset: {
+    English: "Reset",
+    French: "Réinitialiser",
+    Spanish: "Restablecer"
+  },
+  apply: {
+    English: "Apply",
+    French: "Appliquer",
+    Spanish: "Aplicar"
+  },
+  searchError: {
+    English: "Search Error",
+    French: "Erreur de recherche",
+    Spanish: "Error de búsqueda"
+  },
+  searchErrorMsg: {
+    English: "An error occurred while searching. Please try again.",
+    French: "Une erreur s'est produite lors de la recherche. Veuillez réessayer.",
+    Spanish: "Ocurrió un error durante la búsqueda. Por favor, inténtelo de nuevo."
+  },
+  results: {
+    English: "Results",
+    French: "Résultats",
+    Spanish: "Resultados"
+  },
+  exported: {
+    English: "Exported",
+    French: "Exporté",
+    Spanish: "Exportado"
+  },
+  export: {
+    English: "Export",
+    French: "Exporter",
+    Spanish: "Exportar"
+  },
+  noResults: {
+    English: "No results found",
+    French: "Aucun résultat trouvé",
+    Spanish: "No se encontraron resultados"
+  },
+  noResultsMsg: {
+    English: "Try different search terms or modify your filters.",
+    French: "Essayez d'autres termes de recherche ou de modifier vos filtres.",
+    Spanish: "Intente con otros términos de búsqueda o modifique sus filtros."
+  }
+};
 
 const SearchInterface = () => {
   const { language } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
-  const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<{ from: string; to: string }>({ from: "", to: "" });
   const [isExported, setIsExported] = useState(false);
 
-  // Using the same IP addresses and connections as the original
   const { data: results = [], isLoading, isError, error } = useQuery({
     queryKey: ['/api/search', searchQuery],
     queryFn: async () => {
@@ -34,19 +133,7 @@ const SearchInterface = () => {
     enabled: searchQuery.trim().length > 0,
   });
 
-  const collectionsSet = new Set<string>();
-  results.forEach((result: SearchResult) => {
-    if (result.collection) collectionsSet.add(result.collection);
-  });
-  const availableCollections = Array.from(collectionsSet);
-
-  const filteredResults = results.filter((result: SearchResult) => {
-    // Filter by selected collections
-    if (selectedCollections.length > 0 && !selectedCollections.includes(result.collection)) {
-      return false;
-    }
-    return true;
-  });
+  const filteredResults = results; // No collection filtering
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,14 +152,6 @@ const SearchInterface = () => {
     }
   };
 
-  const toggleCollection = (collection: string) => {
-    setSelectedCollections(prev => 
-      prev.includes(collection)
-        ? prev.filter(c => c !== collection)
-        : [...prev, collection]
-    );
-  };
-
   return (
     <div className="w-full mb-12">
       <motion.div 
@@ -82,9 +161,7 @@ const SearchInterface = () => {
         animate="visible"
       >
         <h1 className="text-2xl font-bold mb-6 text-coolWhite">
-          {language === "French" ? "Recherche de données" : 
-           language === "Spanish" ? "Búsqueda de datos" : 
-           "Data Search"}
+          {translations.searchData[language as keyof typeof translations.searchData]}
         </h1>
 
         <form onSubmit={handleSearch} className="mb-6">
@@ -93,11 +170,7 @@ const SearchInterface = () => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={
-                language === "French" ? "Rechercher des identifiants..." : 
-                language === "Spanish" ? "Buscar credenciales..." : 
-                "Search for credentials..."
-              }
+              placeholder={translations.searchPlaceholder[language as keyof typeof translations.searchPlaceholder]}
               className="w-full py-3 pl-12 pr-4 text-coolWhite bg-midGray border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-crimsonRed"
             />
             <div className="absolute inset-y-0 left-0 flex items-center pl-3">
@@ -113,9 +186,7 @@ const SearchInterface = () => {
             >
               <Filter className="h-4 w-4 mr-2" />
               <span className="text-sm">
-                {language === "French" ? "Filtres" : 
-                 language === "Spanish" ? "Filtros" : 
-                 "Filters"}
+                {translations.filters[language as keyof typeof translations.filters]}
               </span>
               {isFiltersOpen ? (
                 <ChevronUp className="h-4 w-4 ml-1" />
@@ -135,15 +206,11 @@ const SearchInterface = () => {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  {language === "French" ? "Recherche..." : 
-                   language === "Spanish" ? "Buscando..." : 
-                   "Searching..."}
+                  {translations.searching[language as keyof typeof translations.searching]}
                 </span>
               ) : (
                 <span>
-                  {language === "French" ? "Rechercher" : 
-                   language === "Spanish" ? "Buscar" : 
-                   "Search"}
+                  {translations.search[language as keyof typeof translations.search]}
                 </span>
               )}
             </button>
@@ -159,41 +226,14 @@ const SearchInterface = () => {
               transition={{ duration: 0.3 }}
               className="overflow-hidden"
             >
-              <div className="border-t border-gray-700 pt-4 pb-2">
-                <h3 className="text-sm font-medium text-gray-300 mb-3">
-                  {language === "French" ? "Collections" : 
-                   language === "Spanish" ? "Colecciones" : 
-                   "Collections"}
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {availableCollections.map(collection => (
-                    <div
-                      key={collection}
-                      onClick={() => toggleCollection(collection)}
-                      className={`px-3 py-1 text-xs rounded-full cursor-pointer ${
-                        selectedCollections.includes(collection)
-                          ? 'bg-crimsonRed text-coolWhite'
-                          : 'bg-midGray text-gray-300 hover:bg-gray-600'
-                      }`}
-                    >
-                      {collection}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
               <div className="border-t border-gray-700 pt-4 pb-2 mt-4">
                 <h3 className="text-sm font-medium text-gray-300 mb-3">
-                  {language === "French" ? "Période de temps" : 
-                   language === "Spanish" ? "Rango de fechas" : 
-                   "Date Range"}
+                  {translations.timePeriod[language as keyof typeof translations.timePeriod]}
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs text-gray-400 mb-1">
-                      {language === "French" ? "De" : 
-                       language === "Spanish" ? "Desde" : 
-                       "From"}
+                      {translations.from[language as keyof typeof translations.from]}
                     </label>
                     <input
                       type="date"
@@ -204,9 +244,7 @@ const SearchInterface = () => {
                   </div>
                   <div>
                     <label className="block text-xs text-gray-400 mb-1">
-                      {language === "French" ? "À" : 
-                       language === "Spanish" ? "Hasta" : 
-                       "To"}
+                      {translations.to[language as keyof typeof translations.to]}
                     </label>
                     <input
                       type="date"
@@ -222,23 +260,18 @@ const SearchInterface = () => {
                 <button
                   type="button"
                   onClick={() => {
-                    setSelectedCollections([]);
                     setDateRange({ from: "", to: "" });
                   }}
                   className="text-sm text-gray-400 hover:text-coolWhite mr-4"
                 >
-                  {language === "French" ? "Réinitialiser" : 
-                   language === "Spanish" ? "Restablecer" : 
-                   "Reset"}
+                  {translations.reset[language as keyof typeof translations.reset]}
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsFiltersOpen(false)}
                   className="text-sm text-crimsonRed hover:text-red-400"
                 >
-                  {language === "French" ? "Appliquer" : 
-                   language === "Spanish" ? "Aplicar" : 
-                   "Apply"}
+                  {translations.apply[language as keyof typeof translations.apply]}
                 </button>
               </div>
             </motion.div>
@@ -254,15 +287,11 @@ const SearchInterface = () => {
           transition={{ duration: 0.3 }}
         >
           <h3 className="text-lg font-medium mb-1">
-            {language === "French" ? "Erreur de recherche" : 
-             language === "Spanish" ? "Error de búsqueda" : 
-             "Search Error"}
+            {translations.searchError[language as keyof typeof translations.searchError]}
           </h3>
           <p className="text-gray-300">
             {(error as Error)?.message || 
-              (language === "French" ? "Une erreur s'est produite lors de la recherche. Veuillez réessayer." : 
-               language === "Spanish" ? "Ocurrió un error durante la búsqueda. Por favor, inténtelo de nuevo." : 
-               "An error occurred while searching. Please try again.")}
+              translations.searchErrorMsg[language as keyof typeof translations.searchErrorMsg]}
           </p>
         </motion.div>
       )}
@@ -275,9 +304,7 @@ const SearchInterface = () => {
         >
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold text-coolWhite">
-              {language === "French" ? "Résultats" : 
-               language === "Spanish" ? "Resultados" : 
-               "Results"} 
+              {translations.results[language as keyof typeof translations.results]} 
               <span className="ml-2 text-sm font-normal text-gray-400">
                 ({filteredResults.length})
               </span>
@@ -291,12 +318,8 @@ const SearchInterface = () => {
                 <Download className="h-4 w-4 mr-2" />
                 <span>
                   {isExported 
-                    ? (language === "French" ? "Exporté" : 
-                       language === "Spanish" ? "Exportado" : 
-                       "Exported")
-                    : (language === "French" ? "Exporter" : 
-                       language === "Spanish" ? "Exportar" : 
-                       "Export")}
+                    ? translations.exported[language as keyof typeof translations.exported]
+                    : translations.export[language as keyof typeof translations.export]}
                 </span>
               </button>
             )}
@@ -311,19 +334,15 @@ const SearchInterface = () => {
                 <Search className="h-8 w-8 text-gray-400" />
               </div>
               <h3 className="text-lg font-medium text-coolWhite mb-2">
-                {language === "French" ? "Aucun résultat trouvé" : 
-                 language === "Spanish" ? "No se encontraron resultados" : 
-                 "No results found"}
+                {translations.noResults[language as keyof typeof translations.noResults]}
               </h3>
               <p className="text-gray-400">
-                {language === "French" ? "Essayez d'autres termes de recherche ou de modifier vos filtres." : 
-                 language === "Spanish" ? "Intente con otros términos de búsqueda o modifique sus filtros." : 
-                 "Try different search terms or modify your filters."}
+                {translations.noResultsMsg[language as keyof typeof translations.noResultsMsg]}
               </p>
             </motion.div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
-              {results.map((result, index) => (
+              {results.map((result: SearchResult, index: number) => (
                 <motion.div
                   key={result.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -333,82 +352,31 @@ const SearchInterface = () => {
                 >
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="text-lg font-semibold text-white truncate">
-                      {result.title || result.fileName || 'Unknown'}
+                      {result.file_name || result.id || 'Unknown'}
                     </h3>
-                    <span className="text-xs text-gray-400 ml-2">
-                      Score: {result.score}
-                    </span>
+                    {result.score !== undefined && (
+                      <span className="text-xs text-gray-400 ml-2">
+                        Score: {result.score}
+                      </span>
+                    )}
                   </div>
-
-                  {result.structuredInfo ? (
-                    <div className="space-y-2 mb-3">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                        {result.structuredInfo.name && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-blue-400 font-medium">Name:</span>
-                            <span className="text-white">{result.structuredInfo.name}</span>
-                          </div>
-                        )}
-                        {result.structuredInfo.phone && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-green-400 font-medium">Phone:</span>
-                            <span className="text-white">{result.structuredInfo.phone}</span>
-                          </div>
-                        )}
-                        {result.structuredInfo.location && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-purple-400 font-medium">Location:</span>
-                            <span className="text-white">{result.structuredInfo.location}</span>
-                          </div>
-                        )}
-                        {result.structuredInfo.additionalLocation && result.structuredInfo.additionalLocation !== result.structuredInfo.location && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-purple-400 font-medium">Additional:</span>
-                            <span className="text-white">{result.structuredInfo.additionalLocation}</span>
-                          </div>
-                        )}
-                        {result.structuredInfo.gender && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-orange-400 font-medium">Gender:</span>
-                            <span className="text-white">{result.structuredInfo.gender}</span>
-                          </div>
-                        )}
-                        {result.structuredInfo.locale && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-cyan-400 font-medium">Locale:</span>
-                            <span className="text-white">{result.structuredInfo.locale}</span>
-                          </div>
-                        )}
-                        {result.structuredInfo.id && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-gray-400 font-medium">ID:</span>
-                            <span className="text-white">{result.structuredInfo.id}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <details className="mt-2">
-                        <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-300">
-                          View raw data
-                        </summary>
-                        <p className="text-xs text-gray-500 mt-1 p-2 bg-gray-900 rounded border-l-2 border-gray-600 overflow-x-auto">
-                          {result.rawContent}
-                        </p>
-                      </details>
+                  <div className="text-gray-300 text-sm mb-2">
+                    {result.content || result.context || 'No content'}
+                  </div>
+                  {result.highlights && result.highlights.length > 0 && (
+                    <div className="text-blue-300 text-xs mb-2">
+                      Highlights: {result.highlights.join(' ... ')}
                     </div>
-                  ) : (
-                    <p className="text-sm text-gray-300 mb-2 line-clamp-3">
-                      {result.content}
-                    </p>
                   )}
-
-                  <div className="flex flex-wrap gap-2 text-xs text-gray-400">
-                    <span>Collection: {result.collection}</span>
-                    <span>•</span>
-                    <span>Folder: {result.folder}</span>
-                    <span>•</span>
-                    <span>{new Date(result.timestamp).toLocaleDateString()}</span>
-                  </div>
+                  {result.file_path && (
+                    <div className="text-xs text-gray-500">Path: {result.file_path}</div>
+                  )}
+                  {result.file_type && (
+                    <div className="text-xs text-gray-500">Type: {result.file_type}</div>
+                  )}
+                  {result.matchedTerms && result.matchedTerms.length > 0 && (
+                    <div className="text-xs text-cyan-400">Matched: {result.matchedTerms.join(', ')}</div>
+                  )}
                 </motion.div>
               ))}
             </div>
