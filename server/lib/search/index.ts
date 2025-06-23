@@ -39,7 +39,7 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
   const isPhone = isPhoneNumber(query);
   const searchQuery = isPhone ? normalizePhoneNumber(query) : query;
 
-  // Indices we want to search in
+  // Indices we want to search in (remove fs.chunks)
   const searchIndices = ['fs_chunks_index', 'filesearchdb.fs.chunks'].join(',');
   console.log('Using Elasticsearch endpoint:', elasticsearchUri);
   console.log('Searching indices:', searchIndices);
