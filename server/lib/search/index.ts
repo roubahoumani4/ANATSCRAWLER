@@ -161,7 +161,9 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
 
     // Process and enhance search results
     const results = hits.map((hit: any) => {
-      const source = hit._source?.data || '';
+      // Use field1 and field2 as main content sources
+      const field1 = hit._source?.field1 || '';
+      const field2 = hit._source?.field2 || '';
       const fileName = hit._source?.file_name || '';
       const filePath = hit._source?.file_path || '';
       const fileType = hit._source?.file_type || '';
@@ -183,8 +185,9 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
         });
       });
 
+      // If no highlights, try to find exact or fuzzy matches in field1/field2
       if (matchedTerms.size === 0) {
-        const terms = source.split(/[\,\s]+/);
+        const terms = (field1 + ',' + field2).split(/[\,\s]+/);
         terms.forEach((term: string) => {
           const normalizedTerm = term.toLowerCase();
           const normalizedQuery = searchQuery.toLowerCase();
@@ -199,17 +202,20 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
         });
       }
 
+      // Compose context from highlights or field1/field2
       const context = highlights.length > 0 ?
         highlights.map((h: string) => h.replace(/<\/?mark>/g, '')).join(' ... ') :
-        source.length > 400 ? `${source.slice(0, 400)}...` : source;
+        (field1 + ' ' + field2).slice(0, 400) + ((field1 + field2).length > 400 ? '...' : '');
       
       // Map to frontend-expected fields
       return matchedTerms.size > 0 ? {
         id: hit._id,
         score: hit._score,
         index: hit._index,
-        source, // main content
-        content: source, // alias for frontend
+        source: field1, // main content
+        content: field1, // alias for frontend
+        field1,
+        field2,
         file_name: fileName,
         file_path: filePath,
         file_type: fileType,
