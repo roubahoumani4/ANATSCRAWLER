@@ -44,7 +44,7 @@ jobs:
 
       - name: Build and Prepare
         run: |
-          npm install
+          npm install --omit=dev
           npm run build:client
           npm run build:server
           npm audit --audit-level=critical
@@ -83,11 +83,7 @@ jobs:
               git clone https://github.com/roubahoumani4/ANATSCRAWLER.git .
             fi
             rm -rf node_modules client/dist
-            if [ -f package-lock.json ]; then
-              npm install --omit=dev
-            else
-              npm install --omit=dev
-            fi
+            npm install --omit=dev
             echo "$SUDOPASS" | sudo -S apt-get update
             echo "$SUDOPASS" | sudo -S apt-get install -y xvfb libxkbcommon-x11-0 libxcb-xinerama0
             # Build in root directory only
