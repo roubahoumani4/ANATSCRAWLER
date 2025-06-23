@@ -15,7 +15,6 @@ This module implements search functionality using Elasticsearch with support for
 
 The search implementation looks for data in the following Elasticsearch indices:
 - `fs_chunks_index`
-- `fs.chunks`
 - `filesearchdb.fs.chunks`
 
 ## Query Types
