@@ -109,9 +109,10 @@ export function registerRoutes(app: Express): void {
       });
     } catch (error) {
       console.error('[Search] Error processing search:', error);
+      // Return the actual error message for debugging
       return res.status(500).json({ 
         success: false, 
-        error: 'Search failed'
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });
