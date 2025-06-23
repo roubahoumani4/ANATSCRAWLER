@@ -12,7 +12,7 @@ async function seed() {
     await User.create({
       username: 'admin',
       email: 'r.houmani',
-      password: 'admin123', // In production, hash this!
+      password: 'admin1234', // In production, hash this!
       isActive: true,
       preferences: {
         theme: 'dark',
