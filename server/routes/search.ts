@@ -4,6 +4,7 @@ import { body, validationResult } from 'express-validator';
 import { mongodb } from '../lib/mongodb';
 import authenticate from '../middleware/auth';
 import { ELASTICSEARCH_URI } from '../config';
+import { performFuzzySearch } from '../lib/search/index';
 
 interface SearchResult {
   id: string;
@@ -82,24 +83,27 @@ export function registerRoutes(app: Express): void {
     }
 
     try {
-      const results = await searchElasticsearch(req.body.query);
+      // Use the advanced fuzzy search logic
+      const results = await performFuzzySearch(req.body.query, ELASTICSEARCH_URI);
       console.log('[API] Search completed successfully:', {
         query: req.body.query,
         resultCount: results.length,
         timestamp: new Date().toISOString()
       });
 
-      // Sanitize response
-      const sanitizedResults = results.map(result => ({
+      // Sanitize response for the client
+      const sanitizedResults = results.slice(0, 20).map(result => ({
         id: result.id,
         score: result.score,
-        snippet: result.snippet,
-        type: result.type
+        context: result.context,
+        highlights: result.highlights,
+        matchedTerms: result.matchedTerms,
+        index: result.index
       }));
 
       return res.json({ 
         success: true, 
-        results: sanitizedResults.slice(0, 20),  // Limit to 20 results max
+        results: sanitizedResults,
         query: req.body.query,
         total: results.length
       });
