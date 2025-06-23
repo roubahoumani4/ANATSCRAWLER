@@ -82,8 +82,12 @@ jobs:
             else
               git clone https://github.com/roubahoumani4/ANATSCRAWLER.git .
             fi
-            rm -rf node_modules package-lock.json client/dist
-            npm ci --omit=dev
+            rm -rf node_modules client/dist
+            if [ -f package-lock.json ]; then
+              npm ci --omit=dev
+            else
+              npm install --omit=dev
+            fi
             echo "$SUDOPASS" | sudo -S apt-get update
             echo "$SUDOPASS" | sudo -S apt-get install -y xvfb libxkbcommon-x11-0 libxcb-xinerama0
             xvfb-run -a npm run build
