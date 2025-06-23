@@ -144,6 +144,16 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
     if (!searchResponse.ok) {
       const errorText = await searchResponse.text();
       console.error('Elasticsearch error response:', errorText);
+      // Try to parse the error and check for index_not_found_exception
+      try {
+        const errorJson = JSON.parse(errorText);
+        if (
+          errorJson?.error?.type === 'index_not_found_exception' ||
+          (errorJson?.error?.root_cause && errorJson.error.root_cause.some((e: any) => e.type === 'index_not_found_exception'))
+        ) {
+          throw new Error('No search data available. Please contact your administrator.');
+        }
+      } catch {}
       throw new Error(`Search request failed: ${errorText}`);
     }
 
