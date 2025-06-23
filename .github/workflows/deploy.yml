@@ -90,7 +90,17 @@ jobs:
             fi
             echo "$SUDOPASS" | sudo -S apt-get update
             echo "$SUDOPASS" | sudo -S apt-get install -y xvfb libxkbcommon-x11-0 libxcb-xinerama0
+            # Build in root directory
             xvfb-run -a npm run build
+            # Build in client directory
+            cd client
+            if [ -f package-lock.json ]; then
+              npm ci --omit=dev
+            else
+              npm install --omit=dev
+            fi
+            xvfb-run -a npm run build
+            cd ..
             npm run migrate
             npm run seed
             cat << EOF > .env
@@ -110,7 +120,7 @@ jobs:
             echo "$SUDOPASS" | sudo -S pm2 save
             # Health check with retries
             for i in {1..5}; do
-              if curl -s http://localhost:$APP_PORT/api/health | grep -q "healthy"; then
+              if curl -s http://192.168.1.105:$APP_PORT/api/health | grep -q "healthy"; then
                 echo "✅ Health check passed."
                 break
               else
