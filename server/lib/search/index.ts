@@ -44,28 +44,21 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
   console.log('Using Elasticsearch endpoint:', elasticsearchUri);
   console.log('Searching indices:', searchIndices);
 
-  // Build search query with improved matching
+  // Build search query with improved matching for field1 and field2
   const searchBody = {
     size: 100,
     track_total_hits: true,
-    _source: ["data", "content", "data.content"],
+    _source: ["field1", "field2", "file_name", "file_path", "file_type", "files_id", "n"],
     highlight: {
       fields: {
-        "data": {
+        "field1": {
           "type": "unified",
           "number_of_fragments": 3,
           "fragment_size": 150,
           "pre_tags": ["<mark>"],
           "post_tags": ["</mark>"]
         },
-        "content": {
-          "type": "unified",
-          "number_of_fragments": 3,
-          "fragment_size": 150,
-          "pre_tags": ["<mark>"],
-          "post_tags": ["</mark>"]
-        },
-        "data.content": {
+        "field2": {
           "type": "unified",
           "number_of_fragments": 3,
           "fragment_size": 150,
@@ -80,7 +73,15 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
           // Exact phrase match with highest boost
           {
             match_phrase: {
-              "content": {
+              "field1": {
+                "query": searchQuery,
+                "boost": 3
+              }
+            }
+          },
+          {
+            match_phrase: {
+              "field2": {
                 "query": searchQuery,
                 "boost": 3
               }
@@ -90,7 +91,7 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
           {
             multi_match: {
               "query": searchQuery,
-              "fields": ["data", "content", "data.content"],
+              "fields": ["field1", "field2"],
               "type": "best_fields",
               "operator": "or",
               "boost": 2
@@ -100,7 +101,7 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
           ...(!isPhone ? [{
             multi_match: {
               "query": searchQuery,
-              "fields": ["data", "content", "data.content"],
+              "fields": ["field1", "field2"],
               "operator": "or",
               "fuzziness": "AUTO",
               "prefix_length": 2,
