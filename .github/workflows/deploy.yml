@@ -76,13 +76,15 @@ jobs:
           script: |
             set -e
             cd /var/www/anatscrawler
-            # Move build artifacts up if they are in an 'out' subfolder
+            # Move build artifacts up if they are in an 'out' subfolder (including dotfiles)
             if [ -d out ]; then
+              shopt -s dotglob
               mv out/* .
               rmdir out
+              shopt -u dotglob
             fi
-            echo "--- Directory contents ---"
-            ls -l
+            echo "--- Directory contents after move ---"
+            ls -la
             echo "--- Node version ---"
             node -v
             echo "--- NPM version ---"
