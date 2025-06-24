@@ -124,6 +124,7 @@ async function startServer() {
         path.resolve(deploymentRoot, 'dist/client'),  // Alternative build location
         path.resolve(__dirname, '../client/dist'),    // Relative to bundled server
         path.resolve(__dirname, '../client'),         // Relative to bundled server fallback
+        path.resolve(deploymentRoot, 'client-dist'),  // <-- Add this line for your deployment
       ];
       
       let clientDistPath: string | null = null;
