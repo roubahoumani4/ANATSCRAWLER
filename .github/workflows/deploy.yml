@@ -55,7 +55,7 @@ jobs:
           port: ${{ secrets.DEPLOY_PORT }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "out/**"
+          source: "out/*"
           target: /var/www/anatscrawler
           rm: true
 
