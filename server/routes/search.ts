@@ -35,17 +35,11 @@ export function registerRoutes(app: Express): void {
       // Sanitize response for the client
       const sanitizedResults = results.slice(0, 20).map(result => ({
         id: result.id,
+        phone: result.phone || '',
+        name: result.name ? Buffer.from(result.name, 'utf8').toString() : '',
+        link: result.link || '',
         score: result.score,
-        source: result.source,
-        content: result.content,
-        context: result.context,
-        highlights: result.highlights,
-        matchedTerms: result.matchedTerms,
-        index: result.index,
-        name: result.name,
-        phone: result.phone,
-        location: result.location,
-        link: result.link
+        timestamp: result.timestamp || '', // fallback to empty string if not present
       }));
 
       return res.json({ 
