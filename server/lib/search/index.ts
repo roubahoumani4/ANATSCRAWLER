@@ -8,6 +8,10 @@ export interface SearchResult {
   highlights: string[];
   context: string;
   index: string;
+  name?: string;
+  phone?: string;
+  location?: string;
+  link?: string;
 }
 
 /**
@@ -26,7 +30,7 @@ function isPhoneNumber(query: string): boolean {
 }
 
 /**
- * Perform fuzzy search using Elasticsearch
+ * Perform fuzzy search using Elasticsearch (for structured data)
  */
 export async function performFuzzySearch(query: string, elasticsearchUri: string): Promise<SearchResult[]> {
   if (!query.trim()) {
@@ -39,32 +43,22 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
   const isPhone = isPhoneNumber(query);
   const searchQuery = isPhone ? normalizePhoneNumber(query) : query;
 
-  // Indices we want to search in (remove fs.chunks)
-  const searchIndices = ['fs_chunks_index', 'filesearchdb.fs.chunks'].join(',');
+  // Use the new structured index
+  const searchIndices = ['darkweb_structured'].join(',');
   console.log('Using Elasticsearch endpoint:', elasticsearchUri);
   console.log('Searching indices:', searchIndices);
 
-  // Build search query with improved matching for field1 and field2
+  // Build search query with improved matching for structured fields
   const searchBody = {
     size: 100,
     track_total_hits: true,
-    _source: ["field1", "field2", "file_name", "file_path", "file_type", "files_id", "n"],
+    _source: ["user_id", "phone", "name", "gender", "language", "location", "link"],
     highlight: {
       fields: {
-        "field1": {
-          "type": "unified",
-          "number_of_fragments": 3,
-          "fragment_size": 150,
-          "pre_tags": ["<mark>"],
-          "post_tags": ["</mark>"]
-        },
-        "field2": {
-          "type": "unified",
-          "number_of_fragments": 3,
-          "fragment_size": 150,
-          "pre_tags": ["<mark>"],
-          "post_tags": ["</mark>"]
-        }
+        "name": { "type": "unified", "number_of_fragments": 3, "fragment_size": 150, "pre_tags": ["<mark>"], "post_tags": ["</mark>"] },
+        "phone": { "type": "unified", "number_of_fragments": 3, "fragment_size": 150, "pre_tags": ["<mark>"], "post_tags": ["</mark>"] },
+        "location": { "type": "unified", "number_of_fragments": 3, "fragment_size": 150, "pre_tags": ["<mark>"], "post_tags": ["</mark>"] },
+        "link": { "type": "unified", "number_of_fragments": 3, "fragment_size": 150, "pre_tags": ["<mark>"], "post_tags": ["</mark>"] }
       }
     },
     query: {
@@ -73,7 +67,7 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
           // Exact phrase match with highest boost
           {
             match_phrase: {
-              "field1": {
+              "name": {
                 "query": searchQuery,
                 "boost": 3
               }
@@ -81,9 +75,25 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
           },
           {
             match_phrase: {
-              "field2": {
+              "phone": {
                 "query": searchQuery,
                 "boost": 3
+              }
+            }
+          },
+          {
+            match_phrase: {
+              "location": {
+                "query": searchQuery,
+                "boost": 2
+              }
+            }
+          },
+          {
+            match_phrase: {
+              "link": {
+                "query": searchQuery,
+                "boost": 2
               }
             }
           },
@@ -91,35 +101,16 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
           {
             multi_match: {
               "query": searchQuery,
-              "fields": ["field1", "field2"],
+              "fields": ["name", "phone", "location", "link"],
               "type": "best_fields",
-              "operator": "or",
-              "boost": 2
-            }
-          },
-          // Fuzzy match for non-phone queries
-          ...(!isPhone ? [{
-            multi_match: {
-              "query": searchQuery,
-              "fields": ["field1", "field2"],
               "operator": "or",
               "fuzziness": "AUTO",
               "prefix_length": 2,
               "boost": 1
             }
-          }] : [])
-        ],
-        minimum_should_match: 1,
-        filter: [
-          {
-            terms: {
-              "_index": [
-                "fs_chunks_index",
-                "filesearchdb.fs.chunks"
-              ]
-            }
           }
-        ]
+        ],
+        minimum_should_match: 1
       }
     }
   };
@@ -177,19 +168,13 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
 
     // Process and enhance search results
     const results = hits.map((hit: any) => {
-      // Use field1 and field2 as main content sources
-      const field1 = hit._source?.field1 || '';
-      const field2 = hit._source?.field2 || '';
-      const fileName = hit._source?.file_name || '';
-      const filePath = hit._source?.file_path || '';
-      const fileType = hit._source?.file_type || '';
-      const filesId = hit._source?.files_id || '';
-      const n = hit._source?.n || null;
+      const name = hit._source?.name || '';
+      const phone = hit._source?.phone || '';
+      const location = hit._source?.location || '';
+      const link = hit._source?.link || '';
       const highlights = Object.values(hit.highlight || {})
         .flat()
         .map((h: unknown) => h?.toString() || '');
-      
-      // Extract matched terms from highlights
       const matchedTerms = new Set<string>();
       highlights.forEach((highlight: string) => {
         const terms = highlight.match(/<mark>([^<]+)<\/mark>/g) || [];
@@ -200,44 +185,27 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
           }
         });
       });
-
-      // If no highlights, try to find exact or fuzzy matches in field1/field2
-      if (matchedTerms.size === 0) {
-        const terms = (field1 + ',' + field2).split(/[\,\s]+/);
-        terms.forEach((term: string) => {
-          const normalizedTerm = term.toLowerCase();
-          const normalizedQuery = searchQuery.toLowerCase();
-          if (
-            normalizedTerm.includes(normalizedQuery) ||
-            normalizedQuery.includes(normalizedTerm) ||
-            (normalizedTerm.length > 3 &&
-             fastLevenshtein.get(normalizedTerm, normalizedQuery) <= 2)
-          ) {
-            matchedTerms.add(term.trim());
-          }
-        });
-      }
-
-      // Compose context from highlights or field1/field2
+      // Compose context from highlights or fields
       const context = highlights.length > 0 ?
         highlights.map((h: string) => h.replace(/<\/?mark>/g, '')).join(' ... ') :
-        (field1 + ' ' + field2).slice(0, 400) + ((field1 + field2).length > 400 ? '...' : '');
-      
-      // Map to frontend-expected fields using only field1 and field2
+        [name, phone, location, link].filter(Boolean).join(' | ').slice(0, 400);
+      // Map to frontend-expected fields using structured fields
       return {
         id: hit._id,
         score: hit._score,
         index: hit._index,
-        source: field1 || field2 || 'Unknown Source',
-        content: (field1 && field2) ? `${field1} | ${field2}` : field1 || field2 || 'No content available',
+        source: name || phone || location || link || 'Unknown Source',
+        content: [name, phone, location, link].filter(Boolean).join(' | '),
         timestamp: '', // No timestamp in your data
-        field1,
-        field2,
+        name,
+        phone,
+        location,
+        link,
         highlights,
-        matchedTerms: Array.from(matchedTerms)
+        matchedTerms: Array.from(matchedTerms),
+        context
       };
-    })
-    .filter((result: any) => result !== null);
+    }).filter((result: any) => result !== null);
 
     // Sort results by score
     results.sort((a: SearchResult, b: SearchResult) => b.score - a.score);
