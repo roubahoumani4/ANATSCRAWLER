@@ -31,9 +31,10 @@ jobs:
           cp -r dist/* out/ || true
           cp -r client/dist out/client-dist || true
           cp -r server/dist out/server-dist || true
-          cp -r package.json out/
-          cp -r ecosystem.config.cjs out/
-          cp -r .env.example out/ || true
+          cp package.json out/
+          cp package-lock.json out/
+          cp ecosystem.config.cjs out/
+          cp .env.example out/ || true
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
