@@ -36,10 +36,16 @@ export function registerRoutes(app: Express): void {
       const sanitizedResults = results.slice(0, 20).map(result => ({
         id: result.id,
         score: result.score,
+        source: result.source,
+        content: result.content,
         context: result.context,
         highlights: result.highlights,
         matchedTerms: result.matchedTerms,
-        index: result.index
+        index: result.index,
+        name: result.name,
+        phone: result.phone,
+        location: result.location,
+        link: result.link
       }));
 
       return res.json({ 

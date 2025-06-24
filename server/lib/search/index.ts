@@ -8,6 +8,7 @@ export interface SearchResult {
   highlights: string[];
   context: string;
   index: string;
+  content?: string;
   name?: string;
   phone?: string;
   location?: string;
