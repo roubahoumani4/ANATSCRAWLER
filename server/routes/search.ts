@@ -32,14 +32,26 @@ export function registerRoutes(app: Express): void {
         timestamp: new Date().toISOString()
       });
 
-      // Sanitize response for the client
+      // Sanitize response for the client with enhanced fields
       const sanitizedResults = results.slice(0, 20).map(result => ({
         id: result.id,
-        phone: result.phone || '',
-        name: result.name ? Buffer.from(result.name, 'utf8').toString() : '',
-        link: result.link || '',
         score: result.score,
-        timestamp: result.timestamp || '', // fallback to empty string if not present
+        source: result.source,
+        content: result.content,
+        context: result.context,
+        highlights: result.highlights,
+        matchedTerms: result.matchedTerms,
+        index: result.index,
+        name: result.name,
+        phone: result.phone,
+        location: result.location,
+        link: result.link,
+        // Enhanced fields from OpenSearch/Elasticsearch
+        timestamp: result.timestamp && result.timestamp !== '' ? result.timestamp : 'N/A',
+        fileType: result.fileType || (result.link && result.link.endsWith('.pdf') ? 'PDF' : result.link && result.link.endsWith('.docx') ? 'DOCX' : result.link && result.link.endsWith('.txt') ? 'TXT' : 'Unknown'),
+        fileName: result.fileName || (result.link ? result.link.split('/').pop() : 'Unknown'),
+        extractionConfidence: result.extractionConfidence || 'N/A',
+        // Add more fields as needed from your OpenSearch mapping
       }));
 
       return res.json({ 

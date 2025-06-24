@@ -13,6 +13,11 @@ export interface SearchResult {
   phone?: string;
   location?: string;
   link?: string;
+  // Enhanced fields for richer data presentation
+  timestamp?: string;
+  fileType?: string;
+  fileName?: string;
+  extractionConfidence?: string;
 }
 
 /**
@@ -190,6 +195,11 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
       const context = highlights.length > 0 ?
         highlights.map((h: string) => h.replace(/<\/?mark>/g, '')).join(' ... ') :
         [name, phone, location, link].filter(Boolean).join(' | ').slice(0, 400);
+      // Enhanced extraction for new fields
+      const timestamp = hit._source?.timestamp || hit._source?.date || hit._source?.created_at || '';
+      const fileType = hit._source?.fileType || (link.endsWith('.pdf') ? 'PDF' : link.endsWith('.docx') ? 'DOCX' : link.endsWith('.txt') ? 'TXT' : 'Unknown');
+      const fileName = hit._source?.fileName || (link ? link.split('/').pop() : 'Unknown');
+      const extractionConfidence = hit._source?.extractionConfidence || hit._source?.confidence || 'N/A';
       // Map to frontend-expected fields using structured fields
       const result = {
         id: hit._id,
@@ -197,11 +207,14 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
         index: hit._index,
         source: name || phone || location || link || 'Unknown Source',
         content: [name, phone, location, link].filter(Boolean).join(' | '),
-        timestamp: '', // No timestamp in your data
+        timestamp,
         name,
         phone,
         location,
         link,
+        fileType,
+        fileName,
+        extractionConfidence,
         highlights,
         matchedTerms: Array.from(matchedTerms),
         context
