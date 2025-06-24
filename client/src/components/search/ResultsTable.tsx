@@ -3,19 +3,29 @@ import { useLanguage } from "@/context/LanguageContext";
 
 interface SearchResult {
   id: string;
-  score?: number;
-  content?: string;
-  name?: string;
+  source: string;
+  breach_date?: string;
+  email?: string;
+  username?: string;
+  full_name?: string;
   phone?: string;
+  password?: string;
+  password_hash?: string;
+  dob?: string;
+  gender?: string;
   location?: string;
-  link?: string;
-  timestamp?: string;
+  profile_url?: string;
+  ip_address?: string;
+  device?: string;
   fileType?: string;
   fileName?: string;
   extractionConfidence?: string;
+  exposed?: string[];
   highlights?: string[];
   matchedTerms?: string[];
   context?: string;
+  score?: number;
+  index?: string;
 }
 
 interface ResultsTableProps {
@@ -32,47 +42,34 @@ const translations = {
     English: "Some details have been redacted for privacy and security",
     French: "Certains détails ont été masqués pour des raisons de confidentialité et de sécurité"
   },
-  score: {
-    English: "Relevance",
-    French: "Pertinence"
+  breach: {
+    English: "Breach",
+    French: "Fuite"
   },
-  phone: {
-    English: "Phone",
-    French: "Téléphone"
+  breachDate: {
+    English: "Breach Date",
+    French: "Date de la fuite"
   },
-  name: {
-    English: "Name",
-    French: "Nom"
+  exposed: {
+    English: "Exposed Data",
+    French: "Données exposées"
   },
-  location: {
-    English: "Location",
-    French: "Lieu"
+  summary: {
+    English: "Summary",
+    French: "Résumé"
   },
-  link: {
-    English: "Link",
-    French: "Lien"
-  },
-  timestamp: {
-    English: "Timestamp",
-    French: "Horodatage"
-  },
-  fileType: {
-    English: "File Type",
-    French: "Type de fichier"
-  },
-  fileName: {
-    English: "File Name",
-    French: "Nom du fichier"
-  },
-  extractionConfidence: {
-    English: "Extraction Confidence",
-    French: "Confiance d'extraction"
-  },
-  context: {
-    English: "Context",
-    French: "Contexte"
+  details: {
+    English: "Details",
+    French: "Détails"
   }
 };
+
+function getSummary(result: SearchResult, language: string) {
+  const exposed = result.exposed?.join(", ") || "-";
+  return language === "French"
+    ? `Vos données (${exposed}) ont été exposées lors de la fuite ${result.source} (${result.breach_date || "N/A"}).`
+    : `Your data (${exposed}) was exposed in the ${result.source} breach (${result.breach_date || "N/A"}).`;
+}
 
 export const ResultsTable = ({ results, loading }: ResultsTableProps) => {
   const { language } = useLanguage();
@@ -99,54 +96,59 @@ export const ResultsTable = ({ results, loading }: ResultsTableProps) => {
   }
 
   return (
-    <div className="overflow-x-auto p-4">
+    <div className="space-y-6 p-4">
       <p className="text-sm text-muted-foreground italic text-center mb-4">
         {translations.confidentialNotice[language]}
       </p>
-      <table className="min-w-full border text-sm bg-card rounded-lg overflow-hidden">
-        <thead className="bg-muted/10">
-          <tr>
-            <th className="px-3 py-2">{translations.phone[language]}</th>
-            <th className="px-3 py-2">{translations.name[language]}</th>
-            <th className="px-3 py-2">{translations.location[language]}</th>
-            <th className="px-3 py-2">{translations.link[language]}</th>
-            <th className="px-3 py-2">{translations.timestamp[language]}</th>
-            <th className="px-3 py-2">{translations.fileType[language]}</th>
-            <th className="px-3 py-2">{translations.fileName[language]}</th>
-            <th className="px-3 py-2">{translations.extractionConfidence[language]}</th>
-            <th className="px-3 py-2">{translations.score[language]}</th>
-            <th className="px-3 py-2">{translations.context[language]}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {results.map((result, index) => (
-            <motion.tr
-              key={result.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: index * 0.05 }}
-              className="border-b last:border-none"
-            >
-              <td className="px-3 py-2">{result.phone || '-'}</td>
-              <td className="px-3 py-2">{result.name || '-'}</td>
-              <td className="px-3 py-2">{result.location || '-'}</td>
-              <td className="px-3 py-2 break-all">
-                {result.link ? (
-                  <a href={result.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
-                    {result.link}
-                  </a>
-                ) : '-'}
-              </td>
-              <td className="px-3 py-2">{result.timestamp || '-'}</td>
-              <td className="px-3 py-2">{result.fileType || '-'}</td>
-              <td className="px-3 py-2">{result.fileName || '-'}</td>
-              <td className="px-3 py-2">{result.extractionConfidence || '-'}</td>
-              <td className="px-3 py-2">{result.score !== undefined ? Math.round(result.score * 100) + '%' : '-'}</td>
-              <td className="px-3 py-2 max-w-xs truncate" title={result.context || ''}>{result.context || '-'}</td>
-            </motion.tr>
-          ))}
-        </tbody>
-      </table>
+      {results.map((result, index) => (
+        <motion.div
+          key={result.id}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: index * 0.08 }}
+          className="rounded-lg border bg-card text-card-foreground shadow-sm p-4"
+        >
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2">
+            <div className="font-bold text-lg text-primary">
+              {translations.breach[language]}: {result.source}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {translations.breachDate[language]}: {result.breach_date || "N/A"}
+            </div>
+          </div>
+          <div className="mb-2">
+            <span className="font-semibold">{translations.exposed[language]}:</span>
+            <span className="ml-2">{result.exposed && result.exposed.length > 0 ? result.exposed.join(", ") : "-"}</span>
+          </div>
+          <div className="mb-2">
+            <span className="font-semibold">{translations.summary[language]}:</span>
+            <span className="ml-2">{getSummary(result, language)}</span>
+          </div>
+          <details className="mt-2">
+            <summary className="cursor-pointer font-semibold text-sm text-blue-600">
+              {translations.details[language]}
+            </summary>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2 text-xs">
+              {result.email && <div><b>Email:</b> {result.email}</div>}
+              {result.username && <div><b>Username:</b> {result.username}</div>}
+              {result.full_name && <div><b>Full Name:</b> {result.full_name}</div>}
+              {result.phone && <div><b>Phone:</b> {result.phone}</div>}
+              {result.password && <div><b>Password:</b> <span className="text-red-600">{result.password}</span></div>}
+              {result.password_hash && <div><b>Password Hash:</b> {result.password_hash}</div>}
+              {result.dob && <div><b>DOB:</b> {result.dob}</div>}
+              {result.gender && <div><b>Gender:</b> {result.gender}</div>}
+              {result.location && <div><b>Location:</b> {result.location}</div>}
+              {result.profile_url && <div><b>Profile URL:</b> <a href={result.profile_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">{result.profile_url}</a></div>}
+              {result.ip_address && <div><b>IP Address:</b> {result.ip_address}</div>}
+              {result.device && <div><b>Device:</b> {result.device}</div>}
+              {result.fileType && <div><b>File Type:</b> {result.fileType}</div>}
+              {result.fileName && <div><b>File Name:</b> {result.fileName}</div>}
+              {result.extractionConfidence && <div><b>Extraction Confidence:</b> {result.extractionConfidence}</div>}
+              {result.context && <div className="col-span-2"><b>Context:</b> {result.context}</div>}
+            </div>
+          </details>
+        </motion.div>
+      ))}
     </div>
   );
 };

@@ -58,7 +58,11 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
   const searchBody = {
     size: 100,
     track_total_hits: true,
-    _source: ["user_id", "phone", "name", "gender", "language", "location", "link"],
+    _source: [
+      "user_id", "phone", "name", "email", "username", "full_name", "dob", "gender",
+      "location", "city", "country", "profile_url", "link", "password", "password_hash",
+      "ip_address", "device", "source", "breach_date", "timestamp", "fileType", "fileName", "extractionConfidence"
+    ],
     highlight: {
       fields: {
         "name": { "type": "unified", "number_of_fragments": 3, "fragment_size": 150, "pre_tags": ["<mark>"], "post_tags": ["</mark>"] },
@@ -174,10 +178,12 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
 
     // Process and enhance search results
     const results = hits.map((hit: any) => {
-      const name = hit._source?.name || '';
-      const phone = hit._source?.phone || '';
-      const location = hit._source?.location || '';
-      const link = hit._source?.link || '';
+      // Extract all possible breach fields
+      const {
+        name, phone, email, username, full_name, dob, gender, location, city, country,
+        profile_url, link, password, password_hash, ip_address, device, source, breach_date,
+        timestamp, fileType, fileName, extractionConfidence
+      } = hit._source || {};
       const highlights = Object.values(hit.highlight || {})
         .flat()
         .map((h: unknown) => h?.toString() || '');
@@ -194,32 +200,42 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
       // Compose context from highlights or fields
       const context = highlights.length > 0 ?
         highlights.map((h: string) => h.replace(/<\/?mark>/g, '')).join(' ... ') :
-        [name, phone, location, link].filter(Boolean).join(' | ').slice(0, 400);
-      // Enhanced extraction for new fields
-      const timestamp = hit._source?.timestamp || hit._source?.date || hit._source?.created_at || '';
-      const fileType = hit._source?.fileType || (link.endsWith('.pdf') ? 'PDF' : link.endsWith('.docx') ? 'DOCX' : link.endsWith('.txt') ? 'TXT' : 'Unknown');
-      const fileName = hit._source?.fileName || (link ? link.split('/').pop() : 'Unknown');
-      const extractionConfidence = hit._source?.extractionConfidence || hit._source?.confidence || 'N/A';
-      // Map to frontend-expected fields using structured fields
+        [email, username, phone, name, full_name, location, city, country, link, profile_url].filter(Boolean).join(' | ').slice(0, 400);
+      // Determine exposed fields
+      const exposed = [
+        email && 'email', username && 'username', phone && 'phone',
+        password && 'password', password_hash && 'password_hash',
+        dob && 'dob', gender && 'gender', location && 'location',
+        city && 'city', country && 'country', ip_address && 'ip_address',
+        device && 'device', profile_url && 'profile_url'
+      ].filter(Boolean);
+      // Map to HIBP-style result
       const result = {
         id: hit._id,
-        score: hit._score,
-        index: hit._index,
-        source: name || phone || location || link || 'Unknown Source',
-        content: [name, phone, location, link].filter(Boolean).join(' | '),
-        timestamp,
-        name,
+        source: source || 'Unknown',
+        breach_date: breach_date || timestamp || 'N/A',
+        email,
+        username,
+        full_name,
         phone,
-        location,
-        link,
+        password,
+        password_hash,
+        dob,
+        gender,
+        location: location || city || country || '',
+        profile_url: profile_url || link || '',
+        ip_address,
+        device,
         fileType,
         fileName,
         extractionConfidence,
+        exposed,
         highlights,
         matchedTerms: Array.from(matchedTerms),
-        context
+        context,
+        score: hit._score,
+        index: hit._index
       };
-      console.log('[DEBUG] Search result mapped:', result);
       return result;
     }).filter((result: any) => result !== null);
 
