@@ -130,6 +130,7 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
 
   try {
     console.log('Sending search request to Elasticsearch...');
+    console.log('Elasticsearch search body:', JSON.stringify(searchBody, null, 2));
     const searchResponse = await fetch(`${elasticsearchUri}/${searchIndices}/_search`, {
       method: 'POST',
       headers: {
@@ -141,8 +142,12 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
 
     clearTimeout(timeoutId);
 
+    // Log the raw response text for debugging
+    const rawResponseText = await searchResponse.clone().text();
+    console.log('Raw Elasticsearch response:', rawResponseText);
+
     if (!searchResponse.ok) {
-      const errorText = await searchResponse.text();
+      const errorText = rawResponseText;
       console.error('Elasticsearch error response:', errorText);
       // Try to parse the error and check for index_not_found_exception
       try {
@@ -157,7 +162,7 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
       throw new Error(`Search request failed: ${errorText}`);
     }
 
-    const searchData = await searchResponse.json();
+    const searchData = JSON.parse(rawResponseText);
     console.log('Elasticsearch response metadata:', {
       took: searchData.took,
       total: searchData.hits?.total,
