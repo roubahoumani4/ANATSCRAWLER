@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: 'anatscrawler',
-      script: 'dist/index.js',
+      script: 'index.js',
       env: {
         NODE_ENV: 'production',
         PORT: '5000',
