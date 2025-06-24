@@ -76,10 +76,18 @@ jobs:
           script: |
             set -e
             cd /var/www/anatscrawler
-
+            echo "--- Directory contents ---"
+            ls -l
+            echo "--- Node version ---"
+            node -v
+            echo "--- NPM version ---"
+            npm -v
+            echo "--- package.json ---"
+            cat package.json
+            echo "--- package-lock.json ---"
+            cat package-lock.json
             # Install production dependencies only
             npm ci --omit=dev
-
             # Recreate .env
             cat > .env <<EOF
             NODE_ENV=production
@@ -93,11 +101,9 @@ jobs:
             COOKIE_SECRET=${COOKIE_SECRET}
             EOF
             chmod 600 .env
-
             # Ensure pm2 is available
             if ! command -v pm2 >/dev/null; then
               npm install -g pm2
             fi
-
             # Reload or start
             pm2 reload ecosystem.config.cjs --env production || pm2 start ecosystem.config.cjs --env production
