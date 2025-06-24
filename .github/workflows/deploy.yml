@@ -5,7 +5,7 @@ on:
     branches: [ main ]
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -16,21 +16,49 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install xvfb
-        run: sudo apt-get update && sudo apt-get install -y xvfb
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Sync source code to VM
+      - name: Build client
+        run: npm run build:client
+
+      - name: Build server
+        run: npm run build:server
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p out
+          cp -r dist/* out/ || true
+          cp -r client/dist out/client-dist || true
+          cp -r server/dist out/server-dist || true
+          cp -r package.json out/
+          cp -r ecosystem.config.cjs out/
+          cp -r .env.example out/ || true
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-build
+          path: out
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: production-build
+          path: out
+
+      - name: Sync build artifacts to VM
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           port: ${{ secrets.DEPLOY_PORT }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "./"
+          source: "out/**"
           target: /var/www/anatscrawler
           rm: true
 
-      - name: Deploy & build on VM
+      - name: Deploy & reload on VM
         uses: appleboy/ssh-action@v1.0.0
         env:
           APP_PORT: ${{ secrets.APP_PORT }}
@@ -48,7 +76,7 @@ jobs:
             set -e
             cd /var/www/anatscrawler
 
-            # Install production dependencies
+            # Install production dependencies only
             npm ci --omit=dev
 
             # Recreate .env
@@ -64,15 +92,6 @@ jobs:
             COOKIE_SECRET=${COOKIE_SECRET}
             EOF
             chmod 600 .env
-
-            # Build in root
-            xvfb-run -a npm run build
-
-            # Build in client
-            cd client
-            npm install
-            xvfb-run -a npm run build
-            cd ..
 
             # Ensure pm2 is available
             if ! command -v pm2 >/dev/null; then
