@@ -190,7 +190,7 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
         highlights.map((h: string) => h.replace(/<\/?mark>/g, '')).join(' ... ') :
         [name, phone, location, link].filter(Boolean).join(' | ').slice(0, 400);
       // Map to frontend-expected fields using structured fields
-      return {
+      const result = {
         id: hit._id,
         score: hit._score,
         index: hit._index,
@@ -205,6 +205,8 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
         matchedTerms: Array.from(matchedTerms),
         context
       };
+      console.log('[DEBUG] Search result mapped:', result);
+      return result;
     }).filter((result: any) => result !== null);
 
     // Sort results by score
