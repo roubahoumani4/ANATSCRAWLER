@@ -1,0 +1,20 @@
+[
+  {
+    "user_id": "100024137495325",
+    "phone": "+96171792906",
+    "email": "example@email.com",
+    "gender": "male",
+    "city": "Beirut",
+    "location": "Saint-Georges",
+    "link": "https://facebook.com/100024137495325"
+  },
+  {
+    "user_id": "100024137495326",
+    "phone": "+96171234567",
+    "email": "another@email.com",
+    "gender": "female",
+    "city": "Tripoli",
+    "location": "Downtown",
+    "link": "https://facebook.com/100024137495326"
+  }
+]
