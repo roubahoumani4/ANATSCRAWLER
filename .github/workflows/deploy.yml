@@ -76,6 +76,11 @@ jobs:
           script: |
             set -e
             cd /var/www/anatscrawler
+            # Move build artifacts up if they are in an 'out' subfolder
+            if [ -d out ]; then
+              mv out/* .
+              rmdir out
+            fi
             echo "--- Directory contents ---"
             ls -l
             echo "--- Node version ---"
