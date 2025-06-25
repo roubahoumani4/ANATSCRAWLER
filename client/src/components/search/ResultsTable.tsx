@@ -144,10 +144,6 @@ export const ResultsTable = ({ results, loading }: ResultsTableProps) => {
             transition={{ duration: 0.3, delay: index * 0.08 }}
             className="rounded-lg border bg-card text-card-foreground shadow-sm p-4"
           >
-            {/* DEBUG: Show the full result object for troubleshooting */}
-            <pre className="text-xs text-red-500 bg-gray-100 p-2 rounded mb-2 overflow-x-auto">
-              {JSON.stringify(result, null, 2)}
-            </pre>
             {/* Only show available fields, or a fallback if none */}
             {availableFields.length === 0 ? (
               <div className="text-center text-muted-foreground">No data available</div>
