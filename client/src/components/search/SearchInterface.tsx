@@ -4,22 +4,9 @@ import { useLanguage } from "@/context/LanguageContext";
 import { Search, Filter, Download, ChevronDown, ChevronUp } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { containerVariants, itemVariants } from "@/utils/animations";
+import { containerVariants } from "@/utils/animations";
+import { ResultsTable } from "./ResultsTable";
 
-interface SearchResult {
-  id: string;
-  content?: string;
-  score?: number;
-  file_name?: string;
-  file_path?: string;
-  file_type?: string;
-  files_id?: string;
-  n?: number;
-  context?: string;
-  highlights?: string[];
-  matchedTerms?: string[];
-  index?: string;
-}
 
 // Translation object for all UI strings
 const translations = {
@@ -122,18 +109,18 @@ const SearchInterface = () => {
   const [dateRange, setDateRange] = useState<{ from: string; to: string }>({ from: "", to: "" });
   const [isExported, setIsExported] = useState(false);
 
-  const { data: results = [], isLoading, isError, error } = useQuery({
-    queryKey: ['/api/search', searchQuery],
+  // Use /api/darkweb-search and expect { success, results } structure
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ['/api/darkweb-search', searchQuery],
     queryFn: async () => {
-      if (!searchQuery.trim()) return [];
-
-      const response = await apiRequest("GET", `/api/search?query=${encodeURIComponent(searchQuery)}`);
+      if (!searchQuery.trim()) return { results: [] };
+      const response = await apiRequest("POST", "/api/darkweb-search", { query: searchQuery });
       return response.json();
     },
     enabled: searchQuery.trim().length > 0,
   });
 
-  const filteredResults = results; // No collection filtering
+  const results = data?.results || [];
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,7 +129,7 @@ const SearchInterface = () => {
 
   const handleExport = async () => {
     try {
-      await apiRequest("POST", "/api/export", { results: filteredResults });
+      await apiRequest("POST", "/api/export", { results });
       setIsExported(true);
 
       // Download the Excel file
@@ -297,91 +284,7 @@ const SearchInterface = () => {
       )}
 
       {searchQuery && !isLoading && !isError && (
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-coolWhite">
-              {translations.results[language as keyof typeof translations.results]} 
-              <span className="ml-2 text-sm font-normal text-gray-400">
-                ({filteredResults.length})
-              </span>
-            </h2>
-
-            {filteredResults.length > 0 && (
-              <button
-                onClick={handleExport}
-                className="flex items-center bg-darkGray hover:bg-midGray text-coolWhite py-2 px-4 rounded-lg transition-colors"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                <span>
-                  {isExported 
-                    ? translations.exported[language as keyof typeof translations.exported]
-                    : translations.export[language as keyof typeof translations.export]}
-                </span>
-              </button>
-            )}
-          </div>
-
-          {filteredResults.length === 0 ? (
-            <motion.div 
-              className="bg-darkGray rounded-lg p-8 text-center"
-              variants={itemVariants}
-            >
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-midGray mb-4">
-                <Search className="h-8 w-8 text-gray-400" />
-              </div>
-              <h3 className="text-lg font-medium text-coolWhite mb-2">
-                {translations.noResults[language as keyof typeof translations.noResults]}
-              </h3>
-              <p className="text-gray-400">
-                {translations.noResultsMsg[language as keyof typeof translations.noResultsMsg]}
-              </p>
-            </motion.div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4">
-              {results.map((result: SearchResult, index: number) => (
-                <motion.div
-                  key={result.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  className="bg-gray-800 rounded-lg p-4 border border-gray-700 hover:border-blue-500 transition-colors"
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="text-lg font-semibold text-white truncate">
-                      {result.file_name || result.id || 'Unknown'}
-                    </h3>
-                    {result.score !== undefined && (
-                      <span className="text-xs text-gray-400 ml-2">
-                        Score: {result.score}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-gray-300 text-sm mb-2">
-                    {result.content || result.context || 'No content'}
-                  </div>
-                  {result.highlights && result.highlights.length > 0 && (
-                    <div className="text-blue-300 text-xs mb-2">
-                      Highlights: {result.highlights.join(' ... ')}
-                    </div>
-                  )}
-                  {result.file_path && (
-                    <div className="text-xs text-gray-500">Path: {result.file_path}</div>
-                  )}
-                  {result.file_type && (
-                    <div className="text-xs text-gray-500">Type: {result.file_type}</div>
-                  )}
-                  {result.matchedTerms && result.matchedTerms.length > 0 && (
-                    <div className="text-xs text-cyan-400">Matched: {result.matchedTerms.join(', ')}</div>
-                  )}
-                </motion.div>
-              ))}
-            </div>
-          )}
-        </motion.div>
+        <ResultsTable results={results} loading={isLoading} />
       )}
     </div>
   );
