@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { Shield, Terminal, Zap, Globe, AlertTriangle, Eye, Lock, ChevronRight, Skull, Wifi, Code2, Search } from "lucide-react";
 import { useTheme } from "@/context/ThemeContext";
 import { useLanguage } from "@/context/LanguageContext";
+import ResultsTable from "@/components/ResultsTable";
 
 const LandingPage = () => {
   const [, setLocation] = useLocation();
@@ -466,35 +467,8 @@ const LandingPage = () => {
                     <Eye className="w-5 h-5 mr-2" />
                     RECONNAISSANCE RESULTS ({searchResults.length})
                   </h4>
-
-                  {searchResults.length > 0 ? (
-                    <div className="space-y-3 max-h-80 overflow-y-auto">
-                      {searchResults.map((result, index) => (
-                        <motion.div
-                          key={index}
-                          className="p-4 rounded-lg bg-black/30 border border-gray-700 hover:border-cyan-400/50 transition-colors"
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: index * 0.1 }}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="text-white font-mono text-sm">{result.source || 'Unknown Source'}</div>
-                              <div className="text-gray-400 text-xs mt-1">{result.timestamp || 'No timestamp'}</div>
-                              <div className="text-gray-300 text-sm mt-2">{result.content || result.title || 'No content available'}</div>
-                            </div>
-                            <div className="text-xs text-cyan-400 font-mono">{result.score || 'N/A'}</div>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <AlertTriangle className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
-                      <p className="text-gray-400">No results found for "{searchQuery}"</p>
-                      <p className="text-gray-500 text-sm mt-2">Try different search terms or check network connectivity</p>
-                    </div>
-                  )}
+                  {/* Use ResultsTable for consistent display */}
+                  <ResultsTable results={searchResults} loading={isSearching} />
                 </div>
               </motion.div>
             )}
