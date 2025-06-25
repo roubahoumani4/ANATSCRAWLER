@@ -29,7 +29,7 @@ jobs:
         run: |
           mkdir -p out
           cp -r dist/* out/ || true
-          cp -r client/dist out/client-dist || true
+          cp -r client/dist out/client/dist || true
           cp -r server/dist out/server-dist || true
           cp package.json out/
           cp package-lock.json out/
