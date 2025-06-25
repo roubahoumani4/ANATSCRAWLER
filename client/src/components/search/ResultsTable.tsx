@@ -8,12 +8,18 @@ interface SearchResult {
   email?: string;
   username?: string;
   full_name?: string;
+  first_name?: string;
+  last_name?: string;
   phone?: string;
   password?: string;
   password_hash?: string;
   dob?: string;
   gender?: string;
   location?: string;
+  location2?: string;
+  link?: string;
+  link2?: string;
+  social_link?: string;
   profile_url?: string;
   ip_address?: string;
   device?: string;
@@ -145,6 +151,11 @@ export const ResultsTable = ({ results, loading }: ResultsTableProps) => {
               {result.fileName && <div><b>File Name:</b> {result.fileName}</div>}
               {result.extractionConfidence && <div><b>Extraction Confidence:</b> {result.extractionConfidence}</div>}
               {result.context && <div className="col-span-2"><b>Context:</b> {result.context}</div>}
+              {result.first_name && <div><b>First Name:</b> {result.first_name}</div>}
+              {result.last_name && <div><b>Last Name:</b> {result.last_name}</div>}
+              {result.link && <div><b>Link:</b> <a href={result.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">{result.link}</a></div>}
+              {result.link2 && <div><b>Link 2:</b> <a href={result.link2} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">{result.link2}</a></div>}
+              {result.social_link && <div><b>Social Link:</b> <a href={result.social_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">{result.social_link}</a></div>}
             </div>
           </details>
         </motion.div>
