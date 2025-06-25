@@ -76,6 +76,7 @@ function getSummary(result: SearchResult, language: string) {
 }
 
 export const ResultsTable = ({ results, loading }: ResultsTableProps) => {
+  console.log("ResultsTable results:", results);
   const { language } = useLanguage();
 
   if (loading) {
