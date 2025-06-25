@@ -122,7 +122,7 @@ export const ResultsTable = ({ results, loading }: ResultsTableProps) => {
           </div>
           <div className="mb-2">
             <span className="font-semibold">{translations.summary[language]}:</span>
-            <span className="ml-2">{getSummary(result, language)}</span>
+            <span className="ml-2">{result.context || getSummary(result, language)}</span>
           </div>
           <details className="mt-2">
             <summary className="cursor-pointer font-semibold text-sm text-blue-600">
