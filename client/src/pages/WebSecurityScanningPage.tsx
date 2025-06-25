@@ -212,7 +212,6 @@ const WebSecurityScanningPage = () => {
               transition={{ duration: 0.3 }}
               initial={{ opacity: 0, y: 50 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: index * 0.1 }}
             >
               <motion.div 
                 className={`mb-4 p-3 rounded-xl bg-gradient-to-r ${module.color} inline-block`}

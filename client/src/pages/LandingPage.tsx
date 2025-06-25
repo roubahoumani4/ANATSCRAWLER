@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { Shield, Terminal, Zap, Globe, AlertTriangle, Eye, Lock, ChevronRight, Skull, Wifi, Code2, Search } from "lucide-react";
 import { useTheme } from "@/context/ThemeContext";
 import { useLanguage } from "@/context/LanguageContext";
-import ResultsTable from "@/components/ResultsTable";
+import { ResultsTable } from "@/components/search/ResultsTable";
 
 const LandingPage = () => {
   const [, setLocation] = useLocation();
