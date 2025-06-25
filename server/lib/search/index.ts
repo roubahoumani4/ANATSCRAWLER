@@ -70,13 +70,15 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
     size: 100,
     track_total_hits: true,
     _source: [
-      "user_id", "phone", "name", "email", "username", "full_name", "dob", "gender",
+      "user_id", "phone", "name", "first_name", "last_name", "email", "username", "full_name", "dob", "gender",
       "location", "city", "country", "profile_url", "link", "password", "password_hash",
       "ip_address", "device", "source", "breach_date", "timestamp", "fileType", "fileName", "extractionConfidence"
     ],
     highlight: {
       fields: {
         "name": { "type": "unified", "number_of_fragments": 3, "fragment_size": 150, "pre_tags": ["<mark>"], "post_tags": ["</mark>"] },
+        "first_name": { "type": "unified", "number_of_fragments": 3, "fragment_size": 150, "pre_tags": ["<mark>"], "post_tags": ["</mark>"] },
+        "last_name": { "type": "unified", "number_of_fragments": 3, "fragment_size": 150, "pre_tags": ["<mark>"], "post_tags": ["</mark>"] },
         "phone": { "type": "unified", "number_of_fragments": 3, "fragment_size": 150, "pre_tags": ["<mark>"], "post_tags": ["</mark>"] },
         "location": { "type": "unified", "number_of_fragments": 3, "fragment_size": 150, "pre_tags": ["<mark>"], "post_tags": ["</mark>"] },
         "link": { "type": "unified", "number_of_fragments": 3, "fragment_size": 150, "pre_tags": ["<mark>"], "post_tags": ["</mark>"] }
@@ -89,6 +91,22 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
           {
             match_phrase: {
               "name": {
+                "query": searchQuery,
+                "boost": 3
+              }
+            }
+          },
+          {
+            match_phrase: {
+              "first_name": {
+                "query": searchQuery,
+                "boost": 3
+              }
+            }
+          },
+          {
+            match_phrase: {
+              "last_name": {
                 "query": searchQuery,
                 "boost": 3
               }
@@ -122,7 +140,7 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
           {
             multi_match: {
               "query": searchQuery,
-              "fields": ["name", "phone", "location", "link"],
+              "fields": ["name", "first_name", "last_name", "phone", "location", "link"],
               "type": "best_fields",
               "operator": "or",
               "fuzziness": "AUTO",
