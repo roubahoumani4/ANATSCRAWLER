@@ -27,25 +27,9 @@ interface ElasticsearchHit {
 
 export async function performFuzzySearch(query: string, elasticsearchUri: string): Promise<SearchResult[]> {
   try {
-    // Get all available indices
-    const indicesResponse = await fetch(`${elasticsearchUri}/_cat/indices?format=json`);
-    const indicesData = await indicesResponse.json();
-    
-    if (!Array.isArray(indicesData)) {
-      throw new Error('Invalid indices response');
-    }
-
-    const indicesList = indicesData
-      .filter((idx: { index: string }) => !idx.index.startsWith('.'))
-      .map((idx: { index: string }) => idx.index)
-      .join(',');
-
-    if (!indicesList) {
-      return [];
-    }
-
-    // Perform fuzzy search
-    const searchResponse = await fetch(`${elasticsearchUri}/${indicesList}/_search`, {
+    // Only search the 'darkweb_structured' index
+    const indexName = 'darkweb_structured';
+    const searchResponse = await fetch(`${elasticsearchUri}/${indexName}/_search`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -57,7 +41,21 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
               {
                 multi_match: {
                   query,
-                  fields: ["content", "fileName", "source"],
+                  fields: [
+                    "content",
+                    "fileName",
+                    "source",
+                    "context",
+                    "name",
+                    "first_name",
+                    "last_name",
+                    "phone",
+                    "email",
+                    "location",
+                    "link",
+                    "fileType",
+                    "extractionConfidence"
+                  ],
                   fuzziness: "AUTO",
                   prefix_length: 2,
                   boost: 1.0
@@ -66,7 +64,21 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
               {
                 multi_match: {
                   query,
-                  fields: ["content", "fileName", "source"],
+                  fields: [
+                    "content",
+                    "fileName",
+                    "source",
+                    "context",
+                    "name",
+                    "first_name",
+                    "last_name",
+                    "phone",
+                    "email",
+                    "location",
+                    "link",
+                    "fileType",
+                    "extractionConfidence"
+                  ],
                   type: "phrase_prefix",
                   boost: 1.5
                 }
@@ -74,7 +86,21 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
               {
                 multi_match: {
                   query,
-                  fields: ["content^2", "fileName^3", "source^1.5"],
+                  fields: [
+                    "content^2",
+                    "fileName^3",
+                    "source^1.5",
+                    "context^2",
+                    "name^2",
+                    "first_name^2",
+                    "last_name^2",
+                    "phone^2",
+                    "email^2",
+                    "location^2",
+                    "link^2",
+                    "fileType^2",
+                    "extractionConfidence^2"
+                  ],
                   type: "best_fields",
                   tie_breaker: 0.3,
                   boost: 2.0
@@ -94,7 +120,31 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
             }
           }
         },
-        _source: ["content", "fileName", "timestamp", "source"],
+        _source: [
+          "content",
+          "fileName",
+          "timestamp",
+          "source",
+          "context",
+          "name",
+          "first_name",
+          "last_name",
+          "phone",
+          "email",
+          "birthdate",
+          "gender",
+          "locale",
+          "city",
+          "location",
+          "location2",
+          "link",
+          "link2",
+          "protocol",
+          "social_link",
+          "fileType",
+          "extractionConfidence",
+          "exposed"
+        ],
         size: 100,
         sort: [
           { _score: "desc" },
@@ -104,42 +154,35 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
     });
 
     const searchData = await searchResponse.json();
-    
     if (!searchResponse.ok) {
       throw new Error(searchData.error?.reason || 'Search failed');
     }
 
-    return searchData.hits.hits.map((hit: ElasticsearchHit) => ({
+    return searchData.hits.hits.map((hit: any) => ({
       id: hit._id,
       score: hit._score,
-      source: hit._source.source || 'Unknown',
-      fileName: hit._source.fileName || '',
-      content: hit.highlight?.content?.[0] || hit._source.content || '',
-      timestamp: hit._source.timestamp || '',
-      collection: hit._index || '',
-      // Add all fields expected by the frontend ResultsTable, with defaults
-      matchedTerms: [],
+      matchedTerms: hit.matchedTerms || [],
       highlights: hit.highlight?.content || [],
-      context: '',
+      context: hit._source.context || '',
       index: hit._index || '',
-      name: '',
-      first_name: '',
-      last_name: '',
-      phone: '',
-      email: '',
-      birthdate: '',
-      gender: '',
-      locale: '',
-      city: '',
-      location: '',
-      location2: '',
-      link: '',
-      link2: '',
-      protocol: '',
-      social_link: '',
-      fileType: '',
-      extractionConfidence: '',
-      exposed: [],
+      name: hit._source.name || '',
+      first_name: hit._source.first_name || '',
+      last_name: hit._source.last_name || '',
+      phone: hit._source.phone || '',
+      email: hit._source.email || '',
+      birthdate: hit._source.birthdate || '',
+      gender: hit._source.gender || '',
+      locale: hit._source.locale || '',
+      city: hit._source.city || '',
+      location: hit._source.location || '',
+      location2: hit._source.location2 || '',
+      link: hit._source.link || '',
+      link2: hit._source.link2 || '',
+      protocol: hit._source.protocol || '',
+      social_link: hit._source.social_link || '',
+      fileType: hit._source.fileType || '',
+      extractionConfidence: hit._source.extractionConfidence || '',
+      exposed: hit._source.exposed || [],
     }));
   } catch (error) {
     console.error('Search error:', error);
