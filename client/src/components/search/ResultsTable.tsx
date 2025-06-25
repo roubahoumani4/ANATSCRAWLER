@@ -4,34 +4,32 @@ import { useLanguage } from "@/context/LanguageContext";
 interface SearchResult {
   id: string;
   source: string;
-  breach_date?: string;
-  email?: string;
-  username?: string;
-  full_name?: string;
+  score: number;
+  matchedTerms: string[];
+  highlights: string[];
+  context: string;
+  index: string;
+  content?: string;
+  name?: string;
   first_name?: string;
   last_name?: string;
   phone?: string;
-  password?: string;
-  password_hash?: string;
-  dob?: string;
+  email?: string;
+  birthdate?: string;
   gender?: string;
+  locale?: string;
+  city?: string;
   location?: string;
   location2?: string;
   link?: string;
   link2?: string;
+  protocol?: string;
   social_link?: string;
-  profile_url?: string;
-  ip_address?: string;
-  device?: string;
+  timestamp?: string;
   fileType?: string;
   fileName?: string;
   extractionConfidence?: string;
   exposed?: string[];
-  highlights?: string[];
-  matchedTerms?: string[];
-  context?: string;
-  score?: number;
-  index?: string;
 }
 
 interface ResultsTableProps {
@@ -73,8 +71,8 @@ const translations = {
 function getSummary(result: SearchResult, language: string) {
   const exposed = result.exposed?.join(", ") || "-";
   return language === "French"
-    ? `Vos données (${exposed}) ont été exposées lors de la fuite ${result.source} (${result.breach_date || "N/A"}).`
-    : `Your data (${exposed}) was exposed in the ${result.source} breach (${result.breach_date || "N/A"}).`;
+    ? `Vos données (${exposed}) ont été exposées lors de la fuite ${result.source} (${result.timestamp || "N/A"}).`
+    : `Your data (${exposed}) was exposed in the ${result.source} breach (${result.timestamp || "N/A"}).`;
 }
 
 export const ResultsTable = ({ results, loading }: ResultsTableProps) => {
@@ -119,7 +117,7 @@ export const ResultsTable = ({ results, loading }: ResultsTableProps) => {
               {translations.breach[language]}: {result.source}
             </div>
             <div className="text-xs text-muted-foreground">
-              {translations.breachDate[language]}: {result.breach_date || "N/A"}
+              {translations.breachDate[language]}: {result.timestamp || "N/A"}
             </div>
           </div>
           <div className="mb-2">
@@ -135,27 +133,31 @@ export const ResultsTable = ({ results, loading }: ResultsTableProps) => {
               {translations.details[language]}
             </summary>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2 text-xs">
-              {result.email && <div><b>Email:</b> {result.email}</div>}
-              {result.username && <div><b>Username:</b> {result.username}</div>}
-              {result.full_name && <div><b>Full Name:</b> {result.full_name}</div>}
+              {result.name && <div><b>Name:</b> {result.name}</div>}
+              {result.first_name && <div><b>First Name:</b> {result.first_name}</div>}
+              {result.last_name && <div><b>Last Name:</b> {result.last_name}</div>}
               {result.phone && <div><b>Phone:</b> {result.phone}</div>}
-              {result.password && <div><b>Password:</b> <span className="text-red-600">{result.password}</span></div>}
-              {result.password_hash && <div><b>Password Hash:</b> {result.password_hash}</div>}
-              {result.dob && <div><b>DOB:</b> {result.dob}</div>}
+              {result.email && <div><b>Email:</b> {result.email}</div>}
+              {result.birthdate && <div><b>Birthdate:</b> {result.birthdate}</div>}
               {result.gender && <div><b>Gender:</b> {result.gender}</div>}
+              {result.locale && <div><b>Locale:</b> {result.locale}</div>}
+              {result.city && <div><b>City:</b> {result.city}</div>}
               {result.location && <div><b>Location:</b> {result.location}</div>}
-              {result.profile_url && <div><b>Profile URL:</b> <a href={result.profile_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">{result.profile_url}</a></div>}
-              {result.ip_address && <div><b>IP Address:</b> {result.ip_address}</div>}
-              {result.device && <div><b>Device:</b> {result.device}</div>}
+              {result.location2 && <div><b>Location 2:</b> {result.location2}</div>}
+              {result.link && <div><b>Link:</b> <a href={result.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">{result.link}</a></div>}
+              {result.link2 && <div><b>Link 2:</b> <a href={result.link2} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">{result.link2}</a></div>}
+              {result.protocol && <div><b>Protocol:</b> {result.protocol}</div>}
+              {result.social_link && <div><b>Social Link:</b> <a href={result.social_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">{result.social_link}</a></div>}
+              {result.timestamp && <div><b>Timestamp:</b> {result.timestamp}</div>}
               {result.fileType && <div><b>File Type:</b> {result.fileType}</div>}
               {result.fileName && <div><b>File Name:</b> {result.fileName}</div>}
               {result.extractionConfidence && <div><b>Extraction Confidence:</b> {result.extractionConfidence}</div>}
+              {result.exposed && result.exposed.length > 0 && <div className="col-span-2"><b>Exposed:</b> {result.exposed.join(", ")}</div>}
               {result.context && <div className="col-span-2"><b>Context:</b> {result.context}</div>}
-              {result.first_name && <div><b>First Name:</b> {result.first_name}</div>}
-              {result.last_name && <div><b>Last Name:</b> {result.last_name}</div>}
-              {result.link && <div><b>Link:</b> <a href={result.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">{result.link}</a></div>}
-              {result.link2 && <div><b>Link 2:</b> <a href={result.link2} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">{result.link2}</a></div>}
-              {result.social_link && <div><b>Social Link:</b> <a href={result.social_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">{result.social_link}</a></div>}
+              {/* If none of the above fields are present, show a fallback */}
+              {!(result.name || result.first_name || result.last_name || result.phone || result.email || result.birthdate || result.gender || result.locale || result.city || result.location || result.location2 || result.link || result.link2 || result.protocol || result.social_link || result.timestamp || result.fileType || result.fileName || result.extractionConfidence || (result.exposed && result.exposed.length > 0) || result.context) && (
+                <div className="col-span-2 text-muted-foreground">No available details for this record.</div>
+              )}
             </div>
           </details>
         </motion.div>
