@@ -5,7 +5,7 @@ This document outlines the fixes applied to resolve deployment issues with the D
 ## Issues Fixed
 
 ### 1. Static File Path Fallback Logic
-
+s
 **Problem**: The server's static file serving logic was not properly handling different deployment directory structures and was using hardcoded paths relative to `process.cwd()`.
 
 **Solution**: Enhanced the static file path resolution with:
