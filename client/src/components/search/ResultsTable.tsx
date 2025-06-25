@@ -127,7 +127,7 @@ export const ResultsTable = ({ results, loading }: ResultsTableProps) => {
   }
 
   return (
-    <div className="space-y-6 p-4">
+    <div className="space-y-6 p-4 max-h-[70vh] overflow-y-auto">
       <p className="text-sm text-muted-foreground italic text-center mb-4">
         {translations.confidentialNotice[language]}
       </p>
