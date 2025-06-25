@@ -132,7 +132,6 @@ export const ResultsTable = ({ results, loading }: ResultsTableProps) => {
         {translations.confidentialNotice[language]}
       </p>
       {results.map((result, index) => {
-        console.log('ResultsTable individual result:', result);
         // Filter to only display fields that exist and are not empty
         const availableFields = DISPLAY_FIELDS.filter(
           (field) => result[field as keyof typeof result] !== undefined && result[field as keyof typeof result] !== '' && !(Array.isArray(result[field as keyof typeof result]) && (result[field as keyof typeof result] as any[]).length === 0)
@@ -145,11 +144,11 @@ export const ResultsTable = ({ results, loading }: ResultsTableProps) => {
             transition={{ duration: 0.3, delay: index * 0.08 }}
             className="rounded-lg border bg-card text-card-foreground shadow-sm p-4"
           >
-            {/* Only show available fields, or a fallback if none */}
+            {/* Main card: Only show available fields, or a fallback if none */}
             {availableFields.length === 0 ? (
               <div className="text-center text-muted-foreground">No data available</div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
                 {availableFields.map((field) => (
                   <div key={field} className={Array.isArray(result[field as keyof typeof result]) ? 'col-span-2' : ''}>
                     <b>{field}:</b> {Array.isArray(result[field as keyof typeof result]) ? (result[field as keyof typeof result] as any[]).join(', ') : String(result[field as keyof typeof result])}
@@ -157,6 +156,19 @@ export const ResultsTable = ({ results, loading }: ResultsTableProps) => {
                 ))}
               </div>
             )}
+            {/* Details section remains unchanged */}
+            <details className="mt-2">
+              <summary className="cursor-pointer font-semibold text-sm text-blue-600">
+                {translations.details[language]}
+              </summary>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2 text-xs">
+                {Object.entries(result).map(([key, value]) => (
+                  <div key={key} className={typeof value === 'object' && value !== null ? 'col-span-2' : ''}>
+                    <b>{key}:</b> {Array.isArray(value) ? value.join(', ') : typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value)}
+                  </div>
+                ))}
+              </div>
+            </details>
           </motion.div>
         );
       })}
