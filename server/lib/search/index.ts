@@ -10,14 +10,25 @@ export interface SearchResult {
   index: string;
   content?: string;
   name?: string;
+  first_name?: string;
+  last_name?: string;
   phone?: string;
+  email?: string;
+  birthdate?: string;
+  gender?: string;
+  locale?: string;
+  city?: string;
   location?: string;
+  location2?: string;
   link?: string;
-  // Enhanced fields for richer data presentation
+  link2?: string;
+  protocol?: string;
+  social_link?: string;
   timestamp?: string;
   fileType?: string;
   fileName?: string;
   extractionConfidence?: string;
+  exposed?: string[];
 }
 
 /**
@@ -182,7 +193,8 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
       const {
         name, phone, email, username, full_name, dob, gender, location, city, country,
         profile_url, link, password, password_hash, ip_address, device, source, breach_date,
-        timestamp, fileType, fileName, extractionConfidence
+        timestamp, fileType, fileName, extractionConfidence,
+        first_name, last_name, birthdate, locale, location2, link2, protocol, social_link
       } = hit._source || {};
       const highlights = Object.values(hit.highlight || {})
         .flat()
@@ -217,12 +229,22 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
         email,
         username,
         full_name,
+        first_name,
+        last_name,
         phone,
+        birthdate,
+        gender,
+        locale,
+        city,
+        location: location || city || country || '',
+        location2,
+        link,
+        link2,
+        protocol,
+        social_link,
         password,
         password_hash,
         dob,
-        gender,
-        location: location || city || country || '',
         profile_url: profile_url || link || '',
         ip_address,
         device,

@@ -97,7 +97,55 @@ function extractFieldObjectsFromContent(content) {
   return results;
 }
 
+async function setupTargetIndex() {
+  // Delete the target index if it exists
+  try {
+    const resp = await fetch(`${ES_HOST}/${TARGET_INDEX}`, { method: 'HEAD' });
+    if (resp.status === 200) {
+      await fetch(`${ES_HOST}/${TARGET_INDEX}`, { method: 'DELETE' });
+      console.log(`Deleted existing index: ${TARGET_INDEX}`);
+    }
+  } catch (err) {
+    console.warn('Could not check/delete target index:', err);
+  }
+  // Create the target index with a mapping
+  const mapping = {
+    mappings: {
+      properties: {
+        user_id: { type: 'keyword' },
+        phone: { type: 'keyword' },
+        first_name: { type: 'text' },
+        last_name: { type: 'text' },
+        email: { type: 'keyword' },
+        birthdate: { type: 'keyword' },
+        gender: { type: 'keyword' },
+        locale: { type: 'keyword' },
+        city: { type: 'text' },
+        location: { type: 'text' },
+        location2: { type: 'text' },
+        link: { type: 'keyword' },
+        link2: { type: 'keyword' },
+        protocol: { type: 'keyword' },
+        social_link: { type: 'keyword' },
+        source: { type: 'keyword' },
+        timestamp: { type: 'keyword' },
+        fileType: { type: 'keyword' },
+        fileName: { type: 'keyword' },
+        extractionConfidence: { type: 'keyword' },
+        context: { type: 'text' }
+      }
+    }
+  };
+  await fetch(`${ES_HOST}/${TARGET_INDEX}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(mapping)
+  });
+  console.log(`Created index: ${TARGET_INDEX} with mapping.`);
+}
+
 async function migrate() {
+  await setupTargetIndex();
   let total = 0;
   let scrollId = null;
   try {
