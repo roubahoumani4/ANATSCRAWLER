@@ -10,6 +10,8 @@ interface SearchResult {
   highlights: string[];
   source: string;
   name?: string;
+  first_name?: string;
+  last_name?: string;
   phone?: string;
   location?: string;
   link?: string;
@@ -94,7 +96,7 @@ const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
                         {result.score.toFixed(2)}
                       </span>
                     </td>
-                    <td className="p-3 border-b border-coolWhite font-semibold text-cyan-300 group-hover:text-white transition-colors">{result.name || '-'}</td>
+                    <td className="p-3 border-b border-coolWhite font-semibold text-cyan-300 group-hover:text-white transition-colors">{result.name || [result.first_name, result.last_name].filter(Boolean).join(' ') || '-'}</td>
                     <td className="p-3 border-b border-coolWhite font-mono text-yellow-200 group-hover:text-white transition-colors">{result.phone || '-'}</td>
                     <td className="p-3 border-b border-coolWhite text-purple-200 group-hover:text-white transition-colors">{result.location || '-'}</td>
                     <td className="p-3 border-b border-coolWhite">

@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 // migrate_chunks_to_structured.js
 // REST-based migration for Elasticsearch 9.x with debug logging
-// Requires: npm install node-fetch@2
-
-const fetch = require('node-fetch');
+// Uses native fetch (Node.js 18+)
 
 const ES_HOST = process.env.ES_HOST || 'http://192.168.1.110:9200';
 const SOURCE_INDEX = 'filesearchdb.fs.chunks';
@@ -18,18 +16,17 @@ function parseField1And2(field1, field2) {
   const parts1 = field1.split(',');
   const parts2 = field2.split(',');
 
-  // Map the first 8 fields
+  // Map the first 8 fields with better defaults
   const doc = {
-    user_id: cleanValue(parts1[0]),
-    phone: cleanValue(parts1[1]),
-    first_name: cleanValue(parts1[2]),
-    last_name: cleanValue(parts1[3]),
-    email: cleanValue(parts1[4]),
-    birthdate: cleanValue(parts1[5]),
-    gender: cleanValue(parts1[6]),
-    locale: cleanValue(parts1[7]),
-    city: cleanValue(parts1[8]),
-    // fallback for city if not present
+    user_id: cleanValue(parts1[0]) || "Unknown",
+    phone: cleanValue(parts1[1]) || "Unknown",
+    first_name: cleanValue(parts1[2]) || "Unknown",
+    last_name: cleanValue(parts1[3]) || "Unknown",
+    email: cleanValue(parts1[4]) || "Unknown",
+    birthdate: cleanValue(parts1[5]) || "Unknown",
+    gender: cleanValue(parts1[6]) || "Unknown",
+    locale: cleanValue(parts1[7]) || "Unknown",
+    city: cleanValue(parts1[8]) || "Unknown",
   };
 
   // Find and extract location(s) and link(s)
@@ -37,17 +34,15 @@ function parseField1And2(field1, field2) {
   for (let i = 9; i < parts1.length; ++i) {
     const val = cleanValue(parts1[i]);
     if (val.startsWith('Location*')) {
-      // Next value is location
       if (i + 1 < parts1.length) {
-        if (!location) location = cleanValue(parts1[i + 1]);
-        else location2 = cleanValue(parts1[i + 1]);
+        if (!location) location = cleanValue(parts1[i + 1]) || "Unknown";
+        else location2 = cleanValue(parts1[i + 1]) || "Unknown";
         i++;
       }
     } else if (val.startsWith('link*')) {
-      // Next value is link/protocol
       if (i + 1 < parts1.length) {
-        if (!link) link = cleanValue(parts1[i + 1]);
-        else link2 = cleanValue(parts1[i + 1]);
+        if (!link) link = cleanValue(parts1[i + 1]) || "No link";
+        else link2 = cleanValue(parts1[i + 1]) || "No link";
         i++;
       }
       if (i + 1 < parts1.length && (parts1[i + 1] === 'https' || parts1[i + 1] === 'http')) {
@@ -63,24 +58,31 @@ function parseField1And2(field1, field2) {
     social_link = 'https:' + parts2[0];
   }
 
-  // Use social_link as main link if link is just 'https' or 'http' or empty
-  const main_link = (link && link !== "https" && link !== "http") ? link : social_link;
+  const main_link = (link && link !== "https" && link !== "http") ? link : (social_link || "No link");
 
   // Compose structured doc with all required fields and a context field
   return {
     ...doc,
-    location,
-    location2,
+    location: location || "Unknown",
+    location2: location2 || "Unknown",
     link: main_link,
-    link2,
-    protocol,
-    social_link,
+    link2: link2 || "No link",
+    protocol: protocol || "Unknown",
+    social_link: social_link || "No link",
     source: "Facebook",
-    timestamp: doc.birthdate || "N/A",
+    timestamp: doc.birthdate || "Unknown",
     fileType: "profile",
     fileName: doc.user_id ? `${doc.user_id}.json` : "Unknown",
     extractionConfidence: "High",
-    context: [doc.first_name, doc.last_name, location, main_link, social_link].filter(Boolean).join(" | ")
+    context: [
+      doc.first_name,
+      doc.last_name,
+      doc.gender,
+      doc.city,
+      location,
+      main_link,
+      social_link
+    ].filter(Boolean).join(" | ")
   };
 }
 
