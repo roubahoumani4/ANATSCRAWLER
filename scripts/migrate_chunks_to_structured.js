@@ -63,15 +63,24 @@ function parseField1And2(field1, field2) {
     social_link = 'https:' + parts2[0];
   }
 
-  // Compose structured doc
+  // Use social_link as main link if link is just 'https' or 'http' or empty
+  const main_link = (link && link !== "https" && link !== "http") ? link : social_link;
+
+  // Compose structured doc with all required fields and a context field
   return {
     ...doc,
     location,
     location2,
-    link,
+    link: main_link,
     link2,
     protocol,
-    social_link
+    social_link,
+    source: "Facebook",
+    timestamp: doc.birthdate || "N/A",
+    fileType: "profile",
+    fileName: doc.user_id ? `${doc.user_id}.json` : "Unknown",
+    extractionConfidence: "High",
+    context: [doc.first_name, doc.last_name, location, main_link, social_link].filter(Boolean).join(" | ")
   };
 }
 

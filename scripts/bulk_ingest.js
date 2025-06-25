@@ -8,7 +8,7 @@ const client = new Client({ node: ELASTIC_URL });
 
 async function bulkIndex(docs, index) {
   const body = docs.flatMap(doc => [{ index: { _index: index } }, doc]);
-  const { body: bulkResponse } = await client.bulk({ refresh: true, body });
+  const bulkResponse = await client.bulk({ refresh: true, body });
   if (bulkResponse.errors) {
     console.error('Bulk indexing errors:', bulkResponse.errors);
   } else {

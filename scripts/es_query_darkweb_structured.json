@@ -1,0 +1,5 @@
+GET /darkweb_structured/_search
+{
+  "size": 10,
+  "query": { "match_all": {} }
+}

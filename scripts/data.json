@@ -2,19 +2,29 @@
   {
     "user_id": "100024137495325",
     "phone": "+96171792906",
-    "email": "example@email.com",
+    "name": "John Doe",
     "gender": "male",
-    "city": "Beirut",
+    "language": "English",
     "location": "Saint-Georges",
-    "link": "https://facebook.com/100024137495325"
+    "link": "https://facebook.com/100024137495325",
+    "source": "Facebook",
+    "timestamp": "2025-06-25T12:00:00Z",
+    "fileType": "profile",
+    "fileName": "john_doe_profile.json",
+    "extractionConfidence": "High"
   },
   {
     "user_id": "100024137495326",
     "phone": "+96171234567",
-    "email": "another@email.com",
+    "name": "Jane Smith",
     "gender": "female",
-    "city": "Tripoli",
+    "language": "Arabic",
     "location": "Downtown",
-    "link": "https://facebook.com/100024137495326"
+    "link": "https://facebook.com/100024137495326",
+    "source": "Facebook",
+    "timestamp": "2025-06-25T13:00:00Z",
+    "fileType": "profile",
+    "fileName": "jane_smith_profile.json",
+    "extractionConfidence": "Medium"
   }
 ]
