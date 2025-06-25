@@ -439,17 +439,6 @@ const LandingPage = () => {
                       {isSearching ? "SEARCHING..." : "SEARCH"}
                     </motion.button>
                   </div>
-
-                  <div className="mt-4 flex items-center justify-center space-x-6 text-sm font-mono">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                      <span className="text-blue-400">ELASTICSEARCH CONNECTED</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse"></div>
-                      <span className="text-indigo-400">TOR NETWORK READY</span>
-                    </div>
-                  </div>
                 </motion.div>
               </div>
             </motion.div>
