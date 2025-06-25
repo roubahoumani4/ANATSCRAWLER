@@ -105,6 +105,16 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
                   tie_breaker: 0.3,
                   boost: 2.0
                 }
+              },
+              // Add a wildcard search for the link field for substring matching
+              {
+                wildcard: {
+                  link: {
+                    value: `*${query.toLowerCase()}*`,
+                    case_insensitive: true,
+                    boost: 2.5
+                  }
+                }
               }
             ],
             minimum_should_match: 1
