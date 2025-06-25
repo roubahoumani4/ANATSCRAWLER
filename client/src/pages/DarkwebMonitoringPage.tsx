@@ -3,13 +3,7 @@ import { motion } from "framer-motion";
 import { useLanguage } from "@/context/LanguageContext";
 import { Skull, Globe, Shield, AlertTriangle, Eye, Database, Terminal, Activity, Zap, Clock, Search, X } from "lucide-react";
 import BackButton from "@/components/ui/back-button";
-
-interface SearchResult {
-  id: string;
-  score: number;
-  snippet: string;
-  type: 'document' | 'user';
-}
+import { ResultsTable } from "@/components/search/ResultsTable";
 
 type LanguageType = "English" | "French" | "Spanish";
 
@@ -17,11 +11,11 @@ const DarkwebMonitoringPage = () => {
   const { language } = useLanguage() as { language: LanguageType };
   const [matrixChars, setMatrixChars] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchResults, setSearchResults] = useState<any[]>([]); // Use unified structure
   const [isSearching, setIsSearching] = useState(false);
   const [searchCount, setSearchCount] = useState(0);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
-  const [selectedResult, setSelectedResult] = useState<SearchResult | null>(null);
+  const [selectedResult, setSelectedResult] = useState<any | null>(null);
 
   useEffect(() => {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?".split("");
@@ -123,7 +117,7 @@ const DarkwebMonitoringPage = () => {
     }
   };
 
-  const handleViewInfo = (result: SearchResult) => {
+  const handleViewInfo = (result: any) => {
     // Check if user exceeded search limit (assuming user is not subscribed for now)
     if (searchCount > 5) {
       setShowSubscriptionModal(true);
@@ -344,63 +338,7 @@ const DarkwebMonitoringPage = () => {
 
         {/* Search Results Section */}
         {searchResults.length > 0 && (
-          <motion.div
-            className="bg-gradient-to-br from-gray-900/60 to-black/80 border border-gray-700/50 rounded-2xl p-6 backdrop-blur-sm mb-8"
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-          >
-            <h2 className="text-2xl font-bold text-green-400 mb-6 flex items-center">
-              <Search className="w-6 h-6 mr-3" />
-              {t({
-                English: `Search Results Found (${searchResults.length})`,
-                French: `Résultats trouvés (${searchResults.length})`,
-                Spanish: `Resultados encontrados (${searchResults.length})`
-              })}
-            </h2>
-            
-            <div className="space-y-4">
-              {searchResults.map((result, index) => (
-                <motion.div
-                  key={result.id}
-                  className="bg-white/5 backdrop-blur-lg rounded-lg p-6 border border-purple-500/20"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: index * 0.1 }}
-                >
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="text-purple-400 font-mono text-sm">
-                          Match Score: {Math.round(result.score * 100)}%
-                        </div>
-                      </div>
-                      
-                      <div 
-                        className="text-gray-200 font-mono text-sm mt-2"
-                        dangerouslySetInnerHTML={{ __html: result.snippet }}
-                      />
-                    </div>
-                    
-                    <button
-                      onClick={() => handleViewInfo(result)}
-                      className="ml-4 p-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 transition-colors"
-                    >
-                      <Eye className="w-5 h-5" />
-                    </button>
-                  </div>
-
-                  <div className="text-gray-400 text-xs">
-                    ID: {result.id.slice(0, 8)}...
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-            
-            <div className="mt-4 text-sm text-gray-400">
-              Search limit: {searchCount}/5 (Unsubscribed users)
-            </div>
-          </motion.div>
+          <ResultsTable results={searchResults} loading={isSearching} />
         )}
 
         {/* Subscription Modal */}
@@ -459,10 +397,10 @@ const DarkwebMonitoringPage = () => {
 
               <div className="space-y-4">
                 <div className="bg-black/50 rounded-lg p-4">
-                  <div 
-                    className="text-gray-200 font-mono text-sm whitespace-pre-wrap"
-                    dangerouslySetInnerHTML={{ __html: selectedResult.snippet }}
-                  />
+                  <div className="text-gray-200 font-mono text-sm whitespace-pre-wrap">
+                    {/* Removed snippet rendering, using unified structure */}
+                    {JSON.stringify(selectedResult, null, 2)}
+                  </div>
                 </div>
 
                 <div className="text-gray-400 text-sm">
