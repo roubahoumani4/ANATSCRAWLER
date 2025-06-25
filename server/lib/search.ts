@@ -38,84 +38,16 @@ export async function performFuzzySearch(query: string, elasticsearchUri: string
         query: {
           bool: {
             should: [
-              {
-                multi_match: {
-                  query,
-                  fields: [
-                    "content",
-                    "fileName",
-                    "source",
-                    "context",
-                    "name",
-                    "first_name",
-                    "last_name",
-                    "phone",
-                    "email",
-                    "location",
-                    "link",
-                    "fileType",
-                    "extractionConfidence"
-                  ],
-                  fuzziness: "AUTO",
-                  prefix_length: 2,
-                  boost: 1.0
-                }
-              },
-              {
-                multi_match: {
-                  query,
-                  fields: [
-                    "content",
-                    "fileName",
-                    "source",
-                    "context",
-                    "name",
-                    "first_name",
-                    "last_name",
-                    "phone",
-                    "email",
-                    "location",
-                    "link",
-                    "fileType",
-                    "extractionConfidence"
-                  ],
-                  type: "phrase_prefix",
-                  boost: 1.5
-                }
-              },
-              {
-                multi_match: {
-                  query,
-                  fields: [
-                    "content^2",
-                    "fileName^3",
-                    "source^1.5",
-                    "context^2",
-                    "name^2",
-                    "first_name^2",
-                    "last_name^2",
-                    "phone^2",
-                    "email^2",
-                    "location^2",
-                    "link^2",
-                    "fileType^2",
-                    "extractionConfidence^2"
-                  ],
-                  type: "best_fields",
-                  tie_breaker: 0.3,
-                  boost: 2.0
-                }
-              },
-              // Add a wildcard search for the link.keyword field for substring matching
-              {
+              // Only use wildcard queries for strict substring matching on all relevant fields
+              ...["content", "fileName", "source", "context", "name", "first_name", "last_name", "phone", "email", "location", "link", "fileType", "extractionConfidence"].map(field => ({
                 wildcard: {
-                  "link": {
+                  [field]: {
                     value: `*${query}*`,
                     case_insensitive: true,
-                    boost: 3.0
+                    boost: 2.0
                   }
                 }
-              }
+              }))
             ],
             minimum_should_match: 1
           }
