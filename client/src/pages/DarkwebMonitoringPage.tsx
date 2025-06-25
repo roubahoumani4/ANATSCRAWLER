@@ -337,6 +337,7 @@ const DarkwebMonitoringPage = () => {
         </motion.div>
 
         {/* Search Results Section */}
+        {(() => { console.log("DarkwebMonitoringPage searchResults:", searchResults); return null; })()}
         {searchResults.length > 0 && (
           <ResultsTable results={searchResults} loading={isSearching} />
         )}
