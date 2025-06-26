@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { useLocation } from "wouter";
-import { Shield, Lock, User, AlertCircle } from "lucide-react";
+import { Shield, Lock, User, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { fadeIn, itemVariants } from "@/utils/animations";
+import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 
 const SignupPage = () => {
@@ -13,17 +13,21 @@ const SignupPage = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const translations = {
-    title: "Create your ANAT Security account",
-    subtitle: "Sign up to access your dashboard",
-    usernameLabel: "Username or Email",
-    passwordLabel: "Password",
-    confirmPasswordLabel: "Confirm Password",
-    signupButton: "Sign Up",
+    title: "SYSTEM ACCESS",
+    subtitle: "DARKSCRAWLER SECURITY FRAMEWORK",
+    operatorId: "OPERATOR ID",
+    accessCode: "ACCESS CODE",
+    confirmAccessCode: "CONFIRM ACCESS CODE",
+    authenticate: "AUTHENTICATE",
+    signup: "SIGN UP",
     loading: "Creating account...",
     footer: "Advanced Data Discovery & Security Platform",
-    loginLink: "Already have an account? Login"
+    loginLink: "Already have an account? Login",
+    signupLink: "Need an account? Sign up"
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -59,35 +63,35 @@ const SignupPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-jetBlack flex flex-col justify-center items-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-[#101726] to-[#181f2c] flex flex-col justify-center items-center px-4">
       <motion.div
-        className="max-w-md w-full p-8 bg-darkGray rounded-xl shadow-xl"
+        className="max-w-md w-full p-8 bg-[#192132] rounded-xl shadow-xl"
         variants={fadeIn}
         initial="hidden"
         animate="visible"
       >
         <div className="text-center mb-8">
           <motion.div
-            className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-crimsonRed/10 mb-4"
+            className="inline-flex items-center justify-center h-14 w-14 rounded-lg bg-[#3b47fa] mb-4"
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.5 }}
           >
-            <Shield className="h-8 w-8 text-crimsonRed" />
+            <Shield className="h-8 w-8 text-white" />
           </motion.div>
           <motion.h1
-            className="text-2xl font-bold text-coolWhite mb-2"
+            className="text-2xl font-bold text-white mb-2 uppercase tracking-wide"
             variants={itemVariants}
           >
             {translations.title}
           </motion.h1>
-          <motion.p className="text-gray-400" variants={itemVariants}>
+          <motion.p className="text-[#b0b8c9] text-sm tracking-wide mb-2" variants={itemVariants}>
             {translations.subtitle}
           </motion.p>
         </div>
         {error && (
           <motion.div
-            className="bg-red-900/30 border border-red-700 text-coolWhite p-4 rounded-lg mb-6 flex items-start"
+            className="bg-red-900/30 border border-red-700 text-white p-4 rounded-lg mb-6 flex items-start"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
@@ -98,59 +102,78 @@ const SignupPage = () => {
         )}
         <motion.form onSubmit={handleSubmit} variants={fadeIn}>
           <div className="mb-4">
-            <label className="block text-gray-300 mb-2 text-sm font-medium">
-              {translations.usernameLabel}
+            <label className="block text-[#b0b8c9] mb-2 text-xs font-semibold tracking-wide uppercase">
+              {translations.operatorId}
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <User className="h-5 w-5 text-gray-500" />
+                <User className="h-5 w-5 text-[#b0b8c9]" />
               </div>
               <input
                 type="text"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                className="pl-10 w-full py-3 bg-midGray border border-gray-700 rounded-lg text-coolWhite focus:outline-none focus:ring-2 focus:ring-crimsonRed"
+                className="pl-10 w-full py-3 bg-[#232b3b] border border-[#232b3b] rounded-lg text-white placeholder-[#b0b8c9] focus:outline-none focus:ring-2 focus:ring-[#3b47fa]"
+                placeholder="Enter your operator ID"
                 required
               />
             </div>
           </div>
           <div className="mb-4">
-            <label className="block text-gray-300 mb-2 text-sm font-medium">
-              {translations.passwordLabel}
+            <label className="block text-[#b0b8c9] mb-2 text-xs font-semibold tracking-wide uppercase">
+              {translations.accessCode}
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Lock className="h-5 w-5 text-gray-500" />
+                <Lock className="h-5 w-5 text-[#b0b8c9]" />
               </div>
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="pl-10 w-full py-3 bg-midGray border border-gray-700 rounded-lg text-coolWhite focus:outline-none focus:ring-2 focus:ring-crimsonRed"
+                className="pl-10 pr-10 w-full py-3 bg-[#232b3b] border border-[#232b3b] rounded-lg text-white placeholder-[#b0b8c9] focus:outline-none focus:ring-2 focus:ring-[#3b47fa]"
+                placeholder="Enter your access code"
                 required
               />
+              <button
+                type="button"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[#b0b8c9] hover:text-white"
+                onClick={() => setShowPassword((v) => !v)}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
             </div>
           </div>
           <div className="mb-6">
-            <label className="block text-gray-300 mb-2 text-sm font-medium">
-              {translations.confirmPasswordLabel}
+            <label className="block text-[#b0b8c9] mb-2 text-xs font-semibold tracking-wide uppercase">
+              {translations.confirmAccessCode}
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Lock className="h-5 w-5 text-gray-500" />
+                <Lock className="h-5 w-5 text-[#b0b8c9]" />
               </div>
               <input
-                type="password"
+                type={showConfirmPassword ? "text" : "password"}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="pl-10 w-full py-3 bg-midGray border border-gray-700 rounded-lg text-coolWhite focus:outline-none focus:ring-2 focus:ring-crimsonRed"
+                className="pl-10 pr-10 w-full py-3 bg-[#232b3b] border border-[#232b3b] rounded-lg text-white placeholder-[#b0b8c9] focus:outline-none focus:ring-2 focus:ring-[#3b47fa]"
+                placeholder="Confirm your access code"
                 required
               />
+              <button
+                type="button"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[#b0b8c9] hover:text-white"
+                onClick={() => setShowConfirmPassword((v) => !v)}
+                tabIndex={-1}
+              >
+                {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
             </div>
           </div>
           <motion.button
             type="submit"
-            className="w-full py-3 bg-crimsonRed text-coolWhite rounded-lg font-medium transition-colors hover:bg-opacity-90 focus:outline-none focus:ring-2 focus:ring-crimsonRed focus:ring-offset-2 focus:ring-offset-darkGray disabled:bg-opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3 bg-[#3b47fa] text-white rounded-lg font-semibold text-base tracking-wide transition-colors hover:bg-[#2d379c] focus:outline-none focus:ring-2 focus:ring-[#3b47fa] focus:ring-offset-2 focus:ring-offset-[#192132] disabled:bg-opacity-50 disabled:cursor-not-allowed"
             disabled={isLoading}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
@@ -164,7 +187,7 @@ const SignupPage = () => {
                 {translations.loading}
               </span>
             ) : (
-              translations.signupButton
+              translations.signup
             )}
           </motion.button>
         </motion.form>
@@ -172,14 +195,14 @@ const SignupPage = () => {
           <button
             type="button"
             onClick={() => setLocation("/login")}
-            className="text-crimsonRed hover:text-coolWhite text-sm"
+            className="text-[#3b47fa] hover:text-white text-sm font-medium"
           >
             {translations.loginLink}
           </button>
         </div>
       </motion.div>
       <motion.div
-        className="mt-8 text-center text-gray-500 text-sm"
+        className="mt-8 text-center text-[#b0b8c9] text-sm"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5 }}
