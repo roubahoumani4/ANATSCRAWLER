@@ -4,6 +4,7 @@ import { registerRoutes } from "./routes";
 import { mongodb } from "./lib/mongodb";
 import path from 'path';
 import cors from 'cors';
+import cookieParser from "cookie-parser";
 
 // Simple environment loading that works with bundlers
 if (process.env.NODE_ENV !== 'production') {
@@ -20,6 +21,9 @@ const app = express();
 
 // Initialize login attempts tracking for rate limiting
 app.locals.loginAttempts = {};
+
+// Use cookie parser for reading cookies
+app.use(cookieParser());
 
 // Basic middleware
 app.use(express.json());
@@ -39,9 +43,9 @@ app.use(express.static(path.join(__dirname, '../client/dist'), {
   }
 }));
 
-// Use more permissive CORS configuration
+// Use more restrictive CORS configuration for production
 const corsOptions = {
-  origin: true, // Allow all origins
+  origin: ["https://horus.anatsecurity.fr"],
   credentials: true
 };
 

@@ -155,9 +155,10 @@ export async function registerRoutes(app: Express): Promise<void> {
       const token = jwt.sign({ _id: user._id, username: user.username }, JWT_SECRET, { expiresIn: TOKEN_EXPIRATION });
       res.cookie("token", token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        maxAge: 24 * 60 * 60 * 1000
+        secure: true,
+        sameSite: "none",
+        maxAge: 24 * 60 * 60 * 1000,
+        domain: ".anatsecurity.fr"
       });
       // Do not return password or sensitive info, and do not return token in body
       return res.json({ success: true, user: { username: cleanUsername, _id: user._id } });
