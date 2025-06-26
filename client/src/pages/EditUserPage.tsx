@@ -31,7 +31,6 @@ const EditUserPage = () => {
   // Profile Information State
   const [profileData, setProfileData] = useState({
     fullName: user?.fullName || "",
-    email: user?.email || "",
     organization: user?.organization || "",
     department: user?.department || "",
     jobPosition: user?.jobPosition || ""
@@ -257,18 +256,6 @@ const EditUserPage = () => {
                     onChange={(e) => setProfileData(prev => ({ ...prev, fullName: e.target.value }))}
                     className="bg-darkGray border-gray-600 text-coolWhite focus:border-gray-400"
                     placeholder="Enter your full name"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-coolWhite">Email Address</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={profileData.email}
-                    onChange={(e) => setProfileData(prev => ({ ...prev, email: e.target.value }))}
-                    className="bg-darkGray border-gray-600 text-coolWhite focus:border-gray-400"
-                    placeholder="Enter your email address"
                   />
                 </div>
 

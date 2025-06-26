@@ -17,6 +17,7 @@ interface AuthContextProps {
   isAuthenticated: boolean;
   user: User | null;
   login: (identifier: string, password: string, csrfToken?: string) => Promise<void>;
+  logout: () => Promise<void>;
   loading: boolean;
 }
 
@@ -97,12 +98,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const logout = async () => {
+    setLoading(true);
+    try {
+      await fetch("/api/logout", { method: "POST", credentials: "include" });
+      setUser(null);
+      setLocation("/");
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out",
+        variant: "default"
+      });
+    } catch (error) {
+      toast({
+        title: "Logout failed",
+        description: "An error occurred during logout.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
         isAuthenticated: !!user,
         user,
         login,
+        logout,
         loading
       }}
     >

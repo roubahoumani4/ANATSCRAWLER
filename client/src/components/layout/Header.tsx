@@ -93,7 +93,6 @@ const Header = () => {
                   </div>
                   <div>
                     <h3 className="text-cyan-400 font-bold text-lg">{user?.fullName || user?.username}</h3>
-                    <p className="text-gray-300 text-sm">{user?.email || "No email provided"}</p>
                   </div>
                 </div>
                 <div className="border-t border-gray-600 pt-3">

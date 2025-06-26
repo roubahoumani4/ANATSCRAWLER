@@ -21,7 +21,6 @@ const EditProfilePage = () => {
   // Form states
   const [personalInfo, setPersonalInfo] = useState({
     fullName: user?.fullName || "",
-    email: user?.email || "",
     organization: user?.organization || "",
     department: user?.department || "",
     jobPosition: user?.jobPosition || ""
@@ -256,22 +255,6 @@ const EditProfilePage = () => {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="email" className="text-cyan-400">Email Address</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={personalInfo.email}
-                      onChange={(e) => handlePersonalInfoChange("email", e.target.value)}
-                      className="bg-slate-700 border-gray-600 text-white"
-                      placeholder="Enter your email address"
-                    />
-                  </div>
-                </div>
-
-                <Separator className="bg-gray-700" />
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
                     <Label htmlFor="organization" className="text-cyan-400">Organization</Label>
                     <Input
                       id="organization"
@@ -281,7 +264,11 @@ const EditProfilePage = () => {
                       placeholder="Enter your organization"
                     />
                   </div>
-                  
+                </div>
+
+                <Separator className="bg-gray-700" />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="department" className="text-cyan-400">Department</Label>
                     <Input
@@ -292,17 +279,17 @@ const EditProfilePage = () => {
                       placeholder="Enter your department"
                     />
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="jobPosition" className="text-cyan-400">Job Position</Label>
-                  <Input
-                    id="jobPosition"
-                    value={personalInfo.jobPosition}
-                    onChange={(e) => handlePersonalInfoChange("jobPosition", e.target.value)}
-                    className="bg-slate-700 border-gray-600 text-white"
-                    placeholder="Enter your job position"
-                  />
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="jobPosition" className="text-cyan-400">Job Position</Label>
+                    <Input
+                      id="jobPosition"
+                      value={personalInfo.jobPosition}
+                      onChange={(e) => handlePersonalInfoChange("jobPosition", e.target.value)}
+                      className="bg-slate-700 border-gray-600 text-white"
+                      placeholder="Enter your job position"
+                    />
+                  </div>
                 </div>
 
                 <Button

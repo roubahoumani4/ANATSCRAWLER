@@ -27,12 +27,13 @@ import {
   Lock,
   Clock,
   User,
+  LogOut,
 } from "lucide-react";
 
 const Sidebar = () => {
   const [location] = useLocation();
   const { theme, toggleTheme } = useTheme();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [expandedModules, setExpandedModules] = useState<{[key: string]: boolean}>({});
@@ -314,7 +315,8 @@ const Sidebar = () => {
             </div>
           </div>
 
-          {!collapsed && user && (
+          {/* User Info */}
+          {user && (
             <div className="flex items-center px-3 py-2 mt-2 text-sm">
               <div className="w-8 h-8 rounded-full bg-darkGray flex items-center justify-center text-coolWhite">
                 {user.username?.charAt(0).toUpperCase() || "U"}
@@ -325,6 +327,15 @@ const Sidebar = () => {
               </div>
             </div>
           )}
+
+          {/* Logout Button under Settings */}
+          <div
+            className="flex items-center px-3 py-2 text-sm text-coolWhite cursor-pointer hover:bg-crimsonRed rounded-lg mt-2"
+            onClick={logout}
+          >
+            <LogOut size={20} />
+            <span className="ml-3">Logout</span>
+          </div>
         </div>
       </div>
     </motion.div>
