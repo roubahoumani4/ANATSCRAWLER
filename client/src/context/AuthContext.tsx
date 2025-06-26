@@ -101,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     setUser(null);
     await fetch("/api/logout", { method: "POST", credentials: "include" });
-    setTimeout(() => setLocation("/"), 0); // Ensure state update before redirect
+    window.location.href = "/"; // Force full reload to landing page
     toast({
       title: "Logged out",
       description: "You have been successfully logged out",
