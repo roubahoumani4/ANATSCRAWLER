@@ -234,15 +234,10 @@ const EnhancedLoginPage = () => {
         </motion.div>
 
         {/* Footer */}
-        <motion.div
-          className="mt-8 text-center text-gray-400 text-sm"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-        >
+        <div className="mt-8 text-center text-gray-400 text-sm">
           <p>Advanced Data Discovery & Security Platform</p>
           <p className="mt-2">© {new Date().getFullYear()} ANAT Security</p>
-        </motion.div>
+        </div>
       </div>
     </div>
   );
