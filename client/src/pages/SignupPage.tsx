@@ -15,6 +15,7 @@ const SignupPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [passwordFeedback, setPasswordFeedback] = useState("");
 
   useEffect(() => {
     setIsVisible(true);
@@ -84,6 +85,26 @@ const SignupPage = () => {
       setIsLoading(false);
     }
   };
+
+  function isStrongPassword(password: string): boolean {
+    return (
+      password.length >= 8 &&
+      /[a-z]/.test(password) &&
+      /[A-Z]/.test(password) &&
+      /\d/.test(password) &&
+      /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)
+    );
+  }
+
+  useEffect(() => {
+    if (password.length === 0) {
+      setPasswordFeedback("");
+    } else if (!isStrongPassword(password)) {
+      setPasswordFeedback("Password must be at least 8 characters and include uppercase, lowercase, number, and special character.");
+    } else {
+      setPasswordFeedback("");
+    }
+  }, [password]);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white relative overflow-hidden flex flex-col items-center justify-center">
@@ -190,17 +211,13 @@ const SignupPage = () => {
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-10 pr-12 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-white"
+                    className="w-full pl-10 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-white"
                     required
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
                 </div>
+                {passwordFeedback && (
+                  <div className="text-xs text-red-400 mt-1">{passwordFeedback}</div>
+                )}
               </div>
               {/* Confirm Password Field */}
               <div>
