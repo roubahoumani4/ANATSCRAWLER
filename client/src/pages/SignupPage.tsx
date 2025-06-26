@@ -50,15 +50,14 @@ const SignupPage = () => {
       });
       const data = await response.json();
       if (!response.ok) {
-        console.log('Signup error response:', data); // DEBUG LOG
-        if (data.errors && Array.isArray(data.errors)) {
-          // Validation errors from backend
-          const passwordError = data.errors.find((e: any) => e.param === "password");
-          if (passwordError) {
-            setError("Password must be at least 8 characters and include uppercase, lowercase, number, and special character.");
-            setIsLoading(false);
-            return;
-          }
+        // Always show password error if backend error message matches
+        if (
+          (data.errors && Array.isArray(data.errors) && data.errors.find((e: any) => e.param === "password")) ||
+          (typeof data.error === "string" && data.error.includes("Password must be at least 8 characters"))
+        ) {
+          setError("Password must be at least 8 characters and include uppercase, lowercase, number, and special character.");
+          setIsLoading(false);
+          return;
         }
         setError(data.error || "Signup failed");
         setIsLoading(false);
