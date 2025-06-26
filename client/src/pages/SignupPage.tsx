@@ -54,7 +54,7 @@ const SignupPage = () => {
           // Validation errors from backend
           const passwordError = data.errors.find((e: any) => e.param === "password");
           if (passwordError) {
-            setError("Password must be at least 8 characters and include uppercase, lowercase, number, and special character.");
+            setError(passwordError.msg || "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.");
             setIsLoading(false);
             return;
           }
