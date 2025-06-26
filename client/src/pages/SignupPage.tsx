@@ -50,6 +50,7 @@ const SignupPage = () => {
       });
       const data = await response.json();
       if (!response.ok) {
+        console.log('Signup error response:', data); // DEBUG LOG
         if (data.errors && Array.isArray(data.errors)) {
           // Validation errors from backend
           const passwordError = data.errors.find((e: any) => e.param === "password");
@@ -59,7 +60,6 @@ const SignupPage = () => {
             return;
           }
         }
-        // If error is not password, show generic error
         setError(data.error || "Signup failed");
         setIsLoading(false);
         return;
