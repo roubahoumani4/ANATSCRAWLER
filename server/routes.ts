@@ -66,8 +66,11 @@ export async function registerRoutes(app: Express): Promise<void> {
     (app.locals as any).loginAttempts = {};
   }
   app.post("/api/login", [
-    body("username").trim().notEmpty().withMessage("Username is required"),
-    body("password").isLength({ min: 6 }).withMessage("Password must be at least 6 characters")
+    body("username").trim().notEmpty().withMessage("Username is required").customSanitizer(v => v.toLowerCase()),
+    body("password")
+      .isLength({ min: 8 })
+      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).+$/)
+      .withMessage("Password must be at least 8 characters and include uppercase, lowercase, number, and special character")
   ], async (req: Request, res: Response) => {
     const ip = String(req.ip);
     const now = Date.now();
@@ -85,7 +88,7 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
     const { username, password } = req.body;
     try {
-      // Find user
+      // Find user (normalized username)
       const userResult = await mongodb.findUsers({ filters: { username } });
       if (!userResult.success || !userResult.users || userResult.users.length === 0) {
         // Generic error to prevent user enumeration
@@ -98,6 +101,10 @@ export async function registerRoutes(app: Express): Promise<void> {
         // Generic error to prevent user enumeration
         return res.status(401).json({ error: "Invalid username or password" });
       }
+      // Update lastLogin
+      if (user._id) {
+        await mongodb.updateUser(user._id.toString(), { lastLogin: new Date() });
+      }
       // Issue JWT
       const token = jwt.sign({ _id: user._id, username: user.username }, JWT_SECRET, { expiresIn: TOKEN_EXPIRATION });
       // Do not return password or sensitive info
@@ -109,7 +116,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   // Signup endpoint - public
   app.post("/api/signup", [
-    body("username").trim().notEmpty().withMessage("Username is required"),
+    body("username").trim().notEmpty().withMessage("Username is required").customSanitizer(v => v.toLowerCase()),
     body("password")
       .isLength({ min: 8 })
       .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).+$/)
@@ -121,7 +128,7 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
     const { username, password } = req.body;
     try {
-      // Check if user already exists
+      // Check if user already exists (normalized username)
       const existing = await mongodb.findUsers({ filters: { username } });
       if (existing.success && existing.users && existing.users.length > 0) {
         return res.status(409).json({ error: "Username already exists" });

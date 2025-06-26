@@ -103,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ identifier, password })
+        body: JSON.stringify({ username: identifier.toLowerCase(), password })
       });
       
       if (!response.ok) {
