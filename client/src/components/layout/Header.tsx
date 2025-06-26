@@ -6,7 +6,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useTheme } from "@/context/ThemeContext";
 
 const Header = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { formatDate, timezone } = useLanguage();
   const { theme, toggleTheme } = useTheme();
   const [location, navigate] = useLocation();
@@ -52,11 +52,6 @@ const Header = () => {
     navigate(path);
     setDropdownOpen(false);
     setSettingsOpen(false);
-  };
-
-  const handleLogout = () => {
-    logout();
-    setDropdownOpen(false);
   };
 
   const dropdownVariants = {
@@ -229,13 +224,6 @@ const Header = () => {
                   <span className="toggle-slider"></span>
                 </label>
               </div>
-
-              <button 
-                className="dropdown-item w-full text-left py-2 px-3 hover:bg-crimsonRed hover:text-coolWhite text-coolWhite"
-                onClick={handleLogout}
-              >
-                Logout
-              </button>
             </motion.div>
           )}
         </AnimatePresence>

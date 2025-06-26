@@ -35,7 +35,6 @@ const translations: Record<string, string> = {
   "nav.websecurity": "Web Security Scanning",
   "nav.users": "Users",
   "nav.settings": "Settings",
-  "nav.logout": "Logout",
   
   // OSINT Framework
   "osint.title": "OSINT Framework",

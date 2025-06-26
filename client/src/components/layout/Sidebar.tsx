@@ -10,7 +10,6 @@ import {
   Users,
   ChevronLeft,
   ChevronRight,
-  LogOut,
   Moon,
   Sun,
   BarChart2,
@@ -33,7 +32,7 @@ import {
 const Sidebar = () => {
   const [location] = useLocation();
   const { theme, toggleTheme } = useTheme();
-  const { logout, user } = useAuth();
+  const { user } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [expandedModules, setExpandedModules] = useState<{[key: string]: boolean}>({});
@@ -312,22 +311,6 @@ const Sidebar = () => {
                   </motion.div>
                 )}
               </AnimatePresence>
-            </div>
-
-            {/* Logout Button */}
-            <div
-              className="flex items-center px-3 py-2 text-sm text-coolWhite cursor-pointer hover:bg-crimsonRed rounded-lg mt-2"
-              onClick={logout}
-            >
-              <LogOut size={20} />
-              <motion.span
-                className="ml-3"
-                variants={labelVariants}
-                animate={collapsed ? "collapsed" : "expanded"}
-                transition={{ duration: 0.2 }}
-              >
-                Logout
-              </motion.span>
             </div>
           </div>
 

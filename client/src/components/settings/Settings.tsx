@@ -12,9 +12,8 @@ const Settings = () => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<"general" | "security" | "connections">("general");
   const [newTimezone, setNewTimezone] = useState(timezone || "UTC");
-  const [autoLogout, setAutoLogout] = useState(30);
   const [notifications, setNotifications] = useState(true);
-  const [elasticsearchUrl, setElasticsearchUrl] = useState("http://192.168.1.110:9200");
+  const [elasticUrl, setElasticUrl] = useState("http://192.168.1.110:9200");
   const [mongoUrl, setMongoUrl] = useState("mongodb://192.168.1.110:27017/anat_security");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -22,83 +21,48 @@ const Settings = () => {
   const translations = {
     settings: {
       English: "Settings",
-      French: "Paramètres",
-      Spanish: "Ajustes"
     },
     general: {
       English: "General",
-      French: "Général",
-      Spanish: "General"
     },
     security: {
       English: "Security",
-      French: "Sécurité",
-      Spanish: "Seguridad"
     },
     connections: {
       English: "Connections",
-      French: "Connexions",
-      Spanish: "Conexiones"
     },
     language: {
       English: "Language",
-      French: "Langue",
-      Spanish: "Idioma"
     },
     theme: {
       English: "Theme",
-      French: "Thème",
-      Spanish: "Tema"
     },
     timezone: {
       English: "Timezone",
-      French: "Fuseau horaire",
-      Spanish: "Zona horaria"
     },
     darkMode: {
       English: "Dark Mode",
-      French: "Mode Sombre",
-      Spanish: "Modo Oscuro"
     },
     lightMode: {
       English: "Light Mode",
-      French: "Mode Clair",
-      Spanish: "Modo Claro"
-    },
-    autoLogout: {
-      English: "Auto Logout (minutes)",
-      French: "Déconnexion Automatique (minutes)",
-      Spanish: "Cierre Automático (minutos)"
     },
     notifications: {
       English: "Enable Notifications",
-      French: "Activer les Notifications",
-      Spanish: "Activar Notificaciones"
     },
     elasticsearchUrl: {
       English: "Elasticsearch URL",
-      French: "URL d'Elasticsearch",
-      Spanish: "URL de Elasticsearch"
     },
     mongoDbUrl: {
       English: "MongoDB URL",
-      French: "URL de MongoDB",
-      Spanish: "URL de MongoDB"
     },
     save: {
       English: "Save Changes",
-      French: "Enregistrer les Modifications",
-      Spanish: "Guardar Cambios"
     },
     saving: {
       English: "Saving...",
-      French: "Enregistrement...",
-      Spanish: "Guardando..."
     },
     saved: {
       English: "Settings saved successfully",
-      French: "Paramètres enregistrés avec succès",
-      Spanish: "Configuración guardada con éxito"
     }
   };
 
@@ -216,28 +180,6 @@ const Settings = () => {
                   <Globe className="h-4 w-4 mr-2" />
                   <span>English</span>
                 </button>
-                <button
-                  onClick={() => changeLanguage("French")}
-                  className={`flex items-center justify-center py-2 px-4 rounded-lg ${
-                    language === "French"
-                      ? "bg-crimsonRed text-coolWhite"
-                      : "bg-midGray text-gray-300 hover:bg-gray-600"
-                  }`}
-                >
-                  <Globe className="h-4 w-4 mr-2" />
-                  <span>Français</span>
-                </button>
-                <button
-                  onClick={() => changeLanguage("Spanish")}
-                  className={`flex items-center justify-center py-2 px-4 rounded-lg ${
-                    language === "Spanish"
-                      ? "bg-crimsonRed text-coolWhite"
-                      : "bg-midGray text-gray-300 hover:bg-gray-600"
-                  }`}
-                >
-                  <Globe className="h-4 w-4 mr-2" />
-                  <span>Español</span>
-                </button>
               </div>
             </div>
 
@@ -299,20 +241,6 @@ const Settings = () => {
             animate="visible"
           >
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                {translations.autoLogout[language as keyof typeof translations.autoLogout]}
-              </label>
-              <input
-                type="number"
-                min="5"
-                max="240"
-                value={autoLogout}
-                onChange={e => setAutoLogout(Number(e.target.value))}
-                className="w-full py-2 px-3 bg-midGray border border-gray-700 rounded-lg text-coolWhite focus:outline-none focus:ring-2 focus:ring-crimsonRed"
-              />
-            </div>
-
-            <div className="mb-6">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-gray-300">
                   {translations.notifications[language as keyof typeof translations.notifications]}
@@ -336,14 +264,10 @@ const Settings = () => {
               <Shield className="h-6 w-6 text-crimsonRed mr-3 mt-0.5 flex-shrink-0" />
               <div>
                 <h3 className="text-sm font-medium text-coolWhite mb-1">
-                  {language === "French" ? "Sécurité Améliorée" : 
-                   language === "Spanish" ? "Seguridad Mejorada" : 
-                   "Enhanced Security"}
+                  Enhanced Security
                 </h3>
                 <p className="text-xs text-gray-400">
-                  {language === "French" ? "Toutes les connexions sont cryptées et sécurisées selon les normes de l'industrie. Vos données sont protégées." : 
-                   language === "Spanish" ? "Todas las conexiones están cifradas y aseguradas según los estándares de la industria. Sus datos están protegidos." : 
-                   "All connections are encrypted and secured to industry standards. Your data is protected."}
+                  All connections are encrypted and secured to industry standards. Your data is protected.
                 </p>
               </div>
             </div>
@@ -361,24 +285,18 @@ const Settings = () => {
               <Database className="h-6 w-6 text-blue-400 mr-3 mt-0.5 flex-shrink-0" />
               <div className="w-full">
                 <h3 className="text-sm font-medium text-coolWhite mb-2">
-                  {language === "French" ? "Statut des Connexions" : 
-                   language === "Spanish" ? "Estado de las Conexiones" : 
-                   "Connection Status"}
+                  Connection Status
                 </h3>
                 <div className="flex justify-between mb-2">
                   <span className="text-xs text-gray-400">Elasticsearch</span>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-green-900 text-green-300">
-                    {language === "French" ? "Connecté" : 
-                     language === "Spanish" ? "Conectado" : 
-                     "Connected"}
+                    Connected
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-xs text-gray-400">MongoDB</span>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-green-900 text-green-300">
-                    {language === "French" ? "Connecté" : 
-                     language === "Spanish" ? "Conectado" : 
-                     "Connected"}
+                    Connected
                   </span>
                 </div>
               </div>
@@ -400,9 +318,7 @@ const Settings = () => {
                 </div>
               </div>
               <p className="mt-1 text-xs text-gray-500">
-                {language === "French" ? "URL actuelle d'Elasticsearch utilisée pour les recherches" : 
-                 language === "Spanish" ? "URL actual de Elasticsearch utilizada para búsquedas" : 
-                 "Current Elasticsearch URL used for searches"}
+                Current Elasticsearch URL used for searches
               </p>
             </div>
 
@@ -422,18 +338,14 @@ const Settings = () => {
                 </div>
               </div>
               <p className="mt-1 text-xs text-gray-500">
-                {language === "French" ? "URL actuelle de MongoDB utilisée pour le stockage des données" : 
-                 language === "Spanish" ? "URL actual de MongoDB utilizada para almacenamiento de datos" : 
-                 "Current MongoDB URL used for data storage"}
+                Current MongoDB URL used for data storage
               </p>
             </div>
 
             <div className="p-4 bg-yellow-900/20 border border-yellow-700/50 rounded-lg flex items-start mb-6">
               <RefreshCw className="h-5 w-5 text-yellow-500 mr-3 mt-0.5 flex-shrink-0" />
               <p className="text-xs text-yellow-200">
-                {language === "French" ? "La modification des URL de connexion nécessitera un redémarrage du serveur pour être appliquée." : 
-                 language === "Spanish" ? "Cambiar las URL de conexión requerirá un reinicio del servidor para que se apliquen." : 
-                 "Changing connection URLs will require a server restart to take effect."}
+                Changing connection URLs will require a server restart to take effect.
               </p>
             </div>
           </motion.div>
