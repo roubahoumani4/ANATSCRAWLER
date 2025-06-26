@@ -117,6 +117,35 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // Signup endpoint - public
+  app.post("/api/signup", [
+    body("username").trim().notEmpty().withMessage("Username is required"),
+    body("password").isLength({ min: 6 }).withMessage("Password must be at least 6 characters")
+  ], async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+    const { username, password } = req.body;
+    try {
+      // Check if user already exists
+      const existing = await mongodb.findUsers({ filters: { username } });
+      if (existing.success && existing.users && existing.users.length > 0) {
+        return res.status(409).json({ error: "Username already exists" });
+      }
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
+      // Create user
+      const result = await mongodb.createUser({ username, password: hashedPassword });
+      if (!result.success) {
+        return res.status(500).json({ error: result.error || "Failed to create user" });
+      }
+      return res.status(201).json({ success: true, userId: result.userId });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || "Signup failed" });
+    }
+  });
+
   // Add protected routes to secure router
   secureRouter.get("/profile", async (req: Request, res: Response) => {
     try {
