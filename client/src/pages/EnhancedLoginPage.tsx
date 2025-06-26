@@ -170,7 +170,6 @@ const EnhancedLoginPage = () => {
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-white placeholder-gray-400"
-                  placeholder="Enter your operator ID"
                   required
                 />
               </div>
@@ -188,7 +187,6 @@ const EnhancedLoginPage = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-10 pr-12 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-white placeholder-gray-400"
-                  placeholder="Enter your access code"
                   required
                 />
                 <button
