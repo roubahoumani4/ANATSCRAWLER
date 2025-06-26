@@ -1,102 +1,55 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { useLanguage } from "@/context/LanguageContext";
 import { useLocation } from "wouter";
-import { Shield, Lock, User, AlertCircle, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { Shield, Lock, User, AlertCircle } from "lucide-react";
+import { fadeIn, itemVariants } from "@/utils/animations";
 import { useToast } from "@/hooks/use-toast";
 
 const SignupPage = () => {
-  const { language } = useLanguage();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  
-  const [formData, setFormData] = useState({
-    username: "",
-    password: "",
-    confirmPassword: "",
-  });
-  
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => {
-    setIsVisible(true);
-  }, []);
 
   const translations = {
-    title: {
-      English: "SYSTEM REGISTRATION",
-      French: "INSCRIPTION AU SYSTÈME"
-    },
-    subtitle: {
-      English: "DARKSCRAWLER SECURITY FRAMEWORK",
-      French: "CADRE DE SÉCURITÉ DARKSCRAWLER"
-    },
-    usernameLabel: {
-      English: "OPERATOR ID",
-      French: "ID OPÉRATEUR"
-    },
-    passwordLabel: {
-      English: "ACCESS CODE",
-      French: "CODE D'ACCÈS"
-    },
-    confirmPasswordLabel: {
-      English: "CONFIRM ACCESS CODE",
-      French: "CONFIRMER CODE D'ACCÈS"
-    },
-    signupButton: {
-      English: "CREATE ACCOUNT",
-      French: "CRÉER UN COMPTE"
-    },
-    backButton: {
-      English: "BACK TO HOME",
-      French: "RETOUR À L'ACCUEIL"
-    },
-    loginLink: {
-      English: "Already have an account? Login",
-      French: "Déjà un compte? Connexion"
-    }
+    title: "Create your ANAT Security account",
+    subtitle: "Sign up to access your dashboard",
+    usernameLabel: "Username or Email",
+    passwordLabel: "Password",
+    confirmPasswordLabel: "Confirm Password",
+    signupButton: "Sign Up",
+    loading: "Creating account...",
+    footer: "Advanced Data Discovery & Security Platform",
+    loginLink: "Already have an account? Login"
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
-
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match");
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
       setIsLoading(false);
       return;
     }
-
     try {
       const response = await fetch("/api/signup", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username: formData.username,
-          password: formData.password,
-          confirmPassword: formData.confirmPassword
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: identifier, password, confirmPassword })
       });
-
       const data = await response.json();
-
       if (!response.ok) {
         throw new Error(data.error || "Signup failed");
       }
-
       toast({
         title: "Success",
         description: "Account created successfully. Please login.",
-        variant: "default",
+        variant: "default"
       });
-
       setLocation("/login");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -106,174 +59,133 @@ const SignupPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white relative overflow-hidden flex items-center justify-center">
-      {/* Professional Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 to-gray-800"></div>
-      
-      {/* Subtle Grid Pattern */}
-      <div className="absolute inset-0 opacity-10">
-        <div 
-          className="w-full h-full"
-          style={{
-            backgroundImage: `
-              linear-gradient(rgba(99, 102, 241, 0.1) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(99, 102, 241, 0.1) 1px, transparent 1px)
-            `,
-            backgroundSize: '60px 60px'
-          }}
-        />
-      </div>
-
-      {/* Back Button */}
-      <motion.button
-        onClick={() => setLocation("/")}
-        className="fixed top-6 left-6 z-50 flex items-center space-x-2 text-indigo-400 hover:text-indigo-300 transition-colors font-medium text-sm"
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.6 }}
-      >
-        <ArrowLeft className="w-4 h-4" />
-        <span>{translations.backButton[language]}</span>
-      </motion.button>
-
-      {/* Main Content */}
+    <div className="min-h-screen bg-jetBlack flex flex-col justify-center items-center px-4">
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ 
-          opacity: isVisible ? 1 : 0,
-          scale: isVisible ? 1 : 0.95
-        }}
-        transition={{ duration: 0.5 }}
         className="max-w-md w-full p-8 bg-darkGray rounded-xl shadow-xl"
+        variants={fadeIn}
+        initial="hidden"
+        animate="visible"
       >
-        {/* Header */}
         <div className="text-center mb-8">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
+            className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-crimsonRed/10 mb-4"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.5 }}
           >
-            <Shield className="w-12 h-12 mx-auto text-indigo-500 mb-4" />
-            <h1 className="text-2xl font-bold tracking-wider mb-2">{translations.title[language]}</h1>
-            <p className="text-indigo-400 text-sm">{translations.subtitle[language]}</p>
+            <Shield className="h-8 w-8 text-crimsonRed" />
           </motion.div>
+          <motion.h1
+            className="text-2xl font-bold text-coolWhite mb-2"
+            variants={itemVariants}
+          >
+            {translations.title}
+          </motion.h1>
+          <motion.p className="text-gray-400" variants={itemVariants}>
+            {translations.subtitle}
+          </motion.p>
         </div>
-
-        {/* Error Message */}
         {error && (
           <motion.div
-            className="p-4 bg-red-900/30 border border-red-800 rounded-lg flex items-center space-x-2"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
+            className="bg-red-900/30 border border-red-700 text-coolWhite p-4 rounded-lg mb-6 flex items-start"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-            <span className="text-sm text-red-300">{error}</span>
+            <AlertCircle className="h-5 w-5 text-red-400 mr-3 mt-0.5 flex-shrink-0" />
+            <span>{error}</span>
           </motion.div>
         )}
-
-        {/* Form Container */}
-        <div className="bg-gray-900/60 rounded-lg p-6">
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Username Field */}
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                {translations.usernameLabel[language]}
-              </label>
-              <div className="relative">
-                <User className="absolute left-3 top-2.5 h-5 w-5 text-indigo-400" />
-                <input
-                  type="text"
-                  value={formData.username}
-                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                  className="w-full pl-10 pr-4 py-3 bg-[#FFFBE6] border-0 rounded-lg text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 transition-all"
-                  placeholder="Enter your operator ID"
-                  required
-                />
+        <motion.form onSubmit={handleSubmit} variants={fadeIn}>
+          <div className="mb-4">
+            <label className="block text-gray-300 mb-2 text-sm font-medium">
+              {translations.usernameLabel}
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <User className="h-5 w-5 text-gray-500" />
               </div>
+              <input
+                type="text"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                className="pl-10 w-full py-3 bg-midGray border border-gray-700 rounded-lg text-coolWhite focus:outline-none focus:ring-2 focus:ring-crimsonRed"
+                required
+              />
             </div>
-
-            {/* Password Field */}
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                {translations.passwordLabel[language]}
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-2.5 h-5 w-5 text-indigo-400" />
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full pl-10 pr-12 py-3 bg-[#FFFBE6] border-0 rounded-lg text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 transition-all"
-                  placeholder="Enter your access code"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-2.5 text-indigo-400 hover:text-indigo-300"
-                >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button>
+          </div>
+          <div className="mb-4">
+            <label className="block text-gray-300 mb-2 text-sm font-medium">
+              {translations.passwordLabel}
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Lock className="h-5 w-5 text-gray-500" />
               </div>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="pl-10 w-full py-3 bg-midGray border border-gray-700 rounded-lg text-coolWhite focus:outline-none focus:ring-2 focus:ring-crimsonRed"
+                required
+              />
             </div>
-
-            {/* Confirm Password Field */}
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                {translations.confirmPasswordLabel[language]}
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-2.5 h-5 w-5 text-indigo-400" />
-                <input
-                  type={showConfirmPassword ? "text" : "password"}
-                  value={formData.confirmPassword}
-                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                  className="w-full pl-10 pr-12 py-3 bg-[#FFFBE6] border-0 rounded-lg text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 transition-all"
-                  placeholder="Confirm your password"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-2.5 text-indigo-400 hover:text-indigo-300"
-                >
-                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button>
+          </div>
+          <div className="mb-6">
+            <label className="block text-gray-300 mb-2 text-sm font-medium">
+              {translations.confirmPasswordLabel}
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Lock className="h-5 w-5 text-gray-500" />
               </div>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="pl-10 w-full py-3 bg-midGray border border-gray-700 rounded-lg text-coolWhite focus:outline-none focus:ring-2 focus:ring-crimsonRed"
+                required
+              />
             </div>
-
-            {/* Submit Button */}
-            <motion.button
-              type="submit"
-              disabled={isLoading}
-              className="w-full py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-all"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              {isLoading ? (
-                <div className="flex items-center justify-center space-x-2">
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  <span>Creating Account...</span>
-                </div>
-              ) : (
-                "CREATE ACCOUNT"
-              )}
-            </motion.button>
-
-            {/* Login Link */}
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={() => setLocation("/login")}
-                className="text-indigo-400 hover:text-indigo-300 text-sm"
-              >
-                {translations.loginLink[language]}
-              </button>
-            </div>
-          </form>
+          </div>
+          <motion.button
+            type="submit"
+            className="w-full py-3 bg-crimsonRed text-coolWhite rounded-lg font-medium transition-colors hover:bg-opacity-90 focus:outline-none focus:ring-2 focus:ring-crimsonRed focus:ring-offset-2 focus:ring-offset-darkGray disabled:bg-opacity-50 disabled:cursor-not-allowed"
+            disabled={isLoading}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            {isLoading ? (
+              <span className="flex items-center justify-center">
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                {translations.loading}
+              </span>
+            ) : (
+              translations.signupButton
+            )}
+          </motion.button>
+        </motion.form>
+        <div className="text-center mt-4">
+          <button
+            type="button"
+            onClick={() => setLocation("/login")}
+            className="text-crimsonRed hover:text-coolWhite text-sm"
+          >
+            {translations.loginLink}
+          </button>
         </div>
+      </motion.div>
+      <motion.div
+        className="mt-8 text-center text-gray-500 text-sm"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.5 }}
+      >
+        <p>{translations.footer}</p>
+        <p className="mt-2">© {new Date().getFullYear()} ANAT Security</p>
       </motion.div>
     </div>
   );
