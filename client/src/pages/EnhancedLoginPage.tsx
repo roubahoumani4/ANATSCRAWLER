@@ -15,9 +15,14 @@ const EnhancedLoginPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [csrfToken, setCsrfToken] = useState<string>("");
 
   useEffect(() => {
     setIsVisible(true);
+    // Fetch CSRF token on mount
+    fetch("/api/csrf-token", { credentials: "include" })
+      .then(res => res.json())
+      .then(data => setCsrfToken(data.csrfToken));
   }, []);
 
   const translations = {
@@ -63,7 +68,7 @@ const EnhancedLoginPage = () => {
     }
 
     try {
-      await login(identifier, password);
+      await login(identifier, password, csrfToken);
       setLocation("/dashboard");
     } catch (err) {
       setError(translations.errorMessage[language]);

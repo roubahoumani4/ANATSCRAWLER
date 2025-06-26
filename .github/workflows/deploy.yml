@@ -114,3 +114,8 @@ jobs:
             fi
             # Reload or start
             pm2 reload ecosystem.config.cjs --env production || pm2 start ecosystem.config.cjs --env production
+            # Install extra security dependencies
+            npm install csurf
+            npm i --save-dev @types/csurf
+            npm install cookie-parser
+            npm i --save-dev @types/cookie-parser

@@ -27,6 +27,9 @@ interface User {
     showIndexedFiles?: boolean;
     showRecentSearches?: boolean;
   };
+  // Add account lockout fields to User interface
+  loginAttempts?: number;
+  lockUntil?: Date;
 }
 
 interface UserQueryResult {
@@ -44,6 +47,15 @@ interface UserCreateResult {
 interface UserUpdateResult {
   success: boolean;
   error?: string;
+}
+
+interface AuthLog {
+  event: 'login' | 'signup';
+  username: string;
+  ip: string;
+  timestamp: Date;
+  success: boolean;
+  reason?: string;
 }
 
 // Use environment variable with fallback
@@ -237,6 +249,13 @@ class MongoDBClient {
       console.error('Error deleting user:', error);
       return { success: false, error: error.message };
     }
+  }
+
+  public async logAuthEvent(log: AuthLog): Promise<void> {
+    await this.connect();
+    if (!this.isConnected) return;
+    const logCollection = this.db.collection('auth_logs');
+    await logCollection.insertOne(log);
   }
 
   public async close(): Promise<void> {

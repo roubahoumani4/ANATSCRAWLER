@@ -13,6 +13,8 @@ import { registerRoutes as registerSearchRoutes } from './routes/search';
 import authenticate from './middleware/auth';
 import type { User } from './types/User';
 import express from 'express';
+import cookieParser from "cookie-parser";
+import csurf from "csurf";
 
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || "ANAT_SECURITY_JWT_SECRET_KEY";
@@ -59,6 +61,13 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   app.use(xss());
   app.use(mongoSanitize());
+  app.use(cookieParser());
+  app.use(csurf({ cookie: { httpOnly: true, sameSite: "strict", secure: process.env.NODE_ENV === "production" } }));
+
+  // CSRF token endpoint
+  app.get("/api/csrf-token", (req: Request, res: Response) => {
+    res.json({ csrfToken: req.csrfToken() });
+  });
 
   // Login endpoint - public
   // Ensure app.locals.loginAttempts is typed and initialized
@@ -91,25 +100,49 @@ export async function registerRoutes(app: Express): Promise<void> {
       // Find user (normalized username)
       const userResult = await mongodb.findUsers({ filters: { username } });
       if (!userResult.success || !userResult.users || userResult.users.length === 0) {
-        // Generic error to prevent user enumeration
+        await mongodb.logAuthEvent({ event: 'login', username, ip, timestamp: new Date(), success: false, reason: 'user not found' });
+        await new Promise(r => setTimeout(r, 500)); // Delay for brute force protection
         return res.status(401).json({ error: "Invalid username or password" });
       }
       const user = userResult.users[0];
+      // Account lockout check
+      if (user.lockUntil && new Date(user.lockUntil) > new Date()) {
+        await mongodb.logAuthEvent({ event: 'login', username, ip, timestamp: new Date(), success: false, reason: 'account locked' });
+        return res.status(423).json({ error: "Account is temporarily locked due to too many failed login attempts. Please try again later." });
+      }
       // Check password
       const valid = await bcrypt.compare(password, user.password);
       if (!valid) {
-        // Generic error to prevent user enumeration
+        // Increment loginAttempts and lock if needed
+        const attempts = (user.loginAttempts || 0) + 1;
+        let lockUntil = user.lockUntil;
+        if (attempts >= 5) {
+          lockUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 min lock
+        }
+        if (user._id) {
+          await mongodb.updateUser(user._id.toString(), { loginAttempts: attempts, lockUntil });
+        }
+        await mongodb.logAuthEvent({ event: 'login', username, ip, timestamp: new Date(), success: false, reason: 'wrong password' });
+        await new Promise(r => setTimeout(r, 500)); // Delay for brute force protection
         return res.status(401).json({ error: "Invalid username or password" });
       }
-      // Update lastLogin
+      // Reset loginAttempts and lockUntil on successful login
       if (user._id) {
-        await mongodb.updateUser(user._id.toString(), { lastLogin: new Date() });
+        await mongodb.updateUser(user._id.toString(), { loginAttempts: 0, lockUntil: undefined, lastLogin: new Date() });
       }
-      // Issue JWT
+      await mongodb.logAuthEvent({ event: 'login', username, ip, timestamp: new Date(), success: true });
+      // Issue JWT as HttpOnly, Secure cookie
       const token = jwt.sign({ _id: user._id, username: user.username }, JWT_SECRET, { expiresIn: TOKEN_EXPIRATION });
-      // Do not return password or sensitive info
-      return res.json({ success: true, token, user: { username: user.username, _id: user._id } });
+      res.cookie("token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 24 * 60 * 60 * 1000
+      });
+      // Do not return password or sensitive info, and do not return token in body
+      return res.json({ success: true, user: { username: user.username, _id: user._id } });
     } catch (err: any) {
+      await mongodb.logAuthEvent({ event: 'login', username, ip, timestamp: new Date(), success: false, reason: 'server error' });
       return res.status(500).json({ error: "Login failed" });
     }
   });
@@ -122,8 +155,10 @@ export async function registerRoutes(app: Express): Promise<void> {
       .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).+$/)
       .withMessage("Password must be at least 8 characters and include uppercase, lowercase, number, and special character")
   ], async (req: Request, res: Response) => {
+    const ip = String(req.ip);
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      await mongodb.logAuthEvent({ event: 'signup', username: req.body.username, ip, timestamp: new Date(), success: false, reason: 'validation error' });
       return res.status(400).json({ errors: errors.array() });
     }
     const { username, password } = req.body;
@@ -131,6 +166,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       // Check if user already exists (normalized username)
       const existing = await mongodb.findUsers({ filters: { username } });
       if (existing.success && existing.users && existing.users.length > 0) {
+        await mongodb.logAuthEvent({ event: 'signup', username, ip, timestamp: new Date(), success: false, reason: 'username exists' });
         return res.status(409).json({ error: "Username already exists" });
       }
       // Hash password
@@ -138,10 +174,13 @@ export async function registerRoutes(app: Express): Promise<void> {
       // Create user
       const result = await mongodb.createUser({ username, password: hashedPassword });
       if (!result.success) {
+        await mongodb.logAuthEvent({ event: 'signup', username, ip, timestamp: new Date(), success: false, reason: 'db error' });
         return res.status(500).json({ error: result.error || "Failed to create user" });
       }
+      await mongodb.logAuthEvent({ event: 'signup', username, ip, timestamp: new Date(), success: true });
       return res.status(201).json({ success: true, userId: result.userId });
     } catch (err: any) {
+      await mongodb.logAuthEvent({ event: 'signup', username, ip, timestamp: new Date(), success: false, reason: 'server error' });
       return res.status(500).json({ error: err.message || "Signup failed" });
     }
   });
@@ -230,6 +269,30 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.post("/api/search-history", authenticate, async (req: Request, res: Response) => {
     // TODO: Implement search history creation
     res.status(201).json({ success: true });
+  });
+
+  // Validate token endpoint (for cookie-based auth)
+  app.get("/api/validate-token", async (req: Request, res: Response) => {
+    try {
+      const token = req.cookies.token;
+      if (!token) return res.status(401).json({ error: "Not authenticated" });
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      if (!decoded || !decoded._id) return res.status(401).json({ error: "Invalid token" });
+      const userResult = await mongodb.findUsers({ filters: { _id: new ObjectId(decoded._id) } });
+      if (!userResult.success || !userResult.users || userResult.users.length === 0) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      const user = userResult.users[0];
+      res.json({ _id: user._id, username: user.username });
+    } catch (err) {
+      res.status(401).json({ error: "Invalid token" });
+    }
+  });
+
+  // Logout endpoint (clear cookie)
+  app.post("/api/logout", (req: Request, res: Response) => {
+    res.clearCookie("token", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict" });
+    res.json({ success: true });
   });
 
   // Mount secure router at /api/secure path

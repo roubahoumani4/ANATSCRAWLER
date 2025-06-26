@@ -16,9 +16,14 @@ const SignupPage = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [passwordFeedback, setPasswordFeedback] = useState("");
+  const [csrfToken, setCsrfToken] = useState<string>("");
 
   useEffect(() => {
     setIsVisible(true);
+    // Fetch CSRF token on mount
+    fetch("/api/csrf-token", { credentials: "include" })
+      .then(res => res.json())
+      .then(data => setCsrfToken(data.csrfToken));
   }, []);
 
   const translations = {
@@ -46,7 +51,11 @@ const SignupPage = () => {
     try {
       const response = await fetch("/api/signup", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken
+        },
+        credentials: "include",
         body: JSON.stringify({ username: identifier.toLowerCase(), password })
       });
       const data = await response.json();
