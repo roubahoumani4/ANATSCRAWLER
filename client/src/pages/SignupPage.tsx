@@ -54,12 +54,15 @@ const SignupPage = () => {
           // Validation errors from backend
           const passwordError = data.errors.find((e: any) => e.param === "password");
           if (passwordError) {
-            setError(passwordError.msg || "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.");
+            setError("Password must be at least 8 characters and include uppercase, lowercase, number, and special character.");
             setIsLoading(false);
             return;
           }
         }
-        throw new Error(data.error || "Signup failed");
+        // If error is not password, show generic error
+        setError(data.error || "Signup failed");
+        setIsLoading(false);
+        return;
       }
       toast({
         title: "Success",
