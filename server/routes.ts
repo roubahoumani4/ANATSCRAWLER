@@ -110,7 +110,10 @@ export async function registerRoutes(app: Express): Promise<void> {
   // Signup endpoint - public
   app.post("/api/signup", [
     body("username").trim().notEmpty().withMessage("Username is required"),
-    body("password").isLength({ min: 6 }).withMessage("Password must be at least 6 characters")
+    body("password")
+      .isLength({ min: 8 })
+      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).+$/)
+      .withMessage("Password must be at least 8 characters and include uppercase, lowercase, number, and special character")
   ], async (req: Request, res: Response) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
