@@ -2,7 +2,6 @@ import type { Express, Request, Response, NextFunction, Router } from "express";
 import helmet from "helmet";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
-import xss from "xss-clean";
 import mongoSanitize from "express-mongo-sanitize";
 import { mongodb } from "./lib/mongodb";
 import bcrypt from "bcryptjs";
@@ -14,7 +13,6 @@ import authenticate from './middleware/auth';
 import type { User } from './types/User';
 import express from 'express';
 import cookieParser from "cookie-parser";
-import csurf from "csurf";
 import sanitizeHtml from "sanitize-html";
 import crypto from "crypto";
 
@@ -61,10 +59,8 @@ export async function registerRoutes(app: Express): Promise<void> {
     credentials: true
   }));
 
-  app.use(xss());
   app.use(mongoSanitize());
   app.use(cookieParser());
-  app.use(csurf({ cookie: { httpOnly: true, sameSite: "strict", secure: process.env.NODE_ENV === "production" } }));
 
   // Custom CSRF protection (double-submit cookie pattern)
   app.use((req, res, next) => {
