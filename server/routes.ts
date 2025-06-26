@@ -15,6 +15,8 @@ import type { User } from './types/User';
 import express from 'express';
 import cookieParser from "cookie-parser";
 import csurf from "csurf";
+import sanitizeHtml from "sanitize-html";
+import crypto from "crypto";
 
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || "ANAT_SECURITY_JWT_SECRET_KEY";
@@ -64,17 +66,38 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.use(cookieParser());
   app.use(csurf({ cookie: { httpOnly: true, sameSite: "strict", secure: process.env.NODE_ENV === "production" } }));
 
-  // CSRF token endpoint
-  app.get("/api/csrf-token", (req: Request, res: Response) => {
-    res.json({ csrfToken: req.csrfToken() });
+  // Custom CSRF protection (double-submit cookie pattern)
+  app.use((req, res, next) => {
+    // Only generate CSRF token for GET requests
+    if (req.method === "GET" && !req.cookies["csrfToken"]) {
+      const csrfToken = crypto.randomBytes(32).toString("hex");
+      res.cookie("csrfToken", csrfToken, {
+        httpOnly: false, // must be readable by JS
+        sameSite: "strict",
+        secure: process.env.NODE_ENV === "production"
+      });
+    }
+    next();
   });
 
-  // Login endpoint - public
-  // Ensure app.locals.loginAttempts is typed and initialized
-  if (!('loginAttempts' in app.locals)) {
-    (app.locals as any).loginAttempts = {};
+  // CSRF token endpoint (for frontend to fetch token)
+  app.get("/api/csrf-token", (req: Request, res: Response) => {
+    const csrfToken = req.cookies["csrfToken"];
+    res.json({ csrfToken });
+  });
+
+  // CSRF validation middleware for state-changing requests
+  function csrfProtection(req: Request, res: Response, next: NextFunction) {
+    const csrfCookie = req.cookies["csrfToken"];
+    const csrfHeader = req.headers["x-csrf-token"];
+    if (!csrfCookie || !csrfHeader || csrfCookie !== csrfHeader) {
+      return res.status(403).json({ error: "Invalid CSRF token" });
+    }
+    next();
   }
-  app.post("/api/login", [
+
+  // Apply CSRF protection to login and signup
+  app.post("/api/login", csrfProtection, [
     body("username").trim().notEmpty().withMessage("Username is required").customSanitizer(v => v.toLowerCase()),
     body("password")
       .isLength({ min: 8 })
@@ -96,18 +119,19 @@ export async function registerRoutes(app: Express): Promise<void> {
       return res.status(400).json({ errors: errors.array() });
     }
     const { username, password } = req.body;
+    const cleanUsername = sanitizeHtml(username, { allowedTags: [], allowedAttributes: {} });
     try {
       // Find user (normalized username)
-      const userResult = await mongodb.findUsers({ filters: { username } });
+      const userResult = await mongodb.findUsers({ filters: { username: cleanUsername } });
       if (!userResult.success || !userResult.users || userResult.users.length === 0) {
-        await mongodb.logAuthEvent({ event: 'login', username, ip, timestamp: new Date(), success: false, reason: 'user not found' });
+        await mongodb.logAuthEvent({ event: 'login', username: cleanUsername, ip, timestamp: new Date(), success: false, reason: 'user not found' });
         await new Promise(r => setTimeout(r, 500)); // Delay for brute force protection
         return res.status(401).json({ error: "Invalid username or password" });
       }
       const user = userResult.users[0];
       // Account lockout check
       if (user.lockUntil && new Date(user.lockUntil) > new Date()) {
-        await mongodb.logAuthEvent({ event: 'login', username, ip, timestamp: new Date(), success: false, reason: 'account locked' });
+        await mongodb.logAuthEvent({ event: 'login', username: cleanUsername, ip, timestamp: new Date(), success: false, reason: 'account locked' });
         return res.status(423).json({ error: "Account is temporarily locked due to too many failed login attempts. Please try again later." });
       }
       // Check password
@@ -122,7 +146,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         if (user._id) {
           await mongodb.updateUser(user._id.toString(), { loginAttempts: attempts, lockUntil });
         }
-        await mongodb.logAuthEvent({ event: 'login', username, ip, timestamp: new Date(), success: false, reason: 'wrong password' });
+        await mongodb.logAuthEvent({ event: 'login', username: cleanUsername, ip, timestamp: new Date(), success: false, reason: 'wrong password' });
         await new Promise(r => setTimeout(r, 500)); // Delay for brute force protection
         return res.status(401).json({ error: "Invalid username or password" });
       }
@@ -130,7 +154,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       if (user._id) {
         await mongodb.updateUser(user._id.toString(), { loginAttempts: 0, lockUntil: undefined, lastLogin: new Date() });
       }
-      await mongodb.logAuthEvent({ event: 'login', username, ip, timestamp: new Date(), success: true });
+      await mongodb.logAuthEvent({ event: 'login', username: cleanUsername, ip, timestamp: new Date(), success: true });
       // Issue JWT as HttpOnly, Secure cookie
       const token = jwt.sign({ _id: user._id, username: user.username }, JWT_SECRET, { expiresIn: TOKEN_EXPIRATION });
       res.cookie("token", token, {
@@ -140,15 +164,15 @@ export async function registerRoutes(app: Express): Promise<void> {
         maxAge: 24 * 60 * 60 * 1000
       });
       // Do not return password or sensitive info, and do not return token in body
-      return res.json({ success: true, user: { username: user.username, _id: user._id } });
+      return res.json({ success: true, user: { username: cleanUsername, _id: user._id } });
     } catch (err: any) {
-      await mongodb.logAuthEvent({ event: 'login', username, ip, timestamp: new Date(), success: false, reason: 'server error' });
+      await mongodb.logAuthEvent({ event: 'login', username: cleanUsername, ip, timestamp: new Date(), success: false, reason: 'server error' });
       return res.status(500).json({ error: "Login failed" });
     }
   });
 
   // Signup endpoint - public
-  app.post("/api/signup", [
+  app.post("/api/signup", csrfProtection, [
     body("username").trim().notEmpty().withMessage("Username is required").customSanitizer(v => v.toLowerCase()),
     body("password")
       .isLength({ min: 8 })
@@ -162,25 +186,26 @@ export async function registerRoutes(app: Express): Promise<void> {
       return res.status(400).json({ errors: errors.array() });
     }
     const { username, password } = req.body;
+    const cleanSignupUsername = sanitizeHtml(username, { allowedTags: [], allowedAttributes: {} });
     try {
       // Check if user already exists (normalized username)
-      const existing = await mongodb.findUsers({ filters: { username } });
+      const existing = await mongodb.findUsers({ filters: { username: cleanSignupUsername } });
       if (existing.success && existing.users && existing.users.length > 0) {
-        await mongodb.logAuthEvent({ event: 'signup', username, ip, timestamp: new Date(), success: false, reason: 'username exists' });
+        await mongodb.logAuthEvent({ event: 'signup', username: cleanSignupUsername, ip, timestamp: new Date(), success: false, reason: 'username exists' });
         return res.status(409).json({ error: "Username already exists" });
       }
       // Hash password
       const hashedPassword = await bcrypt.hash(password, 10);
       // Create user
-      const result = await mongodb.createUser({ username, password: hashedPassword });
+      const result = await mongodb.createUser({ username: cleanSignupUsername, password: hashedPassword });
       if (!result.success) {
-        await mongodb.logAuthEvent({ event: 'signup', username, ip, timestamp: new Date(), success: false, reason: 'db error' });
+        await mongodb.logAuthEvent({ event: 'signup', username: cleanSignupUsername, ip, timestamp: new Date(), success: false, reason: 'db error' });
         return res.status(500).json({ error: result.error || "Failed to create user" });
       }
-      await mongodb.logAuthEvent({ event: 'signup', username, ip, timestamp: new Date(), success: true });
+      await mongodb.logAuthEvent({ event: 'signup', username: cleanSignupUsername, ip, timestamp: new Date(), success: true });
       return res.status(201).json({ success: true, userId: result.userId });
     } catch (err: any) {
-      await mongodb.logAuthEvent({ event: 'signup', username, ip, timestamp: new Date(), success: false, reason: 'server error' });
+      await mongodb.logAuthEvent({ event: 'signup', username: cleanSignupUsername, ip, timestamp: new Date(), success: false, reason: 'server error' });
       return res.status(500).json({ error: err.message || "Signup failed" });
     }
   });

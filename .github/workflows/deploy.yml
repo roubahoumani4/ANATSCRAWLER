@@ -119,3 +119,9 @@ jobs:
             npm i --save-dev @types/csurf
             npm install cookie-parser
             npm i --save-dev @types/cookie-parser
+      - name: Remove deprecated and add secure dependencies
+        run: |
+          npm uninstall xss-clean
+          npm install sanitize-html
+          npm i --save-dev @types/sanitize-html
+          npm uninstall csurf
