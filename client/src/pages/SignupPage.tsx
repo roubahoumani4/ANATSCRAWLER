@@ -59,7 +59,16 @@ const SignupPage = () => {
           setIsLoading(false);
           return;
         }
-        setError(data.error || "Signup failed");
+        // Username exists error
+        if (typeof data.error === "string" && data.error.includes("Username already exists")) {
+          setError("Username already exists. Please choose another.");
+          setIsLoading(false);
+          return;
+        }
+        // Only show generic error for server errors (status 500+)
+        if (response.status >= 500) {
+          setError("Signup failed");
+        }
         setIsLoading(false);
         return;
       }
