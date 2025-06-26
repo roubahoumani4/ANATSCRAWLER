@@ -114,7 +114,6 @@ const SignupPage = () => {
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 className="pl-10 w-full py-3 bg-[#232b3b] border border-[#232b3b] rounded-lg text-white placeholder-[#b0b8c9] focus:outline-none focus:ring-2 focus:ring-[#3b47fa]"
-                placeholder="Enter your operator ID"
                 required
               />
             </div>
@@ -132,7 +131,6 @@ const SignupPage = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="pl-10 pr-10 w-full py-3 bg-[#232b3b] border border-[#232b3b] rounded-lg text-white placeholder-[#b0b8c9] focus:outline-none focus:ring-2 focus:ring-[#3b47fa]"
-                placeholder="Enter your access code"
                 required
               />
               <button
@@ -158,7 +156,6 @@ const SignupPage = () => {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="pl-10 pr-10 w-full py-3 bg-[#232b3b] border border-[#232b3b] rounded-lg text-white placeholder-[#b0b8c9] focus:outline-none focus:ring-2 focus:ring-[#3b47fa]"
-                placeholder="Confirm your access code"
                 required
               />
               <button
