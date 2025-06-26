@@ -101,12 +101,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     setUser(null);
     await fetch("/api/logout", { method: "POST", credentials: "include" });
-    window.location.href = "/"; // Force full reload to landing page
-    toast({
-      title: "Logged out",
-      description: "You have been successfully logged out",
-      variant: "default"
-    });
+    console.log("Logging out, redirecting to /");
+    window.location.href = "/";
+    // toast({
+    //   title: "Logged out",
+    //   description: "You have been successfully logged out",
+    //   variant: "default"
+    // });
   };
 
   return (
