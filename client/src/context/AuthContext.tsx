@@ -99,15 +99,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    setUser(null);
-    await fetch("/api/logout", { method: "POST", credentials: "include" });
-    console.log("Logging out, redirecting to /");
-    window.location.href = "/";
-    // toast({
-    //   title: "Logged out",
-    //   description: "You have been successfully logged out",
-    //   variant: "default"
-    // });
+    setLoading(true);
+    try {
+      await fetch("/api/logout", { method: "POST", credentials: "include" });
+      await validateToken(); // Re-check authentication state after logout
+      setLocation("/"); // SPA navigation to landing page
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out",
+        variant: "default"
+      });
+    } catch (error) {
+      toast({
+        title: "Logout failed",
+        description: "An error occurred during logout.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
