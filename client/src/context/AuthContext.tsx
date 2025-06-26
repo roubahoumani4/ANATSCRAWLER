@@ -101,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     setUser(null);
     await fetch("/api/logout", { method: "POST", credentials: "include" });
-    setLocation("/"); // Use router navigation for logout redirect
+    setTimeout(() => setLocation("/"), 0); // Ensure state update before redirect
     toast({
       title: "Logged out",
       description: "You have been successfully logged out",
