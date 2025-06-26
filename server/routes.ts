@@ -60,60 +60,50 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.use(xss());
   app.use(mongoSanitize());
 
-  // Public routes
+  // Login endpoint - public
+  // Ensure app.locals.loginAttempts is typed and initialized
+  if (!('loginAttempts' in app.locals)) {
+    (app.locals as any).loginAttempts = {};
+  }
   app.post("/api/login", [
-    body("identifier").trim().notEmpty(),
-    body("password").trim().notEmpty()
+    body("username").trim().notEmpty().withMessage("Username is required"),
+    body("password").isLength({ min: 6 }).withMessage("Password must be at least 6 characters")
   ], async (req: Request, res: Response) => {
+    const ip = String(req.ip);
+    const now = Date.now();
+    const loginAttempts = (app.locals as any).loginAttempts;
+    if (!loginAttempts[ip]) loginAttempts[ip] = [];
+    loginAttempts[ip] = loginAttempts[ip].filter((t: number) => now - t < 15 * 60 * 1000); // 15 min window
+    if (loginAttempts[ip].length >= 10) {
+      return res.status(429).json({ error: "Too many login attempts. Please try again later." });
+    }
+    loginAttempts[ip].push(now);
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+    const { username, password } = req.body;
     try {
-      const { identifier, password } = req.body;
-      
       // Find user
-      const result = await mongodb.findUsers({
-        filters: {
-          $or: [
-            { username: identifier },
-            { email: identifier }
-          ]
-        }
-      });
-
-      if (!result.success || !result.users || result.users.length === 0) {
-        return res.status(401).json({ error: "Invalid credentials" });
+      const userResult = await mongodb.findUsers({ filters: { username } });
+      if (!userResult.success || !userResult.users || userResult.users.length === 0) {
+        // Generic error to prevent user enumeration
+        return res.status(401).json({ error: "Invalid username or password" });
       }
-
-      const user = result.users[0];
-
-      // Compare password
-      const validPassword = await bcrypt.compare(password, user.password);
-      if (!validPassword) {
-        return res.status(401).json({ error: "Invalid credentials" });
+      const user = userResult.users[0];
+      // Check password
+      const valid = await bcrypt.compare(password, user.password);
+      if (!valid) {
+        // Generic error to prevent user enumeration
+        return res.status(401).json({ error: "Invalid username or password" });
       }
-
-      // Create token
-      const token = jwt.sign({
-        _id: user._id,
-        username: user.username,
-        roles: user.roles || ['user']
-      }, JWT_SECRET, { expiresIn: TOKEN_EXPIRATION });
-
-      // Return user data and token
-      res.json({
-        token,
-        user: {
-          id: user._id,
-          username: user.username,
-          fullName: user.fullName || '',
-          email: user.email || '',
-          organization: user.organization || '',
-          department: user.department || '',
-          jobPosition: user.jobPosition || '',
-          roles: user.roles || ['user']
-        }
-      });
-    } catch (error) {
-      console.error("[Auth] Login error:", error);
-      res.status(500).json({ error: "Login failed" });
+      // Issue JWT
+      const token = jwt.sign({ _id: user._id, username: user.username }, JWT_SECRET, { expiresIn: TOKEN_EXPIRATION });
+      // Do not return password or sensitive info
+      return res.json({ success: true, token, user: { username: user.username, _id: user._id } });
+    } catch (err: any) {
+      return res.status(500).json({ error: "Login failed" });
     }
   });
 
