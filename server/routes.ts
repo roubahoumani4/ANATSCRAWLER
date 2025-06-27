@@ -386,6 +386,41 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // Change Password Endpoint
+  app.patch("/api/user/password", authenticate, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?._id;
+      const { currentPassword, newPassword } = req.body;
+      if (!userId || !currentPassword || !newPassword) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+      // Validate new password strength
+      if (newPassword.length < 8 || !/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/\d/.test(newPassword) || !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?]/.test(newPassword)) {
+        return res.status(400).json({ error: "Password must be at least 8 characters and include uppercase, lowercase, number, and special character" });
+      }
+      // Fetch user
+      const userResult = await mongodb.findUsers({ filters: { _id: new ObjectId(userId) } });
+      if (!userResult.success || !userResult.users || userResult.users.length === 0) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      const user = userResult.users[0];
+      // Check current password
+      const valid = await bcrypt.compare(currentPassword, user.password);
+      if (!valid) {
+        return res.status(401).json({ error: "Current password is incorrect" });
+      }
+      // Hash new password
+      const hash = await bcrypt.hash(newPassword, 12);
+      const result = await mongodb.updateUser(userId.toString(), { password: hash });
+      if (!result.success) {
+        return res.status(500).json({ error: result.error || "Failed to update password" });
+      }
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to change password" });
+    }
+  });
+
   // Mount secure router at /api/secure path
   app.use('/api/secure', secureRouter);
 }
