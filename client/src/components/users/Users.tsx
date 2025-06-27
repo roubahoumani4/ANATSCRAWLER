@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { useLocation } from "wouter";
-import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { motion, AnimatePresence } from "framer-motion";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUser, faUserPlus, faSearch } from "@fortawesome/free-solid-svg-icons";
 import { useLanguage } from "@/context/LanguageContext";
@@ -18,7 +18,7 @@ interface UserProfile {
 
 const Users = () => {
   const { language, translate } = useLanguage();
-  const [, navigate] = useNavigate();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
   
