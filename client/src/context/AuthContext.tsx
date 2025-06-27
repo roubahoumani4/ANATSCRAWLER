@@ -32,32 +32,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // No localStorage: rely on server session/cookie
-    validateToken();
+    const validate = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch("/api/validate-token", {
+          method: "GET",
+          credentials: "include"
+        });
+        if (response.ok) {
+          const userData = await response.json();
+          setUser(userData);
+          // Only redirect to dashboard if on landing page
+          if (window.location.pathname === "/") {
+            setLocation("/dashboard");
+          }
+        } else {
+          setUser(null);
+          // If on a protected route, redirect to landing page
+          if (window.location.pathname.startsWith("/dashboard")) {
+            setLocation("/");
+          }
+        }
+      } catch (error) {
+        setUser(null);
+        // If on a protected route, redirect to landing page
+        if (window.location.pathname.startsWith("/dashboard")) {
+          setLocation("/");
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    validate();
     // Fetch CSRF token on mount
     fetch("/api/csrf-token", { credentials: "include" })
       .then(res => res.json())
       .then(data => setCsrfToken(data.csrfToken));
   }, []);
-
-  const validateToken = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch("/api/validate-token", {
-        method: "GET",
-        credentials: "include"
-      });
-      if (response.ok) {
-        const userData = await response.json();
-        setUser(userData);
-      } else {
-        setUser(null);
-      }
-    } catch (error) {
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const login = async (identifier: string, password: string, csrfToken?: string) => {
     try {
