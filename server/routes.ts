@@ -326,7 +326,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   // Profile Info Endpoints
   app.get("/api/profile-info", authenticate, async (req: Request, res: Response) => {
     try {
-      const userId = req.user?._id || req.user?.id;
+      const userId = req.user?._id;
       if (!userId) return res.status(401).json({ error: "Not authenticated" });
       const { getProfileInfo } = await import("./lib/profileInfo");
       const info = await getProfileInfo(new ObjectId(userId));
@@ -338,13 +338,51 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   app.patch("/api/profile-info", authenticate, async (req: Request, res: Response) => {
     try {
-      const userId = req.user?._id || req.user?.id;
+      const userId = req.user?._id;
       if (!userId) return res.status(401).json({ error: "Not authenticated" });
       const { upsertProfileInfo } = await import("./lib/profileInfo");
       const updated = await upsertProfileInfo(new ObjectId(userId), req.body);
       res.json(updated);
     } catch (err) {
       res.status(500).json({ error: "Failed to update profile info" });
+    }
+  });
+
+  // Change Username Endpoint
+  app.patch("/api/user/username", authenticate, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?._id;
+      const { newUsername } = req.body;
+      if (!userId || !newUsername) {
+        return res.status(400).json({ error: "Missing user or new username" });
+      }
+      // Sanitize and validate new username
+      const cleanUsername = sanitizeHtml(newUsername, { allowedTags: [], allowedAttributes: {} }).toLowerCase();
+      if (cleanUsername.length < 3) {
+        return res.status(400).json({ error: "Username must be at least 3 characters" });
+      }
+      // Check if username is taken
+      const existing = await mongodb.findUsers({ filters: { username: cleanUsername } });
+      if (existing.success && existing.users && existing.users.length > 0) {
+        return res.status(409).json({ error: "Username already taken" });
+      }
+      // Update username
+      const result = await mongodb.updateUser(userId.toString(), { username: cleanUsername });
+      if (!result.success) {
+        return res.status(500).json({ error: result.error || "Failed to update username" });
+      }
+      // Optionally, issue a new JWT and set cookie
+      const token = jwt.sign({ _id: userId, username: cleanUsername }, JWT_SECRET, { expiresIn: TOKEN_EXPIRATION });
+      res.cookie("token", token, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "none",
+        maxAge: 24 * 60 * 60 * 1000,
+        domain: ".anatsecurity.fr"
+      });
+      res.json({ success: true, username: cleanUsername });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to change username" });
     }
   });
 
