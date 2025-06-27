@@ -7,7 +7,11 @@ import type { User } from '../types/User';
 const JWT_SECRET = process.env.JWT_SECRET || 'ANAT_SECURITY_JWT_SECRET_KEY';
 
 export default async function authenticate(req: Request, res: Response, next: NextFunction) {
-  const token = req.header('Authorization')?.replace('Bearer ', '');
+  // Try Authorization header first, then cookie
+  let token = req.header('Authorization')?.replace('Bearer ', '');
+  if (!token && req.cookies && req.cookies.token) {
+    token = req.cookies.token;
+  }
 
   if (!token) {
     return res.status(401).json({ error: 'Authorization required' });
