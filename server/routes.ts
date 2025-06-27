@@ -323,6 +323,31 @@ export async function registerRoutes(app: Express): Promise<void> {
     res.json({ success: true });
   });
 
+  // Profile Info Endpoints
+  app.get("/api/profile-info", authenticate, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?._id || req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
+      const { getProfileInfo } = await import("./lib/profileInfo");
+      const info = await getProfileInfo(new ObjectId(userId));
+      res.json(info || {});
+    } catch (err) {
+      res.status(500).json({ error: "Failed to fetch profile info" });
+    }
+  });
+
+  app.patch("/api/profile-info", authenticate, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?._id || req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
+      const { upsertProfileInfo } = await import("./lib/profileInfo");
+      const updated = await upsertProfileInfo(new ObjectId(userId), req.body);
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to update profile info" });
+    }
+  });
+
   // Mount secure router at /api/secure path
   app.use('/api/secure', secureRouter);
 }
