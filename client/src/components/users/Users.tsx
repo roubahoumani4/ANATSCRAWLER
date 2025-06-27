@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
@@ -7,11 +7,10 @@ import { faUser, faUserPlus, faSearch } from "@fortawesome/free-solid-svg-icons"
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
 
-interface User {
-  id: number;
+interface UserProfile {
+  _id?: string;
   username: string;
   fullName?: string;
-  email: string;
   organization?: string;
   department?: string;
   jobPosition?: string;
@@ -23,14 +22,19 @@ const Users = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
   
-  const { data: users = [], isLoading, error } = useQuery<User[]>({
-    queryKey: ["/api/users"],
+  // Fetch user profiles from new endpoint
+  const { data: users = [], isLoading, error } = useQuery<UserProfile[]>({
+    queryKey: ["/api/user-profiles"],
+    queryFn: async () => {
+      const res = await fetch("/api/user-profiles", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch user profiles");
+      return res.json();
+    },
   });
   
   const filteredUsers = users.filter((user) =>
     user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (user.fullName && user.fullName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    user.email.toLowerCase().includes(searchQuery.toLowerCase())
+    (user.fullName && user.fullName.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const containerVariants = {
@@ -114,12 +118,11 @@ const Users = () => {
         >
           <thead>
             <tr>
-              <th>{language === "French" ? "Nom d'utilisateur" : "Username"}</th>
-              <th>{language === "French" ? "Nom complet" : "Full Name"}</th>
-              <th>Email</th>
-              <th>{language === "French" ? "Organisation" : "Organization"}</th>
-              <th>{language === "French" ? "Département" : "Department"}</th>
-              <th>{language === "French" ? "Poste" : "Job Position"}</th>
+              <th>Username</th>
+              <th>Full Name</th>
+              <th>Organization</th>
+              <th>Department</th>
+              <th>Job Position</th>
             </tr>
           </thead>
           <tbody>
@@ -127,31 +130,28 @@ const Users = () => {
               {filteredUsers.length > 0 ? (
                 filteredUsers.map((user, index) => (
                   <motion.tr 
-                    key={user.id || index}
+                    key={user._id || user.username || index}
                     variants={rowVariants}
                     initial="hidden"
                     animate="visible"
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.3, delay: index * 0.05 }}
-                    layoutId={`user-${user.id}`}
+                    layoutId={`user-${user._id || user.username}`}
                   >
                     <td className="username-cell">
                       <FontAwesomeIcon icon={faUser} className="user-icon" />
                       {user.username}
                     </td>
-                    <td>{user.fullName || "N/A"}</td>
-                    <td>{user.email}</td>
-                    <td>{user.organization || "N/A"}</td>
-                    <td>{user.department || "N/A"}</td>
-                    <td>{user.jobPosition || "N/A"}</td>
+                    <td>{user.fullName || "-"}</td>
+                    <td>{user.organization || "-"}</td>
+                    <td>{user.department || "-"}</td>
+                    <td>{user.jobPosition || "-"}</td>
                   </motion.tr>
                 ))
               ) : (
                 <motion.tr variants={rowVariants}>
-                  <td colSpan={6}>
-                    {language === "French"
-                      ? "Aucun utilisateur trouvé."
-                      : "No users found."}
+                  <td colSpan={5}>
+                    No users found.
                   </td>
                 </motion.tr>
               )}

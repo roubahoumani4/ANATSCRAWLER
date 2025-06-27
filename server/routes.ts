@@ -421,6 +421,17 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // Get all user profiles (username + profile info)
+  app.get("/api/user-profiles", authenticate, async (req: Request, res: Response) => {
+    try {
+      const { getAllUserProfiles } = await import("./lib/userProfile");
+      const profiles = await getAllUserProfiles();
+      res.json(profiles);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to fetch user profiles" });
+    }
+  });
+
   // Mount secure router at /api/secure path
   app.use('/api/secure', secureRouter);
 }
