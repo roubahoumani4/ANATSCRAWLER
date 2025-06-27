@@ -313,7 +313,12 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   // Logout endpoint (clear cookie)
   app.post("/api/logout", (req: Request, res: Response) => {
-    res.clearCookie("token", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict" });
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      path: "/"
+    });
     res.json({ success: true });
   });
 
