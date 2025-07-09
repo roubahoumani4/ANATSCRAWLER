@@ -8,7 +8,7 @@ interface BackButtonProps {
   color?: "purple" | "green" | "red" | "cyan" | "orange" | "grey";
 }
 
-const BackButton = ({ to = "/dashboard", color = "cyan" }: BackButtonProps) => {
+const BackButton = ({ to = "/dashboard", color = "red" }: BackButtonProps) => {
   const [, setLocation] = useLocation();
   const { language } = useLanguage();
 
@@ -22,7 +22,7 @@ const BackButton = ({ to = "/dashboard", color = "cyan" }: BackButtonProps) => {
   };
 
   return (
-    <motion.div 
+    <motion.div
       className="mb-6"
       initial={{ opacity: 0, x: -50 }}
       animate={{ opacity: 1, x: 0 }}
@@ -30,7 +30,8 @@ const BackButton = ({ to = "/dashboard", color = "cyan" }: BackButtonProps) => {
     >
       <button
         onClick={() => setLocation(to)}
-        className={`flex items-center space-x-2 transition-colors duration-200 bg-gray-100/40 dark:bg-gray-900/40 px-4 py-2 rounded-lg border backdrop-blur-sm ${colorStyles[color]}`}
+        className={`flex items-center space-x-2 transition-colors duration-200 px-5 py-2 rounded-lg border-none shadow font-bold text-lg bg-[hsl(var(--crimsonRed))] text-white hover:bg-[hsl(var(--crimsonRed),.85)]`}
+        style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}
       >
         <ArrowLeft size={20} />
         <span>{language === "French" ? "Retour" : "Back"}</span>
