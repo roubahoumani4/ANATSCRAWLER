@@ -108,7 +108,12 @@ const translations: Record<string, string> = {
   "common.reset": "Reset",
   "common.confirm": "Confirm",
   "common.yes": "Yes",
-  "common.no": "No"
+  "common.no": "No",
+
+  // Users Page
+  "users.title": "Users",
+  "users.newUser": "New User",
+  "users.filter": "Filter users...",
 };
 
 const LanguageContext = createContext<LanguageContextProps | undefined>(undefined);
