@@ -59,7 +59,6 @@ export default function AppContent() {
         <Route path="/malware" component={MalwareAnalysisPage} />
         <Route path="/websecurity" component={WebSecurityScanningPage} />
         <Route path="/users" component={UsersPage} />
-        <Route path="/new-user" component={require("@/pages/NewUserPage").default} />
         <Route path="/settings/general" component={GeneralSettingsPage} />
         <Route path="/edit-profile" component={EditProfilePage} />
         <Route path="/edit-user" component={EditUserPage} />
