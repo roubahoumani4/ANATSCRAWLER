@@ -96,7 +96,7 @@ const Users = () => {
       <div className="users-actions flex items-center gap-4 mb-4">
         <motion.button
           className="new-user-btn px-4 py-2 rounded font-semibold bg-[hsl(var(--crimsonRed))] text-white shadow hover:bg-[hsl(var(--crimsonRed),.85)] transition"
-        onClick={() => navigate("/signup")}
+        onClick={() => navigate("/new-user")}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
