@@ -1,3 +1,43 @@
+// Threat Intelligence Search Endpoint
+import { spawn } from 'child_process';
+import path from 'path';
+
+export async function registerThreatIntelRoute(app: Express) {
+  app.post("/api/threat-intel-search", authenticate, async (req: Request, res: Response) => {
+    try {
+      const { name, username, email } = req.body;
+      if (!name && !username && !email) {
+        return res.status(400).json({ error: "At least one search field is required." });
+      }
+      // Call maigret_runner.py with the search data
+      const scriptPath = path.join(__dirname, 'maigret_runner.py');
+      const py = spawn('./maigret-venv/bin/python3.10', [scriptPath], { stdio: ['pipe', 'pipe', 'pipe'] });
+      py.stdin.write(JSON.stringify({ name, username, email }));
+      py.stdin.end();
+      let data = '';
+      let errData = '';
+      py.stdout.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+      py.stderr.on('data', (chunk: Buffer) => { errData += chunk.toString(); });
+      py.on('close', (code: number) => {
+        if (errData) {
+          return res.status(500).json({ error: errData });
+        }
+        try {
+          const result = JSON.parse(data);
+          if (result.success) {
+            res.json({ success: true, results: result.results });
+          } else {
+            res.status(500).json({ error: result.error || 'Maigret search failed.' });
+          }
+        } catch (e) {
+          res.status(500).json({ error: 'Failed to parse Maigret output.' });
+        }
+      });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to perform threat intelligence search." });
+    }
+  });
+}
 import type { Express, Request, Response, NextFunction, Router } from "express";
 import helmet from "helmet";
 import cors from "cors";
@@ -21,6 +61,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "ANAT_SECURITY_JWT_SECRET_KEY";
 const TOKEN_EXPIRATION = "24h";
 
 export async function registerRoutes(app: Express): Promise<void> {
+  await registerThreatIntelRoute(app);
   // Create a new secure router
   const secureRouter = express.Router();
   

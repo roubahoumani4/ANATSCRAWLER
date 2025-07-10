@@ -95,6 +95,8 @@ jobs:
             cat package-lock.json
             # Install production dependencies only
             npm ci --omit=dev
+            # Install Maigret and dependencies for Threat Intelligence feature
+            bash scripts/install-maigret.sh
             # Recreate .env
             cat > .env <<EOF
             NODE_ENV=production

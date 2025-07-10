@@ -57,6 +57,7 @@ export default function AppContent() {
         <Route path="/osint" component={OsintFrameworkPage} />
         <Route path="/darkweb" component={DarkwebMonitoringPage} />
         <Route path="/malware" component={MalwareAnalysisPage} />
+        <Route path="/threat-intel" component={require("@/pages/ThreatIntelligencePage").default} />
         <Route path="/websecurity" component={WebSecurityScanningPage} />
         <Route path="/users" component={UsersPage} />
         <Route path="/settings/general" component={GeneralSettingsPage} />

@@ -32,7 +32,7 @@ const ThreatIntelSearch = () => {
   const [error, setError] = useState("");
   const [results, setResults] = useState<any>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setResults(null);
@@ -41,17 +41,25 @@ const ThreatIntelSearch = () => {
       return;
     }
     setLoading(true);
-    // Simulate search (replace with API call in next step)
-    setTimeout(() => {
-      setResults({
-        facebook: null,
-        instagram: null,
-        twitter: null,
-        linkedin: null,
-        summary: "(Results will appear here in the next step)"
+    try {
+      const res = await fetch("/api/threat-intel-search", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ name, username, email })
       });
+      const data = await res.json();
+      if (!data.success) {
+        setError(data.error || "Search failed.");
+      } else {
+        setResults(data.results);
+      }
+    } catch (err) {
+      setError("An error occurred. Please try again.");
+    } finally {
       setLoading(false);
-    }, 1200);
+    }
   };
 
   return (

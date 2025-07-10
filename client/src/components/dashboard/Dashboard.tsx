@@ -8,7 +8,7 @@ import SearchInterface from "../search/SearchInterface";
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<"analytics" | "darkweb">("analytics");
+  const [activeTab, setActiveTab] = useState<"analytics" | "darkweb" | "threatintel">("analytics");
   const [currentTime, setCurrentTime] = useState(new Date());
   const [matrixChars, setMatrixChars] = useState<string[]>([]);
 
@@ -84,6 +84,21 @@ const Dashboard = () => {
     >
       {/* Cybersecurity Command Center Header */}
       <div className="mb-8 relative overflow-hidden">
+        {/* Dashboard Tabs */}
+        <div className="flex gap-2 mb-6">
+          <button
+            className={`px-4 py-2 rounded-t-lg font-bold text-sm transition ${activeTab === "analytics" ? "bg-[hsl(var(--crimsonRed))] text-white" : "bg-[#232323] text-gray-300"}`}
+            onClick={() => setActiveTab("analytics")}
+          >Analytics</button>
+          <button
+            className={`px-4 py-2 rounded-t-lg font-bold text-sm transition ${activeTab === "darkweb" ? "bg-[hsl(var(--crimsonRed))] text-white" : "bg-[#232323] text-gray-300"}`}
+            onClick={() => setActiveTab("darkweb")}
+          >Darkweb Monitoring</button>
+          <button
+            className={`px-4 py-2 rounded-t-lg font-bold text-sm transition ${activeTab === "threatintel" ? "bg-[hsl(var(--crimsonRed))] text-white" : "bg-[#232323] text-gray-300"}`}
+            onClick={() => setActiveTab("threatintel")}
+          >Threat Intelligence</button>
+        </div>
         {/* Matrix Background Effect */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-10">
           {[...Array(8)].map((_, i) => (
@@ -164,8 +179,27 @@ const Dashboard = () => {
             </motion.div>
           </div>
 
-          {/* Main User Interface */}
-          <div className="flex items-center space-x-6">
+      {/* Main User Interface */}
+      {activeTab === "threatintel" ? (
+        <motion.div
+          className="w-full flex flex-col items-center justify-center min-h-[400px]"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <a
+            href="/threat-intel"
+            className="inline-block px-8 py-4 rounded-lg bg-[hsl(var(--crimsonRed))] text-white font-bold text-xl shadow-lg hover:bg-[hsl(var(--crimsonRed),.85)] transition mb-6"
+          >
+            Go to Threat Intelligence
+          </a>
+          <p className="text-gray-300 max-w-xl text-center">
+            Search for a person across social media platforms and generate a professional intelligence report.
+          </p>
+        </motion.div>
+      ) : activeTab === "analytics" ? (
+      <div className="flex items-center space-x-6">
             {/* User Avatar & Info */}
             <motion.div
               className="flex items-center space-x-4"

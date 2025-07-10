@@ -26,6 +26,7 @@ const translations: Record<string, string> = {
   "dashboard.results": "Results",
   "dashboard.overview": "Overview",
   "dashboard.darkweb": "Darkweb Monitoring",
+  "dashboard.threatintel": "Threat Intelligence",
   
   // Navigation
   "nav.dashboard": "Dashboard",
