@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
-# Install Python 3.10 and venv if not present
+# Check for Python 3.10
 if ! command -v python3.10 >/dev/null; then
-  sudo apt-get update
-  sudo apt-get install -y python3.10 python3.10-venv python3.10-dev
+  echo "Python 3.10 is required but not found. Please install it before running this script."
+  exit 1
 fi
 # Create venv if not exists
 if [ ! -d "maigret-venv" ]; then
