@@ -35,6 +35,8 @@ jobs:
           cp package-lock.json out/
           cp ecosystem.config.cjs out/
           cp .env.example out/ || true
+          mkdir -p out/scripts
+          cp -r scripts/install-maigret.sh out/scripts/
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
