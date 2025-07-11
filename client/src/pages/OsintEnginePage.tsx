@@ -1,6 +1,7 @@
+import React from "react";
 import OsintEngine from "../components/dashboard/OsintEngine";
 
-const OsintFrameworkPage = () => {
+const OsintEnginePage = () => {
   return (
     <div className="w-full min-h-screen bg-darkGray p-8">
       <OsintEngine />
@@ -8,4 +9,4 @@ const OsintFrameworkPage = () => {
   );
 };
 
-export default OsintFrameworkPage;
+export default OsintEnginePage;
