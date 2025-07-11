@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { useLanguage } from "@/context/LanguageContext";
+// Language context removed, English only
 import { useAuth } from "@/context/AuthContext";
 import { Calendar, Clock, Search, Shield, Database, FileText, Terminal, Skull, Wifi, Eye, Zap, Activity, AlertTriangle, Code2 } from "lucide-react";
 import { fadeIn, slideUp } from "@/utils/animations";
@@ -8,6 +8,7 @@ import SearchInterface from "../search/SearchInterface";
 
 const Dashboard = () => {
   const { user } = useAuth();
+  // English only, remove language context
   const [activeTab, setActiveTab] = useState<"analytics" | "darkweb" | "threatintel">("analytics");
   const [currentTime, setCurrentTime] = useState(new Date());
   const [matrixChars, setMatrixChars] = useState<string[]>([]);
@@ -76,12 +77,7 @@ const Dashboard = () => {
   };
 
   return (
-    <motion.div 
-      className="w-full"
-      variants={fadeIn}
-      initial="hidden"
-      animate="visible"
-    >
+    <motion.div className="w-full" variants={fadeIn} initial="hidden" animate="visible">
       {/* Cybersecurity Command Center Header */}
       <div className="mb-8 relative overflow-hidden">
         {/* Dashboard Tabs */}
@@ -127,7 +123,6 @@ const Dashboard = () => {
             </motion.div>
           ))}
         </div>
-
         {/* Command Center Interface */}
         <motion.div
           className="relative bg-gradient-to-r from-gray-100/60 via-gray-200/70 to-gray-100/60 dark:from-gray-900/60 dark:via-gray-800/70 dark:to-gray-900/60 border border-cyan-400/20 rounded-2xl p-6 backdrop-blur-sm"
@@ -161,7 +156,6 @@ const Dashboard = () => {
                 </motion.div>
               ))}
             </div>
-
             {/* Live Clock */}
             <motion.div 
               className="flex items-center space-x-2 text-cyan-400 font-mono text-sm"
@@ -178,200 +172,186 @@ const Dashboard = () => {
               <span>{currentTime.toLocaleTimeString()}</span>
             </motion.div>
           </div>
-
-      {/* Main User Interface */}
-      {activeTab === "threatintel" ? (
-        <motion.div
-          className="w-full flex flex-col items-center justify-center min-h-[400px]"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <a
-            href="/threat-intel"
-            className="inline-block px-8 py-4 rounded-lg bg-[hsl(var(--crimsonRed))] text-white font-bold text-xl shadow-lg hover:bg-[hsl(var(--crimsonRed),.85)] transition mb-6"
-          >
-            Go to Threat Intelligence
-          </a>
-          <p className="text-gray-300 max-w-xl text-center">
-            Search for a person across social media platforms and generate a professional intelligence report.
-          </p>
-        </motion.div>
-      ) : activeTab === "analytics" ? (
-      <div className="flex items-center space-x-6">
-            {/* User Avatar & Info */}
+          {/* Main User Interface (flattened tab logic) */}
+          {activeTab === "threatintel" && (
             <motion.div
-              className="flex items-center space-x-4"
-              initial={{ opacity: 0, x: -30 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
+              className="w-full flex flex-col items-center justify-center min-h-[400px]"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.5 }}
             >
-              <motion.div
-                className="relative"
-                whileHover={{ scale: 1.1 }}
-                transition={{ duration: 0.3 }}
+              <a
+                href="/threat-intel"
+                className="inline-block px-8 py-4 rounded-lg bg-[hsl(var(--crimsonRed))] text-white font-bold text-xl shadow-lg hover:bg-[hsl(var(--crimsonRed),.85)] transition mb-6"
               >
+                Go to Threat Intelligence
+              </a>
+              <p className="text-gray-300 max-w-xl text-center">
+                Search for a person across social media platforms and generate a professional intelligence report.
+              </p>
+            </motion.div>
+          )}
+          {activeTab === "analytics" && (
+            <>
+              <div className="flex items-center space-x-6">
+                {/* User Avatar & Info */}
                 <motion.div
-                  className="w-16 h-16 rounded-full bg-gradient-to-r from-red-600 via-purple-700 to-blue-600 p-1"
-                  animate={{
-                    rotate: [0, 360],
-                  }}
-                  transition={{
-                    duration: 20,
-                    repeat: Infinity,
-                    ease: "linear"
-                  }}
+                  className="flex items-center space-x-4"
+                  initial={{ opacity: 0, x: -30 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.8, delay: 0.2 }}
                 >
-                  <div className="w-full h-full rounded-full bg-white dark:bg-black flex items-center justify-center">
-                    <Skull className="w-8 h-8 text-cyan-400" />
+                  <motion.div
+                    className="relative"
+                    whileHover={{ scale: 1.1 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <motion.div
+                      className="w-16 h-16 rounded-full bg-gradient-to-r from-red-600 via-purple-700 to-blue-600 p-1"
+                      animate={{
+                        rotate: [0, 360],
+                      }}
+                      transition={{
+                        duration: 20,
+                        repeat: Infinity,
+                        ease: "linear"
+                      }}
+                    >
+                      <div className="w-full h-full rounded-full bg-white dark:bg-black flex items-center justify-center">
+                        <Skull className="w-8 h-8 text-cyan-400" />
+                      </div>
+                    </motion.div>
+                    {/* Status Dot */}
+                    <motion.div
+                      className="absolute -top-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white dark:border-black"
+                      animate={{
+                        scale: [1, 1.2, 1],
+                        opacity: [1, 0.7, 1]
+                      }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity
+                      }}
+                    />
+                  </motion.div>
+                  <div>
+                    <motion.h1 
+                      className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-purple-500 to-red-500"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.6, delay: 0.3 }}
+                    >
+                      OPERATOR: {(user?.username || "UNKNOWN").toUpperCase()}
+                    </motion.h1>
+                    <motion.div
+                      className="flex items-center space-x-4 mt-1"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.6, delay: 0.4 }}
+                    >
+                      <span className="text-sm text-gray-600 dark:text-gray-400 font-mono">
+                        {"ACCESS LEVEL:"}
+                      </span>
+                      <motion.span 
+                        className="text-sm font-mono text-red-400 font-bold"
+                        animate={{
+                          textShadow: [
+                            "0 0 5px rgba(239, 68, 68, 0.5)",
+                            "0 0 10px rgba(239, 68, 68, 0.8)",
+                            "0 0 5px rgba(239, 68, 68, 0.5)"
+                          ]
+                        }}
+                        transition={{ duration: 1.5, repeat: Infinity }}
+                      >
+                        CLASSIFIED
+                      </motion.span>
+                    </motion.div>
                   </div>
                 </motion.div>
-                
-                {/* Status Dot */}
+                {/* System Stats */}
                 <motion.div
-                  className="absolute -top-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white dark:border-black"
-                  animate={{
-                    scale: [1, 1.2, 1],
-                    opacity: [1, 0.7, 1]
-                  }}
-                  transition={{
-                    duration: 2,
-                    repeat: Infinity
-                  }}
-                />
-              </motion.div>
-
-              <div>
-                <motion.h1 
-                  className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-purple-500 to-red-500"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.3 }}
+                  className="flex-1 grid grid-cols-3 gap-4"
+                  initial={{ opacity: 0, x: 30 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.8, delay: 0.5 }}
                 >
-                  OPERATOR: {(user?.username || "UNKNOWN").toUpperCase()}
-                </motion.h1>
-                
-                <motion.div
-                  className="flex items-center space-x-4 mt-1"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.4 }}
-                >
-                  <span className="text-sm text-gray-600 dark:text-gray-400 font-mono">
-                    {language === "French" ? "NIVEAU D'ACCÈS:" : 
-                     language === "Spanish" ? "NIVEL DE ACCESO:" : 
-                     "ACCESS LEVEL:"}
-                  </span>
-                  <motion.span 
-                    className="text-sm font-mono text-red-400 font-bold"
-                    animate={{
-                      textShadow: [
-                        "0 0 5px rgba(239, 68, 68, 0.5)",
-                        "0 0 10px rgba(239, 68, 68, 0.8)",
-                        "0 0 5px rgba(239, 68, 68, 0.5)"
-                      ]
-                    }}
-                    transition={{ duration: 1.5, repeat: Infinity }}
-                  >
-                    CLASSIFIED
-                  </motion.span>
+                  {[
+                    { 
+                      icon: Activity, 
+                      label: "MONITORING", 
+                      value: "ACTIVE", 
+                      color: "text-green-400" 
+                    },
+                    { 
+                      icon: Shield, 
+                      label: "SECURITY", 
+                      value: "ENGAGED", 
+                      color: "text-blue-400" 
+                    },
+                    { 
+                      icon: AlertTriangle, 
+                      label: "THREATS", 
+                      value: "SCANNING", 
+                      color: "text-yellow-400" 
+                    }
+                  ].map((stat, idx) => (
+                    <motion.div
+                      key={idx}
+                      className="text-center p-3 rounded-lg bg-gray-100/50 dark:bg-gray-900/50 border border-gray-300/50 dark:border-gray-700/50"
+                      whileHover={{ 
+                        scale: 1.05,
+                        borderColor: "rgba(6, 182, 212, 0.5)" 
+                      }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <stat.icon className={`w-6 h-6 ${stat.color} mx-auto mb-2`} />
+                      <div className="text-xs text-gray-600 dark:text-gray-400 font-mono">{stat.label}</div>
+                      <motion.div 
+                        className={`text-sm font-bold ${stat.color} font-mono`}
+                        animate={{
+                          opacity: [0.7, 1, 0.7],
+                        }}
+                        transition={{
+                          duration: 2,
+                          delay: idx * 0.3,
+                          repeat: Infinity,
+                        }}
+                      >
+                        {stat.value}
+                      </motion.div>
+                    </motion.div>
+                  ))}
                 </motion.div>
               </div>
-            </motion.div>
-
-            {/* System Stats */}
+              {/* Mission Objective */}
+              <div className="mt-6 p-4 rounded-lg bg-gradient-to-r from-purple-100/30 to-blue-100/30 dark:from-purple-900/30 dark:to-blue-900/30 border border-purple-500/30">
+                <div className="flex items-center space-x-3">
+                  <Code2 className="w-5 h-5 text-purple-400" />
+                  <span className="text-sm font-mono text-purple-300">MISSION:</span>
+                  <span className="text-sm font-mono text-gray-700 dark:text-gray-300">Analyze and secure critical network infrastructures</span>
+                </div>
+              </div>
+            </>
+          )}
+          {activeTab === "darkweb" && (
             <motion.div
-              className="flex-1 grid grid-cols-3 gap-4"
-              initial={{ opacity: 0, x: 30 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8, delay: 0.5 }}
+              variants={fadeIn}
+              initial="hidden"
+              animate="visible"
+              className="text-center p-8"
             >
-              {[
-                { 
-                  icon: Activity, 
-                  label: language === "French" ? "SURVEILLANCE" : 
-                         language === "Spanish" ? "VIGILANCIA" : 
-                         "MONITORING", 
-                  value: "ACTIVE", 
-                  color: "text-green-400" 
-                },
-                { 
-                  icon: Shield, 
-                  label: language === "French" ? "SÉCURITÉ" : 
-                         language === "Spanish" ? "SEGURIDAD" : 
-                         "SECURITY", 
-                  value: "ENGAGED", 
-                  color: "text-blue-400" 
-                },
-                { 
-                  icon: AlertTriangle, 
-                  label: language === "French" ? "MENACES" : 
-                         language === "Spanish" ? "AMENAZAS" : 
-                         "THREATS", 
-                  value: "SCANNING", 
-                  color: "text-yellow-400" 
-                }
-              ].map((stat, idx) => (
-                <motion.div
-                  key={idx}
-                  className="text-center p-3 rounded-lg bg-gray-100/50 dark:bg-gray-900/50 border border-gray-300/50 dark:border-gray-700/50"
-                  whileHover={{ 
-                    scale: 1.05,
-                    borderColor: "rgba(6, 182, 212, 0.5)" 
-                  }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <stat.icon className={`w-6 h-6 ${stat.color} mx-auto mb-2`} />
-                  <div className="text-xs text-gray-600 dark:text-gray-400 font-mono">{stat.label}</div>
-                  <motion.div 
-                    className={`text-sm font-bold ${stat.color} font-mono`}
-                    animate={{
-                      opacity: [0.7, 1, 0.7],
-                    }}
-                    transition={{
-                      duration: 2,
-                      delay: idx * 0.3,
-                      repeat: Infinity,
-                    }}
-                  >
-                    {stat.value}
-                  </motion.div>
-                </motion.div>
-              ))}
+              <div className="text-purple-400 mb-4">
+                <Skull className="w-16 h-16 mx-auto" />
+              </div>
+              <h3 className="text-2xl font-bold text-white mb-2">Darkweb Monitoring</h3>
+              <p className="text-gray-400">
+                Real-time threat intelligence from dark web sources will be displayed here.
+              </p>
             </motion.div>
-          </div>
-
-          {/* Mission Objective */}
-          <motion.div
-            className="mt-6 p-4 rounded-lg bg-gradient-to-r from-purple-100/30 to-blue-100/30 dark:from-purple-900/30 dark:to-blue-900/30 border border-purple-500/30"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.7 }}
-          >
-            <div className="flex items-center space-x-3">
-              <Code2 className="w-5 h-5 text-purple-400" />
-              <span className="text-sm font-mono text-purple-300">
-                {language === "French" ? "MISSION:" : 
-                 language === "Spanish" ? "MISIÓN:" : 
-                 "MISSION:"}
-              </span>
-              <motion.span 
-                className="text-sm font-mono text-gray-700 dark:text-gray-300"
-                animate={{
-                  opacity: [0.8, 1, 0.8]
-                }}
-                transition={{ duration: 3, repeat: Infinity }}
-              >
-                {language === "French" ? "Analyser et sécuriser les infrastructures réseau critiques" : 
-                 language === "Spanish" ? "Analizar y asegurar infraestructuras de red críticas" : 
-                 "Analyze and secure critical network infrastructures"}
-              </motion.span>
-            </div>
-          </motion.div>
+          )}
         </motion.div>
       </div>
-
       {/* Tab Selector */}
       <div className="flex border-b border-gray-300 dark:border-gray-800 mb-8">
         <button
@@ -382,9 +362,7 @@ const Dashboard = () => {
           }`}
           onClick={() => setActiveTab("analytics")}
         >
-          {language === "French" ? "Tableau de Bord" : 
-           language === "Spanish" ? "Panel de Control" : 
-           "Dashboard"}
+          {"Dashboard"}
           {activeTab === "analytics" && (
             <motion.div 
               className="absolute bottom-0 left-0 right-0 h-0.5 bg-crimsonRed"
@@ -400,9 +378,7 @@ const Dashboard = () => {
           }`}
           onClick={() => setActiveTab("darkweb")}
         >
-          {language === "French" ? "Surveillance Dark Web" : 
-           language === "Spanish" ? "Monitoreo Dark Web" : 
-           "Darkweb Monitoring"}
+          {"Darkweb Monitoring"}
           {activeTab === "darkweb" && (
             <motion.div 
               className="absolute bottom-0 left-0 right-0 h-0.5 bg-crimsonRed"
@@ -411,10 +387,9 @@ const Dashboard = () => {
           )}
         </button>
       </div>
-      
-      {/* Tab Content */}
+      {/* Tab Content (analytics only) */}
       <div className="w-full">
-        {activeTab === "analytics" ? (
+        {activeTab === "analytics" && (
           <motion.div
             variants={fadeIn}
             initial="hidden"
@@ -441,7 +416,6 @@ const Dashboard = () => {
                 </motion.div>
               ))}
             </div>
-            
             {/* Search Activity Graph */}
             <motion.div
               className="bg-darkGray p-6 rounded-lg shadow-md mb-8"
@@ -451,27 +425,20 @@ const Dashboard = () => {
               transition={{ delay: 0.3 }}
             >
               <h2 className="text-lg font-semibold text-coolWhite mb-4">
-                {language === "French" ? "Activité de Recherche" : 
-                 language === "Spanish" ? "Actividad de Búsqueda" : 
-                 "Search Activity"}
+                {"Search Activity"}
               </h2>
               <div className="h-72 flex items-center justify-center">
                 <div className="text-gray-400 text-center">
                   <Search className="h-12 w-12 text-gray-500 mx-auto mb-4" />
                   <p className="mb-2">
-                    {language === "French" ? "Visualisation des données de recherche" : 
-                     language === "Spanish" ? "Visualización de datos de búsqueda" : 
-                     "Search data visualization"}
+                    {"Search data visualization"}
                   </p>
                   <p className="text-sm text-gray-500">
-                    {language === "French" ? "Connecté à Elasticsearch" : 
-                     language === "Spanish" ? "Conectado a Elasticsearch" : 
-                     "Connected to Elasticsearch"}
+                    {"Connected to Elasticsearch"}
                   </p>
                 </div>
               </div>
             </motion.div>
-            
             {/* Recent Searches */}
             <motion.div
               className="bg-darkGray p-6 rounded-lg shadow-md"
@@ -481,28 +448,20 @@ const Dashboard = () => {
               transition={{ delay: 0.4 }}
             >
               <h2 className="text-lg font-semibold text-coolWhite mb-4">
-                {language === "French" ? "Recherches Récentes" : 
-                 language === "Spanish" ? "Búsquedas Recientes" : 
-                 "Recent Searches"}
+                {"Recent Searches"}
               </h2>
               <div className="overflow-hidden">
                 <table className="w-full">
                   <thead>
                     <tr className="text-left text-gray-400 text-sm">
                       <th className="pb-3 font-medium">
-                        {language === "French" ? "Requête" : 
-                         language === "Spanish" ? "Consulta" : 
-                         "Query"}
+                        {"Query"}
                       </th>
                       <th className="pb-3 font-medium">
-                        {language === "French" ? "Date" : 
-                         language === "Spanish" ? "Fecha" : 
-                         "Date"}
+                        {"Date"}
                       </th>
                       <th className="pb-3 font-medium">
-                        {language === "French" ? "Résultats" : 
-                         language === "Spanish" ? "Resultados" : 
-                         "Results"}
+                        {"Results"}
                       </th>
                     </tr>
                   </thead>
@@ -532,21 +491,6 @@ const Dashboard = () => {
                 </table>
               </div>
             </motion.div>
-          </motion.div>
-        ) : (
-          <motion.div
-            variants={fadeIn}
-            initial="hidden"
-            animate="visible"
-            className="text-center p-8"
-          >
-            <div className="text-purple-400 mb-4">
-              <Skull className="w-16 h-16 mx-auto" />
-            </div>
-            <h3 className="text-2xl font-bold text-white mb-2">Darkweb Monitoring</h3>
-            <p className="text-gray-400">
-              Real-time threat intelligence from dark web sources will be displayed here.
-            </p>
           </motion.div>
         )}
       </div>
