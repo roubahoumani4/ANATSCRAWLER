@@ -55,6 +55,7 @@ import express from 'express';
 import cookieParser from "cookie-parser";
 import sanitizeHtml from "sanitize-html";
 import crypto from "crypto";
+import spiderfootRouter from './routes/spiderfoot';
 
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || "ANAT_SECURITY_JWT_SECRET_KEY";
@@ -62,6 +63,8 @@ const TOKEN_EXPIRATION = "24h";
 
 export async function registerRoutes(app: Express): Promise<void> {
   await registerThreatIntelRoute(app);
+  // Mount SpiderFoot API proxy at /api/spiderfoot
+  app.use('/api/spiderfoot', spiderfootRouter);
   // Create a new secure router
   const secureRouter = express.Router();
   

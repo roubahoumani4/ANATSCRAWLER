@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Calendar, Clock, Search, Shield, Database, FileText, Terminal, Skull, Wifi, Eye, Zap, Activity, AlertTriangle, Code2 } from "lucide-react";
 import { fadeIn, slideUp } from "@/utils/animations";
 import SearchInterface from "../search/SearchInterface";
+import OsintEngine from "./OsintEngine";
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -412,20 +413,7 @@ const Dashboard = () => {
             </motion.div>
           </motion.div>
         ) : (
-          <motion.div
-            variants={fadeIn}
-            initial="hidden"
-            animate="visible"
-            className="text-center p-8"
-          >
-            <div className="text-purple-400 mb-4">
-              <Skull className="w-16 h-16 mx-auto" />
-            </div>
-            <h3 className="text-2xl font-bold text-white mb-2">Darkweb Monitoring</h3>
-            <p className="text-gray-400">
-              Real-time threat intelligence from dark web sources will be displayed here.
-            </p>
-          </motion.div>
+          <OsintEngine />
         )}
       </div>
     </motion.div>
