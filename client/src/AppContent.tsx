@@ -19,6 +19,7 @@ import EditUserPage from "@/pages/EditUserPage";
 import HistoryPage from "@/pages/HistoryPage";
 import AccountChangesPage from "@/pages/AccountChangesPage";
 import ActivityLogsPage from "@/pages/ActivityLogsPage";
+import ThreatIntelligencePage from "@/pages/ThreatIntelligencePage";
 
 export default function AppContent() {
   const { isAuthenticated, loading } = useAuth();
@@ -57,7 +58,7 @@ export default function AppContent() {
         <Route path="/osint" component={OsintFrameworkPage} />
         <Route path="/darkweb" component={DarkwebMonitoringPage} />
         <Route path="/malware" component={MalwareAnalysisPage} />
-        <Route path="/threat-intel" component={require("@/pages/ThreatIntelligencePage").default} />
+        <Route path="/threat-intel" component={ThreatIntelligencePage} />
         <Route path="/websecurity" component={WebSecurityScanningPage} />
         <Route path="/users" component={UsersPage} />
         <Route path="/settings/general" component={GeneralSettingsPage} />
