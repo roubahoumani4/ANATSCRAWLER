@@ -181,7 +181,7 @@ const Sidebar = () => {
               {item.hasSubmenu && !collapsed && (
                 <div className="space-y-1 mb-2" style={{ marginLeft: '1.5rem' }}>
                   {item.features?.map((feature) => (
-                    <Link key={feature.path} href={item.path} className="no-underline">
+                    <Link key={feature.path} href={feature.path} className="no-underline">
                       <div className="flex items-center px-3 py-2 text-sm text-coolWhite cursor-pointer hover:bg-darkGray hover:border hover:border-gray-700/50 rounded-lg transition-colors duration-200">
                         <span className="text-gray-400">
                           {feature.icon}
