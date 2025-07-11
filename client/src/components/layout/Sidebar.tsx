@@ -61,7 +61,7 @@ const Sidebar = () => {
       features: [
         { path: "/osint/research-tools", label: "Research Tools", icon: <Search size={16} /> },
         { path: "/osint/data-collection", label: "Data Collection", icon: <Globe size={16} /> },
-        { path: "/osint/social-media", label: "Social Media Intel", icon: <Users size={16} /> },
+        { path: "/osint/social-media-intel", label: "Social Media Intel", icon: <Users size={16} /> },
         { path: "/osint/domain-analysis", label: "Domain Analysis", icon: <Globe size={16} /> },
         { path: "/osint/image-analysis", label: "Image Analysis", icon: <Eye size={16} /> }
       ]
