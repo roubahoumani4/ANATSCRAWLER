@@ -26,7 +26,8 @@ const OsintFrameworkPage = () => {
       description: "Social platform monitoring and data collection",
       icon: <Eye className="w-8 h-8" />,
       color: "from-purple-500 to-pink-500",
-      features: ["Profile Analysis", "Content Monitoring", "Network Mapping", "Behavioral Analysis"]
+      features: ["Profile Analysis", "Content Monitoring", "Network Mapping", "Behavioral Analysis"],
+      link: "/osint/social-media-intel"
     },
     {
       title: translate("osint.networkReconnaissance"), 
@@ -189,13 +190,22 @@ const OsintFrameworkPage = () => {
                 ))}
               </div>
 
-              <motion.button
-                className="mt-4 w-full py-2 bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-500/50 rounded-lg text-green-400 font-mono text-sm hover:bg-green-600/30 transition-colors"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                LAUNCH MODULE
-              </motion.button>
+              {module.link ? (
+                <a
+                  href={module.link}
+                  className="mt-4 w-full inline-block py-2 bg-gradient-to-r from-purple-600/20 to-pink-600/20 border border-purple-500/50 rounded-lg text-purple-400 font-mono text-sm hover:bg-purple-600/30 transition-colors text-center"
+                >
+                  LAUNCH MODULE
+                </a>
+              ) : (
+                <motion.button
+                  className="mt-4 w-full py-2 bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-500/50 rounded-lg text-green-400 font-mono text-sm hover:bg-green-600/30 transition-colors"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  LAUNCH MODULE
+                </motion.button>
+              )}
             </motion.div>
           ))}
         </motion.div>
