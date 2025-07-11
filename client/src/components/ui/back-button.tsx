@@ -1,7 +1,6 @@
 import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { useLocation } from "wouter";
-import { useLanguage } from "@/context/LanguageContext";
 
 interface BackButtonProps {
   to?: string;
@@ -10,7 +9,6 @@ interface BackButtonProps {
 
 const BackButton = ({ to = "/dashboard", color = "red" }: BackButtonProps) => {
   const [, setLocation] = useLocation();
-  const { language } = useLanguage();
 
   const colorStyles = {
     purple: "text-purple-400 hover:text-purple-300 border-purple-400/20 hover:border-purple-400/40",
@@ -34,7 +32,7 @@ const BackButton = ({ to = "/dashboard", color = "red" }: BackButtonProps) => {
         style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}
       >
         <ArrowLeft size={20} />
-        <span>{language === "French" ? "Retour" : "Back"}</span>
+        <span>Back</span>
       </button>
     </motion.div>
   );

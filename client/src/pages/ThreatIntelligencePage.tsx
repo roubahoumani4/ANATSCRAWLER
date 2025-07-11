@@ -1,28 +1,6 @@
-import React from "react";
-import { motion } from "framer-motion";
-import { useLanguage } from "@/context/LanguageContext";
 
-const ThreatIntelligencePage = () => {
-  const { translate } = useLanguage();
-  return (
-    <motion.div
-      className="threat-intel-container min-h-screen flex flex-col items-center justify-center bg-jetBlack text-coolWhite"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      <h1 className="text-3xl font-bold text-[hsl(var(--crimsonRed))] mb-4 drop-shadow">
-        Threat Intelligence
-      </h1>
-      <p className="mb-8 text-lg text-gray-300 max-w-xl text-center">
-        Search for a person across social media platforms (Facebook, Instagram, Twitter/X, LinkedIn) and generate a professional intelligence report. Start by entering a name or username below.
-      </p>
-      {/* Step 1: Search form with state, validation, and results placeholder */}
-      <ThreatIntelSearch />
-      {/* Results and reporting UI will be developed step by step */}
-// --- Threat Intelligence Search Form Component ---
-import { useState } from "react";
+import React, { useState } from "react";
+import { motion } from "framer-motion";
 
 const ThreatIntelSearch = () => {
   const [name, setName] = useState("");
@@ -104,6 +82,23 @@ const ThreatIntelSearch = () => {
     </div>
   );
 };
+
+const ThreatIntelligencePage = () => {
+  return (
+    <motion.div
+      className="threat-intel-container min-h-screen flex flex-col items-center justify-center bg-jetBlack text-coolWhite"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.5 }}
+    >
+      <h1 className="text-3xl font-bold text-[hsl(var(--crimsonRed))] mb-4 drop-shadow">
+        Threat Intelligence
+      </h1>
+      <p className="mb-8 text-lg text-gray-300 max-w-xl text-center">
+        Search for a person across social media platforms (Facebook, Instagram, Twitter/X, LinkedIn) and generate a professional intelligence report. Start by entering a name or username below.
+      </p>
+      <ThreatIntelSearch />
     </motion.div>
   );
 };
