@@ -1,3 +1,10 @@
+
+import express from "express";
+import fetch from "node-fetch";
+
+const router = express.Router();
+const SPIDERFOOT_API_URL = "http://127.0.0.1:8000"; // FastAPI wrapper URL
+
 // List available modules
 router.get("/modules", async (req, res) => {
   try {
@@ -8,14 +15,6 @@ router.get("/modules", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch modules" });
   }
 });
-import express from "express";
-import fetch from "node-fetch";
-
-const router = express.Router();
-const SPIDERFOOT_API_URL = "http://127.0.0.1:8000"; // FastAPI wrapper URL
-
-// List all scans (remove duplicate)
-// ...existing code...
 
 // Start a new scan
 router.post("/scan", async (req, res) => {
