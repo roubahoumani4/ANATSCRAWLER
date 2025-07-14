@@ -1,3 +1,13 @@
+// List available modules
+router.get("/modules", async (req, res) => {
+  try {
+    const response = await fetch(`${SPIDERFOOT_API_URL}/modules`);
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch modules" });
+  }
+});
 import express from "express";
 import fetch from "node-fetch";
 
