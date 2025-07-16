@@ -89,9 +89,19 @@ const OsintEngine = () => {
   const [activeTab, setActiveTab] = useState<'new' | 'scans'>('new');
 
   return (
-    <motion.div className="p-8 max-w-5xl mx-auto min-h-screen">
+    <motion.div
+      className="p-8 max-w-5xl mx-auto min-h-screen"
+      initial={{ opacity: 0, y: 30 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: 'easeOut' }}
+    >
       {/* Tabs Header */}
-      <div className="flex items-center gap-2 mb-10">
+      <motion.div
+        className="flex items-center gap-2 mb-10"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1, duration: 0.5 }}
+      >
         <button
           className={`flex items-center gap-2 px-5 py-2 rounded-t-lg font-bold text-lg border-b-4 transition-all ${activeTab === 'new' ? 'border-blue-500 text-blue-400 bg-darkGray' : 'border-transparent text-gray-400 bg-transparent hover:text-blue-300'}`}
           onClick={() => setActiveTab('new')}
@@ -104,12 +114,19 @@ const OsintEngine = () => {
         >
           <FolderSearch className="w-6 h-6" /> Scans
         </button>
-      </div>
+      </motion.div>
 
       {/* New Scan Tab */}
       {activeTab === 'new' && (
-        <form onSubmit={startScan} className="w-full flex flex-col gap-8">
-          <div className="flex flex-col md:flex-row gap-8 w-full">
+        <motion.form
+          onSubmit={startScan}
+          className="w-full flex flex-col gap-8"
+          initial={{ opacity: 0, x: 40 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -40 }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+        >
+          <motion.div className="flex flex-col md:flex-row gap-8 w-full" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.5 }}>
             <div className="flex-1">
               <label className="block mb-2 text-coolWhite font-semibold">Scan Name</label>
               <input
@@ -129,7 +146,7 @@ const OsintEngine = () => {
                 required
               />
             </div>
-            <div className="flex-1 text-sm text-coolWhite bg-darkGray border border-gray-700 rounded p-4">
+            <motion.div className="flex-1 text-sm text-coolWhite bg-darkGray border border-gray-700 rounded p-4" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.5 }}>
               <div className="mb-2 font-semibold flex items-center gap-1 text-blue-400">
                 <span className="text-yellow-400">&#9888;</span> Your scan target may be a domain, IP, email, phone, username, subnet, or bitcoin address. Format will be auto-detected.
               </div>
@@ -150,18 +167,24 @@ const OsintEngine = () => {
                   <div><b>ASN:</b> <span className="italic">1234</span></div>
                 </div>
               </div>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
           {/* Scan Type Section */}
-          <div className="w-full">
+          <motion.div className="w-full" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.5 }}>
             <div className="flex flex-col gap-4">
               {[
                 { value: "all", label: "All", desc: <><b>Get anything and everything about the target.</b> All modules will be enabled (slow) and every possible piece of information about the target will be obtained and analysed.</> },
                 { value: "footprint", label: "Footprint", desc: <><b>Understand what information this target exposes to the Internet.</b> Gain an understanding about the target's network perimeter, associated identities and other information that is obtained through a lot of web crawling and search engine use.</> },
                 { value: "investigate", label: "Investigate", desc: <><b>Best for when you suspect the target to be malicious but need more information.</b> Some basic footprinting will be performed in addition to querying of blacklists and other sources that may have information about your target's maliciousness.</> },
                 { value: "passive", label: "Passive", desc: <><b>When you don't want the target to even suspect they are being investigated.</b> As much information will be gathered without touching the target or their affiliates, therefore only modules that do not touch the target will be enabled.</> }
-              ].map(opt => (
-                <label key={opt.value} className={`flex items-start gap-3 px-4 py-3 rounded cursor-pointer border-2 ${scanType === opt.value ? 'border-blue-500 bg-blue-900/30' : 'border-gray-700 bg-darkGray'} transition-all`}>
+              ].map((opt, idx) => (
+                <motion.label
+                  key={opt.value}
+                  className={`flex items-start gap-3 px-4 py-3 rounded cursor-pointer border-2 ${scanType === opt.value ? 'border-blue-500 bg-blue-900/30' : 'border-gray-700 bg-darkGray'} transition-all`}
+                  initial={{ opacity: 0, x: 30 * (idx + 1) }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.25 + idx * 0.07, duration: 0.4, ease: 'easeOut' }}
+                >
                   <input
                     type="radio"
                     name="scanType"
@@ -174,20 +197,29 @@ const OsintEngine = () => {
                     <span className="font-bold mr-2 text-coolWhite">{opt.label}</span>
                     <span className="text-xs text-gray-300">{opt.desc}</span>
                   </div>
-                </label>
+                </motion.label>
               ))}
             </div>
-          </div>
-          <button type="submit" className="mt-8 bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded font-bold flex items-center w-fit" disabled={loading}>
+          </motion.div>
+          <motion.button
+            type="submit"
+            className="mt-8 bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded font-bold flex items-center w-fit"
+            disabled={loading}
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.98 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35, duration: 0.4 }}
+          >
             <Search className="w-4 h-4 mr-2" /> Run Scan
-          </button>
-          {error && <div className="text-red-400 mt-2">{error}</div>}
-        </form>
+          </motion.button>
+          {error && <motion.div className="text-red-400 mt-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>{error}</motion.div>}
+        </motion.form>
       )}
 
       {/* Scans Tab */}
       {activeTab === 'scans' && (
-        <div className="mb-8 w-full">
+        <motion.div className="mb-8 w-full" initial={{ opacity: 0, x: -40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 40 }} transition={{ duration: 0.5, ease: 'easeOut' }}>
           <h3 className="text-xl font-semibold text-coolWhite mb-4">Your Scans</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm bg-darkGray rounded-lg">
@@ -205,8 +237,8 @@ const OsintEngine = () => {
                 {scans.length === 0 && (
                   <tr><td colSpan={6} className="text-center text-gray-500 p-4">No scans yet.</td></tr>
                 )}
-                {scans.map((scan: any) => (
-                  <tr key={scan.scan_id} className="border-b border-gray-700">
+                {scans.map((scan: any, idx: number) => (
+                  <motion.tr key={scan.scan_id} className="border-b border-gray-700" initial={{ opacity: 0, x: 30 * (idx + 1) }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 + idx * 0.05, duration: 0.3 }}>
                     <td className="p-2 text-coolWhite">{scan.name || scan.scan_id}</td>
                     <td className="p-2 text-coolWhite">{scan.target}</td>
                     <td className="p-2 text-coolWhite">{scan.started ? new Date(scan.started).toLocaleString() : "-"}</td>
@@ -246,25 +278,25 @@ const OsintEngine = () => {
                         </button>
                       )}
                     </td>
-                  </tr>
+                  </motion.tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </div>
+        </motion.div>
       )}
 
       {/* Scan Results Modal/Section */}
       {results && (
-        <div className="bg-darkGray p-6 rounded-lg shadow-md mt-8">
+        <motion.div className="bg-darkGray p-6 rounded-lg shadow-md mt-8" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
           <h3 className="text-lg font-semibold text-coolWhite mb-2">Scan Results</h3>
           <pre className="text-xs text-gray-200 bg-gray-900 rounded p-4 overflow-x-auto max-h-96">
             {JSON.stringify(results, null, 2)}
           </pre>
-        </div>
+        </motion.div>
       )}
 
-      {loading && <div className="text-coolWhite flex items-center"><Loader className="w-5 h-5 mr-2 animate-spin" />Loading...</div>}
+      {loading && <motion.div className="text-coolWhite flex items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}><Loader className="w-5 h-5 mr-2 animate-spin" />Loading...</motion.div>}
     </motion.div>
   );
 };
