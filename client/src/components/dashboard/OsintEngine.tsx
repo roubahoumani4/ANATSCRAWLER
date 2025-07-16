@@ -200,7 +200,7 @@ const OsintEngine = () => {
               ].map((opt, idx) => (
                 <motion.label
                   key={opt.value}
-                  className={`flex items-start gap-3 px-4 py-3 rounded cursor-pointer border-2 ${scanType === opt.value ? 'border-blue-500 bg-blue-900/30' : 'border-gray-700 bg-darkGray'} transition-all`}
+                  className={`flex items-center gap-0 px-4 py-3 rounded cursor-pointer border-2 ${scanType === opt.value ? 'border-blue-500 bg-blue-900/30' : 'border-gray-700 bg-darkGray'} transition-all`}
                   initial={{ opacity: 0, x: 30 * (idx + 1) }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.25 + idx * 0.07, duration: 0.4, ease: 'easeOut' }}
@@ -213,9 +213,12 @@ const OsintEngine = () => {
                     onChange={() => setScanType(opt.value)}
                     className="mt-1 mr-2 accent-blue-500"
                   />
-                  <div className="flex flex-col">
-                    <span className="font-bold text-coolWhite mb-1">{opt.label} <span className="font-semibold">{opt.title}</span></span>
-                    <span className="text-xs text-gray-300 ml-6">{opt.desc}</span>
+                  <div className="flex flex-row w-full items-center">
+                    <div className="w-32 min-w-[8rem] max-w-[8rem] font-bold text-coolWhite text-left">{opt.label}</div>
+                    <div className="flex flex-col flex-1 pl-4">
+                      <span className="font-semibold text-coolWhite mb-1">{opt.title}</span>
+                      <span className="text-xs text-gray-300 mt-1">{opt.desc}</span>
+                    </div>
                   </div>
                 </motion.label>
               ))}
