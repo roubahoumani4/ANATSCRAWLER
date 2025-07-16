@@ -100,7 +100,7 @@ const OsintEngine = () => {
       </div>
 
       {/* New Scan Page Main Content (SpiderFoot style) */}
-      <div className="bg-white rounded-lg shadow p-8 mb-10">
+      <form onSubmit={startScan} className="bg-white rounded-lg shadow p-8 mb-10">
         <div className="flex flex-col md:flex-row gap-8">
           <div className="flex-1">
             <label className="block mb-2 text-gray-700 font-semibold">Scan Name</label>
@@ -181,55 +181,9 @@ const OsintEngine = () => {
           <Search className="w-4 h-4 mr-2" /> Run Scan Now
         </button>
         {error && <div className="text-red-400 mt-2">{error}</div>}
-      </div>
-
-      {/* The rest of the page (scans table, results, etc.) can be added below as a separate section if needed */}
-        <label className="block mb-2 text-coolWhite font-semibold">Scan Type</label>
-        <div className="flex flex-wrap gap-4 mb-4">
-          {[
-            { value: "all", label: "All", desc: "Get anything and everything about the target." },
-            { value: "footprint", label: "Footprint", desc: "Understand what information this target exposes to the Internet." },
-            { value: "investigate", label: "Investigate", desc: "Best for when you suspect the target to be malicious but need more information." },
-            { value: "passive", label: "Passive", desc: "When you don't want the target to even suspect they are being investigated." }
-          ].map(opt => (
-            <label key={opt.value} className={`flex items-center px-3 py-2 rounded cursor-pointer border-2 ${scanType === opt.value ? 'border-blue-500 bg-blue-100' : 'border-gray-600 bg-gray-800'} transition-all`}>
-              <input
-                type="radio"
-                name="scanType"
-                value={opt.value}
-                checked={scanType === opt.value}
-                onChange={() => setScanType(opt.value)}
-                className="mr-2"
-              />
-              <span className="font-bold mr-2 text-black">{opt.label}</span>
-              <span className="text-xs text-gray-700">{opt.desc}</span>
-            </label>
-          ))}
-        </div>
-        <label className="block mb-2 text-coolWhite font-semibold">Scan Name</label>
-        <input
-          type="text"
-          value={scanName}
-          onChange={e => setScanName(e.target.value)}
-          className="w-full p-2 rounded bg-midGray text-black mb-4"
-          placeholder="Enter a name for this scan (optional)"
-        />
-        <label className="block mb-2 text-coolWhite font-semibold">Target</label>
-        <input
-          type="text"
-          value={target}
-          onChange={e => setTarget(e.target.value)}
-          className="w-full p-2 rounded bg-midGray text-black mb-4"
-          placeholder="Enter domain, IP, or username"
-          required
-        />
-        {/* No custom module selection, only scan type controls modules */}
-        <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-bold flex items-center" disabled={loading}>
-          <Search className="w-4 h-4 mr-2" /> Start Scan
-        </button>
-        {error && <div className="text-red-400 mt-2">{error}</div>}
       </form>
 
+      {/* The rest of the page (scans table, results, etc.) can be added below as a separate section if needed */}
       <div className="mb-8">
         <h3 className="text-lg font-semibold text-coolWhite mb-2">Your Scans</h3>
         <div className="overflow-x-auto">
