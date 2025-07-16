@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Search, Loader, List, CheckCircle, XCircle } from "lucide-react";
+import { Search, Loader, List, CheckCircle, XCircle, PlusCircle, FolderSearch } from "lucide-react";
 
 const API_BASE = "/api/spiderfoot";
 
@@ -87,8 +87,103 @@ const OsintEngine = () => {
 
   return (
     <motion.div className="p-8 max-w-4xl mx-auto">
-      <h2 className="text-2xl font-bold mb-6 text-coolWhite">OSINT Engine (SpiderFoot)</h2>
-      <form onSubmit={startScan} className="mb-8 bg-darkGray p-6 rounded-lg shadow-md">
+      {/* Header Section */}
+      <div className="flex items-center gap-8 mb-10">
+        <div className="flex items-center gap-2">
+          <PlusCircle className="w-7 h-7 text-blue-500" />
+          <h2 className="text-2xl font-bold text-coolWhite">New Scan</h2>
+        </div>
+        <div className="flex items-center gap-2">
+          <FolderSearch className="w-7 h-7 text-green-500" />
+          <h2 className="text-2xl font-bold text-coolWhite">Scans</h2>
+        </div>
+      </div>
+
+      {/* New Scan Page Main Content (SpiderFoot style) */}
+      <div className="bg-white rounded-lg shadow p-8 mb-10">
+        <div className="flex flex-col md:flex-row gap-8">
+          <div className="flex-1">
+            <label className="block mb-2 text-gray-700 font-semibold">Scan Name</label>
+            <input
+              type="text"
+              value={scanName}
+              onChange={e => setScanName(e.target.value)}
+              className="w-full p-2 rounded border border-gray-300 mb-4 text-black"
+              placeholder="The name of this scan."
+            />
+            <label className="block mb-2 text-gray-700 font-semibold">Scan Target</label>
+            <input
+              type="text"
+              value={target}
+              onChange={e => setTarget(e.target.value)}
+              className="w-full p-2 rounded border border-gray-300 mb-4 text-black"
+              placeholder="The target of your scan."
+              required
+            />
+          </div>
+          <div className="flex-1 bg-gray-50 rounded p-4 text-xs text-gray-700 border border-gray-200">
+            <div className="mb-2 font-semibold flex items-center gap-1">
+              <span className="text-yellow-600">&#9888;</span> Your scan target may be one of the following. SpiderFoot will automatically detect the target type based on the format of your input:
+            </div>
+            <div className="grid grid-cols-2 gap-x-4">
+              <div>
+                <div><b>Domain Name:</b> <span className="italic">e.g. example.com</span></div>
+                <div><b>IPv4 Address:</b> <span className="italic">e.g. 1.2.3.4</span></div>
+                <div><b>IPv6 Address:</b> <span className="italic">e.g. 2606:4700:4700::1111</span></div>
+                <div><b>Hostname/Sub-domain:</b> <span className="italic">e.g. abc.example.com</span></div>
+                <div><b>Subnet:</b> <span className="italic">e.g. 1.2.3.0/24</span></div>
+                <div><b>Bitcoin Address:</b> <span className="italic">e.g. 1HesYJSP1QqcyPEjnQ9vZBL1wujruNGe7R</span></div>
+              </div>
+              <div>
+                <div><b>E-mail address:</b> <span className="italic">e.g. bob@example.com</span></div>
+                <div><b>Phone Number:</b> <span className="italic">e.g. +12345678901 (E.164 format)</span></div>
+                <div><b>Human Name:</b> <span className="italic">e.g. "John Smith" (must be in quotes)</span></div>
+                <div><b>Username:</b> <span className="italic">e.g. "jsmith2000" (must be in quotes)</span></div>
+                <div><b>Network ASN:</b> <span className="italic">e.g. 1234</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        {/* Scan Type Section */}
+        <div className="mt-8">
+          <div className="border-b border-gray-200 mb-4">
+            <div className="flex gap-8">
+              <button type="button" className="py-2 px-4 border-b-2 border-blue-500 font-semibold text-blue-700 bg-white">By Use Case</button>
+              <button type="button" className="py-2 px-4 text-gray-400 cursor-not-allowed" disabled>By Required Data</button>
+              <button type="button" className="py-2 px-4 text-gray-400 cursor-not-allowed" disabled>By Module</button>
+            </div>
+          </div>
+          <div className="flex flex-col gap-4">
+            {[
+              { value: "all", label: "All", desc: <><b>Get anything and everything about the target.</b><br />All SpiderFoot modules will be enabled (slow) but every possible piece of information about the target will be obtained and analysed.</> },
+              { value: "footprint", label: "Footprint", desc: <><b>Understand what information this target exposes to the Internet.</b><br />Gain an understanding about the target's network perimeter, associated identities and other information that is obtained through a lot of web crawling and search engine use.</> },
+              { value: "investigate", label: "Investigate", desc: <><b>Best for when you suspect the target to be malicious but need more information.</b><br />Some basic footprinting will be performed in addition to querying of blacklists and other sources that may have information about your target's maliciousness.</> },
+              { value: "passive", label: "Passive", desc: <><b>When you don't want the target to even suspect they are being investigated.</b><br />As much information will be gathered without touching the target or their affiliates, therefore only modules that do not touch the target will be enabled.</> }
+            ].map(opt => (
+              <label key={opt.value} className={`flex items-start gap-3 px-4 py-3 rounded cursor-pointer border-2 ${scanType === opt.value ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'} transition-all`}>
+                <input
+                  type="radio"
+                  name="scanType"
+                  value={opt.value}
+                  checked={scanType === opt.value}
+                  onChange={() => setScanType(opt.value)}
+                  className="mt-1 mr-2"
+                />
+                <div>
+                  <span className="font-bold mr-2 text-black">{opt.label}</span>
+                  <span className="text-xs text-gray-700">{opt.desc}</span>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+        <button type="submit" className="mt-8 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded font-bold flex items-center" disabled={loading}>
+          <Search className="w-4 h-4 mr-2" /> Run Scan Now
+        </button>
+        {error && <div className="text-red-400 mt-2">{error}</div>}
+      </div>
+
+      {/* The rest of the page (scans table, results, etc.) can be added below as a separate section if needed */}
         <label className="block mb-2 text-coolWhite font-semibold">Scan Type</label>
         <div className="flex flex-wrap gap-4 mb-4">
           {[
