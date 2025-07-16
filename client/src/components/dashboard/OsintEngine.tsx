@@ -173,10 +173,30 @@ const OsintEngine = () => {
           <motion.div className="w-full" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.5 }}>
             <div className="flex flex-col gap-4">
               {[
-                { value: "all", label: "All", desc: <><b>Get anything and everything about the target.</b> All modules will be enabled (slow) and every possible piece of information about the target will be obtained and analysed.</> },
-                { value: "footprint", label: "Footprint", desc: <><b>Understand what information this target exposes to the Internet.</b> Gain an understanding about the target's network perimeter, associated identities and other information that is obtained through a lot of web crawling and search engine use.</> },
-                { value: "investigate", label: "Investigate", desc: <><b>Best for when you suspect the target to be malicious but need more information.</b> Some basic footprinting will be performed in addition to querying of blacklists and other sources that may have information about your target's maliciousness.</> },
-                { value: "passive", label: "Passive", desc: <><b>When you don't want the target to even suspect they are being investigated.</b> As much information will be gathered without touching the target or their affiliates, therefore only modules that do not touch the target will be enabled.</> }
+                {
+                  value: "all",
+                  label: "All",
+                  title: "Get anything and everything about the target.",
+                  desc: "All modules will be enabled (slow) and every possible piece of information about the target will be obtained and analysed."
+                },
+                {
+                  value: "footprint",
+                  label: "Footprint",
+                  title: "Understand what information this target exposes to the Internet.",
+                  desc: "Gain an understanding about the target's network perimeter, associated identities and other information that is obtained through a lot of web crawling and search engine use."
+                },
+                {
+                  value: "investigate",
+                  label: "Investigate",
+                  title: "Best for when you suspect the target to be malicious but need more information.",
+                  desc: "Some basic footprinting will be performed in addition to querying of blacklists and other sources that may have information about your target's maliciousness."
+                },
+                {
+                  value: "passive",
+                  label: "Passive",
+                  title: "When you don't want the target to even suspect they are being investigated.",
+                  desc: "As much information will be gathered without touching the target or their affiliates, therefore only modules that do not touch the target will be enabled."
+                }
               ].map((opt, idx) => (
                 <motion.label
                   key={opt.value}
@@ -193,9 +213,9 @@ const OsintEngine = () => {
                     onChange={() => setScanType(opt.value)}
                     className="mt-1 mr-2 accent-blue-500"
                   />
-                  <div>
-                    <span className="font-bold mr-2 text-coolWhite">{opt.label}</span>
-                    <span className="text-xs text-gray-300">{opt.desc}</span>
+                  <div className="flex flex-col">
+                    <span className="font-bold text-coolWhite mb-1">{opt.label} <span className="font-semibold">{opt.title}</span></span>
+                    <span className="text-xs text-gray-300 ml-6">{opt.desc}</span>
                   </div>
                 </motion.label>
               ))}
