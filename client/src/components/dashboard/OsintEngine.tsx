@@ -6,6 +6,7 @@ const API_BASE = "/api/spiderfoot";
 
 const OsintEngine = () => {
   const [target, setTarget] = useState("");
+  const [scanName, setScanName] = useState("");
   const [modules, setModules] = useState([]);
   const [selectedModules, setSelectedModules] = useState<string[]>([]);
   const [scans, setScans] = useState<any[]>([]);
@@ -40,7 +41,7 @@ const OsintEngine = () => {
       const res = await fetch(`${API_BASE}/scan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target, modules: selectedModules })
+        body: JSON.stringify({ target, modules: selectedModules, name: scanName })
       });
       const data = await res.json();
       if (data.scan_id) {
@@ -74,6 +75,14 @@ const OsintEngine = () => {
     <motion.div className="p-8 max-w-4xl mx-auto">
       <h2 className="text-2xl font-bold mb-6 text-coolWhite">OSINT Engine (SpiderFoot)</h2>
       <form onSubmit={startScan} className="mb-8 bg-darkGray p-6 rounded-lg shadow-md">
+        <label className="block mb-2 text-coolWhite font-semibold">Scan Name</label>
+        <input
+          type="text"
+          value={scanName}
+          onChange={e => setScanName(e.target.value)}
+          className="w-full p-2 rounded bg-midGray text-coolWhite mb-4"
+          placeholder="Enter a name for this scan (optional)"
+        />
         <label className="block mb-2 text-coolWhite font-semibold">Target</label>
         <input
           type="text"
@@ -114,24 +123,28 @@ const OsintEngine = () => {
           <table className="w-full text-sm bg-darkGray rounded-lg">
             <thead>
               <tr className="text-gray-400">
-                <th className="p-2">Scan ID</th>
+                <th className="p-2">Name</th>
                 <th className="p-2">Target</th>
+                <th className="p-2">Started</th>
+                <th className="p-2">Finished</th>
                 <th className="p-2">Status</th>
                 <th className="p-2">Actions</th>
               </tr>
             </thead>
             <tbody>
               {scans.length === 0 && (
-                <tr><td colSpan={4} className="text-center text-gray-500 p-4">No scans yet.</td></tr>
+                <tr><td colSpan={6} className="text-center text-gray-500 p-4">No scans yet.</td></tr>
               )}
               {scans.map((scan: any) => (
                 <tr key={scan.scan_id} className="border-b border-gray-700">
-                  <td className="p-2 text-coolWhite">{scan.scan_id}</td>
-                  <td className="p-2 text-coolWhite">{scan.scan_target}</td>
+                  <td className="p-2 text-coolWhite">{scan.name || scan.scan_id}</td>
+                  <td className="p-2 text-coolWhite">{scan.target}</td>
+                  <td className="p-2 text-coolWhite">{scan.started ? new Date(scan.started).toLocaleString() : "-"}</td>
+                  <td className="p-2 text-coolWhite">{scan.finished ? new Date(scan.finished).toLocaleString() : "Not yet"}</td>
                   <td className="p-2">
-                    {scan.status === "COMPLETED" ? (
-                      <span className="text-green-400 flex items-center"><CheckCircle className="w-4 h-4 mr-1" />Completed</span>
-                    ) : scan.status === "ERROR" ? (
+                    {scan.status === "finished" ? (
+                      <span className="text-green-400 flex items-center"><CheckCircle className="w-4 h-4 mr-1" />Finished</span>
+                    ) : scan.status === "error" ? (
                       <span className="text-red-400 flex items-center"><XCircle className="w-4 h-4 mr-1" />Error</span>
                     ) : (
                       <span className="text-yellow-400 flex items-center"><Loader className="w-4 h-4 mr-1 animate-spin" />{scan.status}</span>
