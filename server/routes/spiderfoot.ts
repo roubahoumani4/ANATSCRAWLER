@@ -67,10 +67,19 @@ router.get("/scan/:scanId/results", async (req, res) => {
   }
 });
 
-// (Optional) Delete/cancel scan
-// Not implemented in FastAPI wrapper yet
-router.delete("/scan/:scanId", async (req, res) => {
-  res.status(501).json({ error: "Delete scan not implemented" });
+
+// Stop/abort a scan
+router.post("/scan/:scanId/abort", async (req, res) => {
+  try {
+    const { scanId } = req.params;
+    const response = await fetch(`${SPIDERFOOT_API_URL}/scan/${scanId}/abort`, {
+      method: "POST"
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to abort scan" });
+  }
 });
 
 export default router;

@@ -9,6 +9,15 @@ const OsintEngine = () => {
   const [scanName, setScanName] = useState("");
   const [modules, setModules] = useState([]);
   const [selectedModules, setSelectedModules] = useState<string[]>([]);
+  const [scanType, setScanType] = useState<string>("all");
+
+  // Predefined module sets for scan types (example, adjust as needed)
+  const moduleSets: Record<string, string[]> = {
+    all: [], // All modules (empty means all)
+    footprint: ["sfp_dnsresolve", "sfp_whois", "sfp_ipinfo", "sfp_shodan"],
+    investigate: ["sfp_abuseipdb", "sfp_riskiq", "sfp_spamhaus", "sfp_alienvault"],
+    passive: ["sfp_dnsresolve", "sfp_whois", "sfp_socialprofiles"]
+  };
   const [scans, setScans] = useState<any[]>([]);
   const [results, setResults] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -23,6 +32,11 @@ const OsintEngine = () => {
       .catch(() => setModules([]));
     fetchScans();
   }, []);
+
+  // Update selected modules when scan type changes (unless custom)
+  useEffect(() => {
+    setSelectedModules(moduleSets[scanType] || []);
+  }, [scanType]);
 
   // Fetch all scans
   const fetchScans = () => {
@@ -41,7 +55,7 @@ const OsintEngine = () => {
       const res = await fetch(`${API_BASE}/scan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target, modules: selectedModules, name: scanName })
+        body: JSON.stringify({ target, modules: selectedModules, name: scanName, scan_type: scanType })
       });
       const data = await res.json();
       if (data.scan_id) {
@@ -75,12 +89,34 @@ const OsintEngine = () => {
     <motion.div className="p-8 max-w-4xl mx-auto">
       <h2 className="text-2xl font-bold mb-6 text-coolWhite">OSINT Engine (SpiderFoot)</h2>
       <form onSubmit={startScan} className="mb-8 bg-darkGray p-6 rounded-lg shadow-md">
+        <label className="block mb-2 text-coolWhite font-semibold">Scan Type</label>
+        <div className="flex flex-wrap gap-4 mb-4">
+          {[
+            { value: "all", label: "All", desc: "Get anything and everything about the target." },
+            { value: "footprint", label: "Footprint", desc: "Understand what information this target exposes to the Internet." },
+            { value: "investigate", label: "Investigate", desc: "Best for when you suspect the target to be malicious but need more information." },
+            { value: "passive", label: "Passive", desc: "When you don't want the target to even suspect they are being investigated." }
+          ].map(opt => (
+            <label key={opt.value} className={`flex items-center px-3 py-2 rounded cursor-pointer border-2 ${scanType === opt.value ? 'border-blue-500 bg-blue-100' : 'border-gray-600 bg-gray-800'} transition-all`}>
+              <input
+                type="radio"
+                name="scanType"
+                value={opt.value}
+                checked={scanType === opt.value}
+                onChange={() => setScanType(opt.value)}
+                className="mr-2"
+              />
+              <span className="font-bold mr-2 text-black">{opt.label}</span>
+              <span className="text-xs text-gray-700">{opt.desc}</span>
+            </label>
+          ))}
+        </div>
         <label className="block mb-2 text-coolWhite font-semibold">Scan Name</label>
         <input
           type="text"
           value={scanName}
           onChange={e => setScanName(e.target.value)}
-          className="w-full p-2 rounded bg-midGray text-coolWhite mb-4"
+          className="w-full p-2 rounded bg-midGray text-black mb-4"
           placeholder="Enter a name for this scan (optional)"
         />
         <label className="block mb-2 text-coolWhite font-semibold">Target</label>
@@ -88,29 +124,11 @@ const OsintEngine = () => {
           type="text"
           value={target}
           onChange={e => setTarget(e.target.value)}
-          className="w-full p-2 rounded bg-midGray text-coolWhite mb-4"
+          className="w-full p-2 rounded bg-midGray text-black mb-4"
           placeholder="Enter domain, IP, or username"
           required
         />
-        <label className="block mb-2 text-coolWhite font-semibold">Modules (optional)</label>
-        <div className="flex flex-wrap gap-2 mb-4 max-h-32 overflow-y-auto">
-          {modules.length === 0 && <span className="text-gray-400">Loading modules...</span>}
-          {modules.map((mod: string) => (
-            <label key={mod} className="inline-flex items-center text-xs bg-gray-700 text-white px-2 py-1 rounded cursor-pointer">
-              <input
-                type="checkbox"
-                value={mod}
-                checked={selectedModules.includes(mod)}
-                onChange={e => {
-                  if (e.target.checked) setSelectedModules([...selectedModules, mod]);
-                  else setSelectedModules(selectedModules.filter(m => m !== mod));
-                }}
-                className="mr-1"
-              />
-              {mod}
-            </label>
-          ))}
-        </div>
+        {/* No custom module selection, only scan type controls modules */}
         <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-bold flex items-center" disabled={loading}>
           <Search className="w-4 h-4 mr-2" /> Start Scan
         </button>
@@ -150,13 +168,31 @@ const OsintEngine = () => {
                       <span className="text-yellow-400 flex items-center"><Loader className="w-4 h-4 mr-1 animate-spin" />{scan.status}</span>
                     )}
                   </td>
-                  <td className="p-2">
+                  <td className="p-2 flex gap-2">
                     <button
-                      className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-xs mr-2"
+                      className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-xs"
                       onClick={() => fetchResults(scan.scan_id)}
                     >
                       View Results
                     </button>
+                    {scan.status === "running" && (
+                      <button
+                        className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs"
+                        onClick={async () => {
+                          setLoading(true);
+                          setError(null);
+                          try {
+                            await fetch(`${API_BASE}/scan/${scan.scan_id}/abort`, { method: "POST" });
+                            fetchScans();
+                          } catch {
+                            setError("Failed to abort scan");
+                          }
+                          setLoading(false);
+                        }}
+                      >
+                        Stop
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
