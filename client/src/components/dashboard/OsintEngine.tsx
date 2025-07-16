@@ -1,4 +1,8 @@
 import React, { useState, useEffect } from "react";
+import GraphView from "./GraphView";
+import SummaryBarChart from "./SummaryBarChart";
+import CorrelationsTable from "./CorrelationsTable";
+import BrowseTable from "./BrowseTable";
 import { motion } from "framer-motion";
 import { Search, Loader, List, CheckCircle, XCircle, PlusCircle, FolderSearch } from "lucide-react";
 
@@ -21,12 +25,8 @@ const OsintEngine = () => {
   const [scans, setScans] = useState<any[]>([]);
   // Table state
   const [filterStatus, setFilterStatus] = useState<string>('none');
-  const [filterName, setFilterName] = useState('');
-  const [filterTarget, setFilterTarget] = useState('');
-  const [filterStarted, setFilterStarted] = useState('');
-  const [filterFinished, setFilterFinished] = useState('');
-  const [filterElements, setFilterElements] = useState('');
-  const [filterCorrelations, setFilterCorrelations] = useState('');
+  // Sorting state: { column: string, direction: 'asc' | 'desc' }
+  const [sortConfig, setSortConfig] = useState<{ column: string, direction: 'asc' | 'desc' } | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -100,35 +100,45 @@ const OsintEngine = () => {
   const [activeTab, setActiveTab] = useState<'new' | 'scans'>('new');
 
 
-  // Filtering (all columns)
+  // Filtering (status only)
   const filteredScans = scans.filter(scan => {
-    // Status
     if (filterStatus !== 'none') {
       if (filterStatus === 'aborted') {
         if (!(scan.status === 'aborted' || scan.status === 'abort-requested')) return false;
       } else if (scan.status !== filterStatus) return false;
     }
-    // Name
-    if (filterName && !(scan.name || scan.scan_id).toLowerCase().includes(filterName.toLowerCase())) return false;
-    // Target
-    if (filterTarget && !(scan.target || '').toLowerCase().includes(filterTarget.toLowerCase())) return false;
-    // Started
-    if (filterStarted && scan.started && !scan.started.startsWith(filterStarted)) return false;
-    // Finished
-    if (filterFinished && scan.finished && !scan.finished.startsWith(filterFinished)) return false;
-    // Elements
-    if (filterElements && scan.elements !== undefined && String(scan.elements) !== filterElements) return false;
-    // Correlations (search for any value match)
-    if (filterCorrelations && scan.correlations) {
-      const corrStr = Object.values(scan.correlations).join(',');
-      if (!corrStr.includes(filterCorrelations)) return false;
-    }
     return true;
   });
 
+  // Sorting
+  const sortFns: Record<string, (a: any, b: any) => number> = {
+    name: (a, b) => ((a.name || a.scan_id) || '').localeCompare((b.name || b.scan_id) || ''),
+    target: (a, b) => (a.target || '').localeCompare(b.target || ''),
+    started: (a, b) => new Date(a.started || 0).getTime() - new Date(b.started || 0).getTime(),
+    finished: (a, b) => new Date(a.finished || 0).getTime() - new Date(b.finished || 0).getTime(),
+    status: (a, b) => (a.status || '').localeCompare(b.status || ''),
+    elements: (a, b) => (a.elements || 0) - (b.elements || 0),
+    correlations: (a, b) => {
+      const sum = (obj: any) => {
+        if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+          return Object.values(obj).reduce((acc: number, v: any) => acc + (typeof v === 'number' ? v : 0), 0);
+        }
+        return 0;
+      };
+      return sum(a.correlations) - sum(b.correlations);
+    }
+  };
+  let sortedScans = [...filteredScans];
+  if (sortConfig && sortFns[sortConfig.column]) {
+    sortedScans.sort((a, b) => {
+      const res = sortFns[sortConfig.column](a, b);
+      return sortConfig.direction === 'asc' ? res : -res;
+    });
+  }
+
   // Pagination
   const totalPages = Math.max(1, Math.ceil(filteredScans.length / rowsPerPage));
-  const paginatedScans = filteredScans.slice((page - 1) * rowsPerPage, page * rowsPerPage);
+  const paginatedScans = sortedScans.slice((page - 1) * rowsPerPage, page * rowsPerPage);
 
   // Row selection
   const allSelected = paginatedScans.length > 0 && paginatedScans.every(scan => selectedRows.has(scan.scan_id));
@@ -388,33 +398,29 @@ const OsintEngine = () => {
                       onChange={toggleSelectAll}
                     />
                   </th>
-                  <th className="p-2 text-left">
-                    Name
-                    <input type="text" className="mt-1 w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-coolWhite focus:outline-none" placeholder="Filter" value={filterName} onChange={e => setFilterName(e.target.value)} />
-                  </th>
-                  <th className="p-2 text-left">
-                    Target
-                    <input type="text" className="mt-1 w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-coolWhite focus:outline-none" placeholder="Filter" value={filterTarget} onChange={e => setFilterTarget(e.target.value)} />
-                  </th>
-                  <th className="p-2 text-left">
-                    Started
-                    <input type="date" className="mt-1 w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-coolWhite focus:outline-none" value={filterStarted} onChange={e => setFilterStarted(e.target.value)} />
-                  </th>
-                  <th className="p-2 text-left">
-                    Finished
-                    <input type="date" className="mt-1 w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-coolWhite focus:outline-none" value={filterFinished} onChange={e => setFilterFinished(e.target.value)} />
-                  </th>
-                  <th className="p-2 text-center">
-                    Status
-                  </th>
-                  <th className="p-2 text-center">
-                    Elements
-                    <input type="text" className="mt-1 w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-coolWhite focus:outline-none" placeholder="Filter" value={filterElements} onChange={e => setFilterElements(e.target.value)} />
-                  </th>
-                  <th className="p-2 text-center">
-                    Correlations
-                    <input type="text" className="mt-1 w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-coolWhite focus:outline-none" placeholder="Filter" value={filterCorrelations} onChange={e => setFilterCorrelations(e.target.value)} />
-                  </th>
+                  {[
+                    { key: 'name', label: 'Name' },
+                    { key: 'target', label: 'Target' },
+                    { key: 'started', label: 'Started' },
+                    { key: 'finished', label: 'Finished' },
+                    { key: 'status', label: 'Status', center: true },
+                    { key: 'elements', label: 'Elements', center: true },
+                    { key: 'correlations', label: 'Correlations', center: true }
+                  ].map(col => (
+                    <th
+                      key={col.key}
+                      className={`p-2 ${col.center ? 'text-center' : 'text-left'} select-none cursor-pointer group`}
+                      onClick={() => setSortConfig(prev => prev && prev.column === col.key ? { column: col.key, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { column: col.key, direction: 'desc' })}
+                    >
+                      <span className="flex items-center gap-1">
+                        {col.label}
+                        <span className="flex flex-col text-xs">
+                          <span className={`transition-colors ${sortConfig?.column === col.key && sortConfig.direction === 'asc' ? 'text-blue-400' : 'text-gray-500 group-hover:text-blue-300'}`}>▲</span>
+                          <span className={`transition-colors -mt-1 ${sortConfig?.column === col.key && sortConfig.direction === 'desc' ? 'text-blue-400' : 'text-gray-500 group-hover:text-blue-300'}`}>▼</span>
+                        </span>
+                      </span>
+                    </th>
+                  ))}
                   <th className="p-2 text-center">Actions</th>
                 </tr>
               </thead>
@@ -512,19 +518,145 @@ const OsintEngine = () => {
         </motion.div>
       )}
 
-      {/* Scan Results Modal/Section */}
+
+
+      {/* Scan Results Modal/Section with Tabs */}
       {results && (
         <motion.div className="bg-darkGray p-6 rounded-lg shadow-md mt-8" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-          <h3 className="text-lg font-semibold text-coolWhite mb-2">Scan Results</h3>
-          <pre className="text-xs text-gray-200 bg-gray-900 rounded p-4 overflow-x-auto max-h-96">
-            {JSON.stringify(results, null, 2)}
-          </pre>
+          <ScanResultsTabs results={results} />
         </motion.div>
       )}
-
-      {loading && <motion.div className="text-coolWhite flex items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}><Loader className="w-5 h-5 mr-2 animate-spin" />Loading...</motion.div>}
     </motion.div>
   );
-};
+}
 
 export default OsintEngine;
+
+// --- Scan Results Tabs Component ---
+function ScanResultsTabs({ results }: { results: any }) {
+  const [tab, setTab] = React.useState("summary");
+
+  function getCorrelationsSummary() {
+    if (!results || !results.correlations) return { high: 0, medium: 0, low: 0, info: 0 };
+    if (Array.isArray(results.correlations)) {
+      return results.correlations.reduce((acc: any, c: any) => {
+        const risk = (c.risk || '').toLowerCase();
+        if (risk === 'high') acc.high++;
+        else if (risk === 'medium') acc.medium++;
+        else if (risk === 'low') acc.low++;
+        else acc.info++;
+        return acc;
+      }, { high: 0, medium: 0, low: 0, info: 0 });
+    } else if (typeof results.correlations === 'object') {
+      return {
+        high: results.correlations.high || 0,
+        medium: results.correlations.medium || 0,
+        low: results.correlations.low || 0,
+        info: results.correlations.info || 0
+      };
+    }
+    return { high: 0, medium: 0, low: 0, info: 0 };
+  }
+
+  function getSummaryStats() {
+    return {
+      total: results?.elements || results?.summary?.total || 0,
+      unique: results?.summary?.unique || 0,
+      status: results?.status || results?.summary?.status || '',
+      errors: results?.summary?.errors || 0
+    };
+  }
+
+  function getBrowseData() {
+    return results?.browse || results?.data || results?.elements || [];
+  }
+
+  function getCorrelationsTable() {
+    if (Array.isArray(results.correlations)) return results.correlations;
+    if (typeof results.correlations === 'object' && results.correlations !== null) {
+      return Object.entries(results.correlations).map(([k, v]: [string, any]) => ({ correlation: k, ...v }));
+    }
+    return [];
+  }
+
+  function getGraphData() {
+    return results?.graph || results?.network || null;
+  }
+
+  return (
+    <div>
+      <div className="flex gap-2 mb-4 border-b border-gray-700">
+        {[
+          { key: "summary", label: "Summary" },
+          { key: "correlations", label: "Correlations" },
+          { key: "browse", label: "Browse" },
+          { key: "graph", label: "Graph" }
+        ].map(t => (
+          <button
+            key={t.key}
+            className={`px-4 py-2 font-semibold rounded-t ${tab === t.key ? 'bg-gray-800 text-blue-400 border-b-2 border-blue-500' : 'text-gray-400 hover:text-blue-300'}`}
+            onClick={() => setTab(t.key)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* --- Summary Tab --- */}
+      {tab === "summary" && (
+        <div className="grid md:grid-cols-3 gap-6">
+          <div className="bg-gray-900 rounded p-4 flex flex-col gap-2 border border-gray-800">
+            <div className="text-xs text-gray-400">Total</div>
+            <div className="text-2xl font-bold text-coolWhite">{getSummaryStats().total}</div>
+          </div>
+          <div className="bg-gray-900 rounded p-4 flex flex-col gap-2 border border-gray-800">
+            <div className="text-xs text-gray-400">Unique</div>
+            <div className="text-2xl font-bold text-coolWhite">{getSummaryStats().unique}</div>
+          </div>
+          <div className="bg-gray-900 rounded p-4 flex flex-col gap-2 border border-gray-800">
+            <div className="text-xs text-gray-400">Status</div>
+            <div className="text-2xl font-bold text-coolWhite">{getSummaryStats().status}</div>
+          </div>
+          <div className="bg-gray-900 rounded p-4 flex flex-col gap-2 border border-gray-800">
+            <div className="text-xs text-gray-400">Errors</div>
+            <div className="text-2xl font-bold text-red-400">{getSummaryStats().errors}</div>
+          </div>
+          <div className="md:col-span-2 bg-gray-900 rounded p-4 border border-gray-800">
+            <div className="text-xs text-gray-400 mb-2">Correlations</div>
+            <div className="flex gap-2">
+              {Object.entries(getCorrelationsSummary()).map(([risk, count]) => (
+                <span key={String(risk)} className={`px-3 py-1 rounded-full text-xs font-bold ${risk === 'high' ? 'bg-red-700/80 text-red-200' : risk === 'medium' ? 'bg-yellow-700/80 text-yellow-200' : risk === 'low' ? 'bg-blue-700/80 text-blue-200' : 'bg-green-700/80 text-green-200'}`}>{String(risk).toUpperCase()}: {String(count)}</span>
+              ))}
+            </div>
+          </div>
+          {/* --- Bar Chart --- */}
+          <div className="md:col-span-3 bg-gray-900 rounded p-4 border border-gray-800 mt-4">
+            <SummaryBarChart data={getBrowseData()} />
+          </div>
+        </div>
+      )}
+
+      {/* --- Correlations Tab --- */}
+      {tab === "correlations" && (
+        <CorrelationsTable correlations={getCorrelationsTable()} />
+      )}
+
+      {/* --- Browse Tab --- */}
+      {tab === "browse" && (
+        <BrowseTable data={getBrowseData()} />
+      )}
+
+      {/* --- Graph Tab --- */}
+      {tab === "graph" && (
+        <div className="bg-gray-900 rounded p-4 border border-gray-800 min-h-[300px] flex items-center justify-center">
+          <GraphView data={getGraphData()} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+
+
+
