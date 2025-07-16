@@ -85,172 +85,176 @@ const OsintEngine = () => {
     setLoading(false);
   };
 
+  // Tab state: "new" or "scans"
+  const [activeTab, setActiveTab] = useState<'new' | 'scans'>('new');
+
   return (
-    <motion.div className="p-8 max-w-4xl mx-auto">
-      {/* Header Section */}
-      <div className="flex items-center gap-8 mb-10">
-        <div className="flex items-center gap-2">
-          <PlusCircle className="w-7 h-7 text-blue-500" />
-          <h2 className="text-2xl font-bold text-coolWhite">New Scan</h2>
-        </div>
-        <div className="flex items-center gap-2">
-          <FolderSearch className="w-7 h-7 text-green-500" />
-          <h2 className="text-2xl font-bold text-coolWhite">Scans</h2>
-        </div>
-      </div>
-
-      {/* New Scan Page Main Content (SpiderFoot style) */}
-      <form onSubmit={startScan} className="bg-white rounded-lg shadow p-8 mb-10">
-        <div className="flex flex-col md:flex-row gap-8">
-          <div className="flex-1">
-            <label className="block mb-2 text-gray-700 font-semibold">Scan Name</label>
-            <input
-              type="text"
-              value={scanName}
-              onChange={e => setScanName(e.target.value)}
-              className="w-full p-2 rounded border border-gray-300 mb-4 text-black"
-              placeholder="The name of this scan."
-            />
-            <label className="block mb-2 text-gray-700 font-semibold">Scan Target</label>
-            <input
-              type="text"
-              value={target}
-              onChange={e => setTarget(e.target.value)}
-              className="w-full p-2 rounded border border-gray-300 mb-4 text-black"
-              placeholder="The target of your scan."
-              required
-            />
-          </div>
-          <div className="flex-1 bg-gray-50 rounded p-4 text-xs text-gray-700 border border-gray-200">
-            <div className="mb-2 font-semibold flex items-center gap-1">
-              <span className="text-yellow-600">&#9888;</span> Your scan target may be one of the following. SpiderFoot will automatically detect the target type based on the format of your input:
-            </div>
-            <div className="grid grid-cols-2 gap-x-4">
-              <div>
-                <div><b>Domain Name:</b> <span className="italic">e.g. example.com</span></div>
-                <div><b>IPv4 Address:</b> <span className="italic">e.g. 1.2.3.4</span></div>
-                <div><b>IPv6 Address:</b> <span className="italic">e.g. 2606:4700:4700::1111</span></div>
-                <div><b>Hostname/Sub-domain:</b> <span className="italic">e.g. abc.example.com</span></div>
-                <div><b>Subnet:</b> <span className="italic">e.g. 1.2.3.0/24</span></div>
-                <div><b>Bitcoin Address:</b> <span className="italic">e.g. 1HesYJSP1QqcyPEjnQ9vZBL1wujruNGe7R</span></div>
-              </div>
-              <div>
-                <div><b>E-mail address:</b> <span className="italic">e.g. bob@example.com</span></div>
-                <div><b>Phone Number:</b> <span className="italic">e.g. +12345678901 (E.164 format)</span></div>
-                <div><b>Human Name:</b> <span className="italic">e.g. "John Smith" (must be in quotes)</span></div>
-                <div><b>Username:</b> <span className="italic">e.g. "jsmith2000" (must be in quotes)</span></div>
-                <div><b>Network ASN:</b> <span className="italic">e.g. 1234</span></div>
-              </div>
-            </div>
-          </div>
-        </div>
-        {/* Scan Type Section */}
-        <div className="mt-8">
-          <div className="border-b border-gray-200 mb-4">
-            <div className="flex gap-8">
-              <button type="button" className="py-2 px-4 border-b-2 border-blue-500 font-semibold text-blue-700 bg-white">By Use Case</button>
-              <button type="button" className="py-2 px-4 text-gray-400 cursor-not-allowed" disabled>By Required Data</button>
-              <button type="button" className="py-2 px-4 text-gray-400 cursor-not-allowed" disabled>By Module</button>
-            </div>
-          </div>
-          <div className="flex flex-col gap-4">
-            {[
-              { value: "all", label: "All", desc: <><b>Get anything and everything about the target.</b><br />All SpiderFoot modules will be enabled (slow) but every possible piece of information about the target will be obtained and analysed.</> },
-              { value: "footprint", label: "Footprint", desc: <><b>Understand what information this target exposes to the Internet.</b><br />Gain an understanding about the target's network perimeter, associated identities and other information that is obtained through a lot of web crawling and search engine use.</> },
-              { value: "investigate", label: "Investigate", desc: <><b>Best for when you suspect the target to be malicious but need more information.</b><br />Some basic footprinting will be performed in addition to querying of blacklists and other sources that may have information about your target's maliciousness.</> },
-              { value: "passive", label: "Passive", desc: <><b>When you don't want the target to even suspect they are being investigated.</b><br />As much information will be gathered without touching the target or their affiliates, therefore only modules that do not touch the target will be enabled.</> }
-            ].map(opt => (
-              <label key={opt.value} className={`flex items-start gap-3 px-4 py-3 rounded cursor-pointer border-2 ${scanType === opt.value ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'} transition-all`}>
-                <input
-                  type="radio"
-                  name="scanType"
-                  value={opt.value}
-                  checked={scanType === opt.value}
-                  onChange={() => setScanType(opt.value)}
-                  className="mt-1 mr-2"
-                />
-                <div>
-                  <span className="font-bold mr-2 text-black">{opt.label}</span>
-                  <span className="text-xs text-gray-700">{opt.desc}</span>
-                </div>
-              </label>
-            ))}
-          </div>
-        </div>
-        <button type="submit" className="mt-8 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded font-bold flex items-center" disabled={loading}>
-          <Search className="w-4 h-4 mr-2" /> Run Scan Now
+    <motion.div className="p-8 max-w-5xl mx-auto min-h-screen">
+      {/* Tabs Header */}
+      <div className="flex items-center gap-2 mb-10">
+        <button
+          className={`flex items-center gap-2 px-5 py-2 rounded-t-lg font-bold text-lg border-b-4 transition-all ${activeTab === 'new' ? 'border-blue-500 text-blue-400 bg-darkGray' : 'border-transparent text-gray-400 bg-transparent hover:text-blue-300'}`}
+          onClick={() => setActiveTab('new')}
+        >
+          <PlusCircle className="w-6 h-6" /> New Scan
         </button>
-        {error && <div className="text-red-400 mt-2">{error}</div>}
-      </form>
-
-      {/* The rest of the page (scans table, results, etc.) can be added below as a separate section if needed */}
-      <div className="mb-8">
-        <h3 className="text-lg font-semibold text-coolWhite mb-2">Your Scans</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm bg-darkGray rounded-lg">
-            <thead>
-              <tr className="text-gray-400">
-                <th className="p-2">Name</th>
-                <th className="p-2">Target</th>
-                <th className="p-2">Started</th>
-                <th className="p-2">Finished</th>
-                <th className="p-2">Status</th>
-                <th className="p-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {scans.length === 0 && (
-                <tr><td colSpan={6} className="text-center text-gray-500 p-4">No scans yet.</td></tr>
-              )}
-              {scans.map((scan: any) => (
-                <tr key={scan.scan_id} className="border-b border-gray-700">
-                  <td className="p-2 text-coolWhite">{scan.name || scan.scan_id}</td>
-                  <td className="p-2 text-coolWhite">{scan.target}</td>
-                  <td className="p-2 text-coolWhite">{scan.started ? new Date(scan.started).toLocaleString() : "-"}</td>
-                  <td className="p-2 text-coolWhite">{scan.finished ? new Date(scan.finished).toLocaleString() : "Not yet"}</td>
-                  <td className="p-2">
-                    {scan.status === "finished" ? (
-                      <span className="text-green-400 flex items-center"><CheckCircle className="w-4 h-4 mr-1" />Finished</span>
-                    ) : scan.status === "error" ? (
-                      <span className="text-red-400 flex items-center"><XCircle className="w-4 h-4 mr-1" />Error</span>
-                    ) : (
-                      <span className="text-yellow-400 flex items-center"><Loader className="w-4 h-4 mr-1 animate-spin" />{scan.status}</span>
-                    )}
-                  </td>
-                  <td className="p-2 flex gap-2">
-                    <button
-                      className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-xs"
-                      onClick={() => fetchResults(scan.scan_id)}
-                    >
-                      View Results
-                    </button>
-                    {scan.status === "running" && (
-                      <button
-                        className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs"
-                        onClick={async () => {
-                          setLoading(true);
-                          setError(null);
-                          try {
-                            await fetch(`${API_BASE}/scan/${scan.scan_id}/abort`, { method: "POST" });
-                            fetchScans();
-                          } catch {
-                            setError("Failed to abort scan");
-                          }
-                          setLoading(false);
-                        }}
-                      >
-                        Stop
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <button
+          className={`flex items-center gap-2 px-5 py-2 rounded-t-lg font-bold text-lg border-b-4 transition-all ${activeTab === 'scans' ? 'border-green-500 text-green-400 bg-darkGray' : 'border-transparent text-gray-400 bg-transparent hover:text-green-300'}`}
+          onClick={() => setActiveTab('scans')}
+        >
+          <FolderSearch className="w-6 h-6" /> Scans
+        </button>
       </div>
 
-      {loading && <div className="text-coolWhite flex items-center"><Loader className="w-5 h-5 mr-2 animate-spin" />Loading...</div>}
+      {/* New Scan Tab */}
+      {activeTab === 'new' && (
+        <form onSubmit={startScan} className="w-full flex flex-col gap-8">
+          <div className="flex flex-col md:flex-row gap-8 w-full">
+            <div className="flex-1">
+              <label className="block mb-2 text-coolWhite font-semibold">Scan Name</label>
+              <input
+                type="text"
+                value={scanName}
+                onChange={e => setScanName(e.target.value)}
+                className="w-full p-3 rounded bg-darkGray border border-gray-700 mb-4 text-coolWhite placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="The name of this scan."
+              />
+              <label className="block mb-2 text-coolWhite font-semibold">Scan Target</label>
+              <input
+                type="text"
+                value={target}
+                onChange={e => setTarget(e.target.value)}
+                className="w-full p-3 rounded bg-darkGray border border-gray-700 mb-4 text-coolWhite placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="The target of your scan."
+                required
+              />
+            </div>
+            <div className="flex-1 text-sm text-coolWhite bg-darkGray border border-gray-700 rounded p-4">
+              <div className="mb-2 font-semibold flex items-center gap-1 text-blue-400">
+                <span className="text-yellow-400">&#9888;</span> Your scan target may be a domain, IP, email, phone, username, subnet, or bitcoin address. Format will be auto-detected.
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 text-xs">
+                <div>
+                  <div><b>Domain Name:</b> <span className="italic">example.com</span></div>
+                  <div><b>IPv4:</b> <span className="italic">1.2.3.4</span></div>
+                  <div><b>IPv6:</b> <span className="italic">2606:4700:4700::1111</span></div>
+                  <div><b>Hostname:</b> <span className="italic">abc.example.com</span></div>
+                  <div><b>Subnet:</b> <span className="italic">1.2.3.0/24</span></div>
+                  <div><b>Bitcoin:</b> <span className="italic">1HesYJSP1QqcyPEjnQ9vZBL1wujruNGe7R</span></div>
+                </div>
+                <div>
+                  <div><b>Email:</b> <span className="italic">bob@example.com</span></div>
+                  <div><b>Phone:</b> <span className="italic">+12345678901</span></div>
+                  <div><b>Name:</b> <span className="italic">"John Smith"</span></div>
+                  <div><b>Username:</b> <span className="italic">"jsmith2000"</span></div>
+                  <div><b>ASN:</b> <span className="italic">1234</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* Scan Type Section */}
+          <div className="w-full">
+            <div className="flex flex-col gap-4">
+              {[
+                { value: "all", label: "All", desc: <><b>Get anything and everything about the target.</b> All modules will be enabled (slow) and every possible piece of information about the target will be obtained and analysed.</> },
+                { value: "footprint", label: "Footprint", desc: <><b>Understand what information this target exposes to the Internet.</b> Gain an understanding about the target's network perimeter, associated identities and other information that is obtained through a lot of web crawling and search engine use.</> },
+                { value: "investigate", label: "Investigate", desc: <><b>Best for when you suspect the target to be malicious but need more information.</b> Some basic footprinting will be performed in addition to querying of blacklists and other sources that may have information about your target's maliciousness.</> },
+                { value: "passive", label: "Passive", desc: <><b>When you don't want the target to even suspect they are being investigated.</b> As much information will be gathered without touching the target or their affiliates, therefore only modules that do not touch the target will be enabled.</> }
+              ].map(opt => (
+                <label key={opt.value} className={`flex items-start gap-3 px-4 py-3 rounded cursor-pointer border-2 ${scanType === opt.value ? 'border-blue-500 bg-blue-900/30' : 'border-gray-700 bg-darkGray'} transition-all`}>
+                  <input
+                    type="radio"
+                    name="scanType"
+                    value={opt.value}
+                    checked={scanType === opt.value}
+                    onChange={() => setScanType(opt.value)}
+                    className="mt-1 mr-2 accent-blue-500"
+                  />
+                  <div>
+                    <span className="font-bold mr-2 text-coolWhite">{opt.label}</span>
+                    <span className="text-xs text-gray-300">{opt.desc}</span>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+          <button type="submit" className="mt-8 bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded font-bold flex items-center w-fit" disabled={loading}>
+            <Search className="w-4 h-4 mr-2" /> Run Scan
+          </button>
+          {error && <div className="text-red-400 mt-2">{error}</div>}
+        </form>
+      )}
+
+      {/* Scans Tab */}
+      {activeTab === 'scans' && (
+        <div className="mb-8 w-full">
+          <h3 className="text-xl font-semibold text-coolWhite mb-4">Your Scans</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm bg-darkGray rounded-lg">
+              <thead>
+                <tr className="text-gray-400">
+                  <th className="p-2">Name</th>
+                  <th className="p-2">Target</th>
+                  <th className="p-2">Started</th>
+                  <th className="p-2">Finished</th>
+                  <th className="p-2">Status</th>
+                  <th className="p-2">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {scans.length === 0 && (
+                  <tr><td colSpan={6} className="text-center text-gray-500 p-4">No scans yet.</td></tr>
+                )}
+                {scans.map((scan: any) => (
+                  <tr key={scan.scan_id} className="border-b border-gray-700">
+                    <td className="p-2 text-coolWhite">{scan.name || scan.scan_id}</td>
+                    <td className="p-2 text-coolWhite">{scan.target}</td>
+                    <td className="p-2 text-coolWhite">{scan.started ? new Date(scan.started).toLocaleString() : "-"}</td>
+                    <td className="p-2 text-coolWhite">{scan.finished ? new Date(scan.finished).toLocaleString() : "Not yet"}</td>
+                    <td className="p-2">
+                      {scan.status === "finished" ? (
+                        <span className="text-green-400 flex items-center"><CheckCircle className="w-4 h-4 mr-1" />Finished</span>
+                      ) : scan.status === "error" ? (
+                        <span className="text-red-400 flex items-center"><XCircle className="w-4 h-4 mr-1" />Error</span>
+                      ) : (
+                        <span className="text-yellow-400 flex items-center"><Loader className="w-4 h-4 mr-1 animate-spin" />{scan.status}</span>
+                      )}
+                    </td>
+                    <td className="p-2 flex gap-2">
+                      <button
+                        className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-xs"
+                        onClick={() => fetchResults(scan.scan_id)}
+                      >
+                        View Results
+                      </button>
+                      {scan.status === "running" && (
+                        <button
+                          className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs"
+                          onClick={async () => {
+                            setLoading(true);
+                            setError(null);
+                            try {
+                              await fetch(`${API_BASE}/scan/${scan.scan_id}/abort`, { method: "POST" });
+                              fetchScans();
+                            } catch {
+                              setError("Failed to abort scan");
+                            }
+                            setLoading(false);
+                          }}
+                        >
+                          Stop
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Scan Results Modal/Section */}
       {results && (
         <div className="bg-darkGray p-6 rounded-lg shadow-md mt-8">
           <h3 className="text-lg font-semibold text-coolWhite mb-2">Scan Results</h3>
@@ -259,6 +263,8 @@ const OsintEngine = () => {
           </pre>
         </div>
       )}
+
+      {loading && <div className="text-coolWhite flex items-center"><Loader className="w-5 h-5 mr-2 animate-spin" />Loading...</div>}
     </motion.div>
   );
 };
