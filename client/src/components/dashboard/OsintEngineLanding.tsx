@@ -29,7 +29,7 @@ const OsintEngineLanding = () => {
   // Animated background letters/numbers
   const matrixChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?".split("");
   return (
-    <div className="min-h-screen w-full bg-[#0a0f1c] text-white relative overflow-hidden">
+    <div className="min-h-screen w-full fixed inset-0 bg-[#0a0f1c] text-white overflow-auto">
       {/* Animated background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-10">
         {[...Array(12)].map((_, i) => (
@@ -46,7 +46,7 @@ const OsintEngineLanding = () => {
           </motion.div>
         ))}
       </div>
-      <div className="relative z-10 pt-8 w-full px-8">
+      <div className="relative z-10 pt-8 w-full max-w-7xl mx-auto px-8">
         {/* Back Button */}
         <div className="mb-6">
           <BackButton color="green" className="!static" />
