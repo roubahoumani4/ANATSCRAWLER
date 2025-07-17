@@ -55,10 +55,10 @@ const OsintEngineLanding = () => {
         <motion.div className="mb-8" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
           <div className="flex items-center gap-4 mb-2">
             <div className="p-4 rounded-xl bg-gradient-to-r from-green-600 to-green-700 shadow-lg flex items-center justify-center">
-              <Zap className="w-12 h-12 text-white" />
+              <Zap className="w-12 h-12 text-white" style={{ filter: 'brightness(1.3)' }} />
             </div>
             <div>
-              <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">
+              <h1 className="text-4xl font-black text-green-400">
                 OSINT ENGINE
               </h1>
               <p className="text-gray-400 font-mono text-lg">
