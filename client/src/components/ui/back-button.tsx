@@ -28,7 +28,7 @@ const BackButton = ({ to = "/dashboard", color = "red" }: BackButtonProps) => {
     >
       <button
         onClick={() => setLocation(to)}
-        className={`flex items-center space-x-2 transition-colors duration-200 px-5 py-2 rounded-lg border-none shadow font-bold text-lg bg-[hsl(var(--crimsonRed))] text-white hover:bg-[hsl(var(--crimsonRed),.85)]`}
+        className={`flex items-center space-x-2 transition-colors duration-200 px-5 py-2 rounded-lg border-2 shadow font-bold text-lg bg-transparent ${colorStyles[color]} bg-opacity-0`}
         style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}
       >
         <ArrowLeft size={20} />
