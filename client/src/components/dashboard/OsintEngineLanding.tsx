@@ -70,7 +70,7 @@ const OsintEngineLanding = () => {
           </div>
         </motion.div>
 
-        {/* Cards Section */}
+        {/* Cards Section (only at the top) */}
         <motion.div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1, delay: 0.5 }}>
           {osintCards.map((card, index) => (
             <motion.div key={index} className="relative p-8 rounded-2xl bg-[#10151f] border border-green-700/30 shadow-xl" whileHover={{ scale: 1.05, borderColor: 'rgba(34,197,94,0.5)', boxShadow: '0 10px 30px rgba(34,197,94,0.2)' }} transition={{ duration: 0.3 }} initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }}>
@@ -85,43 +85,47 @@ const OsintEngineLanding = () => {
 
         {/* Professional Scan Animation Section */}
         <motion.div className="flex flex-col items-center mb-14" initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 0.3 }}>
-          {/* Professional network/graph animation */}
-          <div className="relative w-full max-w-5xl h-[480px] mb-8">
+          {/* Professional network/graph animation - inspired by modern dashboards */}
+          <div className="relative w-full max-w-6xl h-[540px] mb-8">
             {/* Central Target Node */}
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: [1, 1.08, 1] }} transition={{ repeat: Infinity, duration: 2 }}
-              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-gradient-to-br from-green-600 to-green-800 rounded-full w-32 h-32 flex items-center justify-center shadow-2xl border-8 border-green-500/60">
-              <Search className="w-16 h-16 text-white" />
+            <motion.div initial={{ scale: 0.98 }} animate={{ scale: [1, 1.05, 1] }} transition={{ repeat: Infinity, duration: 2 }}
+              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-gradient-to-br from-green-500 to-green-900 rounded-full w-40 h-40 flex items-center justify-center shadow-2xl border-8 border-green-400/70">
+              <Search className="w-20 h-20 text-white" />
             </motion.div>
-            {/* Outward Nodes and Animated Lines */}
+            {/* Outward Nodes and Animated Lines - more nodes, more pro layout */}
             {[
-              { icon: <Globe className="w-12 h-12 text-blue-400" />, label: "Domains", x: '78%', y: '18%' },
-              { icon: <Database className="w-12 h-12 text-purple-400" />, label: "Data", x: '90%', y: '75%' },
-              { icon: <Shield className="w-12 h-12 text-cyan-400" />, label: "Threats", x: '15%', y: '80%' },
-              { icon: <Zap className="w-12 h-12 text-yellow-400" />, label: "Activity", x: '10%', y: '20%' },
-              { icon: <Plus className="w-10 h-10 text-green-400" />, label: "New Entities", x: '50%', y: '5%' },
-              { icon: <List className="w-10 h-10 text-green-300" />, label: "Scan Results", x: '95%', y: '40%' },
+              { icon: <Globe className="w-14 h-14 text-blue-400" />, label: "Domains", x: '80%', y: '15%' },
+              { icon: <Database className="w-14 h-14 text-purple-400" />, label: "Data", x: '92%', y: '80%' },
+              { icon: <Shield className="w-14 h-14 text-cyan-400" />, label: "Threats", x: '10%', y: '85%' },
+              { icon: <Zap className="w-14 h-14 text-yellow-400" />, label: "Activity", x: '7%', y: '18%' },
+              { icon: <Plus className="w-12 h-12 text-green-400" />, label: "New Entities", x: '50%', y: '2%' },
+              { icon: <List className="w-12 h-12 text-green-300" />, label: "Scan Results", x: '97%', y: '40%' },
+              { icon: <Shield className="w-10 h-10 text-pink-400" />, label: "Alerts", x: '85%', y: '95%' },
+              { icon: <Database className="w-10 h-10 text-indigo-400" />, label: "Reports", x: '15%', y: '10%' },
             ].map((node, idx) => (
               <motion.div key={idx} className="absolute flex flex-col items-center" style={{ left: node.x, top: node.y }}
-                initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: [1, 1.12, 1] }} transition={{ delay: 0.5 + idx * 0.15, duration: 1.2, repeat: Infinity }}>
-                <div className="bg-[#10151f] border-2 border-green-700/60 rounded-full p-5 shadow-2xl mb-2">
+                initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: [1, 1.1, 1] }} transition={{ delay: 0.5 + idx * 0.12, duration: 1.1, repeat: Infinity }}>
+                <div className="bg-[#10151f] border-2 border-green-700/70 rounded-full p-6 shadow-2xl mb-2">
                   {node.icon}
                 </div>
-                <span className="text-sm text-gray-300 font-mono font-semibold drop-shadow-lg">{node.label}</span>
+                <span className="text-base text-gray-200 font-mono font-semibold drop-shadow-lg">{node.label}</span>
               </motion.div>
             ))}
-            {/* Animated lines (SVG) */}
+            {/* Animated lines (SVG) - more lines, more pro look */}
             <svg className="absolute left-0 top-0 w-full h-full pointer-events-none" width="100%" height="100%">
               {/* Animate lines to each node */}
-              <motion.line x1="50%" y1="50%" x2="78%" y2="18%" stroke="#22c55e" strokeWidth="3" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1, repeat: Infinity, repeatDelay: 1 }} />
-              <motion.line x1="50%" y1="50%" x2="90%" y2="75%" stroke="#a78bfa" strokeWidth="3" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.2, repeat: Infinity, repeatDelay: 1.2 }} />
-              <motion.line x1="50%" y1="50%" x2="15%" y2="80%" stroke="#22d3ee" strokeWidth="3" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.4, repeat: Infinity, repeatDelay: 1.4 }} />
-              <motion.line x1="50%" y1="50%" x2="10%" y2="20%" stroke="#fde047" strokeWidth="3" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.6, repeat: Infinity, repeatDelay: 1.6 }} />
-              <motion.line x1="50%" y1="50%" x2="50%" y2="5%" stroke="#4ade80" strokeWidth="3" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.8, repeat: Infinity, repeatDelay: 1.8 }} />
-              <motion.line x1="50%" y1="50%" x2="95%" y2="40%" stroke="#6ee7b7" strokeWidth="3" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 2, repeat: Infinity, repeatDelay: 2 }} />
+              <motion.line x1="50%" y1="50%" x2="80%" y2="15%" stroke="#22c55e" strokeWidth="4" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1, repeat: Infinity, repeatDelay: 1 }} />
+              <motion.line x1="50%" y1="50%" x2="92%" y2="80%" stroke="#a78bfa" strokeWidth="4" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.2, repeat: Infinity, repeatDelay: 1.2 }} />
+              <motion.line x1="50%" y1="50%" x2="10%" y2="85%" stroke="#22d3ee" strokeWidth="4" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.4, repeat: Infinity, repeatDelay: 1.4 }} />
+              <motion.line x1="50%" y1="50%" x2="7%" y2="18%" stroke="#fde047" strokeWidth="4" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.6, repeat: Infinity, repeatDelay: 1.6 }} />
+              <motion.line x1="50%" y1="50%" x2="50%" y2="2%" stroke="#4ade80" strokeWidth="4" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.8, repeat: Infinity, repeatDelay: 1.8 }} />
+              <motion.line x1="50%" y1="50%" x2="97%" y2="40%" stroke="#6ee7b7" strokeWidth="4" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 2, repeat: Infinity, repeatDelay: 2 }} />
+              <motion.line x1="50%" y1="50%" x2="85%" y2="95%" stroke="#f472b6" strokeWidth="4" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 2.2, repeat: Infinity, repeatDelay: 2.2 }} />
+              <motion.line x1="50%" y1="50%" x2="15%" y2="10%" stroke="#818cf8" strokeWidth="4" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 2.4, repeat: Infinity, repeatDelay: 2.4 }} />
             </svg>
           </div>
           {/* Animation Caption */}
-          <div className="text-gray-300 font-mono text-base mb-6 font-semibold drop-shadow-lg">Professional OSINT scan: mapping entities, data, threats, and results in real time.</div>
+          <div className="text-gray-200 font-mono text-lg mb-6 font-semibold drop-shadow-lg">Enterprise OSINT scan: mapping entities, data, threats, alerts, and results in real time.</div>
           {/* Action Buttons */}
           <div className="flex gap-8 mt-2">
             <button
