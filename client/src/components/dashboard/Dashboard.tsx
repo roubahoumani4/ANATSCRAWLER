@@ -22,7 +22,6 @@ const Dashboard = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // All dashboard text is now English only. Remove language/context logic.
   // Replace mock data with empty arrays or zeroes, or leave as placeholders for real API integration.
   const searchActivityData: any[] = [];
   const recentSearches: any[] = [];

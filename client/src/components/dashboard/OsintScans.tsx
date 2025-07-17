@@ -93,11 +93,28 @@ const OsintScans = () => {
   React.useEffect(() => { setPage(1); }, [filterStatus, rowsPerPage]);
 
   return (
-    <>
-      <div className="mb-6">
-        <BackButton color="cyan" to="/osint" />
+    <div className="min-h-screen bg-gradient-to-br from-[#0a0f1c] to-[#10151f] text-white relative overflow-hidden">
+      {/* Animated background: grey for Scans */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-10 z-0">
+        {[...Array(12)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute font-mono text-xs select-none"
+            style={{ left: `${(i * 8) + 5}%`, top: `-5%` }}
+            animate={{ y: ["0vh", "100vh"] }}
+            transition={{ duration: Math.random() * 6 + 8, repeat: Infinity, delay: Math.random() * 3, ease: "linear" }}
+          >
+            {"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?".split("").slice(0, 10).map((_, idx) => (
+              <div key={idx} className="mb-1" style={{ color: '#a3a3a3' }}>{"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?".split("")[Math.floor(Math.random() * 68)]}</div>
+            ))}
+          </motion.div>
+        ))}
       </div>
-      <motion.div className="mb-8 w-full" initial={{ opacity: 0, x: -40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 40 }} transition={{ duration: 0.5, ease: 'easeOut' }}>
+      <div className="relative z-10">
+        <div className="mb-6">
+          <BackButton color="grey" to="/osint" />
+        </div>
+        <motion.div className="mb-8 w-full" initial={{ opacity: 0, x: -40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 40 }} transition={{ duration: 0.5, ease: 'easeOut' }}>
       <h3 className="text-xl font-semibold text-coolWhite mb-4">Scans</h3>
       {/* Table Controls */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
@@ -260,8 +277,9 @@ const OsintScans = () => {
           </div>
         </div>
       </div>
-    </motion.div>
-    </>
+        </motion.div>
+      </div>
+    </div>
   );
 };
 

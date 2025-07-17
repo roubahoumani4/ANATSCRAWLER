@@ -51,18 +51,35 @@ const OsintNewScan = () => {
   };
 
   return (
-    <>
-      <div className="mb-6">
-        <BackButton color="blue" to="/osint" />
+    <div className="min-h-screen bg-gradient-to-br from-[#0a0f1c] to-[#10151f] text-white relative overflow-hidden">
+      {/* Animated background: blue for New Scan */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-10 z-0">
+        {[...Array(12)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute font-mono text-xs select-none"
+            style={{ left: `${(i * 8) + 5}%`, top: `-5%` }}
+            animate={{ y: ["0vh", "100vh"] }}
+            transition={{ duration: Math.random() * 6 + 8, repeat: Infinity, delay: Math.random() * 3, ease: "linear" }}
+          >
+            {"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?".split("").slice(0, 10).map((_, idx) => (
+              <div key={idx} className="mb-1" style={{ color: '#3b82f6' }}>{"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?".split("")[Math.floor(Math.random() * 68)]}</div>
+            ))}
+          </motion.div>
+        ))}
       </div>
-      <motion.form
-        onSubmit={startScan}
-        className="w-full flex flex-col gap-8"
-        initial={{ opacity: 0, x: 40 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: -40 }}
-        transition={{ duration: 0.5, ease: 'easeOut' }}
-      >
+      <div className="relative z-10">
+        <div className="mb-6">
+          <BackButton color="blue" to="/osint" />
+        </div>
+        <motion.form
+          onSubmit={startScan}
+          className="w-full flex flex-col gap-8"
+          initial={{ opacity: 0, x: 40 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -40 }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+        >
       <div className="flex flex-col md:flex-row gap-8 w-full">
         <div className="flex-1">
           <label className="block mb-2 text-coolWhite font-semibold">Scan Name</label>
@@ -166,8 +183,9 @@ const OsintNewScan = () => {
         <Search className="w-4 h-4 mr-2" /> Run Scan
       </button>
       {error && <div className="text-red-400 mt-2">{error}</div>}
-    </motion.form>
-    </>
+        </motion.form>
+      </div>
+    </div>
   );
 };
 
