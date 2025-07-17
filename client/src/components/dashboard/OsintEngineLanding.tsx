@@ -70,54 +70,72 @@ const OsintEngineLanding = () => {
           </div>
         </motion.div>
 
-        {/* Scan Animation Section */}
-        <motion.div className="flex flex-col items-center mb-10" initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 0.3 }}>
-          {/* Spiderfoot-style scan map animation */}
-          <div className="relative w-full max-w-2xl h-64 mb-6">
+        {/* Cards Section */}
+        <motion.div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1, delay: 0.5 }}>
+          {osintCards.map((card, index) => (
+            <motion.div key={index} className="relative p-8 rounded-2xl bg-[#10151f] border border-green-700/30 shadow-xl" whileHover={{ scale: 1.05, borderColor: 'rgba(34,197,94,0.5)', boxShadow: '0 10px 30px rgba(34,197,94,0.2)' }} transition={{ duration: 0.3 }} initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }}>
+              <motion.div className={`mb-4 p-4 rounded-xl bg-gradient-to-r ${card.color} inline-block shadow-lg`} whileHover={{ scale: 1.1, rotate: 5 }} transition={{ duration: 0.3 }}>
+                {card.icon}
+              </motion.div>
+              <h3 className="text-2xl font-bold text-white mb-2">{card.title}</h3>
+              <p className="text-gray-400 text-base mb-2">{card.description}</p>
+            </motion.div>
+          ))}
+        </motion.div>
+
+        {/* Professional Scan Animation Section */}
+        <motion.div className="flex flex-col items-center mb-14" initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 0.3 }}>
+          {/* Professional network/graph animation */}
+          <div className="relative w-full max-w-5xl h-[480px] mb-8">
             {/* Central Target Node */}
-            <motion.div initial={{ scale: 0.8 }} animate={{ scale: [1, 1.1, 1] }} transition={{ repeat: Infinity, duration: 2 }}
-              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-green-700 rounded-full w-20 h-20 flex items-center justify-center shadow-lg border-4 border-green-500">
-              <Search className="w-10 h-10 text-white" />
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: [1, 1.08, 1] }} transition={{ repeat: Infinity, duration: 2 }}
+              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-gradient-to-br from-green-600 to-green-800 rounded-full w-32 h-32 flex items-center justify-center shadow-2xl border-8 border-green-500/60">
+              <Search className="w-16 h-16 text-white" />
             </motion.div>
             {/* Outward Nodes and Animated Lines */}
             {[
-              { icon: <Globe className="w-7 h-7 text-blue-400" />, label: "Domains", x: '70%', y: '20%' },
-              { icon: <Database className="w-7 h-7 text-purple-400" />, label: "Data", x: '80%', y: '70%' },
-              { icon: <Shield className="w-7 h-7 text-cyan-400" />, label: "Threats", x: '20%', y: '70%' },
-              { icon: <Zap className="w-7 h-7 text-yellow-400" />, label: "Activity", x: '15%', y: '25%' },
+              { icon: <Globe className="w-12 h-12 text-blue-400" />, label: "Domains", x: '78%', y: '18%' },
+              { icon: <Database className="w-12 h-12 text-purple-400" />, label: "Data", x: '90%', y: '75%' },
+              { icon: <Shield className="w-12 h-12 text-cyan-400" />, label: "Threats", x: '15%', y: '80%' },
+              { icon: <Zap className="w-12 h-12 text-yellow-400" />, label: "Activity", x: '10%', y: '20%' },
+              { icon: <Plus className="w-10 h-10 text-green-400" />, label: "New Entities", x: '50%', y: '5%' },
+              { icon: <List className="w-10 h-10 text-green-300" />, label: "Scan Results", x: '95%', y: '40%' },
             ].map((node, idx) => (
               <motion.div key={idx} className="absolute flex flex-col items-center" style={{ left: node.x, top: node.y }}
-                initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: [1, 1.1, 1] }} transition={{ delay: 0.5 + idx * 0.2, duration: 1.2, repeat: Infinity }}>
-                <div className="bg-[#10151f] border border-green-700/40 rounded-full p-3 shadow-lg mb-1">
+                initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: [1, 1.12, 1] }} transition={{ delay: 0.5 + idx * 0.15, duration: 1.2, repeat: Infinity }}>
+                <div className="bg-[#10151f] border-2 border-green-700/60 rounded-full p-5 shadow-2xl mb-2">
                   {node.icon}
                 </div>
-                <span className="text-xs text-gray-400 font-mono">{node.label}</span>
+                <span className="text-sm text-gray-300 font-mono font-semibold drop-shadow-lg">{node.label}</span>
               </motion.div>
             ))}
             {/* Animated lines (SVG) */}
             <svg className="absolute left-0 top-0 w-full h-full pointer-events-none" width="100%" height="100%">
-              <motion.line x1="50%" y1="50%" x2="70%" y2="20%" stroke="#22c55e" strokeWidth="2" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1, repeat: Infinity, repeatDelay: 1 }} />
-              <motion.line x1="50%" y1="50%" x2="80%" y2="70%" stroke="#a78bfa" strokeWidth="2" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.2, repeat: Infinity, repeatDelay: 1.2 }} />
-              <motion.line x1="50%" y1="50%" x2="20%" y2="70%" stroke="#22d3ee" strokeWidth="2" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.4, repeat: Infinity, repeatDelay: 1.4 }} />
-              <motion.line x1="50%" y1="50%" x2="15%" y2="25%" stroke="#fde047" strokeWidth="2" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.6, repeat: Infinity, repeatDelay: 1.6 }} />
+              {/* Animate lines to each node */}
+              <motion.line x1="50%" y1="50%" x2="78%" y2="18%" stroke="#22c55e" strokeWidth="3" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1, repeat: Infinity, repeatDelay: 1 }} />
+              <motion.line x1="50%" y1="50%" x2="90%" y2="75%" stroke="#a78bfa" strokeWidth="3" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.2, repeat: Infinity, repeatDelay: 1.2 }} />
+              <motion.line x1="50%" y1="50%" x2="15%" y2="80%" stroke="#22d3ee" strokeWidth="3" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.4, repeat: Infinity, repeatDelay: 1.4 }} />
+              <motion.line x1="50%" y1="50%" x2="10%" y2="20%" stroke="#fde047" strokeWidth="3" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.6, repeat: Infinity, repeatDelay: 1.6 }} />
+              <motion.line x1="50%" y1="50%" x2="50%" y2="5%" stroke="#4ade80" strokeWidth="3" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.8, repeat: Infinity, repeatDelay: 1.8 }} />
+              <motion.line x1="50%" y1="50%" x2="95%" y2="40%" stroke="#6ee7b7" strokeWidth="3" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 2, repeat: Infinity, repeatDelay: 2 }} />
             </svg>
           </div>
           {/* Animation Caption */}
-          <div className="text-gray-400 font-mono text-sm mb-4">Visualizing OSINT scan: discovering domains, data, threats, and activity...</div>
+          <div className="text-gray-300 font-mono text-base mb-6 font-semibold drop-shadow-lg">Professional OSINT scan: mapping entities, data, threats, and results in real time.</div>
           {/* Action Buttons */}
-          <div className="flex gap-6 mt-2">
+          <div className="flex gap-8 mt-2">
             <button
               onClick={() => navigate('/osint/new')}
-              className="flex items-center gap-2 px-6 py-3 rounded-lg bg-gradient-to-r from-green-600 to-green-500 text-white font-bold text-lg shadow-lg hover:from-green-500 hover:to-green-400 transition-all"
+              className="flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-green-600 to-green-500 text-white font-bold text-xl shadow-2xl hover:from-green-500 hover:to-green-400 transition-all"
             >
-              <Plus className="w-5 h-5" />
+              <Plus className="w-6 h-6" />
               Start New OSINT Scan
             </button>
             <button
               onClick={() => navigate('/osint/scans')}
-              className="flex items-center gap-2 px-6 py-3 rounded-lg bg-gradient-to-r from-gray-700 to-gray-800 text-green-400 font-bold text-lg shadow-lg border border-green-700 hover:bg-gray-600 transition-all"
+              className="flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-gray-700 to-gray-800 text-green-400 font-bold text-xl shadow-2xl border-2 border-green-700 hover:bg-gray-600 transition-all"
             >
-              <List className="w-5 h-5" />
+              <List className="w-6 h-6" />
               View All Scans
             </button>
           </div>
