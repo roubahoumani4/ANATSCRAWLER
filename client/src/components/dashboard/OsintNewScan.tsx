@@ -16,7 +16,7 @@ const OsintNewScan = () => {
   const [scanName, setScanName] = useState("");
   const [modules, setModules] = useState([]);
   const [selectedModules, setSelectedModules] = useState<string[]>([]);
-  const [scanType, setScanType] = useState<string>("all");
+  const [scanType, setScanType] = useState<keyof typeof moduleSets>("all");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,8 +58,7 @@ const OsintNewScan = () => {
       exit={{ opacity: 0, x: -40 }}
       transition={{ duration: 0.5, ease: 'easeOut' }}
     >
-      {/* ...form content copied from OsintEngine... */}
-      <motion.div className="flex flex-col md:flex-row gap-8 w-full" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.5 }}>
+      <div className="flex flex-col md:flex-row gap-8 w-full">
         <div className="flex-1">
           <label className="block mb-2 text-coolWhite font-semibold">Scan Name</label>
           <input
@@ -79,7 +78,7 @@ const OsintNewScan = () => {
             required
           />
         </div>
-        <motion.div className="flex-1 text-sm text-coolWhite bg-darkGray border border-gray-700 rounded p-4" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.5 }}>
+        <div className="flex-1 text-sm text-coolWhite bg-darkGray border border-gray-700 rounded p-4">
           <div className="mb-2 font-semibold flex items-center gap-1 text-blue-400">
             <span className="text-yellow-400">&#9888;</span> Your scan target may be a domain, IP, email, phone, username, subnet, or bitcoin address. Format will be auto-detected.
           </div>
@@ -100,12 +99,11 @@ const OsintNewScan = () => {
               <div><b>ASN:</b> <span className="italic">1234</span></div>
             </div>
           </div>
-        </motion.div>
-      </motion.div>
+        </div>
+      </div>
       {/* Scan Type Section */}
-      <motion.div className="w-full" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.5 }}>
+      <div className="w-full mt-8">
         <div className="flex flex-col gap-4">
-          {/* ...scan type options... */}
           {[
             {
               value: "all",
@@ -132,19 +130,16 @@ const OsintNewScan = () => {
               desc: "As much information will be gathered without touching the target or their affiliates, therefore only modules that do not touch the target will be enabled."
             }
           ].map((opt, idx) => (
-            <motion.label
+            <label
               key={opt.value}
               className={`flex items-center gap-0 px-4 py-3 rounded cursor-pointer border-2 ${scanType === opt.value ? 'border-blue-500 bg-blue-900/30' : 'border-gray-700 bg-darkGray'} transition-all`}
-              initial={{ opacity: 0, x: 30 * (idx + 1) }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.25 + idx * 0.07, duration: 0.4, ease: 'easeOut' }}
             >
               <input
                 type="radio"
                 name="scanType"
                 value={opt.value}
                 checked={scanType === opt.value}
-                onChange={() => setScanType(opt.value)}
+                onChange={() => setScanType(opt.value as keyof typeof moduleSets)}
                 className="mt-1 mr-2 accent-blue-500"
               />
               <div className="flex flex-row w-full items-center">
@@ -154,23 +149,18 @@ const OsintNewScan = () => {
                   <span className="text-xs text-gray-300 mt-1">{opt.desc}</span>
                 </div>
               </div>
-            </motion.label>
+            </label>
           ))}
         </div>
-      </motion.div>
-      <motion.button
+      </div>
+      <button
         type="submit"
         className="mt-8 bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded font-bold flex items-center w-fit"
         disabled={loading}
-        whileHover={{ scale: 1.04 }}
-        whileTap={{ scale: 0.98 }}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.35, duration: 0.4 }}
       >
         <Search className="w-4 h-4 mr-2" /> Run Scan
-      </motion.button>
-      {error && <motion.div className="text-red-400 mt-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>{error}</motion.div>}
+      </button>
+      {error && <div className="text-red-400 mt-2">{error}</div>}
     </motion.form>
   );
 };
