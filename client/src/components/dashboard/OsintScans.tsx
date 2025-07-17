@@ -95,7 +95,7 @@ const OsintScans = () => {
   return (
     <>
       <div className="mb-6">
-        <BackButton color="green" to="/osint" />
+        <BackButton color="cyan" to="/osint" />
       </div>
       <motion.div className="mb-8 w-full" initial={{ opacity: 0, x: -40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 40 }} transition={{ duration: 0.5, ease: 'easeOut' }}>
       <h3 className="text-xl font-semibold text-coolWhite mb-4">Scans</h3>
