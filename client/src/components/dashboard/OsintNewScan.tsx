@@ -68,7 +68,7 @@ const OsintNewScan = () => {
           </motion.div>
         ))}
       </div>
-      <div className="relative z-10 max-w-7xl mx-auto px-4">
+      <div className="relative z-10 w-full px-0">
         <div className="mb-6">
           <BackButton color="blue" to="/osint" />
         </div>
