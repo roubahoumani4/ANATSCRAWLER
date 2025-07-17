@@ -1,9 +1,9 @@
-import OsintEngine from "../components/dashboard/OsintEngine";
+import OsintNewScan from "../components/dashboard/OsintNewScan";
 
 const OsintNewScanPage = () => {
   return (
     <div className="w-full min-h-screen bg-darkGray p-8">
-      <OsintEngine mode="new" />
+      <OsintNewScan />
     </div>
   );
 };

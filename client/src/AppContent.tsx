@@ -21,6 +21,8 @@ import AccountChangesPage from "@/pages/AccountChangesPage";
 import ActivityLogsPage from "@/pages/ActivityLogsPage";
 import ThreatIntelligencePage from "@/pages/ThreatIntelligencePage";
 import SocialMediaIntelPage from "@/pages/SocialMediaIntelPage";
+import OsintNewScanPage from "@/pages/OsintNewScanPage";
+import OsintScansPage from "@/pages/OsintScansPage";
 
 export default function AppContent() {
   const { isAuthenticated, loading } = useAuth();
@@ -69,6 +71,8 @@ export default function AppContent() {
         <Route path="/history" component={HistoryPage} />
         <Route path="/account-changes" component={AccountChangesPage} />
         <Route path="/activity-logs" component={ActivityLogsPage} />
+        <Route path="/osint-engine/new-scan" component={OsintNewScanPage} />
+        <Route path="/osint-engine/scans" component={OsintScansPage} />
         <Route component={NotFoundPage} />
       </Switch>
     </AnimatePresence>
