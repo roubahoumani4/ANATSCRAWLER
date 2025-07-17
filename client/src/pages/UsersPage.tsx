@@ -13,7 +13,7 @@ const UsersPage = () => {
         exit={{ opacity: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <BackButton />
+        <BackButton color="grey" />
         <Users />
       </motion.div>
     </div>

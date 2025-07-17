@@ -12,7 +12,7 @@ const GeneralSettingsPage = () => {
       transition={{ duration: 0.5 }}
     >
       <div className="p-4">
-        <BackButton />
+        <BackButton color="orange" />
       </div>
       <GeneralSettings />
     </motion.div>
