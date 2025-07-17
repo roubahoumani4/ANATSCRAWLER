@@ -93,7 +93,7 @@ const OsintScans = () => {
   React.useEffect(() => { setPage(1); }, [filterStatus, rowsPerPage]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a0f1c] to-[#10151f] text-white relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-[#0a0f1c] via-[#0a0f1c] to-[#10151f] text-white relative overflow-hidden">
       {/* Animated background: grey for Scans */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-10 z-0">
         {[...Array(12)].map((_, i) => (
