@@ -53,7 +53,7 @@ const OsintNewScan = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0a0f1c] via-[#0a0f1c] to-[#10151f] text-white relative overflow-hidden">
       {/* Animated background: blue for New Scan */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-10 z-0">
+      <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-10 z-0">
         {[...Array(12)].map((_, i) => (
           <motion.div
             key={i}
@@ -68,7 +68,7 @@ const OsintNewScan = () => {
           </motion.div>
         ))}
       </div>
-      <div className="relative z-10">
+      <div className="relative z-10 max-w-7xl mx-auto px-4">
         <div className="mb-6">
           <BackButton color="blue" to="/osint" />
         </div>
