@@ -83,49 +83,58 @@ const OsintEngineLanding = () => {
           ))}
         </motion.div>
 
-        {/* Professional Scan Animation Section */}
+        {/* Traceroute-style Scan Steps Section */}
         <motion.div className="flex flex-col items-center mb-14" initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 0.3 }}>
-          {/* Professional network/graph animation - inspired by modern dashboards */}
-          <div className="relative w-full max-w-6xl h-[540px] mb-8">
-            {/* Central Target Node */}
-            <motion.div initial={{ scale: 0.98 }} animate={{ scale: [1, 1.05, 1] }} transition={{ repeat: Infinity, duration: 2 }}
-              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-gradient-to-br from-green-500 to-green-900 rounded-full w-40 h-40 flex items-center justify-center shadow-2xl border-8 border-green-400/70">
-              <Search className="w-20 h-20 text-white" />
-            </motion.div>
-            {/* Outward Nodes and Animated Lines - more nodes, more pro layout */}
-            {[
-              { icon: <Globe className="w-14 h-14 text-blue-400" />, label: "Domains", x: '80%', y: '15%' },
-              { icon: <Database className="w-14 h-14 text-purple-400" />, label: "Data", x: '92%', y: '80%' },
-              { icon: <Shield className="w-14 h-14 text-cyan-400" />, label: "Threats", x: '10%', y: '85%' },
-              { icon: <Zap className="w-14 h-14 text-yellow-400" />, label: "Activity", x: '7%', y: '18%' },
-              { icon: <Plus className="w-12 h-12 text-green-400" />, label: "New Entities", x: '50%', y: '2%' },
-              { icon: <List className="w-12 h-12 text-green-300" />, label: "Scan Results", x: '97%', y: '40%' },
-              { icon: <Shield className="w-10 h-10 text-pink-400" />, label: "Alerts", x: '85%', y: '95%' },
-              { icon: <Database className="w-10 h-10 text-indigo-400" />, label: "Reports", x: '15%', y: '10%' },
-            ].map((node, idx) => (
-              <motion.div key={idx} className="absolute flex flex-col items-center" style={{ left: node.x, top: node.y }}
-                initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: [1, 1.1, 1] }} transition={{ delay: 0.5 + idx * 0.12, duration: 1.1, repeat: Infinity }}>
-                <div className="bg-[#10151f] border-2 border-green-700/70 rounded-full p-6 shadow-2xl mb-2">
-                  {node.icon}
+          <div className="w-full max-w-3xl mx-auto mb-8">
+            <h2 className="text-2xl font-bold text-green-400 mb-6 text-center tracking-wide">How an OSINT Scan Works</h2>
+            <ol className="relative border-l-4 border-green-700/60 pl-8">
+              {/* Step 1 */}
+              <li className="mb-12 ml-2">
+                <div className="absolute -left-6 flex items-center justify-center w-10 h-10 bg-gradient-to-br from-green-500 to-green-700 rounded-full shadow-lg">
+                  <Search className="w-6 h-6 text-white" />
                 </div>
-                <span className="text-base text-gray-200 font-mono font-semibold drop-shadow-lg">{node.label}</span>
-              </motion.div>
-            ))}
-            {/* Animated lines (SVG) - more lines, more pro look */}
-            <svg className="absolute left-0 top-0 w-full h-full pointer-events-none" width="100%" height="100%">
-              {/* Animate lines to each node */}
-              <motion.line x1="50%" y1="50%" x2="80%" y2="15%" stroke="#22c55e" strokeWidth="4" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1, repeat: Infinity, repeatDelay: 1 }} />
-              <motion.line x1="50%" y1="50%" x2="92%" y2="80%" stroke="#a78bfa" strokeWidth="4" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.2, repeat: Infinity, repeatDelay: 1.2 }} />
-              <motion.line x1="50%" y1="50%" x2="10%" y2="85%" stroke="#22d3ee" strokeWidth="4" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.4, repeat: Infinity, repeatDelay: 1.4 }} />
-              <motion.line x1="50%" y1="50%" x2="7%" y2="18%" stroke="#fde047" strokeWidth="4" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.6, repeat: Infinity, repeatDelay: 1.6 }} />
-              <motion.line x1="50%" y1="50%" x2="50%" y2="2%" stroke="#4ade80" strokeWidth="4" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.8, repeat: Infinity, repeatDelay: 1.8 }} />
-              <motion.line x1="50%" y1="50%" x2="97%" y2="40%" stroke="#6ee7b7" strokeWidth="4" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 2, repeat: Infinity, repeatDelay: 2 }} />
-              <motion.line x1="50%" y1="50%" x2="85%" y2="95%" stroke="#f472b6" strokeWidth="4" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 2.2, repeat: Infinity, repeatDelay: 2.2 }} />
-              <motion.line x1="50%" y1="50%" x2="15%" y2="10%" stroke="#818cf8" strokeWidth="4" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 2.4, repeat: Infinity, repeatDelay: 2.4 }} />
-            </svg>
+                <h3 className="text-xl font-bold text-white mb-1">Target Discovery</h3>
+                <p className="text-gray-400 mb-1">The scan begins by identifying the target (domain, IP, email, username, etc.) and gathering initial metadata.</p>
+                <span className="text-green-400 text-xs font-mono">Step 1</span>
+              </li>
+              {/* Step 2 */}
+              <li className="mb-12 ml-2">
+                <div className="absolute -left-6 flex items-center justify-center w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full shadow-lg">
+                  <Globe className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-1">Entity Enumeration</h3>
+                <p className="text-gray-400 mb-1">Discovers related domains, subdomains, IPs, emails, and social accounts using open-source intelligence techniques.</p>
+                <span className="text-blue-400 text-xs font-mono">Step 2</span>
+              </li>
+              {/* Step 3 */}
+              <li className="mb-12 ml-2">
+                <div className="absolute -left-6 flex items-center justify-center w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full shadow-lg">
+                  <Shield className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-1">Relationship Mapping</h3>
+                <p className="text-gray-400 mb-1">Maps connections between discovered entities, visualizing the digital footprint and potential risk paths.</p>
+                <span className="text-cyan-400 text-xs font-mono">Step 3</span>
+              </li>
+              {/* Step 4 */}
+              <li className="mb-12 ml-2">
+                <div className="absolute -left-6 flex items-center justify-center w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full shadow-lg">
+                  <Database className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-1">Data Correlation & Analysis</h3>
+                <p className="text-gray-400 mb-1">Correlates findings, analyzes risks, and highlights suspicious or high-risk exposures for further review.</p>
+                <span className="text-purple-400 text-xs font-mono">Step 4</span>
+              </li>
+              {/* Step 5 */}
+              <li className="mb-4 ml-2">
+                <div className="absolute -left-6 flex items-center justify-center w-10 h-10 bg-gradient-to-br from-green-400 to-green-700 rounded-full shadow-lg">
+                  <List className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-1">Comprehensive Reporting</h3>
+                <p className="text-gray-400 mb-1">Generates a detailed, professional report with summaries, graphs, and evidence for compliance or investigation.</p>
+                <span className="text-green-400 text-xs font-mono">Step 5</span>
+              </li>
+            </ol>
           </div>
-          {/* Animation Caption */}
-          <div className="text-gray-200 font-mono text-lg mb-6 font-semibold drop-shadow-lg">Enterprise OSINT scan: mapping entities, data, threats, alerts, and results in real time.</div>
           {/* Action Buttons */}
           <div className="flex gap-8 mt-2">
             <button
@@ -144,18 +153,7 @@ const OsintEngineLanding = () => {
             </button>
           </div>
         </motion.div>
-        {/* Cards Section */}
-        <motion.div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1, delay: 0.5 }}>
-          {osintCards.map((card, index) => (
-            <motion.div key={index} className="relative p-8 rounded-2xl bg-[#10151f] border border-green-700/30 shadow-xl" whileHover={{ scale: 1.05, borderColor: 'rgba(34,197,94,0.5)', boxShadow: '0 10px 30px rgba(34,197,94,0.2)' }} transition={{ duration: 0.3 }} initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }}>
-              <motion.div className={`mb-4 p-4 rounded-xl bg-gradient-to-r ${card.color} inline-block shadow-lg`} whileHover={{ scale: 1.1, rotate: 5 }} transition={{ duration: 0.3 }}>
-                {card.icon}
-              </motion.div>
-              <h3 className="text-2xl font-bold text-white mb-2">{card.title}</h3>
-              <p className="text-gray-400 text-base mb-2">{card.description}</p>
-            </motion.div>
-          ))}
-        </motion.div>
+        {/* Removed duplicate cards section at the bottom */}
       </div>
     </div>
   );
