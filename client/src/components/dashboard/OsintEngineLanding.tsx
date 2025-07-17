@@ -46,7 +46,7 @@ const OsintEngineLanding = () => {
           </motion.div>
         ))}
       </div>
-      <div className="relative z-10 pt-8 w-full max-w-7xl mx-auto px-8">
+      <div className="relative z-10 pt-8 w-full px-8">
         {/* Back Button */}
         <div className="mb-6">
           <BackButton color="green" className="!static" />
@@ -58,8 +58,12 @@ const OsintEngineLanding = () => {
               <Zap className="w-12 h-12 text-white" />
             </div>
             <div>
-              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-green-400 drop-shadow-lg leading-tight">OSINT ENGINE</h1>
-              <div className="text-base md:text-lg font-mono text-green-200 mt-1">Automated Open Source Intelligence Collection & Analysis</div>
+              <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">
+                OSINT ENGINE
+              </h1>
+              <p className="text-gray-400 font-mono text-lg">
+                Automated Open Source Intelligence Collection & Analysis
+              </p>
             </div>
           </div>
         </motion.div>
