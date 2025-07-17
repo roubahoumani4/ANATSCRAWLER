@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Calendar, Clock, Search, Shield, Database, FileText, Terminal, Skull, Wifi, Eye, Zap, Activity, AlertTriangle, Code2 } from "lucide-react";
 import { fadeIn, slideUp } from "@/utils/animations";
 import SearchInterface from "../search/SearchInterface";
-import OsintEngine from "./OsintEngine";
+import { OsintEngine } from "./OsintEngine";
 
 const Dashboard = () => {
   const { user } = useAuth();

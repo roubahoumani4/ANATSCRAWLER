@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Loader, List, XCircle, Activity, Search } from "lucide-react";
+import BackButton from "../ui/back-button";
 
 const API_BASE = "/api/spiderfoot";
 
@@ -92,7 +93,11 @@ const OsintScans = () => {
   React.useEffect(() => { setPage(1); }, [filterStatus, rowsPerPage]);
 
   return (
-    <motion.div className="mb-8 w-full" initial={{ opacity: 0, x: -40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 40 }} transition={{ duration: 0.5, ease: 'easeOut' }}>
+    <>
+      <div className="mb-6">
+        <BackButton color="green" to="/osint" />
+      </div>
+      <motion.div className="mb-8 w-full" initial={{ opacity: 0, x: -40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 40 }} transition={{ duration: 0.5, ease: 'easeOut' }}>
       <h3 className="text-xl font-semibold text-coolWhite mb-4">Scans</h3>
       {/* Table Controls */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
@@ -256,6 +261,7 @@ const OsintScans = () => {
         </div>
       </div>
     </motion.div>
+    </>
   );
 };
 

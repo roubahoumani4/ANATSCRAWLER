@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Search } from "lucide-react";
+import BackButton from "../ui/back-button";
 
 const API_BASE = "/api/spiderfoot";
 
@@ -50,14 +51,18 @@ const OsintNewScan = () => {
   };
 
   return (
-    <motion.form
-      onSubmit={startScan}
-      className="w-full flex flex-col gap-8"
-      initial={{ opacity: 0, x: 40 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -40 }}
-      transition={{ duration: 0.5, ease: 'easeOut' }}
-    >
+    <>
+      <div className="mb-6">
+        <BackButton color="green" to="/osint" />
+      </div>
+      <motion.form
+        onSubmit={startScan}
+        className="w-full flex flex-col gap-8"
+        initial={{ opacity: 0, x: 40 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -40 }}
+        transition={{ duration: 0.5, ease: 'easeOut' }}
+      >
       <div className="flex flex-col md:flex-row gap-8 w-full">
         <div className="flex-1">
           <label className="block mb-2 text-coolWhite font-semibold">Scan Name</label>
@@ -162,6 +167,7 @@ const OsintNewScan = () => {
       </button>
       {error && <div className="text-red-400 mt-2">{error}</div>}
     </motion.form>
+    </>
   );
 };
 

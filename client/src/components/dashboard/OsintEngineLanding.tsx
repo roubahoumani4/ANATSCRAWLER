@@ -51,7 +51,7 @@ const OsintEngineLanding = () => {
       <div className="relative z-10 pt-8 w-full px-8">
         {/* Back Button */}
         <div className="mb-6">
-          <BackButton color="green" className="!static" />
+          <BackButton color="green" />
         </div>
         {/* Header Section */}
         <motion.div className="mb-8" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
