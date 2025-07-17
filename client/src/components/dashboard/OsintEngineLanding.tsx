@@ -46,7 +46,7 @@ const OsintEngineLanding = () => {
           </motion.div>
         ))}
       </div>
-      <div className="relative z-10 px-0 pt-8 max-w-7xl mx-auto">
+      <div className="relative z-10 pt-8 w-full">
         {/* Back Button */}
         <BackButton color="green" />
         {/* Header Section */}
@@ -59,22 +59,6 @@ const OsintEngineLanding = () => {
               <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-green-500 tracking-tight">OSINT ENGINE</h1>
               <p className="text-gray-400 font-mono text-xl mt-2">Automated Open Source Intelligence Collection & Analysis</p>
             </div>
-          </div>
-          {/* Accent Bar / Info Section - mimic Web Security Scanning */}
-          <div className="flex flex-wrap items-center gap-6 bg-gradient-to-r from-green-900/30 to-green-700/10 border border-green-700/30 rounded-xl px-6 py-3 mb-6 shadow">
-            <span className="font-mono text-green-400 text-lg"><b>SCANS:</b> 12 ACTIVE</span>
-            <span className="font-mono text-blue-400 text-lg"><b>ENTITIES:</b> 34 DISCOVERED</span>
-            <span className="font-mono text-yellow-400 text-lg"><b>RISKS:</b> 5 FOUND</span>
-          </div>
-          {/* Quick OSINT Scan Section */}
-          <div className="mb-8 bg-darkGray border border-green-700 rounded-lg shadow p-6 flex flex-col gap-4">
-            <div className="text-lg font-bold text-green-400 mb-2">Quick OSINT Scan</div>
-            <form className="flex flex-col md:flex-row gap-4 items-center">
-              <input type="text" placeholder="Enter target domain, IP, email, etc..." className="flex-1 p-3 rounded bg-gray-900 border border-green-700 text-coolWhite placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500" />
-              <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded font-bold flex items-center w-fit">
-                <Search className="w-4 h-4 mr-2" /> Start Scan
-              </button>
-            </form>
           </div>
         </motion.div>
         {/* Cards Section */}
