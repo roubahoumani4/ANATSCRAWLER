@@ -64,7 +64,7 @@ const OsintEngineLanding = () => {
         {/* Cards Section */}
         <motion.div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1, delay: 0.5 }}>
           {osintCards.map((card, index) => (
-            <motion.div key={index} className="relative p-8 rounded-2xl bg-gradient-to-br from-gray-900/80 to-black/90 border border-green-700/30 shadow-xl backdrop-blur-sm" whileHover={{ scale: 1.05, borderColor: "rgba(34,197,94,0.5)", boxShadow: "0 10px 30px rgba(34,197,94,0.2)" }} transition={{ duration: 0.3 }} initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }}>
+            <motion.div key={index} className="relative p-8 rounded-2xl bg-transparent border border-green-700/30 shadow-xl" whileHover={{ scale: 1.05, borderColor: 'rgba(34,197,94,0.5)', boxShadow: '0 10px 30px rgba(34,197,94,0.2)' }} transition={{ duration: 0.3 }} initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }}>
               <motion.div className={`mb-4 p-4 rounded-xl bg-gradient-to-r ${card.color} inline-block shadow-lg`} whileHover={{ scale: 1.1, rotate: 5 }} transition={{ duration: 0.3 }}>
                 {card.icon}
               </motion.div>
