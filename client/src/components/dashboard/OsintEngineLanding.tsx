@@ -138,14 +138,14 @@ const OsintEngineLanding = () => {
           {/* Action Buttons */}
           <div className="flex gap-8 mt-2">
             <button
-              onClick={() => navigate('/osint/new')}
+              onClick={() => navigate('/osint-engine/new-scan')}
               className="flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-green-600 to-green-500 text-white font-bold text-xl shadow-2xl hover:from-green-500 hover:to-green-400 transition-all"
             >
               <Plus className="w-6 h-6" />
               Start New OSINT Scan
             </button>
             <button
-              onClick={() => navigate('/osint/scans')}
+              onClick={() => navigate('/osint-engine/scans')}
               className="flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-gray-700 to-gray-800 text-green-400 font-bold text-xl shadow-2xl border-2 border-green-700 hover:bg-gray-600 transition-all"
             >
               <List className="w-6 h-6" />
