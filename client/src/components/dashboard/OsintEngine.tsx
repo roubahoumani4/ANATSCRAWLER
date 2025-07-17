@@ -4,7 +4,7 @@ import SummaryBarChart from "./SummaryBarChart";
 import CorrelationsTable from "./CorrelationsTable";
 import BrowseTable from "./BrowseTable";
 import { motion } from "framer-motion";
-import { Search, Loader, List, CheckCircle, XCircle, PlusCircle, FolderSearch } from "lucide-react";
+import { Search, Loader, List, CheckCircle, XCircle, PlusCircle, FolderSearch, AlertTriangle, Activity, Zap } from "lucide-react";
 
 const API_BASE = "/api/spiderfoot";
 
@@ -202,6 +202,34 @@ const OsintEngine = () => {
   // Reset page if filter or rowsPerPage changes
   React.useEffect(() => { setPage(1); }, [filterStatus, rowsPerPage]);
 
+  // --- OSINT Info Cards ---
+  const infoCards = [
+    {
+      title: "Comprehensive Intelligence",
+      description: "Uncover a wide range of public data about domains, IPs, emails, usernames, and more using advanced automated reconnaissance.",
+      icon: <Search className="w-8 h-8 text-blue-400" />,
+      color: "from-blue-700 to-blue-900"
+    },
+    {
+      title: "Risk & Threat Detection",
+      description: "Identify potential risks, exposures, and suspicious correlations in real time to help you stay ahead of digital threats.",
+      icon: <AlertTriangle className="w-8 h-8 text-yellow-400" />,
+      color: "from-yellow-700 to-yellow-900"
+    },
+    {
+      title: "Automated Correlation",
+      description: "Correlate findings across multiple sources and modules for deeper context and actionable insights.",
+      icon: <Activity className="w-8 h-8 text-green-400" />,
+      color: "from-green-700 to-green-900"
+    },
+    {
+      title: "Live Results & Monitoring",
+      description: "Monitor scan progress and view live results as data is discovered, with interactive dashboards and visualizations.",
+      icon: <Zap className="w-8 h-8 text-cyan-400" />,
+      color: "from-cyan-700 to-cyan-900"
+    }
+  ];
+
   return (
     <motion.div
       className="p-8 max-w-5xl mx-auto min-h-screen"
@@ -209,6 +237,23 @@ const OsintEngine = () => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: 'easeOut' }}
     >
+      {/* Info Cards Section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+        {infoCards.map((card, idx) => (
+          <motion.div
+            key={card.title}
+            className={`p-6 rounded-2xl bg-gradient-to-br ${card.color} border border-blue-800/40 shadow-lg flex flex-col items-start gap-4`}
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 + idx * 0.1, duration: 0.5 }}
+          >
+            <div>{card.icon}</div>
+            <div className="font-bold text-lg text-coolWhite mb-1">{card.title}</div>
+            <div className="text-gray-300 text-sm">{card.description}</div>
+          </motion.div>
+        ))}
+      </div>
+
       {/* Tabs Header */}
       <motion.div
         className="flex items-center gap-2 mb-10"
