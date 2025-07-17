@@ -29,7 +29,7 @@ const OsintEngineLanding = () => {
   // Animated background letters/numbers
   const matrixChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?".split("");
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a0f1c] to-[#10151f] text-white relative overflow-hidden">
+    <div className="min-h-screen w-full bg-[#0a0f1c] text-white relative overflow-hidden">
       {/* Animated background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-10">
         {[...Array(12)].map((_, i) => (
@@ -46,25 +46,27 @@ const OsintEngineLanding = () => {
           </motion.div>
         ))}
       </div>
-      <div className="relative z-10 pt-8 w-full">
+      <div className="relative z-10 pt-8 w-full px-8">
         {/* Back Button */}
-        <BackButton color="green" />
+        <div className="mb-6">
+          <BackButton color="green" className="!static" />
+        </div>
         {/* Header Section */}
-        <motion.div className="mb-4" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
-          <div className="flex items-center space-x-4 mb-4">
-            <motion.div className="p-4 rounded-xl bg-gradient-to-r from-green-600 to-green-700 shadow-lg" animate={{ boxShadow: ["0 0 20px rgba(34,197,94,0.3)", "0 0 40px rgba(34,197,94,0.6)", "0 0 20px rgba(34,197,94,0.3)"] }} transition={{ duration: 2, repeat: Infinity }}>
+        <motion.div className="mb-8" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
+          <div className="flex items-center gap-4 mb-2">
+            <div className="p-4 rounded-xl bg-gradient-to-r from-green-600 to-green-700 shadow-lg flex items-center justify-center">
               <Zap className="w-12 h-12 text-white" />
-            </motion.div>
+            </div>
             <div>
-              <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-green-500 tracking-tight">OSINT ENGINE</h1>
-              <p className="text-gray-400 font-mono text-xl mt-2">Automated Open Source Intelligence Collection & Analysis</p>
+              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-green-400 drop-shadow-lg leading-tight">OSINT ENGINE</h1>
+              <div className="text-base md:text-lg font-mono text-green-200 mt-1">Automated Open Source Intelligence Collection & Analysis</div>
             </div>
           </div>
         </motion.div>
         {/* Cards Section */}
         <motion.div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1, delay: 0.5 }}>
           {osintCards.map((card, index) => (
-            <motion.div key={index} className="relative p-8 rounded-2xl bg-transparent border border-green-700/30 shadow-xl" whileHover={{ scale: 1.05, borderColor: 'rgba(34,197,94,0.5)', boxShadow: '0 10px 30px rgba(34,197,94,0.2)' }} transition={{ duration: 0.3 }} initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }}>
+            <motion.div key={index} className="relative p-8 rounded-2xl bg-[#10151f] border border-green-700/30 shadow-xl" whileHover={{ scale: 1.05, borderColor: 'rgba(34,197,94,0.5)', boxShadow: '0 10px 30px rgba(34,197,94,0.2)' }} transition={{ duration: 0.3 }} initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }}>
               <motion.div className={`mb-4 p-4 rounded-xl bg-gradient-to-r ${card.color} inline-block shadow-lg`} whileHover={{ scale: 1.1, rotate: 5 }} transition={{ duration: 0.3 }}>
                 {card.icon}
               </motion.div>
