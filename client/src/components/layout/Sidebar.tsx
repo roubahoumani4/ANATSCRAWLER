@@ -56,7 +56,12 @@ const Sidebar = () => {
       path: "/osint",
       icon: <Terminal size={20} />,
       label: "OSINT Engine",
-      color: "text-green-400"
+      color: "text-green-400",
+      hasSubmenu: true,
+      features: [
+        { path: "/osint-engine/new-scan", label: "New Scan", icon: <Search size={16} /> },
+        { path: "/osint-engine/scans", label: "Scans", icon: <Activity size={16} /> }
+      ]
     },
     {
       path: "/darkweb",
