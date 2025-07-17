@@ -81,7 +81,7 @@ const OsintEngine = () => {
     setLoading(false);
   };
 
-  // Fetch scan results
+  // Fetch scan results (with polling for live updates)
   const fetchResults = async (scanId: string) => {
     setLoading(true);
     setResults(null);
@@ -90,11 +90,45 @@ const OsintEngine = () => {
       const res = await fetch(`${API_BASE}/scan/${scanId}/results`);
       const data = await res.json();
       setResults(data);
+      // If scan is running, start polling for live updates
+      if (data.status === 'running' || data.status === 'abort-requested') {
+        setActiveScanId(scanId);
+      } else {
+        setActiveScanId(null);
+      }
     } catch {
       setError("Failed to fetch results");
     }
     setLoading(false);
   };
+
+  // Poll for scan results if scan is running
+  useEffect(() => {
+    if (!activeScanId) return;
+    let isMounted = true;
+    let pollTimeout: NodeJS.Timeout;
+    const poll = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/scan/${activeScanId}/results`);
+        const data = await res.json();
+        if (!isMounted) return;
+        setResults(data);
+        if (data.status === 'running' || data.status === 'abort-requested') {
+          pollTimeout = setTimeout(poll, 2000); // poll every 2s
+        } else {
+          setActiveScanId(null);
+        }
+      } catch {
+        // Optionally handle error
+        setActiveScanId(null);
+      }
+    };
+    poll();
+    return () => {
+      isMounted = false;
+      if (pollTimeout) clearTimeout(pollTimeout);
+    };
+  }, [activeScanId]);
 
   // Tab state: "new" or "scans"
   const [activeTab, setActiveTab] = useState<'new' | 'scans'>('new');
@@ -535,7 +569,9 @@ export default OsintEngine;
 // --- Scan Results Tabs Component ---
 function ScanResultsTabs({ results }: { results: any }) {
   const [tab, setTab] = React.useState("summary");
+  const [polling, setPolling] = React.useState(false);
 
+  // --- Helper functions ---
   function getCorrelationsSummary() {
     if (!results || !results.correlations) return { high: 0, medium: 0, low: 0, info: 0 };
     if (Array.isArray(results.correlations)) {
@@ -583,6 +619,33 @@ function ScanResultsTabs({ results }: { results: any }) {
     return results?.graph || results?.network || null;
   }
 
+  // --- Live polling for running scans ---
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    if (results?.status === 'running') {
+      setPolling(true);
+      interval = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/spiderfoot/scan/${results.scan_id}/results`);
+          const data = await res.json();
+          if (data) {
+            // Only update if status or data changed
+            if (JSON.stringify(data) !== JSON.stringify(results)) {
+              Object.assign(results, data); // Mutate in place for modal
+              setTab(t => t); // Force re-render
+            }
+          }
+        } catch (e) {
+          // Ignore polling errors
+        }
+      }, 2000);
+    } else {
+      setPolling(false);
+    }
+    return () => { if (interval) clearInterval(interval); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [results?.status, results?.scan_id]);
+
   return (
     <div>
       <div className="flex gap-2 mb-4 border-b border-gray-700">
@@ -598,6 +661,9 @@ function ScanResultsTabs({ results }: { results: any }) {
             onClick={() => setTab(t.key)}
           >
             {t.label}
+            {t.key === 'summary' && results?.status === 'running' && (
+              <span className="ml-2 animate-pulse text-xs text-blue-400">(Live)</span>
+            )}
           </button>
         ))}
       </div>
@@ -615,7 +681,11 @@ function ScanResultsTabs({ results }: { results: any }) {
           </div>
           <div className="bg-gray-900 rounded p-4 flex flex-col gap-2 border border-gray-800">
             <div className="text-xs text-gray-400">Status</div>
-            <div className="text-2xl font-bold text-coolWhite">{getSummaryStats().status}</div>
+            <div className="text-2xl font-bold text-coolWhite">{getSummaryStats().status}
+              {results?.status === 'running' && (
+                <span className="ml-2 animate-spin inline-block align-middle"><svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg></span>
+              )}
+            </div>
           </div>
           <div className="bg-gray-900 rounded p-4 flex flex-col gap-2 border border-gray-800">
             <div className="text-xs text-gray-400">Errors</div>
