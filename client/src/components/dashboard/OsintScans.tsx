@@ -93,7 +93,7 @@ const OsintScans = () => {
   React.useEffect(() => { setPage(1); }, [filterStatus, rowsPerPage]);
 
   return (
-    <div className="fixed inset-0 min-h-screen w-screen bg-gradient-to-br from-[#0a0f1c] via-[#0a0f1c] to-[#10151f] text-white overflow-auto">
+    <div className="fixed inset-0 min-h-screen w-screen bg-gradient-to-br from-[#0a0f1c] via-[#0a0f1c] to-[#10151f] text-white overflow-auto px-6 pt-8 pb-4">
       {/* Animated background: grey for Scans */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-10 z-0">
         {[...Array(12)].map((_, i) => (
@@ -110,7 +110,7 @@ const OsintScans = () => {
           </motion.div>
         ))}
       </div>
-      <div className="relative z-10 w-full px-0">
+      <div className="relative z-10 w-full">
         <div className="mb-6">
           <BackButton color="grey" to="/osint" />
         </div>
