@@ -100,8 +100,12 @@ class MongoDBService {
       if (!this.isConnected) {
         await this.connect();
       }
-      await mongoose.connection.db.admin().ping();
-      return true;
+      if (mongoose.connection.db) {
+        await mongoose.connection.db.admin().ping();
+        return true;
+      } else {
+        throw new Error('Database not connected');
+      }
     } catch (error) {
       console.error('MongoDB connection test failed:', error);
       return false;

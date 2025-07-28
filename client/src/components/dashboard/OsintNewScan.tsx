@@ -70,7 +70,7 @@ const OsintNewScan = () => {
       </div>
       <div className="relative z-10 w-full">
         <div className="mb-6">
-          <BackButton color="blue" to="/osint" />
+          <BackButton color="cyan" to="/osint" />
         </div>
         <motion.form
           onSubmit={startScan}
