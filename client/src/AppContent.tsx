@@ -23,6 +23,7 @@ import ThreatIntelligencePage from "@/pages/ThreatIntelligencePage";
 import SocialMediaIntelPage from "@/pages/SocialMediaIntelPage";
 import OsintNewScanPage from "@/pages/OsintNewScanPage";
 import OsintScansPage from "@/pages/OsintScansPage";
+import ScanDetailsPage from "@/pages/ScanDetailsPage";
 
 export default function AppContent() {
   const { isAuthenticated, loading } = useAuth();
@@ -72,6 +73,7 @@ export default function AppContent() {
         <Route path="/account-changes" component={AccountChangesPage} />
         <Route path="/activity-logs" component={ActivityLogsPage} />
         <Route path="/osint-engine/new-scan" component={OsintNewScanPage} />
+        <Route path="/osint-engine/scans/:scanId" component={ScanDetailsPage} />
         <Route path="/osint-engine/scans" component={OsintScansPage} />
         <Route component={NotFoundPage} />
       </Switch>
