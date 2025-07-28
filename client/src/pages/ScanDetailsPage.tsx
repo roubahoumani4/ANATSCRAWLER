@@ -5,6 +5,7 @@ const TABS = ["Summary", "Correlations", "Browse", "Graph"];
 
 const ScanDetailsPage = () => {
   const { scanId } = useParams();
+  console.log('ScanDetailsPage mounted, scanId:', scanId);
   const [tab, setTab] = useState("Summary");
   const [scanStatus, setScanStatus] = useState<any>(null);
   const [scanResults, setScanResults] = useState<any>(null);
