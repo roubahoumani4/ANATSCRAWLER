@@ -1,3 +1,13 @@
+// Proxy for SpiderFoot scanlist (raw array, for UI compatibility)
+router.get("/scanlist", async (req, res) => {
+  try {
+    const response = await fetch(`${SPIDERFOOT_API_URL}/scanlist`);
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch scan list" });
+  }
+});
 
 import express from "express";
 import fetch from "node-fetch";
