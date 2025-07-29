@@ -1,7 +1,11 @@
+
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LabelList
+} from 'recharts';
 
-const TABS = ["Summary", "Correlations", "Browse", "Graph"];
+const TABS = ["Summary", "Correlations", "Browse", "Graph", "Scan Settings", "Log"];
 
 const ScanDetailsPage = () => {
   const { scanId } = useParams();
@@ -11,6 +15,7 @@ const ScanDetailsPage = () => {
   const [scanResults, setScanResults] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [scanLog, setScanLog] = useState<string>("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -18,11 +23,13 @@ const ScanDetailsPage = () => {
     setError(null);
     Promise.all([
       fetch(`/api/spiderfoot/scan/${scanId}/status`).then(res => res.json()),
-      fetch(`/api/spiderfoot/scan/${scanId}/results`).then(res => res.json())
+      fetch(`/api/spiderfoot/scan/${scanId}/results`).then(res => res.json()),
+      fetch(`/api/spiderfoot/scan/${scanId}/log`).then(res => res.ok ? res.text() : "")
     ])
-      .then(([status, results]) => {
+      .then(([status, results, log]) => {
         setScanStatus(status);
         setScanResults(results);
+        setScanLog(log);
         setLoading(false);
       })
       .catch(() => {
@@ -34,6 +41,15 @@ const ScanDetailsPage = () => {
   if (loading) return <div className="p-8">Loading scan details...</div>;
   if (error) return <div className="p-8 text-red-400">{error}</div>;
   if (!scanStatus) return <div className="p-8">No scan info found.</div>;
+
+  // Prepare data types for bar chart
+  const dataTypes = scanResults?.data_types || scanResults?.types || [];
+  const barData = Array.isArray(dataTypes)
+    ? dataTypes.map((dt: any) => ({
+        name: dt.name || dt.type || dt[0],
+        value: dt.count || dt[1] || 0
+      }))
+    : Object.entries(dataTypes).map(([name, value]) => ({ name, value }));
 
   return (
     <div className="p-8 w-full">
@@ -54,13 +70,14 @@ const ScanDetailsPage = () => {
       </div>
       {tab === "Summary" && (
         <div>
-          {/* Scan status summary, data types, and chart here */}
           <div className="mb-4 flex gap-8">
             <div className="bg-gray-800 p-4 rounded">
               <div>Total: <b>{scanResults?.total || scanResults?.elements?.length || 0}</b></div>
               <div>Unique: <b>{scanResults?.unique || 0}</b></div>
               <div>Status: <b>{scanStatus.status}</b></div>
               <div>Errors: <b>{scanStatus.errors || 0}</b></div>
+              <div>Started: <b>{scanStatus.started || '-'}</b></div>
+              <div>Finished: <b>{scanStatus.finished || '-'}</b></div>
             </div>
             <div className="bg-gray-800 p-4 rounded">
               <div className="mb-2 font-semibold">Correlations</div>
@@ -72,29 +89,84 @@ const ScanDetailsPage = () => {
               </div>
             </div>
           </div>
-          {/* Data types bar chart placeholder */}
           <div className="bg-gray-900 p-4 rounded mt-4">
             <div className="font-semibold mb-2">Data Types</div>
-            {/* You can use a chart library here, or render a simple bar chart */}
-            <div className="text-gray-400">[Bar chart of data types goes here]</div>
+            {barData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={barData} layout="vertical" margin={{ left: 40, right: 40 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" allowDecimals={false} />
+                  <YAxis dataKey="name" type="category" width={120} />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="#3b82f6">
+                    <LabelList dataKey="value" position="right" />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="text-gray-400">No data types found.</div>
+            )}
           </div>
         </div>
       )}
       {tab === "Correlations" && (
-        <div className="bg-yellow-100 text-yellow-900 p-4 rounded">No correlations.<br/>If the scan is still running please reload once it has completed.</div>
+        <div className="bg-yellow-100 text-yellow-900 p-4 rounded">
+          {/* TODO: Render actual correlations if available */}
+          No correlations.<br/>If the scan is still running please reload once it has completed.
+        </div>
       )}
       {tab === "Browse" && (
         <div>
           <div className="font-semibold mb-2">Browse Data</div>
-          {/* Table of data elements, types, timestamps, etc. */}
-          <div className="text-gray-400">[Browse data table goes here]</div>
+          {Array.isArray(scanResults?.elements) && scanResults.elements.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-xs bg-gray-900 rounded">
+                <thead>
+                  <tr>
+                    <th className="p-2">Type</th>
+                    <th className="p-2">Value</th>
+                    <th className="p-2">Module</th>
+                    <th className="p-2">Timestamp</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {scanResults.elements.map((el: any, idx: number) => (
+                    <tr key={idx} className="border-b border-gray-800">
+                      <td className="p-2">{el.type || el[0]}</td>
+                      <td className="p-2">{el.value || el[1]}</td>
+                      <td className="p-2">{el.module || el[2]}</td>
+                      <td className="p-2">{el.ts || el[3]}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-gray-400">No data elements found.</div>
+          )}
         </div>
       )}
       {tab === "Graph" && (
         <div>
           <div className="font-semibold mb-2">Graph</div>
-          {/* Graph visualization placeholder */}
+          {/* TODO: Add graph visualization here */}
           <div className="text-gray-400">[Graph visualization goes here]</div>
+        </div>
+      )}
+      {tab === "Scan Settings" && (
+        <div className="bg-gray-900 p-4 rounded">
+          <div className="font-semibold mb-2">Scan Settings</div>
+          <pre className="text-xs text-gray-300 whitespace-pre-wrap">
+            {JSON.stringify(scanStatus?.settings || scanStatus, null, 2)}
+          </pre>
+        </div>
+      )}
+      {tab === "Log" && (
+        <div className="bg-gray-900 p-4 rounded">
+          <div className="font-semibold mb-2">Scan Log</div>
+          <pre className="text-xs text-gray-300 whitespace-pre-wrap max-h-96 overflow-y-auto">
+            {scanLog || "No log available."}
+          </pre>
         </div>
       )}
     </div>

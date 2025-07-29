@@ -99,6 +99,8 @@ jobs:
             npm ci --omit=dev
             # Install Maigret and dependencies for Threat Intelligence feature
             bash scripts/install-maigret.sh
+            # Install Recharts for frontend charting (ensure available for SSR/build)
+            npm install recharts
             # Recreate .env
             cat > .env <<EOF
             NODE_ENV=production
