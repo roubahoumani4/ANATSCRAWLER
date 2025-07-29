@@ -17,14 +17,41 @@ const OsintScans = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+
   useEffect(() => {
     fetchScans();
   }, []);
 
+  // Fetch scans from SpiderFoot scanlist (array of arrays)
   const fetchScans = () => {
-    fetch(`${API_BASE}/scans`)
+    setLoading(true);
+    fetch(`${API_BASE}/scanlist`)
       .then(res => res.json())
-      .then(data => setScans(data.scans || []));
+      .then(data => {
+        // SpiderFoot scanlist is an array of arrays, each scan:
+        // [scan_id, name, target, started, finished, status, elements, correlations, modules, scan_type]
+        setScans(
+          Array.isArray(data)
+            ? data.map(arr => ({
+                scan_id: arr[0],
+                name: arr[1],
+                target: arr[2],
+                started: arr[3],
+                finished: arr[4],
+                status: arr[5],
+                elements: arr[6],
+                correlations: arr[7],
+                modules: arr[8],
+                scan_type: arr[9],
+              }))
+            : []
+        );
+        setLoading(false);
+      })
+      .catch(() => {
+        setScans([]);
+        setLoading(false);
+      });
   };
 
   // Filtering (status only)
