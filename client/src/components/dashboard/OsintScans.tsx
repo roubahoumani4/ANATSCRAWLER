@@ -278,9 +278,38 @@ const OsintScans = () => {
                 </td>
                 <td className="p-2 text-center">
                   <div className="flex gap-1 justify-center">
-                    <button className="bg-purple-700 hover:bg-purple-600 text-white p-1 rounded" title="View Results"><List className="w-4 h-4" /></button>
+                    <button className="bg-purple-700 hover:bg-purple-600 text-white p-1 rounded" title="View Results" onClick={() => navigate(`/osint-engine/scans/${scan.scan_id}`)}><List className="w-4 h-4" /></button>
+                    <button className="bg-yellow-700 hover:bg-yellow-600 text-white p-1 rounded" title="Clone" onClick={async () => {
+                      await fetch(`${API_BASE}/scan/${scan.scan_id}/clone`, { method: "POST" });
+                      fetchScans();
+                    }}>⧉</button>
+                    <button className="bg-green-700 hover:bg-green-600 text-white p-1 rounded" title="Export" onClick={async () => {
+                      const res = await fetch(`${API_BASE}/scan/${scan.scan_id}/export`);
+                      if (res.ok) {
+                        const blob = await res.blob();
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `scan_${scan.scan_id}.json`;
+                        document.body.appendChild(a);
+                        a.click();
+                        setTimeout(() => {
+                          document.body.removeChild(a);
+                          URL.revokeObjectURL(url);
+                        }, 100);
+                      }
+                    }}>⬇</button>
+                    <button className="bg-red-800 hover:bg-red-700 text-white p-1 rounded" title="Delete" onClick={async () => {
+                      if (window.confirm('Delete this scan?')) {
+                        await fetch(`${API_BASE}/scan/${scan.scan_id}/delete`, { method: "POST" });
+                        fetchScans();
+                      }
+                    }}>🗑</button>
                     {scan.status === "running" && (
-                      <button className="bg-red-700 hover:bg-red-600 text-white p-1 rounded" title="Stop"><XCircle className="w-4 h-4" /></button>
+                      <button className="bg-red-700 hover:bg-red-600 text-white p-1 rounded" title="Stop" onClick={async () => {
+                        await fetch(`${API_BASE}/scan/${scan.scan_id}/abort`, { method: "POST" });
+                        fetchScans();
+                      }}><XCircle className="w-4 h-4" /></button>
                     )}
                   </div>
                 </td>
