@@ -1,3 +1,10 @@
+
+import express from "express";
+import fetch from "node-fetch";
+
+const router = express.Router();
+const SPIDERFOOT_API_URL = "http://127.0.0.1:8000"; // FastAPI wrapper URL
+
 // Proxy for SpiderFoot scanlist (raw array, for UI compatibility)
 router.get("/scanlist", async (req, res) => {
   try {
@@ -8,13 +15,6 @@ router.get("/scanlist", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch scan list" });
   }
 });
-
-import express from "express";
-import fetch from "node-fetch";
-
-const router = express.Router();
-const SPIDERFOOT_API_URL = "http://127.0.0.1:8000"; // FastAPI wrapper URL
-
 // List available modules
 router.get("/modules", async (req, res) => {
   try {
