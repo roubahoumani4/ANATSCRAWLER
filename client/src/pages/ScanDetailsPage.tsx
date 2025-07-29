@@ -9,6 +9,9 @@ const TABS = ["Summary", "Correlations", "Browse", "Graph", "Scan Settings", "Lo
 
 const ScanDetailsPage = () => {
   const { scanId } = useParams();
+  if (!scanId) {
+    return <div className="p-8 text-red-400">Invalid scan ID.</div>;
+  }
   console.log('ScanDetailsPage mounted, scanId:', scanId);
   const [tab, setTab] = useState("Summary");
   const [scanStatus, setScanStatus] = useState<any>(null);
