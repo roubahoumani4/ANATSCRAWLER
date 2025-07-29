@@ -1,9 +1,8 @@
-
 import express from "express";
 import fetch from "node-fetch";
 
 const router = express.Router();
-const SPIDERFOOT_API_URL = "http://127.0.0.1:8000"; // FastAPI wrapper URL
+const SPIDERFOOT_API_URL = "https://192.168.1.105:5001"; // FastAPI wrapper URL
 
 // Delete a scan
 router.post("/scan/:scanId/delete", async (req, res) => {
