@@ -1,3 +1,4 @@
+
 import express from "express";
 import fetch from "node-fetch";
 
@@ -5,11 +6,20 @@ const router = express.Router();
 // Real SpiderFoot API base URL
 const SPIDERFOOT_API_URL = "http://192.168.1.105:5001";
 
-
-
-
-
 // --- SpiderFoot Native API Proxy Routes ---
+
+// Proxy: /scan/:scanId/status → /scaninfo?id=scanId
+router.get("/scan/:scanId/status", async (req, res) => {
+  try {
+    const { scanId } = req.params;
+    if (!scanId) return res.status(400).json({ error: "Missing scan id" });
+    const response = await fetch(`${SPIDERFOOT_API_URL}/scaninfo?id=${encodeURIComponent(scanId)}`);
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch scan info" });
+  }
+});
 
 // List all scans (scanlist)
 router.get("/scanlist", async (req, res) => {
