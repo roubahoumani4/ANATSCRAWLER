@@ -103,14 +103,14 @@ jobs:
             # Install Recharts for frontend charting (ensure available for SSR/build)
             npm install recharts
             # Install Python dependencies for Spiderfoot
-            if [ -d "maigret-venv" ]; then
-              source maigret-venv/bin/activate
-              pip install --upgrade pip
-              pip install networkx
-              deactivate
-            else
-              pip install --user networkx
+            # Always use maigret-venv for Python dependencies
+            if [ ! -d "maigret-venv" ]; then
+              python3 -m venv maigret-venv
             fi
+            source maigret-venv/bin/activate
+            pip install --upgrade pip
+            pip install networkx
+            deactivate
             # Restart PM2 cleanly for new deployment
             pm2 delete anatscrawler || true
             pm2 start index.js --name anatscrawler
