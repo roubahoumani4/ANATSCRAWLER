@@ -13,7 +13,7 @@ npm ci --only=production
 
 # Restart server with pm2 (uncomment and adjust if needed)
 if command -v pm2 >/dev/null 2>&1; then
-  pm2 reload anatscrawler || pm2 start index.js --name anatscrawler
+  pm2 reload anatscrawler || pm2 start dist/index.js --name anatscrawler
   echo "Server restarted with pm2."
 else
   echo "pm2 not found. Please restart the server process manually if needed."
