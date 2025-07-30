@@ -1,13 +1,16 @@
 def list_modules():
+    import traceback
     try:
-        # Import from the correct package path
+        # Use absolute path for spiderfoot directory
+        spiderfoot_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "spiderfoot"))
+        sys.path.insert(0, spiderfoot_dir)
         from spiderfoot.spiderfoot.helpers import SpiderFootHelpers
-        modules_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "spiderfoot", "modules"))
+        modules_path = os.path.join(spiderfoot_dir, "modules")
         modules_dict = SpiderFootHelpers.loadModulesAsDict(modules_path)
         module_names = sorted(list(modules_dict.keys()))
         print(json.dumps({"modules": module_names}))
     except Exception as e:
-        print(json.dumps({"error": str(e)}))
+        print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}))
 
 import sys
 import json
@@ -27,14 +30,16 @@ except ImportError:
     sys.exit(1)
 
 def scan_info(scan_id):
+    import traceback
     db = SpiderFootDb({'__database': DB_PATH})
     try:
         scan = db.scanInstanceGet(scan_id)
         print(json.dumps(scan))
     except Exception as e:
-        print(json.dumps({"error": str(e)}))
+        print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}))
 
 def scan_graph(scan_id):
+    import traceback
     db = SpiderFootDb({'__database': DB_PATH})
     try:
         # For graph, return all event relationships (parent/child links)
@@ -43,7 +48,7 @@ def scan_graph(scan_id):
         # Optionally, you could use scanElementSourcesDirect/scanElementChildrenDirect for more structure
         print(json.dumps(results))
     except Exception as e:
-        print(json.dumps({"error": str(e)}))
+        print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}))
 
 def scan_browse(scan_id):
     db = SpiderFootDb({'__database': DB_PATH})
@@ -88,11 +93,15 @@ def scan_logs(scan_id):
     print(json.dumps(logs))
 
 def start_scan(target, name):
-    db = SpiderFootDb({'__database': DB_PATH})
-    # This is a placeholder. Actual scan start logic may require more integration.
-    # You may need to use sfscan.py or similar for real scan execution.
-    db.scanInstanceCreate(name, name, target)
-    print(json.dumps({"success": True}))
+    import traceback
+    try:
+        # This only creates a scan instance, does NOT start a scan engine!
+        db = SpiderFootDb({'__database': DB_PATH})
+        db.scanInstanceCreate(name, name, target)
+        # TODO: Actually start a scan using sfscan.py or SpiderFootScanner
+        print(json.dumps({"success": False, "error": "Scan engine not started. Only DB entry created. Implement scan execution via sfscan.py or SpiderFootScanner."}))
+    except Exception as e:
+        print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}))
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
