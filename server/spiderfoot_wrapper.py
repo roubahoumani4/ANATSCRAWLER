@@ -1,7 +1,7 @@
 def list_modules():
     try:
-        from spiderfoot import SpiderFootHelpers
-        # Use loadModulesAsDict to get all modules from the modules directory
+        # Import from the correct package path
+        from spiderfoot.spiderfoot.helpers import SpiderFootHelpers
         modules_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "spiderfoot", "modules"))
         modules_dict = SpiderFootHelpers.loadModulesAsDict(modules_path)
         module_names = sorted(list(modules_dict.keys()))
@@ -17,13 +17,13 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "spid
 
 # Import SpiderFoot modules (adjust as needed for your version)
 try:
-    from spiderfoot import SpiderFootDb
+    from spiderfoot.spiderfoot.db import SpiderFootDb
 except ImportError:
     print(json.dumps({"error": "Could not import SpiderFoot modules. Make sure the code is in server/spiderfoot."}))
     sys.exit(1)
 
 def scan_info(scan_id):
-    db = SpiderFootDb('spiderfoot.db')
+    db = SpiderFootDb({'__database': 'spiderfoot.db'})
     try:
         scan = db.scanInstanceGet(scan_id)
         print(json.dumps(scan))
@@ -31,7 +31,7 @@ def scan_info(scan_id):
         print(json.dumps({"error": str(e)}))
 
 def scan_graph(scan_id):
-    db = SpiderFootDb('spiderfoot.db')
+    db = SpiderFootDb({'__database': 'spiderfoot.db'})
     try:
         # For graph, return all event relationships (parent/child links)
         # Get all results for the scan
@@ -42,7 +42,7 @@ def scan_graph(scan_id):
         print(json.dumps({"error": str(e)}))
 
 def scan_browse(scan_id):
-    db = SpiderFootDb('spiderfoot.db')
+    db = SpiderFootDb({'__database': 'spiderfoot.db'})
     try:
         # For browse, return all unique elements (entities)
         unique = db.scanResultEventUnique(scan_id)
@@ -51,7 +51,7 @@ def scan_browse(scan_id):
         print(json.dumps({"error": str(e)}))
 
 def list_scans():
-    db = SpiderFootDb('spiderfoot.db')
+    db = SpiderFootDb({'__database': 'spiderfoot.db'})
     try:
         # Returns a list of all scan instances
         scans = db.scanInstanceList()
@@ -59,32 +59,32 @@ def list_scans():
     except Exception as e:
         print(json.dumps({"error": str(e)}))
 def scan_result_summary(scan_id):
-    db = SpiderFootDb('spiderfoot.db')
+    db = SpiderFootDb({'__database': 'spiderfoot.db'})
     summary = db.scanResultSummary(scan_id)
     print(json.dumps(summary))
 
 def scan_correlation_summary(scan_id):
-    db = SpiderFootDb('spiderfoot.db')
+    db = SpiderFootDb({'__database': 'spiderfoot.db'})
     summary = db.scanCorrelationSummary(scan_id)
     print(json.dumps(summary))
 
 def scan_correlation_list(scan_id):
-    db = SpiderFootDb('spiderfoot.db')
+    db = SpiderFootDb({'__database': 'spiderfoot.db'})
     clist = db.scanCorrelationList(scan_id)
     print(json.dumps(clist))
 
 def scan_result_event(scan_id):
-    db = SpiderFootDb('spiderfoot.db')
+    db = SpiderFootDb({'__database': 'spiderfoot.db'})
     events = db.scanResultEvent(scan_id)
     print(json.dumps(events))
 
 def scan_logs(scan_id):
-    db = SpiderFootDb('spiderfoot.db')
+    db = SpiderFootDb({'__database': 'spiderfoot.db'})
     logs = db.scanLogs(scan_id)
     print(json.dumps(logs))
 
 def start_scan(target, name):
-    db = SpiderFootDb('spiderfoot.db')
+    db = SpiderFootDb({'__database': 'spiderfoot.db'})
     # This is a placeholder. Actual scan start logic may require more integration.
     # You may need to use sfscan.py or similar for real scan execution.
     db.scanInstanceCreate(name, name, target)
