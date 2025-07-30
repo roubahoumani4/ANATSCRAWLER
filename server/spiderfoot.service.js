@@ -17,7 +17,10 @@ function runPythonCommand(args) {
     py.stdout.on('data', chunk => data += chunk);
     py.stderr.on('data', chunk => err += chunk);
     py.on('close', code => {
-      if (code !== 0) return reject(err || 'Python error');
+      if (code !== 0) {
+        console.error('PYTHON ERROR:', err);
+        return reject(err || 'Python error');
+      }
       try {
         resolve(JSON.parse(data));
       } catch (e) {
