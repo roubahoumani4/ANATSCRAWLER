@@ -1,3 +1,13 @@
+def list_modules():
+    try:
+        from spiderfoot import SpiderFootHelpers
+        # Use loadModulesAsDict to get all modules from the modules directory
+        modules_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "spiderfoot", "modules"))
+        modules_dict = SpiderFootHelpers.loadModulesAsDict(modules_path)
+        module_names = sorted(list(modules_dict.keys()))
+        print(json.dumps({"modules": module_names}))
+    except Exception as e:
+        print(json.dumps({"error": str(e)}))
 import sys
 import json
 import os
@@ -85,6 +95,9 @@ if __name__ == "__main__":
         print(json.dumps({"error": "No command provided"}))
         sys.exit(1)
     cmd = sys.argv[1]
+    if cmd == "list_modules":
+        list_modules()
+        sys.exit(0)
     if cmd == "list_scans":
         list_scans()
     elif cmd == "scan_info":

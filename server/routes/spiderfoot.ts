@@ -1,8 +1,16 @@
-
 import express from "express";
-
 const router = express.Router();
 const spiderfoot = require("../spiderfoot.service");
+
+// List available modules
+router.get("/modules", async (req, res) => {
+  try {
+    const modules = await spiderfoot.listModules();
+    res.json(modules);
+  } catch (e) {
+    res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
+  }
+});
 
 // List all scans (scanlist)
 router.get("/scanlist", async (req, res) => {

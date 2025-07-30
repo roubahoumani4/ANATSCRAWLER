@@ -30,4 +30,5 @@ module.exports = {
   scanResultEvent: (scanId) => runPythonCommand(['scan_result_event', scanId]),
   scanLogs: (scanId) => runPythonCommand(['scan_logs', scanId]),
   startScan: (target, name) => runPythonCommand(['start_scan', target, name]),
+  listModules: () => runPythonCommand(['list_modules']),
 };

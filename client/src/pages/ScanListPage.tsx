@@ -21,10 +21,26 @@ const ScanListPage = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetch("/api/spiderfoot/scans")
+    fetch("/api/spiderfoot/scanlist")
       .then(res => res.json())
       .then(data => {
-        setScans(data.scans || []);
+        // The new endpoint returns an array of arrays, map to Scan objects
+        setScans(
+          Array.isArray(data)
+            ? data.filter(arr => arr && arr[0]).map(arr => ({
+                scan_id: arr[0],
+                name: arr[1],
+                target: arr[2],
+                started: arr[3],
+                finished: arr[4],
+                status: arr[5],
+                elements: arr[6],
+                correlations: arr[7],
+                modules: arr[8],
+                scan_type: arr[9],
+              }))
+            : []
+        );
         setLoading(false);
       })
       .catch(() => {
