@@ -3,9 +3,9 @@ const path = require('path');
 
 function runPythonCommand(args) {
   return new Promise((resolve, reject) => {
-    // Always resolve path relative to project root, not just __dirname
+    
     const wrapperPath = path.join(__dirname, 'spiderfoot_wrapper.py');
-    // If the file does not exist (e.g. running from project root), try ../server/spiderfoot_wrapper.py
+   
     const fs = require('fs');
     let actualPath = wrapperPath;
     if (!fs.existsSync(wrapperPath)) {
