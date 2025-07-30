@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { Loader, List, XCircle, Activity, Search } from "lucide-react";
 import BackButton from "../ui/back-button";
@@ -8,7 +8,7 @@ const API_BASE = "/api/spiderfoot";
 
 const OsintScans = () => {
   const [scans, setScans] = useState<any[]>([]);
-  const navigate = useNavigate();
+  const [, navigate] = useLocation();
   const [filterStatus, setFilterStatus] = useState<string>('none');
   const [sortConfig, setSortConfig] = useState<{ column: string, direction: 'asc' | 'desc' } | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -247,7 +247,10 @@ const OsintScans = () => {
                 <td
                   className="p-2 text-blue-400 underline cursor-pointer"
                   title={scan.name || scan.scan_id}
-                  onClick={() => navigate(`/osint-engine/scans/${scan.scan_id}`)}
+                  onClick={() => {
+                    console.log('Navigating to scan details with scan_id:', scan.scan_id, typeof scan.scan_id);
+                    navigate(`/osint-engine/scans/${scan.scan_id}`);
+                  }}
                 >
                   {scan.name || scan.scan_id}
                 </td>

@@ -1,14 +1,18 @@
 
 import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useRoute, useLocation } from "wouter";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LabelList
 } from 'recharts';
 
 const TABS = ["Summary", "Correlations", "Browse", "Graph", "Scan Settings", "Log"];
 
+
 const ScanDetailsPage = () => {
-  const { scanId } = useParams();
+  // Use wouter's useRoute to extract scanId from the URL
+  const [match, params] = useRoute("/osint-engine/scans/:scanId");
+  const scanId = params?.scanId;
+  const [, navigate] = useLocation();
   if (!scanId) {
     return <div className="p-8 text-red-400">Invalid scan ID.</div>;
   }
@@ -21,7 +25,6 @@ const ScanDetailsPage = () => {
   const [scanLog, setScanLog] = useState<string>("");
   const [graphData, setGraphData] = useState<any>(null);
   const [correlations, setCorrelations] = useState<any>(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     setLoading(true);
@@ -76,7 +79,7 @@ const ScanDetailsPage = () => {
   return (
     <div className="p-8 w-full">
       <div className="flex items-center gap-4 mb-4">
-        <button className="text-blue-400 underline" onClick={() => navigate(-1)}>&larr; Back</button>
+        <button className="text-blue-400 underline" onClick={() => navigate("/osint-engine/scans") }>&larr; Back</button>
         <h1 className="text-2xl font-bold">{scanStatus.name || scanStatus.target} <span className="ml-2 text-xs font-semibold text-yellow-400">{scanStatus.status}</span></h1>
       </div>
       <div className="flex gap-2 mb-6">
