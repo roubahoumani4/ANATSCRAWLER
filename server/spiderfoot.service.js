@@ -11,7 +11,9 @@ function runPythonCommand(args) {
     if (!fs.existsSync(wrapperPath)) {
       actualPath = path.join(__dirname, 'server', 'spiderfoot_wrapper.py');
     }
-    const py = spawn('python3', [actualPath, ...args]);
+    // Use the deployment maigret-venv Python interpreter
+    const pythonPath = path.join(__dirname, '../maigret-venv/bin/python3.10');
+    const py = spawn(pythonPath, [actualPath, ...args]);
     let data = '';
     let err = '';
     py.stdout.on('data', chunk => data += chunk);
