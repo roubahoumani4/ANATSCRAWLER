@@ -1,10 +1,12 @@
-
 import express from "express";
 import fetch from "node-fetch";
 
 const router = express.Router();
 // Real SpiderFoot API base URL
 const SPIDERFOOT_API_URL = "http://192.168.1.105:5001";
+
+
+
 
 
 // --- SpiderFoot Native API Proxy Routes ---
