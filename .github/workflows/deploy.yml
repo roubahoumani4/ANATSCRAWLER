@@ -78,15 +78,8 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -e
-            cd /var/www/anatscrawler
-            # Move build artifacts up if they are in an 'out' subfolder (including dotfiles)
-            if [ -d out ]; then
-              shopt -s dotglob
-              mv out/* .
-              rmdir out
-              shopt -u dotglob
-            fi
-            echo "--- Directory contents after move ---"
+            cd /var/www/anatscrawler/app
+            echo "--- Directory contents ---"
             ls -la
             echo "--- Node version ---"
             node -v
