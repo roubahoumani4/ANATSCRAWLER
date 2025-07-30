@@ -1,3 +1,4 @@
+
 name: CI/CD → VM
 
 on:
@@ -51,6 +52,11 @@ jobs:
           name: production-build
           path: out
 
+      - name: Flatten out directory for deploy
+        run: |
+          mkdir -p deploy
+          rsync -a out/ deploy/
+
       - name: Sync build artifacts to VM
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -58,7 +64,7 @@ jobs:
           port: ${{ secrets.DEPLOY_PORT }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "out/*"
+          source: "deploy/*"
           target: /var/www/anatscrawler/app
           rm: false
 
