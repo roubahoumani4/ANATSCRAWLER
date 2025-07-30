@@ -3,7 +3,15 @@ const path = require('path');
 
 function runPythonCommand(args) {
   return new Promise((resolve, reject) => {
-    const py = spawn('python3', [path.join(__dirname, 'spiderfoot_wrapper.py'), ...args]);
+    // Always resolve path relative to project root, not just __dirname
+    const wrapperPath = path.join(__dirname, 'spiderfoot_wrapper.py');
+    // If the file does not exist (e.g. running from project root), try ../server/spiderfoot_wrapper.py
+    const fs = require('fs');
+    let actualPath = wrapperPath;
+    if (!fs.existsSync(wrapperPath)) {
+      actualPath = path.join(__dirname, 'server', 'spiderfoot_wrapper.py');
+    }
+    const py = spawn('python3', [actualPath, ...args]);
     let data = '';
     let err = '';
     py.stdout.on('data', chunk => data += chunk);
