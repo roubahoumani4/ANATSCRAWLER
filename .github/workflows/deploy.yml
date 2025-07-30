@@ -59,7 +59,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "out/*"
-          target: /var/www/anatscrawler/app
+          target: /var/www/anatscrawler/
           rm: true
 
       - name: Deploy & reload on VM
@@ -78,7 +78,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -e
-            cd /var/www/anatscrawler/app
+            cd /var/www/anatscrawler/
             echo "--- Directory contents ---"
             ls -la
             echo "--- Node version ---"
