@@ -1,151 +1,111 @@
 
 import express from "express";
-import fetch from "node-fetch";
 
 const router = express.Router();
-// Real SpiderFoot API base URL
-const SPIDERFOOT_API_URL = "http://192.168.1.105:5001";
-
-// --- SpiderFoot Native API Proxy Routes ---
-
-// Proxy: /scan/:scanId/status → /scaninfo?id=scanId
-router.get("/scan/:scanId/status", async (req, res) => {
-  try {
-    const { scanId } = req.params;
-    if (!scanId) return res.status(400).json({ error: "Missing scan id" });
-    const response = await fetch(`${SPIDERFOOT_API_URL}/scaninfo?id=${encodeURIComponent(scanId)}`);
-    const data = await response.json();
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch scan info" });
-  }
-});
+const spiderfoot = require("../spiderfoot.service");
 
 // List all scans (scanlist)
 router.get("/scanlist", async (req, res) => {
   try {
-    const response = await fetch(`${SPIDERFOOT_API_URL}/scanlist`);
-    const data = await response.json();
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch scan list" });
+    const scans = await spiderfoot.listScans();
+    res.json(scans);
+  } catch (e) {
+    res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
   }
 });
 
 // Get scan info (details)
-router.get("/scaninfo", async (req, res) => {
+router.get("/scan/:scanId/status", async (req, res) => {
   try {
-    const { id } = req.query;
-    if (!id) return res.status(400).json({ error: "Missing scan id" });
-    const response = await fetch(`${SPIDERFOOT_API_URL}/scaninfo?id=${encodeURIComponent(id as string)}`);
-    const data = await response.json();
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch scan info" });
+    const info = await spiderfoot.scanInfo(req.params.scanId);
+    res.json(info);
+  } catch (e) {
+    res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
   }
 });
 
-// Get scan results
-router.get("/scanresults", async (req, res) => {
+
+// Scan graph (event relationships)
+router.get("/scan/:scanId/graph", async (req, res) => {
   try {
-    const { id } = req.query;
-    if (!id) return res.status(400).json({ error: "Missing scan id" });
-    const response = await fetch(`${SPIDERFOOT_API_URL}/scanresults?id=${encodeURIComponent(id as string)}`);
-    const data = await response.json();
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch scan results" });
+    const graph = await spiderfoot.scanGraph(req.params.scanId);
+    res.json(graph);
+  } catch (e) {
+    res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
   }
 });
 
-// Get scan log
-router.get("/scanlog", async (req, res) => {
+// Scan browse (unique entities)
+router.get("/scan/:scanId/browse", async (req, res) => {
   try {
-    const { id } = req.query;
-    if (!id) return res.status(400).json({ error: "Missing scan id" });
-    const response = await fetch(`${SPIDERFOOT_API_URL}/scanlog?id=${encodeURIComponent(id as string)}`);
-    const data = await response.text();
-    res.setHeader('Content-Type', 'text/plain');
-    res.send(data);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch scan log" });
+    const browse = await spiderfoot.scanBrowse(req.params.scanId);
+    res.json(browse);
+  } catch (e) {
+    res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
   }
 });
 
-// Delete a scan
-router.post("/scan/:scanId/delete", async (req, res) => {
+// Scan result summary
+router.get("/scan/:scanId/summary", async (req, res) => {
   try {
-    const { scanId } = req.params;
-    const response = await fetch(`${SPIDERFOOT_API_URL}/scandelete?id=${encodeURIComponent(scanId)}`, { method: "POST" });
-    const data = await response.json();
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to delete scan" });
+    const summary = await spiderfoot.scanResultSummary(req.params.scanId);
+    res.json(summary);
+  } catch (e) {
+    res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
   }
 });
 
-// Clone a scan
-router.post("/scan/:scanId/clone", async (req, res) => {
+// Scan correlation summary
+router.get("/scan/:scanId/correlationsummary", async (req, res) => {
   try {
-    const { scanId } = req.params;
-    const response = await fetch(`${SPIDERFOOT_API_URL}/scanclone?id=${encodeURIComponent(scanId)}`, { method: "POST" });
-    const data = await response.json();
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to clone scan" });
+    const summary = await spiderfoot.scanCorrelationSummary(req.params.scanId);
+    res.json(summary);
+  } catch (e) {
+    res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
   }
 });
 
-// Export a scan (JSON)
-router.get("/scan/:scanId/export", async (req, res) => {
+// Scan correlation list
+router.get("/scan/:scanId/correlationlist", async (req, res) => {
   try {
-    const { scanId } = req.params;
-    const response = await fetch(`${SPIDERFOOT_API_URL}/scanexport?id=${encodeURIComponent(scanId)}`);
-    if (!response.ok) return res.status(500).json({ error: "Failed to export scan" });
-    const data = await response.text();
-    res.setHeader('Content-Type', 'application/json');
-    res.send(data);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to export scan" });
+    const list = await spiderfoot.scanCorrelationList(req.params.scanId);
+    res.json(list);
+  } catch (e) {
+    res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
   }
 });
 
-// Abort/stop a scan
-router.post("/scan/:scanId/abort", async (req, res) => {
+// Scan result event
+router.get("/scan/:scanId/events", async (req, res) => {
   try {
-    const { scanId } = req.params;
-    const response = await fetch(`${SPIDERFOOT_API_URL}/scanabort?id=${encodeURIComponent(scanId)}`, { method: "POST" });
-    const data = await response.json();
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to abort scan" });
+    const events = await spiderfoot.scanResultEvent(req.params.scanId);
+    res.json(events);
+  } catch (e) {
+    res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
   }
 });
 
-// (Optional) Start a new scan (if supported by SpiderFoot API)
-router.post("/scan", async (req, res) => {
+// Scan logs
+router.get("/scan/:scanId/logs", async (req, res) => {
   try {
-    const { target, modules } = req.body;
-    const response = await fetch(`${SPIDERFOOT_API_URL}/startscan`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ target, modules })
-    });
-    const data = await response.json();
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to start scan" });
+    const logs = await spiderfoot.scanLogs(req.params.scanId);
+    res.json(logs);
+  } catch (e) {
+    res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
   }
 });
 
-// (Optional) List available modules (if needed)
-router.get("/modules", async (req, res) => {
+// Start new scan
+router.post("/scan/start", async (req, res) => {
+  const { target, name } = req.body;
+  if (!target || !name) {
+    return res.status(400).json({ error: "Missing target or name" });
+  }
   try {
-    const response = await fetch(`${SPIDERFOOT_API_URL}/modules`);
-    const data = await response.json();
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch modules" });
+    const result = await spiderfoot.startScan(target, name);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
   }
 });
 

@@ -31,30 +31,18 @@ const ScanDetailsPage = () => {
     setError(null);
     Promise.all([
       fetch(`/api/spiderfoot/scan/${scanId}/status`).then(res => res.json()),
-      fetch(`/api/spiderfoot/scan/${scanId}/results`).then(res => res.json()),
-      fetch(`/api/spiderfoot/scan/${scanId}/log`).then(res => res.ok ? res.text() : "")
+      fetch(`/api/spiderfoot/scan/${scanId}/summary`).then(res => res.json()),
+      fetch(`/api/spiderfoot/scan/${scanId}/correlationsummary`).then(res => res.json()),
+      fetch(`/api/spiderfoot/scan/${scanId}/browse`).then(res => res.json()),
+      fetch(`/api/spiderfoot/scan/${scanId}/graph`).then(res => res.json()),
+      fetch(`/api/spiderfoot/scan/${scanId}/logs`).then(res => res.json())
     ])
-      .then(([status, results, log]) => {
+      .then(([status, summary, correlations, browse, graph, logs]) => {
         setScanStatus(status);
-        setScanResults(results);
-        setScanLog(log);
-        // Extract correlations if present
-        if (results && (results.correlations || results.corr_high || results.corr_medium || results.corr_low || results.corr_info)) {
-          setCorrelations(results.correlations || {
-            high: results.corr_high,
-            medium: results.corr_medium,
-            low: results.corr_low,
-            info: results.corr_info
-          });
-        } else {
-          setCorrelations(null);
-        }
-        // Extract graph data if present
-        if (results && results.graph) {
-          setGraphData(results.graph);
-        } else {
-          setGraphData(null);
-        }
+        setScanResults({ summary, correlations, browse, graph });
+        setCorrelations(correlations);
+        setGraphData(graph);
+        setScanLog(Array.isArray(logs) ? logs.map(l => `${l.generated} [${l.component}] ${l.type}: ${l.message}`).join('\n') : (logs || ""));
         setLoading(false);
       })
       .catch(() => {
@@ -67,14 +55,12 @@ const ScanDetailsPage = () => {
   if (error) return <div className="p-8 text-red-400">{error}</div>;
   if (!scanStatus) return <div className="p-8">No scan info found.</div>;
 
-  // Prepare data types for bar chart
-  const dataTypes = scanResults?.data_types || scanResults?.types || [];
-  const barData = Array.isArray(dataTypes)
-    ? dataTypes.map((dt: any) => ({
-        name: dt.name || dt.type || dt[0],
-        value: dt.count || dt[1] || 0
-      }))
-    : Object.entries(dataTypes).map(([name, value]) => ({ name, value }));
+  // Prepare data types for bar chart (from summary)
+  const summaryArr = Array.isArray(scanResults?.summary) ? scanResults.summary : [];
+  const barData = summaryArr.map((row: any) => ({
+    name: row[0] || row.type || row.name,
+    value: row[3] || row.total || 0
+  }));
 
   return (
     <div className="p-8 w-full">
@@ -97,20 +83,17 @@ const ScanDetailsPage = () => {
         <div>
           <div className="mb-4 flex gap-8">
             <div className="bg-gray-800 p-4 rounded">
-              <div>Total: <b>{scanResults?.total || scanResults?.elements?.length || 0}</b></div>
-              <div>Unique: <b>{scanResults?.unique || 0}</b></div>
               <div>Status: <b>{scanStatus.status}</b></div>
-              <div>Errors: <b>{scanStatus.errors || 0}</b></div>
               <div>Started: <b>{scanStatus.started || '-'}</b></div>
               <div>Finished: <b>{scanStatus.finished || '-'}</b></div>
             </div>
             <div className="bg-gray-800 p-4 rounded">
               <div className="mb-2 font-semibold">Correlations</div>
               <div className="flex gap-2">
-                <span className="bg-red-400 px-2 rounded">High {scanResults?.corr_high || 0}</span>
-                <span className="bg-yellow-400 px-2 rounded">Medium {scanResults?.corr_medium || 0}</span>
-                <span className="bg-blue-400 px-2 rounded">Low {scanResults?.corr_low || 0}</span>
-                <span className="bg-green-400 px-2 rounded">Info {scanResults?.corr_info || 0}</span>
+                <span className="bg-red-400 px-2 rounded">High {correlations?.high || 0}</span>
+                <span className="bg-yellow-400 px-2 rounded">Medium {correlations?.medium || 0}</span>
+                <span className="bg-blue-400 px-2 rounded">Low {correlations?.low || 0}</span>
+                <span className="bg-green-400 px-2 rounded">Info {correlations?.info || 0}</span>
               </div>
             </div>
           </div>
@@ -137,17 +120,10 @@ const ScanDetailsPage = () => {
       {tab === "Correlations" && (
         <div className="bg-gray-900 p-4 rounded">
           <div className="font-semibold mb-2">Correlations</div>
-          {correlations && (correlations.high || correlations.medium || correlations.low || correlations.info) ? (
-            <div className="flex gap-4">
-              <span className="bg-red-700/80 text-red-200 px-3 py-1 rounded-full text-xs font-bold">High: {correlations.high ?? 0}</span>
-              <span className="bg-yellow-700/80 text-yellow-200 px-3 py-1 rounded-full text-xs font-bold">Medium: {correlations.medium ?? 0}</span>
-              <span className="bg-blue-700/80 text-blue-200 px-3 py-1 rounded-full text-xs font-bold">Low: {correlations.low ?? 0}</span>
-              <span className="bg-green-700/80 text-green-200 px-3 py-1 rounded-full text-xs font-bold">Info: {correlations.info ?? 0}</span>
-            </div>
-          ) : correlations && typeof correlations === 'object' ? (
+          {correlations && Object.keys(correlations).length > 0 ? (
             <div className="flex gap-4">
               {Object.entries(correlations).map(([key, val]) => (
-                <span key={key} className={`px-3 py-1 rounded-full text-xs font-bold ${key === 'high' || key === 'errors' ? 'bg-red-700/80 text-red-200' : key === 'medium' || key === 'warnings' ? 'bg-yellow-700/80 text-yellow-200' : key === 'low' ? 'bg-blue-700/80 text-blue-200' : 'bg-green-700/80 text-green-200'}`}>{key}: {typeof val === 'number' || typeof val === 'string' ? val : JSON.stringify(val)}</span>
+                <span key={key} className={`px-3 py-1 rounded-full text-xs font-bold ${key === 'high' ? 'bg-red-700/80 text-red-200' : key === 'medium' ? 'bg-yellow-700/80 text-yellow-200' : key === 'low' ? 'bg-blue-700/80 text-blue-200' : 'bg-green-700/80 text-green-200'}`}>{key}: {typeof val === 'number' || typeof val === 'string' ? val : JSON.stringify(val)}</span>
               ))}
             </div>
           ) : (
@@ -158,24 +134,20 @@ const ScanDetailsPage = () => {
       {tab === "Browse" && (
         <div>
           <div className="font-semibold mb-2">Browse Data</div>
-          {Array.isArray(scanResults?.elements) && scanResults.elements.length > 0 ? (
+          {Array.isArray(scanResults?.browse) && scanResults.browse.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="min-w-full text-xs bg-gray-900 rounded">
                 <thead>
                   <tr>
                     <th className="p-2">Type</th>
                     <th className="p-2">Value</th>
-                    <th className="p-2">Module</th>
-                    <th className="p-2">Timestamp</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {scanResults.elements.map((el: any, idx: number) => (
+                  {scanResults.browse.map((el: any, idx: number) => (
                     <tr key={idx} className="border-b border-gray-800">
-                      <td className="p-2">{el.type || el[0]}</td>
-                      <td className="p-2">{el.value || el[1]}</td>
-                      <td className="p-2">{el.module || el[2]}</td>
-                      <td className="p-2">{el.ts || el[3]}</td>
+                      <td className="p-2">{el[1] || el.type}</td>
+                      <td className="p-2">{el[0] || el.value}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -189,8 +161,8 @@ const ScanDetailsPage = () => {
       {tab === "Graph" && (
         <div className="bg-gray-900 p-4 rounded">
           <div className="font-semibold mb-2">Graph</div>
-          {graphData && Array.isArray(graphData.nodes) && Array.isArray(graphData.edges) ? (
-            <div className="text-gray-400">Graph data loaded ({graphData.nodes.length} nodes, {graphData.edges.length} edges). {/* TODO: Add visualization */}</div>
+          {Array.isArray(graphData) && graphData.length > 0 ? (
+            <div className="text-gray-400">Graph data loaded ({graphData.length} events). {/* TODO: Add visualization */}</div>
           ) : (
             <div className="text-gray-400">No graph data available.</div>
           )}

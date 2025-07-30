@@ -37,13 +37,13 @@ const OsintNewScan = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/scan`, {
+      const res = await fetch(`${API_BASE}/scan/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target, modules: selectedModules, name: scanName, scan_type: scanType })
+        body: JSON.stringify({ target, name: scanName })
       });
       const data = await res.json();
-      if (!data.scan_id) setError("Failed to start scan");
+      if (!data.success) setError("Failed to start scan");
     } catch {
       setError("Failed to start scan");
     }
