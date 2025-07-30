@@ -60,7 +60,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "out/*"
           target: /var/www/anatscrawler/
-          rm: true
+          rm: false
 
       - name: Deploy & reload on VM
         uses: appleboy/ssh-action@v1.0.0
