@@ -12,9 +12,14 @@ def list_modules():
     except Exception as e:
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}))
 
+
 import sys
 import json
 import os
+import traceback
+
+# Print to stderr at the very top to confirm script starts
+print("[spiderfoot_wrapper.py] STARTED", file=sys.stderr, flush=True)
 
 # Use absolute path for SpiderFoot DB
 DB_PATH = os.path.expanduser('~/.spiderfoot/spiderfoot.db')
@@ -26,7 +31,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "spid
 try:
     from spiderfoot.spiderfoot.db import SpiderFootDb
 except ImportError:
-    print(json.dumps({"error": "Could not import SpiderFoot modules. Make sure the code is in server/spiderfoot."}))
+    print(json.dumps({"error": "Could not import SpiderFoot modules. Make sure the code is in server/spiderfoot."}), flush=True)
+    print(traceback.format_exc(), file=sys.stderr, flush=True)
+    sys.stderr.flush()
     sys.exit(1)
 
 def scan_info(scan_id):
@@ -60,13 +67,15 @@ def scan_browse(scan_id):
         print(json.dumps({"error": str(e)}))
 
 def list_scans():
-    db = SpiderFootDb({'__database': DB_PATH})
     try:
+        db = SpiderFootDb({'__database': DB_PATH})
         # Returns a list of all scan instances
         scans = db.scanInstanceList()
-        print(json.dumps(scans))
+        print(json.dumps(scans), flush=True)
     except Exception as e:
-        print(json.dumps({"error": str(e)}))
+        print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
+        sys.stderr.flush()
+        sys.exit(1)
 def scan_result_summary(scan_id):
     db = SpiderFootDb({'__database': DB_PATH})
     summary = db.scanResultSummary(scan_id)
@@ -104,70 +113,75 @@ def start_scan(target, name):
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}))
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print(json.dumps({"error": "No command provided"}))
-        sys.exit(1)
-    cmd = sys.argv[1]
-    if cmd == "list_modules":
-        list_modules()
-        sys.exit(0)
-    if cmd == "list_scans":
-        list_scans()
-    elif cmd == "scan_info":
-        if len(sys.argv) < 3:
-            print(json.dumps({"error": "No scan_id provided"}))
+    try:
+        if len(sys.argv) < 2:
+            print(json.dumps({"error": "No command provided"}), flush=True)
             sys.exit(1)
-        scan_id = sys.argv[2]
-        scan_info(scan_id)
-    elif cmd == "scan_graph":
-        if len(sys.argv) < 3:
-            print(json.dumps({"error": "No scan_id provided"}))
+        cmd = sys.argv[1]
+        if cmd == "list_modules":
+            list_modules()
+            sys.exit(0)
+        if cmd == "list_scans":
+            list_scans()
+        elif cmd == "scan_info":
+            if len(sys.argv) < 3:
+                print(json.dumps({"error": "No scan_id provided"}), flush=True)
+                sys.exit(1)
+            scan_id = sys.argv[2]
+            scan_info(scan_id)
+        elif cmd == "scan_graph":
+            if len(sys.argv) < 3:
+                print(json.dumps({"error": "No scan_id provided"}), flush=True)
+                sys.exit(1)
+            scan_id = sys.argv[2]
+            scan_graph(scan_id)
+        elif cmd == "scan_browse":
+            if len(sys.argv) < 3:
+                print(json.dumps({"error": "No scan_id provided"}), flush=True)
+                sys.exit(1)
+            scan_id = sys.argv[2]
+            scan_browse(scan_id)
+        elif cmd == "scan_result_summary":
+            if len(sys.argv) < 3:
+                print(json.dumps({"error": "No scan_id provided"}), flush=True)
+                sys.exit(1)
+            scan_id = sys.argv[2]
+            scan_result_summary(scan_id)
+        elif cmd == "scan_correlation_summary":
+            if len(sys.argv) < 3:
+                print(json.dumps({"error": "No scan_id provided"}), flush=True)
+                sys.exit(1)
+            scan_id = sys.argv[2]
+            scan_correlation_summary(scan_id)
+        elif cmd == "scan_correlation_list":
+            if len(sys.argv) < 3:
+                print(json.dumps({"error": "No scan_id provided"}), flush=True)
+                sys.exit(1)
+            scan_id = sys.argv[2]
+            scan_correlation_list(scan_id)
+        elif cmd == "scan_result_event":
+            if len(sys.argv) < 3:
+                print(json.dumps({"error": "No scan_id provided"}), flush=True)
+                sys.exit(1)
+            scan_id = sys.argv[2]
+            scan_result_event(scan_id)
+        elif cmd == "scan_logs":
+            if len(sys.argv) < 3:
+                print(json.dumps({"error": "No scan_id provided"}), flush=True)
+                sys.exit(1)
+            scan_id = sys.argv[2]
+            scan_logs(scan_id)
+        elif cmd == "start_scan":
+            if len(sys.argv) < 4:
+                print(json.dumps({"error": "No target or name provided"}), flush=True)
+                sys.exit(1)
+            target = sys.argv[2]
+            name = sys.argv[3]
+            start_scan(target, name)
+        else:
+            print(json.dumps({"error": "Unknown command"}), flush=True)
             sys.exit(1)
-        scan_id = sys.argv[2]
-        scan_graph(scan_id)
-    elif cmd == "scan_browse":
-        if len(sys.argv) < 3:
-            print(json.dumps({"error": "No scan_id provided"}))
-            sys.exit(1)
-        scan_id = sys.argv[2]
-        scan_browse(scan_id)
-    elif cmd == "scan_result_summary":
-        if len(sys.argv) < 3:
-            print(json.dumps({"error": "No scan_id provided"}))
-            sys.exit(1)
-        scan_id = sys.argv[2]
-        scan_result_summary(scan_id)
-    elif cmd == "scan_correlation_summary":
-        if len(sys.argv) < 3:
-            print(json.dumps({"error": "No scan_id provided"}))
-            sys.exit(1)
-        scan_id = sys.argv[2]
-        scan_correlation_summary(scan_id)
-    elif cmd == "scan_correlation_list":
-        if len(sys.argv) < 3:
-            print(json.dumps({"error": "No scan_id provided"}))
-            sys.exit(1)
-        scan_id = sys.argv[2]
-        scan_correlation_list(scan_id)
-    elif cmd == "scan_result_event":
-        if len(sys.argv) < 3:
-            print(json.dumps({"error": "No scan_id provided"}))
-            sys.exit(1)
-        scan_id = sys.argv[2]
-        scan_result_event(scan_id)
-    elif cmd == "scan_logs":
-        if len(sys.argv) < 3:
-            print(json.dumps({"error": "No scan_id provided"}))
-            sys.exit(1)
-        scan_id = sys.argv[2]
-        scan_logs(scan_id)
-    elif cmd == "start_scan":
-        if len(sys.argv) < 4:
-            print(json.dumps({"error": "No target or name provided"}))
-            sys.exit(1)
-        target = sys.argv[2]
-        name = sys.argv[3]
-        start_scan(target, name)
-    else:
-        print(json.dumps({"error": "Unknown command"}))
+    except Exception as e:
+        print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
+        sys.stderr.flush()
         sys.exit(1)
