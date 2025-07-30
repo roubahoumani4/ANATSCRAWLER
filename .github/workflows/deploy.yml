@@ -59,7 +59,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "out/*"
-          target: /var/www/anatscrawler
+          target: /var/www/anatscrawler/app
           rm: true
 
       - name: Deploy & reload on VM
