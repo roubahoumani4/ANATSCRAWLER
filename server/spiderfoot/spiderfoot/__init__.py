@@ -5,4 +5,4 @@ from .plugin import SpiderFootPlugin
 from .target import SpiderFootTarget
 from .helpers import SpiderFootHelpers
 from .correlation import SpiderFootCorrelator
-from spiderfoot.__version__ import __version__
+from .__version__ import __version__
