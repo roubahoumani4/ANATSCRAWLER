@@ -1,41 +1,32 @@
-
-# --- Cleaned Imports and Path Setup ---
 # --- Cleaned Imports and Path Setup ---
 import sys
 import json
 import os
 import traceback
-# Path setup for SpiderFoot imports
-BASE_DIR = os.path.dirname(__file__)
-SPIDERFOOT_DIR = os.path.join(BASE_DIR, 'spiderfoot')
-MODULES_DIR = os.path.join(SPIDERFOOT_DIR, 'modules')
-sys.path.insert(0, BASE_DIR)
-sys.path.insert(0, SPIDERFOOT_DIR)
-sys.path.insert(0, MODULES_DIR)
-# Remove or redirect the startup print to avoid polluting stdout (which must be pure JSON for API)
-# print("[spiderfoot_wrapper.py] STARTED", file=sys.stderr, flush=True)
 
+
+# Path setup for SpiderFoot imports
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SPIDERFOOT_PKG = os.path.join(BASE_DIR, 'spiderfoot')
+MODULES_DIR = os.path.join(BASE_DIR, 'modules')
+
+# Ensure SpiderFoot package and modules are on sys.path
+for p in [BASE_DIR, SPIDERFOOT_PKG, MODULES_DIR]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
 # Use absolute path for SpiderFoot DB
 DB_PATH = os.path.expanduser('~/.spiderfoot/spiderfoot.db')
 
-
-# Import SpiderFoot modules (flat import style)
-
-print('CWD:', os.getcwd(), file=sys.stderr)
-print('sys.path:', sys.path, file=sys.stderr)
-from spiderfoot.spiderfoot import SpiderFootDb, SpiderFootHelpers
-import importlib
+# --- Import SpiderFoot core modules (direct imports only, robust for this structure) ---
 try:
-    from spiderfoot.sfscan import SpiderFootScanner
-except ImportError:
-    try:
-        # Try importing as a flat module if running from BASE_DIR
-        sfscan_mod = importlib.import_module('sfscan')
-        SpiderFootScanner = getattr(sfscan_mod, 'SpiderFootScanner', None)
-    except Exception as e:
-        print(json.dumps({"error": f"Failed to import SpiderFootScanner: {str(e)}"}), file=sys.stderr)
-        SpiderFootScanner = None
+    from spiderfoot.db import SpiderFootDb
+    from spiderfoot.helpers import SpiderFootHelpers
+    from sfscan import SpiderFootScanner
+except ImportError as e:
+    print(json.dumps({"error": "Failed to import SpiderFoot modules", "details": str(e)}), file=sys.stderr, flush=True)
+    sys.exit(1)
+
 def list_modules():
     try:
         modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR)
@@ -57,10 +48,7 @@ def scan_graph(scan_id):
     import traceback
     db = SpiderFootDb({'__database': DB_PATH})
     try:
-        # For graph, return all event relationships (parent/child links)
-        # Get all results for the scan
         results = db.scanResultEvent(scan_id)
-        # Optionally, you could use scanElementSourcesDirect/scanElementChildrenDirect for more structure
         print(json.dumps(results))
     except Exception as e:
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}))
@@ -68,7 +56,6 @@ def scan_graph(scan_id):
 def scan_browse(scan_id):
     db = SpiderFootDb({'__database': DB_PATH})
     try:
-        # For browse, return all unique elements (entities)
         unique = db.scanResultEventUnique(scan_id)
         print(json.dumps(unique))
     except Exception as e:
@@ -110,18 +97,13 @@ def scan_logs(scan_id):
 
 def start_scan(target, name):
     try:
-        # Determine target type
         target_type = SpiderFootHelpers.targetTypeFromString(target)
         if not target_type:
             print(json.dumps({"success": False, "error": "Could not determine target type for: " + target}))
             return
-        # Load modules
         modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR)
         enabled_modules = list(modules_dict.keys())
-        # Build config
         config = {'__database': DB_PATH}
-        # Start scan
-        # Generate a scanId (must be a string)
         scan_id = SpiderFootHelpers.genScanInstanceId()
         scanner = SpiderFootScanner(
             scanName=name,
