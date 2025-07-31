@@ -7,10 +7,7 @@ if ! command -v python3.10 >/dev/null; then
 fi
 
 # Ensure required dev headers are present (for venv Python and reportlab)
-if command -v apt-get >/dev/null; then
-  sudo apt-get update
-  sudo apt-get install -y libsqlite3-dev libxml2-dev libxslt1-dev libfreetype6-dev
-fi
+# (System dependencies are assumed to be pre-installed on the VM)
 
 # Create venv if not exists
 if [ ! -d "maigret-venv" ]; then
