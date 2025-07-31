@@ -6,11 +6,11 @@ if ! command -v python3.10 >/dev/null; then
   exit 1
 fi
 
-# Ensure sqlite3 dev headers are present (for venv Python to have sqlite3)
-# if command -v apt-get >/dev/null; then
-#   apt-get update
-#   apt-get install -y libsqlite3-dev
-# fi
+# Ensure required dev headers are present (for venv Python and reportlab)
+if command -v apt-get >/dev/null; then
+  sudo apt-get update
+  sudo apt-get install -y libsqlite3-dev libxml2-dev libxslt1-dev libfreetype6-dev
+fi
 
 # Create venv if not exists
 if [ ! -d "maigret-venv" ]; then
