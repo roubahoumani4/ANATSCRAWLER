@@ -1,1 +1,1 @@
-from spiderfoot.spiderfoot.db import SpiderFootDb
+from spiderfoot.db import SpiderFootDb

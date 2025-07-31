@@ -1,1 +1,1 @@
-from spiderfoot.spiderfoot.helpers import SpiderFootHelpers
+from spiderfoot.helpers import SpiderFootHelpers
