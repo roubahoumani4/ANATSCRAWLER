@@ -1,46 +1,41 @@
-def list_modules():
-    import traceback
+
+# --- Cleaned Imports and Path Setup ---
+import sys
+import json
+import os
+import traceback
+BASE_DIR = os.path.dirname(__file__)
+sys.path.insert(0, os.path.join(BASE_DIR, 'spiderfoot'))
+sys.path.insert(0, BASE_DIR)
+print("[spiderfoot_wrapper.py] STARTED", file=sys.stderr, flush=True)
+
+
+# Use absolute path for SpiderFoot DB
+DB_PATH = os.path.expanduser('~/.spiderfoot/spiderfoot.db')
+
+
+# Import SpiderFoot modules (flat import style)
+
+# Import SpiderFoot modules (flat import style)
+import importlib.util
+def import_optional(module, name=None):
     try:
-        # Use absolute path for spiderfoot directory
-        spiderfoot_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "spiderfoot"))
-        sys.path.insert(0, spiderfoot_dir)
-        from spiderfoot.spiderfoot.helpers import SpiderFootHelpers
-        modules_path = os.path.join(spiderfoot_dir, "modules")
+        return importlib.import_module(module)
+    except ImportError as e:
+        print(json.dumps({"error": f"Could not import {module}. Make sure the code is present.", "details": str(e)}), flush=True)
+        sys.exit(1)
+
+SpiderFootDb = import_optional('spiderfoot.db', 'SpiderFootDb').SpiderFootDb
+SpiderFootHelpers = import_optional('spiderfoot.helpers', 'SpiderFootHelpers').SpiderFootHelpers
+SpiderFootScanner = import_optional('sfscan', 'SpiderFootScanner').SpiderFootScanner
+def list_modules():
+    try:
+        modules_path = os.path.join(BASE_DIR, "spiderfoot", "modules")
         modules_dict = SpiderFootHelpers.loadModulesAsDict(modules_path)
         module_names = sorted(list(modules_dict.keys()))
         print(json.dumps({"modules": module_names}))
     except Exception as e:
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}))
-
-
-
-import sys
-import json
-import os
-import traceback
-
-
-
-
-# Add SpiderFoot to the Python path as a root module folder for local import
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'spiderfoot'))
-
-# Print to stderr at the very top to confirm script starts
-print("[spiderfoot_wrapper.py] STARTED", file=sys.stderr, flush=True)
-
-# Use absolute path for SpiderFoot DB
-DB_PATH = os.path.expanduser('~/.spiderfoot/spiderfoot.db')
-
-# Import SpiderFoot modules (adjust as needed for your version)
-try:
-    from spiderfoot.db import SpiderFootDb
-except ImportError:
-    print(json.dumps({"error": "Could not import SpiderFoot modules. Make sure the code is in server/spiderfoot."}), flush=True)
-    print(traceback.format_exc(), file=sys.stderr, flush=True)
-    sys.stderr.flush()
-    sys.exit(1)
 
 def scan_info(scan_id):
     import traceback
@@ -75,9 +70,8 @@ def scan_browse(scan_id):
 def list_scans():
     try:
         db = SpiderFootDb({'__database': DB_PATH})
-        # Returns a list of all scan instances
         scans = db.scanInstanceList()
-        print(json.dumps(scans), flush=True)
+        print(json.dumps({"scans": scans}), flush=True)
     except Exception as e:
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
         sys.stderr.flush()
@@ -108,15 +102,31 @@ def scan_logs(scan_id):
     print(json.dumps(logs))
 
 def start_scan(target, name):
-    import traceback
     try:
-        # This only creates a scan instance, does NOT start a scan engine!
-        db = SpiderFootDb({'__database': DB_PATH})
-        db.scanInstanceCreate(name, name, target)
-        # TODO: Actually start a scan using sfscan.py or SpiderFootScanner
-        print(json.dumps({"success": False, "error": "Scan engine not started. Only DB entry created. Implement scan execution via sfscan.py or SpiderFootScanner."}))
+        # Determine target type
+        target_type = SpiderFootHelpers.targetTypeFromString(target)
+        if not target_type:
+            print(json.dumps({"success": False, "error": "Could not determine target type for: " + target}))
+            return
+        # Load modules
+        modules_path = os.path.join(BASE_DIR, "spiderfoot", "modules")
+        modules_dict = SpiderFootHelpers.loadModulesAsDict(modules_path)
+        enabled_modules = list(modules_dict.keys())
+        # Build config
+        config = {'__database': DB_PATH}
+        # Start scan
+        scanner = SpiderFootScanner(
+            scanName=name,
+            scanId=None,
+            targetValue=target,
+            targetType=target_type,
+            moduleList=enabled_modules,
+            globalOpts=config,
+            start=True
+        )
+        print(json.dumps({"success": True, "scanId": scanner.scanId}))
     except Exception as e:
-        print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}))
+        print(json.dumps({"success": False, "error": str(e), "traceback": traceback.format_exc()}))
 
 if __name__ == "__main__":
     try:
