@@ -13,10 +13,19 @@ def list_modules():
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}))
 
 
+
 import sys
 import json
 import os
 import traceback
+
+
+
+
+# Add SpiderFoot to the Python path as a root module folder for local import
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'spiderfoot'))
 
 # Print to stderr at the very top to confirm script starts
 print("[spiderfoot_wrapper.py] STARTED", file=sys.stderr, flush=True)
@@ -24,12 +33,9 @@ print("[spiderfoot_wrapper.py] STARTED", file=sys.stderr, flush=True)
 # Use absolute path for SpiderFoot DB
 DB_PATH = os.path.expanduser('~/.spiderfoot/spiderfoot.db')
 
-# Add SpiderFoot to the Python path (assumes code is in server/spiderfoot)
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "spiderfoot")))
-
 # Import SpiderFoot modules (adjust as needed for your version)
 try:
-    from spiderfoot.spiderfoot.db import SpiderFootDb
+    from spiderfoot.db import SpiderFootDb
 except ImportError:
     print(json.dumps({"error": "Could not import SpiderFoot modules. Make sure the code is in server/spiderfoot."}), flush=True)
     print(traceback.format_exc(), file=sys.stderr, flush=True)
