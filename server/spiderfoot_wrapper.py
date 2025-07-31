@@ -7,7 +7,8 @@ import traceback
 BASE_DIR = os.path.dirname(__file__)
 sys.path.insert(0, os.path.join(BASE_DIR, 'spiderfoot'))
 sys.path.insert(0, BASE_DIR)
-print("[spiderfoot_wrapper.py] STARTED", file=sys.stderr, flush=True)
+# Remove or redirect the startup print to avoid polluting stdout (which must be pure JSON for API)
+# print("[spiderfoot_wrapper.py] STARTED", file=sys.stderr, flush=True)
 
 
 # Use absolute path for SpiderFoot DB
