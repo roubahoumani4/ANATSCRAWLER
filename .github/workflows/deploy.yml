@@ -100,7 +100,13 @@ jobs:
             npm ci --omit=dev
             # Install Maigret and dependencies for Threat Intelligence feature
             chmod +x scripts/install-maigret.sh
-            bash scripts/install-maigret.sh
+            export SUDO_ASKPASS_SCRIPT=$(mktemp)
+            echo "#!/bin/sh" > $SUDO_ASKPASS_SCRIPT
+            echo "echo \"$SUDO_PASSWORD\"" >> $SUDO_ASKPASS_SCRIPT
+            chmod +x $SUDO_ASKPASS_SCRIPT
+            export SUDO_ASKPASS=$SUDO_ASKPASS_SCRIPT
+            SUDO_ASKPASS=$SUDO_ASKPASS_SCRIPT bash scripts/install-maigret.sh
+            rm -f $SUDO_ASKPASS_SCRIPT
             # Install Recharts for frontend charting (ensure available for SSR/build)
             npm install recharts
             # Install Python dependencies for Spiderfoot
