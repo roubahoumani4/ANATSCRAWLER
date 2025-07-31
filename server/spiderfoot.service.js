@@ -5,7 +5,7 @@ function runPythonCommand(args) {
   return new Promise((resolve, reject) => {
     
     // Always use the canonical wrapper location
-    const actualPath = path.join(__dirname, 'spiderfoot', 'spiderfoot_wrapper.py');
+    const actualPath = path.join(__dirname, 'spiderfoot', 'spiderfoot', 'spiderfoot_wrapper.py');
     // Use the deployment maigret-venv Python interpreter (always from app root)
     const pythonPath = path.join(process.cwd(), 'maigret-venv/bin/python3.10');
     const py = spawn(pythonPath, [actualPath, ...args]);
