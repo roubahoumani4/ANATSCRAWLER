@@ -8,8 +8,8 @@ fi
 
 # Ensure sqlite3 dev headers are present (for venv Python to have sqlite3)
 if command -v apt-get >/dev/null; then
-  sudo apt-get update
-  sudo apt-get install -y libsqlite3-dev
+  apt-get update
+  apt-get install -y libsqlite3-dev
 fi
 
 # Create venv if not exists
