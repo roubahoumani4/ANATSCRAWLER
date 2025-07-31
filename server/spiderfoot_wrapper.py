@@ -1,12 +1,12 @@
 
 # --- Cleaned Imports and Path Setup ---
+# --- Cleaned Imports and Path Setup ---
 import sys
 import json
 import os
 import traceback
 BASE_DIR = os.path.dirname(__file__)
-sys.path.insert(0, os.path.join(BASE_DIR, 'spiderfoot', 'spiderfoot'))
-sys.path.insert(0, os.path.join(BASE_DIR, 'spiderfoot'))
+# Add BASE_DIR to sys.path so 'spiderfoot' is importable as a package and 'sfscan' as a module
 sys.path.insert(0, BASE_DIR)
 # Remove or redirect the startup print to avoid polluting stdout (which must be pure JSON for API)
 # print("[spiderfoot_wrapper.py] STARTED", file=sys.stderr, flush=True)
@@ -18,18 +18,20 @@ DB_PATH = os.path.expanduser('~/.spiderfoot/spiderfoot.db')
 
 # Import SpiderFoot modules (flat import style)
 
-# Import SpiderFoot modules (flat import style)
-import importlib.util
-def import_optional(module, name=None):
+print('CWD:', os.getcwd(), file=sys.stderr)
+print('sys.path:', sys.path, file=sys.stderr)
+from spiderfoot.spiderfoot import SpiderFootDb, SpiderFootHelpers
+import importlib
+try:
+    from spiderfoot.sfscan import SpiderFootScanner
+except ImportError:
     try:
-        return importlib.import_module(module)
-    except ImportError as e:
-        print(json.dumps({"error": f"Could not import {module}. Make sure the code is present.", "details": str(e)}), flush=True)
-        sys.exit(1)
-
-SpiderFootDb = import_optional('spiderfoot', 'SpiderFootDb').SpiderFootDb
-SpiderFootHelpers = import_optional('spiderfoot', 'SpiderFootHelpers').SpiderFootHelpers
-SpiderFootScanner = import_optional('sfscan', 'SpiderFootScanner').SpiderFootScanner
+        # Try importing as a flat module if running from BASE_DIR
+        sfscan_mod = importlib.import_module('sfscan')
+        SpiderFootScanner = getattr(sfscan_mod, 'SpiderFootScanner', None)
+    except Exception as e:
+        print(json.dumps({"error": f"Failed to import SpiderFootScanner: {str(e)}"}), file=sys.stderr)
+        SpiderFootScanner = None
 def list_modules():
     try:
         modules_path = os.path.join(BASE_DIR, "spiderfoot", "modules")
@@ -117,9 +119,11 @@ def start_scan(target, name):
         # Build config
         config = {'__database': DB_PATH}
         # Start scan
+        # Generate a scanId (must be a string)
+        scan_id = SpiderFootHelpers.genScanInstanceId()
         scanner = SpiderFootScanner(
             scanName=name,
-            scanId=None,
+            scanId=scan_id,
             targetValue=target,
             targetType=target_type,
             moduleList=enabled_modules,
