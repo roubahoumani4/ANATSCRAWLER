@@ -103,7 +103,10 @@ def start_scan(target, name):
             return
         modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR)
         enabled_modules = list(modules_dict.keys())
-        config = {'__database': DB_PATH}
+        config = {
+            '__database': DB_PATH,
+            '_dnsserver': '8.8.8.8'  # Default to Google DNS, change if needed
+        }
         scan_id = SpiderFootHelpers.genScanInstanceId()
         scanner = SpiderFootScanner(
             scanName=name,
