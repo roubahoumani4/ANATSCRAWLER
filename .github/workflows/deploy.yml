@@ -99,6 +99,7 @@ jobs:
             # Install production dependencies only
             npm ci --omit=dev
             # Install Maigret and dependencies for Threat Intelligence feature
+            chmod +x scripts/install-maigret.sh
             bash scripts/install-maigret.sh
             # Install Recharts for frontend charting (ensure available for SSR/build)
             npm install recharts
