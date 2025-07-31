@@ -27,8 +27,8 @@ def import_optional(module, name=None):
         print(json.dumps({"error": f"Could not import {module}. Make sure the code is present.", "details": str(e)}), flush=True)
         sys.exit(1)
 
-SpiderFootDb = import_optional('spiderfoot.db_proxy', 'SpiderFootDb').SpiderFootDb
-SpiderFootHelpers = import_optional('spiderfoot.helpers_proxy', 'SpiderFootHelpers').SpiderFootHelpers
+SpiderFootDb = import_optional('spiderfoot', 'SpiderFootDb').SpiderFootDb
+SpiderFootHelpers = import_optional('spiderfoot', 'SpiderFootHelpers').SpiderFootHelpers
 SpiderFootScanner = import_optional('sfscan', 'SpiderFootScanner').SpiderFootScanner
 def list_modules():
     try:
