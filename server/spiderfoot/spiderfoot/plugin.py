@@ -222,7 +222,7 @@ class SpiderFootPlugin():
         Raises:
             TypeError: target argument was invalid type
         """
-        from spiderfoot import SpiderFootTarget
+        from .target import SpiderFootTarget
 
         if not isinstance(target, SpiderFootTarget):
             raise TypeError(f"target is {type(target)}; expected SpiderFootTarget")
@@ -321,7 +321,7 @@ class SpiderFootPlugin():
             TypeError: sfEvent argument was invalid type
         """
 
-        from spiderfoot import SpiderFootEvent
+        from .event import SpiderFootEvent
 
         if not isinstance(sfEvent, SpiderFootEvent):
             raise TypeError(f"sfEvent is {type(sfEvent)}; expected SpiderFootEvent")
@@ -498,7 +498,7 @@ class SpiderFootPlugin():
     def threadWorker(self) -> None:
         try:
             # create new database handle since we're in our own thread
-            from spiderfoot import SpiderFootDb
+            from .db import SpiderFootDb
             self.setDbh(SpiderFootDb(self.opts))
             self.sf._dbh = self.__sfdb__
 

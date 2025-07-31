@@ -3,7 +3,7 @@ from copy import deepcopy
 import re
 import netaddr
 import yaml
-from spiderfoot import SpiderFootDb
+from .db import SpiderFootDb
 
 
 class SpiderFootCorrelator:

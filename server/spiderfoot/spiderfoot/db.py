@@ -1350,7 +1350,7 @@ class SpiderFootDb:
             ValueError: arg value was invalid
             IOError: database I/O failed
         """
-        from spiderfoot import SpiderFootEvent
+        from .event import SpiderFootEvent
 
         if not isinstance(instanceId, str):
             raise TypeError(f"instanceId is {type(instanceId)}; expected str()") from None

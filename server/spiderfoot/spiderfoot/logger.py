@@ -5,7 +5,8 @@ import time
 from contextlib import suppress
 from logging.handlers import QueueHandler, QueueListener
 
-from spiderfoot import SpiderFootDb, SpiderFootHelpers
+from .db import SpiderFootDb
+from .helpers import SpiderFootHelpers
 
 
 class SpiderFootSqliteLogHandler(logging.Handler):
