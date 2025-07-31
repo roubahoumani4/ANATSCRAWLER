@@ -105,7 +105,12 @@ def start_scan(target, name):
         enabled_modules = list(modules_dict.keys())
         config = {
             '__database': DB_PATH,
-            '_dnsserver': '8.8.8.8'  # Default to Google DNS, change if needed
+            '_dnsserver': '8.8.8.8',  # Default to Google DNS, change if needed
+            '_useragent': 'Mozilla/5.0',                      # 🔵 Added
+            '_scanlogtodisk': True,                           # 🔵 Optional: prevents future KeyErrors
+            '_maxthreads': 10,                                # 🔵 Optional: default concurrency
+            '_uiShowOnlyNew': False,                          # 🔵 Optional
+            '_moduleTimeout': 30                              # 🔵 Optional
         }
         scan_id = SpiderFootHelpers.genScanInstanceId()
         scanner = SpiderFootScanner(
