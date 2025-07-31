@@ -4,15 +4,20 @@ const path = require('path');
 function runPythonCommand(args) {
   return new Promise((resolve, reject) => {
     
-    // Always use the canonical wrapper location
-    const actualPath = path.join(__dirname, 'spiderfoot', 'spiderfoot', 'spiderfoot_wrapper.py');
-    // Use the deployment maigret-venv Python interpreter (always from app root)
+    // Use absolute path to the real script
+    const actualPath = '/var/www/anatscrawler/app/server/spiderfoot/spiderfoot_wrapper.py';
+
+    // Use the correct Python inside the virtual environment
     const pythonPath = path.join(process.cwd(), 'maigret-venv/bin/python3.10');
+    
     const py = spawn(pythonPath, [actualPath, ...args]);
+
     let data = '';
     let err = '';
+    
     py.stdout.on('data', chunk => data += chunk);
     py.stderr.on('data', chunk => err += chunk);
+    
     py.on('close', code => {
       if (code !== 0) {
         console.error('PYTHON ERROR:', err);
@@ -26,6 +31,7 @@ function runPythonCommand(args) {
     });
   });
 }
+
 
 module.exports = {
   listScans: () => runPythonCommand(['list_scans']),
