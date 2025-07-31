@@ -5,6 +5,7 @@ import json
 import os
 import traceback
 BASE_DIR = os.path.dirname(__file__)
+sys.path.insert(0, os.path.join(BASE_DIR, 'spiderfoot', 'spiderfoot'))
 sys.path.insert(0, os.path.join(BASE_DIR, 'spiderfoot'))
 sys.path.insert(0, BASE_DIR)
 # Remove or redirect the startup print to avoid polluting stdout (which must be pure JSON for API)
