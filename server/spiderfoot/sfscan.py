@@ -185,7 +185,7 @@ class SpiderFootScanner():
             self.__sf.socksProxy = None
 
         # Override the default DNS server
-        if self.__config['_dnsserver']:
+        if self.__config.get('_dnsserver'):
             res = dns.resolver.Resolver()
             res.nameservers = [self.__config['_dnsserver']]
             dns.resolver.override_system_resolver(res)
