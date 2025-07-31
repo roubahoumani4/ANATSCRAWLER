@@ -5,9 +5,13 @@ import sys
 import json
 import os
 import traceback
+# Path setup for SpiderFoot imports
 BASE_DIR = os.path.dirname(__file__)
-# Add BASE_DIR to sys.path so 'spiderfoot' is importable as a package and 'sfscan' as a module
+SPIDERFOOT_DIR = os.path.join(BASE_DIR, 'spiderfoot')
+MODULES_DIR = os.path.join(SPIDERFOOT_DIR, 'modules')
 sys.path.insert(0, BASE_DIR)
+sys.path.insert(0, SPIDERFOOT_DIR)
+sys.path.insert(0, MODULES_DIR)
 # Remove or redirect the startup print to avoid polluting stdout (which must be pure JSON for API)
 # print("[spiderfoot_wrapper.py] STARTED", file=sys.stderr, flush=True)
 
@@ -34,8 +38,7 @@ except ImportError:
         SpiderFootScanner = None
 def list_modules():
     try:
-        modules_path = os.path.join(BASE_DIR, "spiderfoot", "modules")
-        modules_dict = SpiderFootHelpers.loadModulesAsDict(modules_path)
+        modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR)
         module_names = sorted(list(modules_dict.keys()))
         print(json.dumps({"modules": module_names}))
     except Exception as e:
@@ -113,8 +116,7 @@ def start_scan(target, name):
             print(json.dumps({"success": False, "error": "Could not determine target type for: " + target}))
             return
         # Load modules
-        modules_path = os.path.join(BASE_DIR, "spiderfoot", "modules")
-        modules_dict = SpiderFootHelpers.loadModulesAsDict(modules_path)
+        modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR)
         enabled_modules = list(modules_dict.keys())
         # Build config
         config = {'__database': DB_PATH}
