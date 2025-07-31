@@ -1,2 +1,1 @@
-# Flat module copy for SpiderFootDb import compatibility
-from .spiderfoot.db import *
+from spiderfoot.spiderfoot.db import SpiderFootDb

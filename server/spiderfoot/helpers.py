@@ -1,2 +1,1 @@
-# Flat module copy for SpiderFootHelpers import compatibility
-from .spiderfoot.helpers import *
+from spiderfoot.spiderfoot.helpers import SpiderFootHelpers
