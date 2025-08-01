@@ -1,3 +1,28 @@
+# --- SpiderFootPlugin class (restored) ---
+class SpiderFootPlugin:
+    """Base class all SpiderFoot plugins inherit from."""
+
+    def __init__(self):
+        self.sf = None  # Reference to SpiderFoot scan context
+        self.opts = None  # Plugin options
+        self.baseConfig = None  # Base configuration
+        self.results = []  # Collected results (optional)
+
+    def setup(self, sf, userOpts=dict()):
+        self.sf = sf
+        self.opts = userOpts
+
+    def watchedEvents(self):
+        """List of event types this plugin will watch for."""
+        return []
+
+    def producedEvents(self):
+        """List of event types this plugin will produce."""
+        return []
+
+    def handleEvent(self, event):
+        """Override this in each plugin with your processing logic."""
+        raise NotImplementedError("Plugin must implement handleEvent()")
 # --- SpiderFootEvent class (restored) ---
 class SpiderFootEvent:
     def __init__(self, eventType, eventData, module=None, sourceEvent=None):
