@@ -8,7 +8,7 @@ import traceback
 
 
 # Path setup for SpiderFoot imports
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__)))
 MODULES_DIR = os.path.abspath(os.path.join(BASE_DIR, 'modules'))
 print("MODULES_DIR:", MODULES_DIR, file=sys.stderr)
 
