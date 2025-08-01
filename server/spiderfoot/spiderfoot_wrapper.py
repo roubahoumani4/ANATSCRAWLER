@@ -3,7 +3,6 @@ import json
 import os
 import traceback
 
-
 # --- Path Setup ---
 WRAPPER_DIR = os.path.abspath(os.path.dirname(__file__))
 SPIDERFOOT_CORE = os.path.join(WRAPPER_DIR, "core")
@@ -118,8 +117,10 @@ def start_scan(target, name):
         if not target_type:
             print(json.dumps({"success": False, "error": f"Could not determine target type for: {target}"}))
             return
+
         modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR)
         enabled_modules = list(modules_dict.keys())
+
         config = {
             '__database': DB_PATH,
             '_debug': True,
@@ -134,9 +135,11 @@ def start_scan(target, name):
             '_internettlds_cache': True,
             '_internettlds': 'generic, country, sponsored, infrastructure'
         }
-        # Ensure DB tables are created
+
+        # ✅ Ensure DB tables exist
         sfdb = SpiderFootDb({'__database': DB_PATH})
         sfdb.create()
+
         scan_id = SpiderFootHelpers.genScanInstanceId()
         scanner = SpiderFootScanner(
             scanName=name,
@@ -147,6 +150,7 @@ def start_scan(target, name):
             globalOpts=config,
             start=True
         )
+
         print(json.dumps({"success": True, "scanId": scanner.scanId}))
     except Exception as e:
         print(json.dumps({"success": False, "error": str(e), "traceback": traceback.format_exc()}))
