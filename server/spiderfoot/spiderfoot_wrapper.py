@@ -3,9 +3,10 @@ import json
 import os
 import traceback
 
+
 # --- Path Setup ---
-WRAPPER_DIR = os.path.abspath(os.path.dirname(__file__))  # /var/www/anatscrawler/app/server/spiderfoot
-SPIDERFOOT_DIR = os.path.join(WRAPPER_DIR, "spiderfoot")  # /var/www/anatscrawler/app/server/spiderfoot/spiderfoot
+WRAPPER_DIR = os.path.abspath(os.path.dirname(__file__))
+CORE_DIR = os.path.join(WRAPPER_DIR, "core")
 MODULES_DIR = os.path.join(WRAPPER_DIR, "modules")
 DB_PATH = os.path.expanduser("~/.spiderfoot/spiderfoot.db")
 
@@ -14,15 +15,15 @@ print("PYTHONPATH:", sys.path, file=sys.stderr)
 print("MODULES_DIR:", MODULES_DIR, file=sys.stderr)
 
 # Ensure importable paths
-for path in [WRAPPER_DIR, SPIDERFOOT_DIR, MODULES_DIR]:
+for path in [WRAPPER_DIR, CORE_DIR, MODULES_DIR]:
     if path not in sys.path:
         sys.path.insert(0, path)
 
 # --- Imports ---
 try:
-    from spiderfoot.db import SpiderFootDb
-    from spiderfoot.helpers import SpiderFootHelpers
-    from spiderfoot.sfscan import SpiderFootScanner
+    from core.spiderfoot.db import SpiderFootDb
+    from core.spiderfoot.helpers import SpiderFootHelpers
+    from core.sfscan import SpiderFootScanner
 except ImportError as e:
     print(json.dumps({
         "error": "Failed to import SpiderFoot modules",
