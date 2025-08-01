@@ -110,8 +110,14 @@ router.post("/scan/start", async (req, res) => {
     return res.status(400).json({ error: "Missing target or name" });
   }
   try {
+    // Start scan and get scanId only, do not wait for scan to finish
     const result = await spiderfoot.startScan(target, name);
-    res.json(result);
+    if (result && result.scanId) {
+      // Return scanId immediately, frontend should poll for status/results
+      res.json({ scanId: result.scanId, success: true });
+    } else {
+      res.status(500).json({ error: "Failed to start scan", details: result });
+    }
   } catch (e) {
     res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
   }
