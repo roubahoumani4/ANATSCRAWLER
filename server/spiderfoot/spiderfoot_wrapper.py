@@ -1,4 +1,6 @@
 # --- Cleaned Imports and Path Setup ---
+print("PYTHONPATH:", sys.path, file=sys.stderr)
+
 import sys
 import json
 import os

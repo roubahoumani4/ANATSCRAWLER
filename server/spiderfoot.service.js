@@ -10,7 +10,10 @@ function runPythonCommand(args) {
     // Use the correct Python inside the virtual environment
     const pythonPath = path.join(process.cwd(), 'maigret-venv/bin/python3.10');
     
-    const env = { ...process.env, PYTHONPATH: path.join(__dirname, 'spiderfoot' )};  // one level up from 'services'
+    const env = { 
+      ...process.env, 
+      PYTHONPATH: '/var/www/anatscrawler/app/server/spiderfoot',
+    };  
     const py = spawn(pythonPath, [actualPath, ...args], { env });
 
     let data = '';
