@@ -134,6 +134,9 @@ def start_scan(target, name):
             '_internettlds_cache': True,
             '_internettlds': 'generic, country, sponsored, infrastructure'
         }
+        # Ensure DB tables are created
+        sfdb = SpiderFootDb({'__database': DB_PATH})
+        sfdb.create()
         scan_id = SpiderFootHelpers.genScanInstanceId()
         scanner = SpiderFootScanner(
             scanName=name,
