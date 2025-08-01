@@ -11,7 +11,8 @@
 # -------------------------------------------------------------------------------
 import json
 
-from spiderfoot.sflib import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_hostio(SpiderFootPlugin):
