@@ -5,7 +5,7 @@ function runPythonCommand(args) {
   return new Promise((resolve, reject) => {
     
     // Use absolute path to the real script
-    const actualPath = '/var/www/anatscrawler/app/server/spiderfoot/spiderfoot_wrapper.py';
+    const actualPath = '/var/www/anatscrawler/app/server/spiderfoot/spiderfoot/spiderfoot_wrapper.py';
 
     // Use the correct Python inside the virtual environment
     const pythonPath = path.join(process.cwd(), 'maigret-venv/bin/python3.10');
