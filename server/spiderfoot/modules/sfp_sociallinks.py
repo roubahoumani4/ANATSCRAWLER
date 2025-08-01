@@ -13,7 +13,8 @@
 
 import json
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from spiderfoot.plugin import SpiderFootEvent, SpiderFootPlugin
+
 
 
 class sfp_sociallinks(SpiderFootPlugin):
