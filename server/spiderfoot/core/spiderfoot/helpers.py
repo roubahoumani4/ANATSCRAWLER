@@ -160,7 +160,19 @@ class SpiderFootHelpers():
             sfModules[modName] = dict()
             mod = __import__('modules.' + modName, globals(), locals(), [modName])
             sfModules[modName]['object'] = getattr(mod, modName)()
-            mod_dict = sfModules[modName]['object'].asdict()
+            try:
+                mod_obj = sfModules[modName]['object']
+                mod_dict = {
+                    "name": modName,
+                    "object": mod_obj.__class__.__name__,
+                    "watchedEvents": mod_obj.watchedEvents(),
+                    "producedEvents": mod_obj.producedEvents()
+                }
+            except Exception as e:
+                mod_dict = {
+                    "name": modName,
+                    "error": str(e)
+                }
             sfModules[modName].update(mod_dict)
 
             if len(sfModules[modName]['cats']) > 1:
