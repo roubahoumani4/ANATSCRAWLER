@@ -175,10 +175,10 @@ class SpiderFootHelpers():
                 }
             sfModules[modName].update(mod_dict)
 
-            if len(sfModules[modName]['cats']) > 1:
+            if 'cats' in sfModules[modName] and len(sfModules[modName]['cats']) > 1:
                 raise SyntaxError(f"Module {modName} has multiple categories defined but only one is supported.")
 
-            if sfModules[modName]['cats'] and sfModules[modName]['cats'][0] not in valid_categories:
+            if 'cats' in sfModules[modName] and sfModules[modName]['cats'] and sfModules[modName]['cats'][0] not in valid_categories:
                 raise SyntaxError(f"Module {modName} has invalid category '{sfModules[modName]['cats']}'.")
 
         return sfModules
