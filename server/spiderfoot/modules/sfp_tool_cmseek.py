@@ -16,7 +16,7 @@ import json
 import os.path
 from subprocess import PIPE, Popen
 
-from spiderfoot.sflib import SpiderFootEvent, SpiderFootPlugin, SpiderFootHelpers
+from core.sflib import SpiderFootEvent, SpiderFootPlugin, SpiderFootHelpers
 
 
 class sfp_tool_cmseek(SpiderFootPlugin):

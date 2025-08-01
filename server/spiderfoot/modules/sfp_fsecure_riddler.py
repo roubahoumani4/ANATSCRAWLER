@@ -13,7 +13,7 @@
 import json
 import time
 
-from spiderfoot.sflib import SpiderFootEvent, SpiderFootPlugin
+from core.sflib import SpiderFootEvent, SpiderFootPlugin
 
 
 class sfp_fsecure_riddler(SpiderFootPlugin):

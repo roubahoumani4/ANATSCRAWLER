@@ -11,7 +11,7 @@
 # Licence:     MIT
 # -------------------------------------------------------------------------------
 
-from spiderfoot.sflib import SpiderFootPlugin
+from core.sflib import SpiderFootPlugin
 
 
 class sfp__stor_db(SpiderFootPlugin):

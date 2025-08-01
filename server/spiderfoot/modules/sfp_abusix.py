@@ -15,7 +15,7 @@ import ipaddress
 
 from netaddr import IPNetwork
 
-from spiderfoot.sflib import SpiderFootEvent, SpiderFootPlugin
+from core.sflib import SpiderFootEvent, SpiderFootPlugin
 
 
 class sfp_abusix(SpiderFootPlugin):

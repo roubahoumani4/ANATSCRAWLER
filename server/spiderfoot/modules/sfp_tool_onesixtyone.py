@@ -17,7 +17,9 @@ import tempfile
 from netaddr import IPNetwork
 from subprocess import PIPE, Popen, TimeoutExpired
 
-from spiderfoot.sflib import SpiderFootPlugin, SpiderFootEvent, SpiderFootHelpers
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.helpers import SpiderFootHelpers
 
 
 class sfp_tool_onesixtyone(SpiderFootPlugin):
@@ -50,13 +52,16 @@ class sfp_tool_onesixtyone(SpiderFootPlugin):
         'netblockscanmax': "Maximum netblock/subnet size to scan IPs within (CIDR value, 24 = /24, 16 = /16, etc.)"
     }
 
-    results = None
+    # results is always initialized in setup and __init__
+    def __init__(self):
+        super().__init__()
+        self.results = {}
     errorState = False
     communitiesFile = None
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = dict()
+        self.results = {}
         self.errorState = False
         self.__dataSource__ = "Target Website"
 

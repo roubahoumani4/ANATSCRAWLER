@@ -13,7 +13,7 @@
 
 import json
 
-from spiderfoot.sflib import SpiderFootEvent, SpiderFootPlugin
+from core.sflib import SpiderFootEvent, SpiderFootPlugin
 
 
 class sfp_googlesafebrowsing(SpiderFootPlugin):

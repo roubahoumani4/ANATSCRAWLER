@@ -18,7 +18,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from spiderfoot.sflib import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
+from core.sflib import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
 
 
 class sfp_grep_app(SpiderFootPlugin):

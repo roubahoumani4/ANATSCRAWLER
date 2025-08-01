@@ -11,7 +11,7 @@
 # Licence:     MIT
 # -------------------------------------------------------------------------------
 
-from spiderfoot.sflib import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
+from core.sflib import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
 
 
 class sfp_hashes(SpiderFootPlugin):
