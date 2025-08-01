@@ -117,8 +117,7 @@ def start_scan(target, name):
             '_uiShowOnlyNew': False,                          
             '_moduleTimeout': 30,  
             '_internettlds_cache': True,
-            '_internettlds': 'generic, country, sponsored, infrastructure',   
-            '__logging': False                  
+            '_internettlds': 'generic, country, sponsored, infrastructure',                    
         }
         scan_id = SpiderFootHelpers.genScanInstanceId()
         scanner = SpiderFootScanner(
