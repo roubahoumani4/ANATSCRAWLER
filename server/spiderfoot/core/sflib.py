@@ -1,3 +1,18 @@
+# --- SpiderFootEvent class (restored) ---
+class SpiderFootEvent:
+    def __init__(self, eventType, eventData, module=None, sourceEvent=None):
+        self.eventType = eventType
+        self.eventData = eventData
+        self.module = module
+        self.sourceEvent = sourceEvent
+        self.dataType = None
+        self.raw = None
+
+    def __str__(self):
+        return f"<SpiderFootEvent(type={self.eventType}, data={self.eventData})>"
+
+    def __repr__(self):
+        return self.__str__()
 #  -*- coding: utf-8 -*-
 # -------------------------------------------------------------------------------
 # Name:         sflib
