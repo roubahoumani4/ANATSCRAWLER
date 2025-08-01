@@ -1,11 +1,10 @@
-# --- Cleaned Imports and Path Setup ---
-print("PYTHONPATH:", sys.path, file=sys.stderr)
-
 import sys
 import json
 import os
 import traceback
 
+# --- Cleaned Imports and Path Setup ---
+print("PYTHONPATH:", sys.path, file=sys.stderr)
 
 # Path setup for SpiderFoot imports
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__)))
