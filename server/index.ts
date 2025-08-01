@@ -199,9 +199,13 @@ async function startServer() {
 
       // Handle SPA routing - serve index.html for all non-API routes
       app.get('*', (req, res, next) => {
-        if (req.path.startsWith('/api')) {
-          return next(); // Let API routes be handled by the API router
-        }
+        if (
+          req.path.startsWith('/api') ||
+          req.path.startsWith('/scan') ||
+          req.path.startsWith('/spiderfoot')
+      ) {
+        return next(); // Let API routes be handled by the API router
+     }
         
         // Send the index.html file for client-side routing
         res.sendFile(indexHtmlPath!, (err) => {
