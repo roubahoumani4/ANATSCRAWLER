@@ -294,7 +294,7 @@ class SpiderFootScanner():
                     mod = getattr(module, modName)()
                     mod.__name__ = modName
                 except Exception:
-                    self.__sf.error(f"Module {modName} initialization failed", exc_info=True)
+                    self.__sf.error(f"Module {modName} initialization failed")
                     continue
 
                 # Set up the module options, scan ID, database handle and listeners
@@ -311,7 +311,7 @@ class SpiderFootScanner():
                     mod.setDbh(self.__dbh)
                     mod.setup(self.__sf, self.__modconfig[modName])
                 except Exception:
-                    self.__sf.error(f"Module {modName} initialization failed", exc_info=True)
+                    self.__sf.error(f"Module {modName} initialization failed")
                     mod.errorState = True
                     continue
 
@@ -412,8 +412,7 @@ class SpiderFootScanner():
 
         except BaseException as e:
             self.__sf.error(
-                f"Unhandled exception ({e.__class__.__name__}) encountered during scan. Please report this as a bug",
-                exc_info=True
+                f"Unhandled exception ({e.__class__.__name__}) encountered during scan. Please report this as a bug"
             )
             self.__sf.status(f"Scan [{self.__scanId}] failed: {e}")
             self.__setStatus("ERROR-FAILED", None, time.time() * 1000)
