@@ -31,14 +31,14 @@ import openpyxl
 
 import secure
 
-from sflib import SpiderFoot
+from .sflib import SpiderFoot
 
-from sfscan import startSpiderFootScanner
+from .sfscan import startSpiderFootScanner
 
-from spiderfoot import SpiderFootDb
-from spiderfoot import SpiderFootHelpers
-from spiderfoot import __version__
-from spiderfoot.logger import logListenerSetup, logWorkerSetup
+from .spiderfoot import SpiderFootDb
+from .spiderfoot import SpiderFootHelpers
+from .spiderfoot.__version__ import __version__
+from .spiderfoot.logger import logListenerSetup, logWorkerSetup
 
 mp.set_start_method("spawn", force=True)
 

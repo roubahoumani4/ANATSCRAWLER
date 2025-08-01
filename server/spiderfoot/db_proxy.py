@@ -1,1 +1,1 @@
-from db import SpiderFootDb
+from .db import SpiderFootDb

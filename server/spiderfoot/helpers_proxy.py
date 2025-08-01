@@ -1,1 +1,1 @@
-from helpers import SpiderFootHelpers
+from .helpers import SpiderFootHelpers

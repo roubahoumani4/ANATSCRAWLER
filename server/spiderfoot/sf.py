@@ -11,6 +11,7 @@
 # Licence:     MIT
 # -------------------------------------------------------------------------------
 
+
 import argparse
 import logging
 import multiprocessing as mp
@@ -22,18 +23,21 @@ import sys
 import time
 from copy import deepcopy
 
+# Ensure the script's directory is in sys.path for module imports
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 import cherrypy
 import cherrypy_cors
 from cherrypy.lib import auth_digest
 
-from sflib import SpiderFoot
-from sfscan import startSpiderFootScanner
-from sfwebui import SpiderFootWebUi
-from spiderfoot import SpiderFootHelpers
-from spiderfoot import SpiderFootDb
-from spiderfoot import SpiderFootCorrelator
-from spiderfoot.logger import logListenerSetup, logWorkerSetup
-from spiderfoot import __version__
+from .sflib import SpiderFoot
+from .sfscan import startSpiderFootScanner
+from .sfwebui import SpiderFootWebUi
+from .spiderfoot.helpers import SpiderFootHelpers
+from .spiderfoot.db import SpiderFootDb
+from .spiderfoot.logger import logListenerSetup, logWorkerSetup
+from .spiderfoot.correlation import SpiderFootCorrelator
+from .spiderfoot.__version__ import __version__
 
 scanId = None
 dbh = None
@@ -600,7 +604,7 @@ def handle_abort(signal, frame) -> None:
 
     if scanId and dbh:
         log.info(f"Aborting scan [{scanId}] ...")
-        dbh.scanInstanceSet(scanId, None, None, "ABORTED")
+        dbh.scanInstanceSet(scanId, "", "", "ABORTED")
     sys.exit(-1)
 
 

@@ -35,7 +35,7 @@ import OpenSSL
 import requests
 import urllib3
 from publicsuffixlist import PublicSuffixList
-from spiderfoot import SpiderFootHelpers
+from .spiderfoot import SpiderFootHelpers
 
 # For hiding the SSL warnings coming from the requests lib
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)  # noqa: DUO131

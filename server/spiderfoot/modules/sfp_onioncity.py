@@ -13,7 +13,7 @@
 
 import re
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from spiderfoot.sflib import SpiderFootEvent, SpiderFootPlugin
 
 
 class sfp_onioncity(SpiderFootPlugin):
