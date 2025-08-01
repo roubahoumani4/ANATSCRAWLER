@@ -3,23 +3,22 @@ import json
 import os
 import traceback
 
-# --- Cleaned Imports and Path Setup ---
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-SPIDERFOOT_DIR = os.path.join(BASE_DIR, "spiderfoot")
-SPIDERFOOT_CORE = os.path.join(SPIDERFOOT_DIR, "spiderfoot")
-MODULES_DIR = os.path.join(SPIDERFOOT_DIR, "modules")
+# --- Path Setup ---
+WRAPPER_DIR = os.path.abspath(os.path.dirname(__file__))  # /var/www/anatscrawler/app/server/spiderfoot
+SPIDERFOOT_DIR = os.path.join(WRAPPER_DIR, "spiderfoot")  # /var/www/anatscrawler/app/server/spiderfoot/spiderfoot
+MODULES_DIR = os.path.join(WRAPPER_DIR, "modules")
 DB_PATH = os.path.expanduser("~/.spiderfoot/spiderfoot.db")
 
-# Show current paths for debugging
+# Show paths (debugging)
 print("PYTHONPATH:", sys.path, file=sys.stderr)
 print("MODULES_DIR:", MODULES_DIR, file=sys.stderr)
 
-# Update PYTHONPATH dynamically
-for path in [BASE_DIR, SPIDERFOOT_DIR, SPIDERFOOT_CORE]:
+# Ensure importable paths
+for path in [WRAPPER_DIR, SPIDERFOOT_DIR, MODULES_DIR]:
     if path not in sys.path:
         sys.path.insert(0, path)
 
-# Ensure packages are importable
+# --- Imports ---
 try:
     from spiderfoot.db import SpiderFootDb
     from spiderfoot.helpers import SpiderFootHelpers
@@ -31,6 +30,7 @@ except ImportError as e:
     }), file=sys.stderr, flush=True)
     sys.exit(1)
 
+# --- Wrapper Commands ---
 def list_modules():
     try:
         modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR)
@@ -48,64 +48,64 @@ def list_scans():
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}))
 
 def scan_info(scan_id):
-    db = SpiderFootDb({'__database': DB_PATH})
     try:
+        db = SpiderFootDb({'__database': DB_PATH})
         scan = db.scanInstanceGet(scan_id)
         print(json.dumps(scan))
     except Exception as e:
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}))
 
 def scan_graph(scan_id):
-    db = SpiderFootDb({'__database': DB_PATH})
     try:
+        db = SpiderFootDb({'__database': DB_PATH})
         results = db.scanResultEvent(scan_id)
         print(json.dumps(results))
     except Exception as e:
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}))
 
 def scan_browse(scan_id):
-    db = SpiderFootDb({'__database': DB_PATH})
     try:
+        db = SpiderFootDb({'__database': DB_PATH})
         unique = db.scanResultEventUnique(scan_id)
         print(json.dumps(unique))
     except Exception as e:
         print(json.dumps({"error": str(e)}))
 
 def scan_result_summary(scan_id):
-    db = SpiderFootDb({'__database': DB_PATH})
     try:
+        db = SpiderFootDb({'__database': DB_PATH})
         summary = db.scanResultSummary(scan_id)
         print(json.dumps(summary))
     except Exception as e:
         print(json.dumps({"error": str(e)}))
 
 def scan_correlation_summary(scan_id):
-    db = SpiderFootDb({'__database': DB_PATH})
     try:
+        db = SpiderFootDb({'__database': DB_PATH})
         summary = db.scanCorrelationSummary(scan_id)
         print(json.dumps(summary))
     except Exception as e:
         print(json.dumps({"error": str(e)}))
 
 def scan_correlation_list(scan_id):
-    db = SpiderFootDb({'__database': DB_PATH})
     try:
+        db = SpiderFootDb({'__database': DB_PATH})
         clist = db.scanCorrelationList(scan_id)
         print(json.dumps(clist))
     except Exception as e:
         print(json.dumps({"error": str(e)}))
 
 def scan_result_event(scan_id):
-    db = SpiderFootDb({'__database': DB_PATH})
     try:
+        db = SpiderFootDb({'__database': DB_PATH})
         events = db.scanResultEvent(scan_id)
         print(json.dumps(events))
     except Exception as e:
         print(json.dumps({"error": str(e)}))
 
 def scan_logs(scan_id):
-    db = SpiderFootDb({'__database': DB_PATH})
     try:
+        db = SpiderFootDb({'__database': DB_PATH})
         logs = db.scanLogs(scan_id)
         print(json.dumps(logs))
     except Exception as e:
@@ -115,10 +115,7 @@ def start_scan(target, name):
     try:
         target_type = SpiderFootHelpers.targetTypeFromString(target)
         if not target_type:
-            print(json.dumps({
-                "success": False,
-                "error": f"Could not determine target type for: {target}"
-            }))
+            print(json.dumps({"success": False, "error": f"Could not determine target type for: {target}"}))
             return
         modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR)
         enabled_modules = list(modules_dict.keys())
@@ -148,12 +145,9 @@ def start_scan(target, name):
         )
         print(json.dumps({"success": True, "scanId": scanner.scanId}))
     except Exception as e:
-        print(json.dumps({
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }))
+        print(json.dumps({"success": False, "error": str(e), "traceback": traceback.format_exc()}))
 
+# --- Command Handler ---
 if __name__ == "__main__":
     try:
         if len(sys.argv) < 2:
@@ -161,36 +155,22 @@ if __name__ == "__main__":
             sys.exit(1)
 
         cmd = sys.argv[1]
+        args = sys.argv[2:]
 
-        if cmd == "list_modules":
-            list_modules()
-        elif cmd == "list_scans":
-            list_scans()
-        elif cmd == "scan_info":
-            scan_info(sys.argv[2])
-        elif cmd == "scan_graph":
-            scan_graph(sys.argv[2])
-        elif cmd == "scan_browse":
-            scan_browse(sys.argv[2])
-        elif cmd == "scan_result_summary":
-            scan_result_summary(sys.argv[2])
-        elif cmd == "scan_correlation_summary":
-            scan_correlation_summary(sys.argv[2])
-        elif cmd == "scan_correlation_list":
-            scan_correlation_list(sys.argv[2])
-        elif cmd == "scan_result_event":
-            scan_result_event(sys.argv[2])
-        elif cmd == "scan_logs":
-            scan_logs(sys.argv[2])
-        elif cmd == "start_scan":
-            start_scan(sys.argv[2], sys.argv[3])
-        else:
-            print(json.dumps({"error": "Unknown command"}))
-            sys.exit(1)
+        match cmd:
+            case "list_modules": list_modules()
+            case "list_scans": list_scans()
+            case "scan_info": scan_info(*args)
+            case "scan_graph": scan_graph(*args)
+            case "scan_browse": scan_browse(*args)
+            case "scan_result_summary": scan_result_summary(*args)
+            case "scan_correlation_summary": scan_correlation_summary(*args)
+            case "scan_correlation_list": scan_correlation_list(*args)
+            case "scan_result_event": scan_result_event(*args)
+            case "scan_logs": scan_logs(*args)
+            case "start_scan": start_scan(*args)
+            case _: print(json.dumps({"error": "Unknown command"})); sys.exit(1)
 
     except Exception as e:
-        print(json.dumps({
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), file=sys.stderr)
+        print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr)
         sys.exit(1)
