@@ -106,6 +106,10 @@ def start_scan(target, name):
         enabled_modules = list(modules_dict.keys())
         config = {
             '__database': DB_PATH,
+            '_debug': True,  
+            '_loglevel': 'DEBUG', 
+            '_scanlogtodisk': True,
+            '__logging': True, 
             '_dnsserver': '8.8.8.8', 
             '_useragent': 'Mozilla/5.0',                      
             '_scanlogtodisk': True,                           
