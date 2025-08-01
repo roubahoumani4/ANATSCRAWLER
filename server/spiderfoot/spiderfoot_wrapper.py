@@ -9,8 +9,8 @@ import traceback
 
 # Path setup for SpiderFoot imports
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-print("MODULES_DIR:", os.path.join(BASE_DIR, '..', 'modules'), file=sys.stderr)
-MODULES_DIR = os.path.join(BASE_DIR, '..', 'modules')
+MODULES_DIR = os.path.join(BASE_DIR, 'modules')
+print("MODULES_DIR:", MODULES_DIR, file=sys.stderr)
 
 # Ensure SpiderFoot package and modules are on sys.path
 for p in [BASE_DIR, MODULES_DIR]:
