@@ -136,11 +136,14 @@ def start_scan(target, name):
             '_internettlds': 'generic, country, sponsored, infrastructure'
         }
 
-        # ✅ Ensure DB tables exist
         sfdb = SpiderFootDb({'__database': DB_PATH})
         sfdb.create()
 
         scan_id = SpiderFootHelpers.genScanInstanceId()
+
+        # ✅ Register scan instance in DB
+        sfdb.scanInstanceCreate(scan_id, name, target)
+
         scanner = SpiderFootScanner(
             scanName=name,
             scanId=scan_id,
