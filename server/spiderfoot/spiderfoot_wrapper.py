@@ -119,7 +119,7 @@ def start_scan(target, name):
             return
 
         modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR)
-        enabled_modules = list(modules_dict.keys())
+        enabled_modules = ["sfp_dnsresolve"]  # Use minimal module to debug failures
 
         config = {
             '__database': DB_PATH,
@@ -141,18 +141,29 @@ def start_scan(target, name):
 
         scan_id = SpiderFootHelpers.genScanInstanceId()
 
-        # ✅ Register scan instance in DB
+        # ✅ Register the scan in the DB manually
         sfdb.scanInstanceCreate(scan_id, name, target)
 
-        scanner = SpiderFootScanner(
-            scanName=name,
-            scanId=scan_id,
-            targetValue=target,
-            targetType=target_type,
-            moduleList=enabled_modules,
-            globalOpts=config,
-            start=True
-        )
+        print(f"▶️ Starting scan...", file=sys.stderr)
+        print(f"Target: {target}", file=sys.stderr)
+        print(f"Target Type: {target_type}", file=sys.stderr)
+        print(f"Scan ID: {scan_id}", file=sys.stderr)
+        print(f"Enabled Modules: {enabled_modules}", file=sys.stderr)
+
+        try:
+            scanner = SpiderFootScanner(
+                scanName=name,
+                scanId=scan_id,
+                targetValue=target,
+                targetType=target_type,
+                moduleList=enabled_modules,
+                globalOpts=config,
+                start=True
+            )
+        except Exception as inner:
+            print("🚨 Failed to initialize SpiderFootScanner", file=sys.stderr)
+            print(traceback.format_exc(), file=sys.stderr)
+            return
 
         print(json.dumps({"success": True, "scanId": scanner.scanId}))
     except Exception as e:
