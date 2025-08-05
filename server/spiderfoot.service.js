@@ -39,7 +39,37 @@ function runPythonCommand(args, waitForOutput = true) {
 }
 
 module.exports = {
-  listScans: () => runPythonCommand(['list_scans']),
+  listScans: async () => {
+    // Get the basic scan list (array of arrays)
+    const result = await runPythonCommand(['list_scans']);
+    let scans = result.scans || [];
+    // For each scan, fetch correlation summary and append as 9th element
+    // If correlation summary fails, use default empty object
+    const withCorrelations = await Promise.all(scans.map(async (scan) => {
+      let corr = { HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
+      try {
+        const corrResult = await runPythonCommand(['scan_correlation_summary', scan[0]]);
+        if (corrResult && typeof corrResult === 'object') {
+          // Accept both array and object
+          if (Array.isArray(corrResult)) {
+            // Not expected, but fallback
+            corr = { HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
+          } else {
+            corr = {
+              HIGH: corrResult.HIGH || 0,
+              MEDIUM: corrResult.MEDIUM || 0,
+              LOW: corrResult.LOW || 0,
+              INFO: corrResult.INFO || 0
+            };
+          }
+        }
+      } catch (e) {
+        // ignore, use default
+      }
+      return [...scan, corr];
+    }));
+    return { scans: withCorrelations };
+  },
   scanInfo: (scanId) => runPythonCommand(['scan_info', scanId]),
   scanGraph: (scanId) => runPythonCommand(['scan_graph', scanId]),
   scanBrowse: (scanId) => runPythonCommand(['scan_browse', scanId]),
