@@ -137,17 +137,19 @@ function showlist(types, filter) {
     globalTypes = types;
     globalFilter = filter;
     sf.fetchData(docroot + '/scanlist', null, function(data) {
-        if (data.length == 0) {
+        // If backend returns {scans: [...]}, use data.scans
+        var scanData = (data && data.scans) ? data.scans : data;
+        if (!scanData || scanData.length === 0) {
             $("#loader").fadeOut(500);
-            welcome = "<div class='alert alert-info'>";
+            var welcome = "<div class='alert alert-info'>";
             welcome += "<h4>No scan history</h4><br>";
-            welcome += "There is currently no history of previously run scans. Please click 'New Scan' to initiate a new scan."
+            welcome += "There is currently no history of previously run scans. Please click 'New Scan' to initiate a new scan.";
             welcome += "</div>";
             $("#scancontent").append(welcome);
             return;
         }
 
-        showlisttable(types, filter, data)
+        showlisttable(types, filter, scanData);
     });
 }
 
