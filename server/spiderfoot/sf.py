@@ -403,6 +403,10 @@ def start_scan(sfConfig: dict, sfModules: dict, args, loggingQueue) -> None:
 
     cfg = sf.configUnserialize(dbh.configGet(), sfConfig)
 
+    # Defensive: if configUnserialize returns None, fall back to sfConfig
+    if cfg is None:
+        cfg = deepcopy(sfConfig)
+
     # Debug mode is a variable that gets stored to the DB, so re-apply it
     if args.debug:
         cfg['_debug'] = True

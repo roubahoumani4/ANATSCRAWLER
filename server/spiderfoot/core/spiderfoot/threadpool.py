@@ -42,7 +42,8 @@ class SpiderFootThreadPool:
         self.log = logging.getLogger(f"spiderfoot.{__name__}")
         self.threads = int(threads)
         self.qsize = int(qsize)
-        self.pool = [None] * self.threads
+        # type: ignore is used to suppress type checker complaints about assigning ThreadPoolWorker to None slots
+        self.pool = []
         self.name = str(name)
         self.inputThread = None
         self.inputQueues = dict()
@@ -55,7 +56,7 @@ class SpiderFootThreadPool:
         for i in range(self.threads):
             t = ThreadPoolWorker(pool=self, name=f"{self.name}_worker_{i + 1}")
             t.start()
-            self.pool[i] = t
+            self.pool.append(t)
 
     @property
     def stop(self) -> bool:
@@ -65,8 +66,9 @@ class SpiderFootThreadPool:
     def stop(self, val: bool):
         assert val in (True, False), "stop must be either True or False"
         for t in self.pool:
-            with suppress(Exception):
-                t.stop = val
+            if t is not None:
+                with suppress(Exception):
+                    t.stop = val
         self._stop = val
 
     def shutdown(self, wait: bool = True) -> dict:
@@ -85,7 +87,8 @@ class SpiderFootThreadPool:
                 with self._lock:
                     outputQueues = list(self.outputQueues)
                 for taskName in outputQueues:
-                    moduleResults = list(self.results(taskName))
+                    res_iter = self.results(taskName)
+                    moduleResults = list(res_iter) if res_iter is not None else []
                     try:
                         results[taskName] += moduleResults
                     except KeyError:
@@ -105,7 +108,8 @@ class SpiderFootThreadPool:
         with self._lock:
             outputQueues = list(self.outputQueues.items())
         for taskName, q in outputQueues:
-            moduleResults = list(self.results(taskName))
+            res_iter = self.results(taskName)
+            moduleResults = list(res_iter) if res_iter is not None else []
             try:
                 results[taskName] += moduleResults
             except KeyError:
@@ -147,26 +151,29 @@ class SpiderFootThreadPool:
             queuedTasks += self.inputQueues[taskName].qsize()
         runningTasks = 0
         for t in self.pool:
-            with suppress(Exception):
-                if t.taskName == taskName:
-                    runningTasks += 1
+            if t is not None:
+                with suppress(Exception):
+                    if t.taskName == taskName:
+                        runningTasks += 1
         return queuedTasks + runningTasks
 
-    def inputQueue(self, taskName: str = "default") -> str:
-        try:
-            return self.inputQueues[taskName]
-        except KeyError:
-            self.inputQueues[taskName] = queue.Queue(self.qsize)
-            return self.inputQueues[taskName]
+    def inputQueue(self, taskName: str = "default"):
+        q = self.inputQueues.get(taskName)
+        if q is not None:
+            return q
+        q = queue.Queue(self.qsize)
+        self.inputQueues[taskName] = q
+        return q
 
-    def outputQueue(self, taskName: str = "default") -> str:
-        try:
-            return self.outputQueues[taskName]
-        except KeyError:
-            self.outputQueues[taskName] = queue.Queue(self.qsize)
-            return self.outputQueues[taskName]
+    def outputQueue(self, taskName: str = "default"):
+        q = self.outputQueues.get(taskName)
+        if q is not None:
+            return q
+        q = queue.Queue(self.qsize)
+        self.outputQueues[taskName] = q
+        return q
 
-    def map(self, callback, iterable, *args, **kwargs) -> None:  # noqa: A003
+    def map(self, callback, iterable, *args, **kwargs):  # noqa: A003
         """map.
 
         Args:
@@ -185,7 +192,7 @@ class SpiderFootThreadPool:
         sleep(.1)
         yield from self.results(taskName, wait=True)
 
-    def results(self, taskName: str = "default", wait: bool = False) -> None:
+    def results(self, taskName: str = "default", wait: bool = False):
         while 1:
             result = False
             with suppress(Exception):
@@ -210,10 +217,12 @@ class SpiderFootThreadPool:
             return True
 
         finishedThreads = [not t.busy for t in self.pool if t is not None]
-        try:
-            inputThreadAlive = self.inputThread.is_alive()
-        except AttributeError:
-            inputThreadAlive = False
+        inputThreadAlive = False
+        if self.inputThread is not None:
+            try:
+                inputThreadAlive = self.inputThread.is_alive()
+            except AttributeError:
+                inputThreadAlive = False
 
         inputQueuesEmpty = [q.empty() for q in self.inputQueues.values()]
         return not inputThreadAlive and all(inputQueuesEmpty) and all(finishedThreads)
@@ -227,14 +236,12 @@ class SpiderFootThreadPool:
 
 class ThreadPoolWorker(threading.Thread):
 
-    def __init__(self, pool, name: str = None) -> None:
-
+    def __init__(self, pool, name: str = "") -> None:
         self.log = logging.getLogger(f"spiderfoot.{__name__}")
         self.pool = pool
         self.taskName = ""  # which module submitted the callback
         self.busy = False
         self.stop = False
-
         super().__init__(name=name)
 
     def run(self) -> None:

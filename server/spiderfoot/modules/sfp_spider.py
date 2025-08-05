@@ -33,10 +33,10 @@ class sfp_spider(SpiderFootPlugin):
         root_event._risk = 0
         root_event._module = self.__name__
         root_event._data = "ROOT"
-        root_event._sourceEvent = None
+        root_event._sourceEvent = root_event  # type: ignore
         root_event._sourceEventHash = "ROOT"
-        root_event._moduleDataSource = None
-        root_event._actualSource = None
+        root_event._moduleDataSource = "ROOT"
+        root_event._actualSource = "ROOT"
         root_event.__id = "ROOT"
         dummy_event = SpiderFootEvent("DUMMY", "", self.__name__, root_event)
         return dummy_event
@@ -329,9 +329,9 @@ class sfp_spider(SpiderFootPlugin):
                 self.notifyListeners(event)
 
     def handleEvent(self, event) -> None:
-        eventName = event.eventType
-        srcModuleName = event.module
-        eventData = event.data
+        eventName = getattr(event, 'eventType', None)
+        srcModuleName = getattr(event, 'module', None)
+        eventData = getattr(event, 'data', None)
         spiderTarget = None
 
         self.debug(f"Received event, {eventName}, from {srcModuleName}")
@@ -339,28 +339,32 @@ class sfp_spider(SpiderFootPlugin):
         # Don't spider links we find ourselves
         if srcModuleName == "sfp_spider":
             self.debug(f"Ignoring {eventName}, from self.")
-            return None
+            return
 
         if eventData in self.urlEvents:
             self.debug(f"Ignoring {eventData} as already spidered or is being spidered.")
-            return None
+            return
 
         self.urlEvents[eventData] = event if isinstance(event, SpiderFootEvent) else None
 
         # Determine where to start spidering from if it's a INTERNET_NAME event
         if eventName == "INTERNET_NAME":
             for prefix in self.opts['start']:
-                res = self.sf.fetchUrl(
-                    prefix + eventData,
-                    timeout=self.opts['_fetchtimeout'],
-                    useragent=self.opts['_useragent'],
-                    verify=False
-                )
+                try:
+                    res = self.sf.fetchUrl(
+                        prefix + eventData,
+                        timeout=self.opts['_fetchtimeout'],
+                        useragent=self.opts['_useragent'],
+                        verify=False
+                    )
+                except Exception as e:
+                    self.error(f"Exception during fetchUrl: {e}")
+                    continue
 
                 if not res:
                     continue
 
-                if res['content'] is not None:
+                if res.get('content') is not None:
                     spiderTarget = prefix + eventData
                     evt = SpiderFootEvent(
                         "LINKED_URL_INTERNAL",
@@ -381,7 +385,7 @@ class sfp_spider(SpiderFootPlugin):
 
         # Link the spidered URL to the event that triggered it
         self.urlEvents[spiderTarget] = event
-        return self.spiderFrom(spiderTarget)
+        self.spiderFrom(spiderTarget)
 
     def spiderFrom(self, startingPoint: str) -> None:
         pagesFetched = 0

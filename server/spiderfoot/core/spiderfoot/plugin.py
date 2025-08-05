@@ -48,27 +48,33 @@ class SpiderFootPluginLogger(logging.Logger):
             f = f.f_back
         orig_f = f
         while f and stacklevel > 1:
-            f = f.f_back
+            if hasattr(f, 'f_back') and f.f_back is not None:
+                f = f.f_back
+            else:
+                break
             stacklevel -= 1
         if not f:
             f = orig_f
         rv = "(unknown file)", 0, "(unknown function)", None
-        while hasattr(f, "f_code"):
+        while f and hasattr(f, "f_code"):
             co = f.f_code
             filename = os.path.normcase(co.co_filename)
-            if filename in (logging._srcfile, _srcfile):  # This is the only change
-                f = f.f_back
-                continue
+            if filename in (getattr(logging, '_srcfile', None), _srcfile):  # This is the only change
+                if hasattr(f, 'f_back') and f.f_back is not None:
+                    f = f.f_back
+                    continue
+                else:
+                    break
             sinfo = None
             if stack_info:
                 sio = io.StringIO()
                 sio.write('Stack (most recent call last):\n')
                 traceback.print_stack(f, file=sio)
                 sinfo = sio.getvalue()
-                if sinfo[-1] == '\n':
+                if sinfo and sinfo[-1] == '\n':
                     sinfo = sinfo[:-1]
                 sio.close()
-            rv = (co.co_filename, f.f_lineno, co.co_name, sinfo)
+            rv = (co.co_filename, getattr(f, 'f_lineno', 0), co.co_name, sinfo)
             break
         return rv  # noqa R504
 
@@ -265,20 +271,21 @@ class SpiderFootPlugin():
             raise TypeError("Module called getScanId() but no scanId is set.")
 
         return self.__scanId__
-
     def getTarget(self) -> str:
         """Gets the current target this module is acting against.
 
         Returns:
-            str: current target
+            str: current target value
 
         Raises:
-            TypeError: Module called getTarget() but no target is set.
+            TypeError: Module called getTarget() but no target is set or is invalid.
         """
         if not self._currentTarget:
             raise TypeError("Module called getTarget() but no target is set.")
-
-        return self._currentTarget
+        # Defensive: ensure _currentTarget has targetValue attribute
+        if not hasattr(self._currentTarget, 'targetValue'):
+            raise TypeError("Current target does not have a targetValue attribute.")
+        return self._currentTarget.targetValue
 
     def registerListener(self, listener) -> None:
         """Listener modules which will get notified once we have data for them to
@@ -331,7 +338,15 @@ class SpiderFootPlugin():
 
         # Be strict about what events to pass on, unless they are
         # the ROOT event or the event type of the target.
-        if self.__outputFilter__ and eventName not in ['ROOT', self.getTarget().targetType, self.__outputFilter__]:
+        # Check for .targetType attribute safely
+        target = self.getTarget()
+        target_type = getattr(target, 'targetType', None)
+        filter_types = ['ROOT']
+        if target_type:
+            filter_types.append(target_type)
+        if self.__outputFilter__:
+            filter_types.append(self.__outputFilter__)
+        if self.__outputFilter__ and eventName not in filter_types:
             return
 
         storeOnly = False  # Under some conditions, only store and don't notify
@@ -387,7 +402,11 @@ class SpiderFootPlugin():
                 try:
                     listener.handleEvent(sfEvent)
                 except Exception as e:
-                    self.sf.error(f"Module ({listener.__module__}) encountered an error: {e}")
+                    # Use self.sf.error if available, else fallback to logging
+                    if self.sf and hasattr(self.sf, 'error'):
+                        self.sf.error(f"Module ({listener.__module__}) encountered an error: {e}")
+                    else:
+                        logging.error(f"Module ({listener.__module__}) encountered an error: {e}")
                     # set errorState
                     self.errorState = True
                     # clear incoming queue
@@ -414,15 +433,14 @@ class SpiderFootPlugin():
         if not self.__scanId__:
             return False
 
+        if self.__sfdb__ is None:
+            return False
         scanstatus = self.__sfdb__.scanInstanceGet(self.__scanId__)
-
         if not scanstatus:
             return False
-
         if scanstatus[5] == "ABORT-REQUESTED":
             self._stopScanning = True
             return True
-
         return False
 
     @property
@@ -433,7 +451,9 @@ class SpiderFootPlugin():
         Returns:
             bool: True if the module is currently processing data.
         """
-        return self.sharedThreadPool.countQueuedTasks(f"{self.__name__}_threadWorker") > 0
+        if self.sharedThreadPool is not None:
+            return self.sharedThreadPool.countQueuedTasks(f"{self.__name__}_threadWorker") > 0
+        return False
 
     def watchedEvents(self) -> list:
         """What events is this module interested in for input. The format is a list
@@ -470,17 +490,19 @@ class SpiderFootPlugin():
         return
 
     def asdict(self) -> dict:
+        meta = self.meta if self.meta is not None else {}
+        optdescs = getattr(self, 'optdescs', {})
         return {
-            'name': self.meta.get('name'),
-            'descr': self.meta.get('summary'),
-            'cats': self.meta.get('categories', []),
-            'group': self.meta.get('useCases', []),
-            'labels': self.meta.get('flags', []),
+            'name': meta.get('name'),
+            'descr': meta.get('summary'),
+            'cats': meta.get('categories', []),
+            'group': meta.get('useCases', []),
+            'labels': meta.get('flags', []),
             'provides': self.producedEvents(),
             'consumes': self.watchedEvents(),
-            'meta': self.meta,
+            'meta': meta,
             'opts': self.opts,
-            'optdescs': self.optdescs,
+            'optdescs': optdescs,
         }
 
     def start(self) -> None:
@@ -500,10 +522,14 @@ class SpiderFootPlugin():
             # create new database handle since we're in our own thread
             from .db import SpiderFootDb
             self.setDbh(SpiderFootDb(self.opts))
-            self.sf._dbh = self.__sfdb__
+            if self.sf is not None:
+                setattr(self.sf, '_dbh', self.__sfdb__)
 
             if not (self.incomingEventQueue and self.outgoingEventQueue):
-                self.sf.error("Please set up queues before starting module as thread")
+                if self.sf and hasattr(self.sf, 'error'):
+                    self.sf.error("Please set up queues before starting module as thread")
+                else:
+                    logging.error("Please set up queues before starting module as thread")
                 return
 
             while not self.checkForStop():
@@ -513,24 +539,41 @@ class SpiderFootPlugin():
                     sleep(.3)
                     continue
                 if sfEvent == 'FINISHED':
-                    self.sf.debug(f"{self.__name__}.threadWorker() got \"FINISHED\" from incomingEventQueue.")
+                    if self.sf and hasattr(self.sf, 'debug'):
+                        self.sf.debug(f"{self.__name__}.threadWorker() got \"FINISHED\" from incomingEventQueue.")
+                    else:
+                        logging.debug(f"{self.__name__}.threadWorker() got \"FINISHED\" from incomingEventQueue.")
                     self.poolExecute(self.finish)
                 else:
-                    self.sf.debug(f"{self.__name__}.threadWorker() got event, {sfEvent.eventType}, from incomingEventQueue.")
+                    if self.sf and hasattr(self.sf, 'debug'):
+                        self.sf.debug(f"{self.__name__}.threadWorker() got event, {sfEvent.eventType}, from incomingEventQueue.")
+                    else:
+                        logging.debug(f"{self.__name__}.threadWorker() got event, {sfEvent.eventType}, from incomingEventQueue.")
                     self.poolExecute(self.handleEvent, sfEvent)
         except KeyboardInterrupt:
-            self.sf.debug(f"Interrupted module {self.__name__}.")
+            if self.sf and hasattr(self.sf, 'debug'):
+                self.sf.debug(f"Interrupted module {self.__name__}.")
+            else:
+                logging.debug(f"Interrupted module {self.__name__}.")
             self._stopScanning = True
         except Exception as e:
             import traceback
-            self.sf.error(f"Exception ({e.__class__.__name__}) in module {self.__name__}."
-                          + traceback.format_exc())
+            if self.sf and hasattr(self.sf, 'error'):
+                self.sf.error(f"Exception ({e.__class__.__name__}) in module {self.__name__}."
+                              + traceback.format_exc())
+                self.sf.debug(f"Setting errorState for module {self.__name__}.")
+            else:
+                logging.error(f"Exception ({e.__class__.__name__}) in module {self.__name__}."
+                              + traceback.format_exc())
+                logging.debug(f"Setting errorState for module {self.__name__}.")
             # set errorState
-            self.sf.debug(f"Setting errorState for module {self.__name__}.")
             self.errorState = True
             # clear incoming queue
             if self.incomingEventQueue:
-                self.sf.debug(f"Emptying incomingEventQueue for module {self.__name__}.")
+                if self.sf and hasattr(self.sf, 'debug'):
+                    self.sf.debug(f"Emptying incomingEventQueue for module {self.__name__}.")
+                else:
+                    logging.debug(f"Emptying incomingEventQueue for module {self.__name__}.")
                 with suppress(queue.Empty):
                     while 1:
                         self.incomingEventQueue.get_nowait()
@@ -550,8 +593,10 @@ class SpiderFootPlugin():
         """
         if self.__name__.startswith('sfp__stor_'):
             callback(*args, **kwargs)
-        else:
+        elif self.sharedThreadPool is not None:
             self.sharedThreadPool.submit(callback, *args, taskName=f"{self.__name__}_threadWorker", maxThreads=self.maxThreads, **kwargs)
+        else:
+            callback(*args, **kwargs)
 
     def threadPool(self, *args, **kwargs):
         return SpiderFootThreadPool(*args, **kwargs)

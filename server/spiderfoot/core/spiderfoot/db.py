@@ -19,6 +19,9 @@ import threading
 import time
 
 
+from typing import Optional
+from .event import SpiderFootEvent
+
 class SpiderFootDb:
     """SpiderFoot database
 
@@ -403,6 +406,8 @@ class SpiderFootDb:
         """
 
         with self.dbhLock:
+            if self.dbh is None or self.conn is None:
+                raise IOError("Database handle is not initialized.")
             try:
                 for qry in self.createSchemaQueries:
                     self.dbh.execute(qry)
@@ -413,7 +418,6 @@ class SpiderFootDb:
                     event_raw = row[2]
                     event_type = row[3]
                     qry = "INSERT INTO tbl_event_types (event, event_descr, event_raw, event_type) VALUES (?, ?, ?, ?)"
-
                     self.dbh.execute(qry, (
                         event, event_descr, event_raw, event_type
                     ))
@@ -425,7 +429,8 @@ class SpiderFootDb:
         """Close the database handle."""
 
         with self.dbhLock:
-            self.dbh.close()
+            if self.dbh is not None:
+                self.dbh.close()
 
     def vacuumDB(self) -> None:
         """Vacuum the database. Clears unused database file pages.
@@ -437,13 +442,13 @@ class SpiderFootDb:
             IOError: database I/O failed
         """
         with self.dbhLock:
+            if self.dbh is None or self.conn is None:
+                raise IOError("Database handle is not initialized.")
             try:
                 self.dbh.execute("VACUUM")
                 self.conn.commit()
-                return True
             except sqlite3.Error as e:
                 raise IOError("SQL error encountered when vacuuming the database") from e
-        return False
 
     def search(self, criteria: dict, filterFp: bool = False) -> list:
         """Search database.
@@ -522,6 +527,8 @@ class SpiderFootDb:
         qry += " ORDER BY c.data"
 
         with self.dbhLock:
+            if self.dbh is None:
+                raise IOError("Database handle is not initialized.")
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
@@ -540,6 +547,8 @@ class SpiderFootDb:
 
         qry = "SELECT event_descr, event, event_raw, event_type FROM tbl_event_types"
         with self.dbhLock:
+            if self.dbh is None:
+                raise IOError("Database handle is not initialized.")
             try:
                 self.dbh.execute(qry)
                 return self.dbh.fetchall()
@@ -583,6 +592,8 @@ class SpiderFootDb:
                 VALUES (?, ?, ?, ?, ?)"
 
             with self.dbhLock:
+                if self.dbh is None or self.conn is None:
+                    raise IOError("Database handle is not initialized.")
                 try:
                     self.dbh.executemany(qry, inserts)
                     self.conn.commit()
@@ -592,7 +603,7 @@ class SpiderFootDb:
                     return False
         return True
 
-    def scanLogEvent(self, instanceId: str, classification: str, message: str, component: str = None) -> None:
+    def scanLogEvent(self, instanceId: str, classification: str, message: str, component: str = "SpiderFoot") -> None:
         """Log an event to the database.
 
         Args:
@@ -626,6 +637,8 @@ class SpiderFootDb:
             VALUES (?, ?, ?, ?, ?)"
 
         with self.dbhLock:
+            if self.dbh is None or self.conn is None:
+                raise IOError("Database handle is not initialized.")
             try:
                 self.dbh.execute(qry, (
                     instanceId, time.time() * 1000, component, classification, message
@@ -634,8 +647,6 @@ class SpiderFootDb:
             except sqlite3.Error as e:
                 if "locked" not in e.args[0] and "thread" not in e.args[0]:
                     raise IOError("Unable to log scan event in database") from e
-                # print("[warning] Couldn't log due to SQLite limitations. You can probably ignore this.")
-                # log.critical(f"Unable to log event in DB due to lock: {e.args[0]}")
                 pass
 
     def scanInstanceCreate(self, instanceId: str, scanName: str, scanTarget: str) -> None:
@@ -665,6 +676,8 @@ class SpiderFootDb:
             VALUES (?, ?, ?, ?, ?)"
 
         with self.dbhLock:
+            if self.dbh is None or self.conn is None:
+                raise IOError("Database handle is not initialized.")
             try:
                 self.dbh.execute(qry, (
                     instanceId, scanName, scanTarget, time.time() * 1000, 'CREATED'
@@ -673,7 +686,7 @@ class SpiderFootDb:
             except sqlite3.Error as e:
                 raise IOError("Unable to create scan instance in database") from e
 
-    def scanInstanceSet(self, instanceId: str, started: str = None, ended: str = None, status: str = None) -> None:
+    def scanInstanceSet(self, instanceId: str, started: str = "", ended: str = "", status: str = "") -> None:
         """Update the start time, end time or status (or all 3) of a scan instance.
 
         Args:
@@ -710,6 +723,8 @@ class SpiderFootDb:
         qvars.append(instanceId)
 
         with self.dbhLock:
+            if self.dbh is None or self.conn is None:
+                raise IOError("Database handle is not initialized.")
             try:
                 self.dbh.execute(qry, qvars)
                 self.conn.commit()
@@ -739,6 +754,8 @@ class SpiderFootDb:
         qvars = [instanceId]
 
         with self.dbhLock:
+            if self.dbh is None:
+                raise IOError("Database handle is not initialized.")
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchone()
@@ -793,6 +810,8 @@ class SpiderFootDb:
         qvars = [instanceId]
 
         with self.dbhLock:
+            if self.dbh is None:
+                raise IOError("Database handle is not initialized.")
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
@@ -838,6 +857,8 @@ class SpiderFootDb:
         qvars = [instanceId]
 
         with self.dbhLock:
+            if self.dbh is None:
+                raise IOError("Database handle is not initialized.")
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
@@ -870,6 +891,8 @@ class SpiderFootDb:
         qvars = [instanceId]
 
         with self.dbhLock:
+            if self.dbh is None:
+                raise IOError("Database handle is not initialized.")
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
@@ -880,10 +903,10 @@ class SpiderFootDb:
         self,
         instanceId: str,
         eventType: str = 'ALL',
-        srcModule: str = None,
-        data: list = None,
-        sourceId: list = None,
-        correlationId: str = None,
+        srcModule: str = "",
+        data: Optional[list] = None,
+        sourceId: Optional[list] = None,
+        correlationId: str = "",
         filterFp: bool = False
     ) -> list:
         """Obtain the data for a scan and event type.
@@ -968,6 +991,8 @@ class SpiderFootDb:
         qry += " ORDER BY c.data"
 
         with self.dbhLock:
+            if self.dbh is None:
+                raise IOError("Database handle is not initialized.")
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
@@ -1010,13 +1035,15 @@ class SpiderFootDb:
         qry += " GROUP BY type, data ORDER BY COUNT(*)"
 
         with self.dbhLock:
+            if self.dbh is None:
+                raise IOError("Database handle is not initialized.")
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
             except sqlite3.Error as e:
                 raise IOError("SQL error encountered when fetching unique result events") from e
 
-    def scanLogs(self, instanceId: str, limit: int = None, fromRowId: int = 0, reverse: bool = False) -> list:
+    def scanLogs(self, instanceId: str, limit: int = 0, fromRowId: int = 0, reverse: bool = False) -> list:
         """Get scan logs.
 
         Args:
@@ -1056,6 +1083,8 @@ class SpiderFootDb:
             qvars.append(str(limit))
 
         with self.dbhLock:
+            if self.dbh is None:
+                raise IOError("Database handle is not initialized.")
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
@@ -1093,6 +1122,8 @@ class SpiderFootDb:
             qvars.append(str(limit))
 
         with self.dbhLock:
+            if self.dbh is None:
+                raise IOError("Database handle is not initialized.")
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
@@ -1123,6 +1154,8 @@ class SpiderFootDb:
         qvars = [instanceId]
 
         with self.dbhLock:
+            if self.dbh is None or self.conn is None:
+                raise IOError("Database handle is not initialized.")
             try:
                 self.dbh.execute(qry1, qvars)
                 self.dbh.execute(qry2, qvars)
@@ -1131,7 +1164,6 @@ class SpiderFootDb:
                 self.conn.commit()
             except sqlite3.Error as e:
                 raise IOError("SQL error encountered when deleting scan") from e
-
         return True
 
     def scanResultsUpdateFP(self, instanceId: str, resultHashes: list, fpFlag: int) -> bool:
@@ -1157,6 +1189,8 @@ class SpiderFootDb:
             raise TypeError(f"resultHashes is {type(resultHashes)}; expected list()") from None
 
         with self.dbhLock:
+            if self.dbh is None or self.conn is None:
+                raise IOError("Database handle is not initialized.")
             for resultHash in resultHashes:
                 qry = "UPDATE tbl_scan_results SET false_positive = ? WHERE \
                     scan_instance_id = ? AND hash = ?"
@@ -1196,6 +1230,8 @@ class SpiderFootDb:
         qry = "REPLACE INTO tbl_config (scope, opt, val) VALUES (?, ?, ?)"
 
         with self.dbhLock:
+            if self.dbh is None or self.conn is None:
+                raise IOError("Database handle is not initialized.")
             for opt in list(optMap.keys()):
                 # Module option
                 if ":" in opt:
@@ -1232,6 +1268,8 @@ class SpiderFootDb:
         retval = dict()
 
         with self.dbhLock:
+            if self.dbh is None:
+                raise IOError("Database handle is not initialized.")
             try:
                 self.dbh.execute(qry)
                 for [scope, opt, val] in self.dbh.fetchall():
@@ -1239,7 +1277,6 @@ class SpiderFootDb:
                         retval[opt] = val
                     else:
                         retval[f"{scope}:{opt}"] = val
-
                 return retval
             except sqlite3.Error as e:
                 raise IOError("SQL error encountered when fetching configuration") from e
@@ -1255,6 +1292,8 @@ class SpiderFootDb:
 
         qry = "DELETE from tbl_config"
         with self.dbhLock:
+            if self.dbh is None or self.conn is None:
+                raise IOError("Database handle is not initialized.")
             try:
                 self.dbh.execute(qry)
                 self.conn.commit()
@@ -1283,6 +1322,8 @@ class SpiderFootDb:
                 (scan_instance_id, component, opt, val) VALUES (?, ?, ?, ?)"
 
         with self.dbhLock:
+            if self.dbh is None or self.conn is None:
+                raise IOError("Database handle is not initialized.")
             for opt in list(optMap.keys()):
                 # Module option
                 if ":" in opt:
@@ -1326,6 +1367,8 @@ class SpiderFootDb:
         retval = dict()
 
         with self.dbhLock:
+            if self.dbh is None:
+                raise IOError("Database handle is not initialized.")
             try:
                 self.dbh.execute(qry, qvars)
                 for [component, opt, val] in self.dbh.fetchall():
@@ -1338,6 +1381,7 @@ class SpiderFootDb:
                 raise IOError("SQL error encountered when fetching configuration") from e
 
     def scanEventStore(self, instanceId: str, sfEvent, truncateSize: int = 0) -> None:
+
         """Store an event in the database.
 
         Args:
@@ -1350,7 +1394,6 @@ class SpiderFootDb:
             ValueError: arg value was invalid
             IOError: database I/O failed
         """
-        from .event import SpiderFootEvent
 
         if not isinstance(instanceId, str):
             raise TypeError(f"instanceId is {type(instanceId)}; expected str()") from None
@@ -1429,6 +1472,8 @@ class SpiderFootDb:
                  sfEvent.module, storeData, sfEvent.sourceEventHash]
 
         with self.dbhLock:
+            if self.dbh is None or self.conn is None:
+                raise IOError("Database handle is not initialized.")
             try:
                 self.dbh.execute(qry, qvals)
                 self.conn.commit()
@@ -1460,6 +1505,8 @@ class SpiderFootDb:
             ORDER BY started DESC"
 
         with self.dbhLock:
+            if self.dbh is None:
+                raise IOError("Database handle is not initialized.")
             try:
                 self.dbh.execute(qry)
                 return self.dbh.fetchall()
@@ -1489,6 +1536,8 @@ class SpiderFootDb:
         qvars = [instanceId]
 
         with self.dbhLock:
+            if self.dbh is None:
+                raise IOError("Database handle is not initialized.")
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
@@ -1540,6 +1589,8 @@ class SpiderFootDb:
         qvars = [instanceId]
 
         with self.dbhLock:
+            if self.dbh is None:
+                raise IOError("Database handle is not initialized.")
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
@@ -1589,6 +1640,8 @@ class SpiderFootDb:
         qvars = [instanceId]
 
         with self.dbhLock:
+            if self.dbh is None:
+                raise IOError("Database handle is not initialized.")
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
@@ -1776,6 +1829,8 @@ class SpiderFootDb:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
 
         with self.dbhLock:
+            if self.dbh is None or self.conn is None:
+                raise IOError("Database handle is not initialized.")
             try:
                 self.dbh.execute(qry, (
                     uniqueId, instanceId, correlationTitle, ruleName, ruleDescr, ruleRisk, ruleId, ruleYaml
@@ -1790,6 +1845,8 @@ class SpiderFootDb:
             VALUES (?, ?)"
 
         with self.dbhLock:
+            if self.dbh is None or self.conn is None:
+                raise IOError("Database handle is not initialized.")
             for eventHash in eventHashes:
                 try:
                     self.dbh.execute(qry, (

@@ -1,9 +1,10 @@
+
 import atexit
 import logging
 import sys
 import time
 from contextlib import suppress
-from logging.handlers import QueueHandler, QueueListener
+from logging.handlers import QueueHandler, QueueListener, TimedRotatingFileHandler
 
 from .db import SpiderFootDb
 from .helpers import SpiderFootHelpers
@@ -55,18 +56,23 @@ class SpiderFootSqliteLogHandler(logging.Handler):
         if self.dbh is None:
             # Create a new database handle when the first log batch is processed
             self.makeDbh()
-        logResult = self.dbh.scanLogEvents(batch)
+        logResult = False
+        if self.dbh is not None:
+            logResult = self.dbh.scanLogEvents(batch)
         if logResult is False:
             # Try to recreate database handle if insert failed
             self.makeDbh()
-            self.dbh.scanLogEvents(batch)
+            if self.dbh is not None:
+                self.dbh.scanLogEvents(batch)
 
     def makeDbh(self) -> None:
         """TBD."""
         self.dbh = SpiderFootDb(self.opts)
 
 
-def logListenerSetup(loggingQueue, opts: dict = None) -> 'logging.handlers.QueueListener':
+from typing import Optional
+
+def logListenerSetup(loggingQueue, opts: Optional[dict] = None) -> 'QueueListener':
     """Create and start a SpiderFoot log listener in its own thread.
 
     This function should be called as soon as possible in the main
@@ -91,7 +97,7 @@ def logListenerSetup(loggingQueue, opts: dict = None) -> 'logging.handlers.Queue
 
     # Log debug messages to file
     log_dir = SpiderFootHelpers.logPath()
-    debug_handler = logging.handlers.TimedRotatingFileHandler(
+    debug_handler = TimedRotatingFileHandler(
         f"{log_dir}/spiderfoot.debug.log",
         when="d",
         interval=1,
@@ -99,7 +105,7 @@ def logListenerSetup(loggingQueue, opts: dict = None) -> 'logging.handlers.Queue
     )
 
     # Log error messages to file
-    error_handler = logging.handlers.TimedRotatingFileHandler(
+    error_handler = TimedRotatingFileHandler(
         f"{log_dir}/spiderfoot.error.log",
         when="d",
         interval=1,
@@ -152,7 +158,7 @@ def logWorkerSetup(loggingQueue) -> 'logging.Logger':
     return log
 
 
-def stop_listener(listener: 'logging.handlers.QueueListener') -> None:
+def stop_listener(listener: 'QueueListener') -> None:
     """TBD.
 
     Args:

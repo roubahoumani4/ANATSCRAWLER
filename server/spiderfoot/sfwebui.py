@@ -148,7 +148,8 @@ class SpiderFootWebUi:
         """Error page."""
         cherrypy.response.status = 500
 
-        if self.config.get('_debug'):
+        cfg = self.config if self.config is not None else self.defaultConfig
+        if cfg.get('_debug'):
             cherrypy.response.body = _cperror.get_error_page(status=500, traceback=_cperror.format_exc())
         else:
             cherrypy.response.body = b"<html><body>Error</body></html>"
@@ -285,7 +286,8 @@ class SpiderFootWebUi:
             value = "%"
             regex = ""
 
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
         criteria = {
             'scan_id': id or '',
             'type': eventType or '',
@@ -376,7 +378,8 @@ class SpiderFootWebUi:
         Returns:
             bytes: scan logs in CSV format
         """
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
 
         try:
             data = dbh.scanLogs(id, 0, 0, True)
@@ -415,7 +418,8 @@ class SpiderFootWebUi:
         Returns:
             str: results in CSV or Excel format
         """
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
 
         try:
             scaninfo = dbh.scanInstanceGet(id)
@@ -486,7 +490,8 @@ class SpiderFootWebUi:
         Returns:
             str: results in CSV or Excel format
         """
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
         data = dbh.scanResultEvent(id, type)
 
         if filetype.lower() in ["xlsx", "excel"]:
@@ -536,7 +541,8 @@ class SpiderFootWebUi:
         Returns:
             str: results in CSV or Excel format
         """
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
         scaninfo = dict()
         data = list()
         scan_name = ""
@@ -654,7 +660,8 @@ class SpiderFootWebUi:
         Returns:
             str: results in JSON format
         """
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
         scaninfo = list()
         scan_name = ""
 
@@ -712,7 +719,8 @@ class SpiderFootWebUi:
         if not id:
             return b''
 
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
         data = dbh.scanResultEvent(id, filterFp=True)
         scan = dbh.scanInstanceGet(id)
 
@@ -747,7 +755,8 @@ class SpiderFootWebUi:
         Returns:
             str: GEXF data
         """
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
         data = list()
         roots = list()
         scan_name = ""
@@ -793,7 +802,8 @@ class SpiderFootWebUi:
         Returns:
             dict: scan options for the specified scan
         """
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
         ret = dict()
 
         meta = dbh.scanInstanceGet(id)
@@ -813,20 +823,23 @@ class SpiderFootWebUi:
         ret['meta'] = [meta[0], meta[1], meta[2], started, finished, meta[5]]
         ret['config'] = dbh.scanConfigGet(id)
         ret['configdesc'] = dict()
+        cfg = self.config if self.config is not None else self.defaultConfig
         for key in list(ret['config'].keys()):
             if ':' not in key:
-                globaloptdescs = self.config['__globaloptdescs__']
+                globaloptdescs = cfg.get('__globaloptdescs__', {})
                 if globaloptdescs:
                     ret['configdesc'][key] = globaloptdescs.get(key, f"{key} (legacy)")
             else:
                 [modName, modOpt] = key.split(':')
-                if modName not in list(self.config['__modules__'].keys()):
+                modules = cfg.get('__modules__', {})
+                if modName not in list(modules.keys()):
                     continue
 
-                if modOpt not in list(self.config['__modules__'][modName]['optdescs'].keys()):
+                optdescs = modules[modName].get('optdescs', {})
+                if modOpt not in list(optdescs.keys()):
                     continue
 
-                ret['configdesc'][key] = self.config['__modules__'][modName]['optdescs'][modOpt]
+                ret['configdesc'][key] = optdescs[modOpt]
 
         return ret
 
@@ -846,6 +859,7 @@ class SpiderFootWebUi:
         # Snapshot the current configuration to be used by the scan
         cfg = deepcopy(self.config)
         modlist = list()
+        cfg = cfg if cfg is not None else self.defaultConfig
         dbh = SpiderFootDb(cfg)
         info = dbh.scanInstanceGet(id)
 
@@ -906,6 +920,7 @@ class SpiderFootWebUi:
         # Snapshot the current configuration to be used by the scan
         cfg = deepcopy(self.config)
         modlist = list()
+        cfg = cfg if cfg is not None else self.defaultConfig
         dbh = SpiderFootDb(cfg)
 
         for id in ids.split(","):
@@ -960,12 +975,21 @@ class SpiderFootWebUi:
         Returns:
             str: New scan page HTML
         """
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
         types = dbh.eventTypes()
         templ = Template(filename='spiderfoot/templates/newscan.tmpl', lookup=self.lookup)
-        result = templ.render(pageid='NEWSCAN', types=types, docroot=self.docroot,
-                            modules=self.config['__modules__'], scanname="",
-                            selectedmods="", scantarget="", version=__version__)
+        result = templ.render(
+            pageid='NEWSCAN',
+            types=types,
+            docroot=self.docroot,
+            cfg=cfg,
+            modules=cfg.get('__modules__', {}),
+            scanname="",
+            selectedmods="",
+            scantarget="",
+            version=__version__
+        )
         if isinstance(result, (bytes, bytearray)):
             return result.decode('utf-8')
         if isinstance(result, memoryview):
@@ -982,7 +1006,8 @@ class SpiderFootWebUi:
         Returns:
             str: New scan page HTML pre-populated with options from cloned scan.
         """
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
         types = dbh.eventTypes()
         info = dbh.scanInstanceGet(id)
 
@@ -1005,10 +1030,17 @@ class SpiderFootWebUi:
         modlist = scanconfig['_modulesenabled'].split(',')
 
         templ = Template(filename='spiderfoot/templates/newscan.tmpl', lookup=self.lookup)
-        result = templ.render(pageid='NEWSCAN', types=types, docroot=self.docroot,
-                            modules=self.config['__modules__'], selectedmods=modlist,
-                            scanname=str(scanname),
-                            scantarget=str(scantarget), version=__version__)
+        result = templ.render(
+            pageid='NEWSCAN',
+            types=types,
+            docroot=self.docroot,
+            cfg=cfg,
+            modules=cfg.get('__modules__', {}),
+            selectedmods=modlist,
+            scanname=str(scanname),
+            scantarget=str(scantarget),
+            version=__version__
+        )
         if isinstance(result, (bytes, bytearray)):
             return result.decode('utf-8')
         if isinstance(result, memoryview):
@@ -1040,7 +1072,8 @@ class SpiderFootWebUi:
         Returns:
             str: scan info page HTML
         """
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
         res = dbh.scanInstanceGet(id)
         if res is None:
             return self.error("Scan ID not found.")
@@ -1086,19 +1119,20 @@ class SpiderFootWebUi:
         Returns:
             str: Configuration settings
         """
-        sf = SpiderFoot(self.config)
-        conf = sf.configSerialize(self.config)
+        sf = SpiderFoot(self.config if self.config is not None else self.defaultConfig)
+        conf = sf.configSerialize(self.config if self.config is not None else self.defaultConfig)
         content = ""
 
-        for opt in sorted(conf):
-            if ":_" in opt or opt.startswith("_"):
-                continue
+        if conf:
+            for opt in sorted(conf):
+                if ":_" in opt or opt.startswith("_"):
+                    continue
 
-            if pattern:
-                if pattern in opt:
+                if pattern:
+                    if pattern in opt:
+                        content += f"{opt}={conf[opt]}\n"
+                else:
                     content += f"{opt}={conf[opt]}\n"
-            else:
-                content += f"{opt}={conf[opt]}\n"
 
         cherrypy.response.headers['Content-Disposition'] = 'attachment; filename="SpiderFoot.cfg"'
         cherrypy.response.headers['Content-Type'] = "text/plain"
@@ -1118,17 +1152,19 @@ class SpiderFootWebUi:
         """
         ret = dict()
         self.token = random.SystemRandom().randint(0, 99999999)
-        for opt in self.config:
-            if not opt.startswith('__'):
-                ret["global." + opt] = self.config[opt]
-                continue
+        config = self.config if self.config is not None else self.defaultConfig
+        if config:
+            for opt in config:
+                if not opt.startswith('__'):
+                    ret["global." + opt] = config[opt]
+                    continue
 
-            if opt == '__modules__':
-                for mod in sorted(self.config['__modules__'].keys()):
-                    for mo in sorted(self.config['__modules__'][mod]['opts'].keys()):
-                        if mo.startswith("_"):
-                            continue
-                        ret["module." + mod + "." + mo] = self.config['__modules__'][mod]['opts'][mo]
+                if opt == '__modules__' and '__modules__' in config:
+                    for mod in sorted(config['__modules__'].keys()):
+                        for mo in sorted(config['__modules__'][mod]['opts'].keys()):
+                            if mo.startswith("_"):
+                                continue
+                            ret["module." + mod + "." + mo] = config['__modules__'][mod]['opts'][mo]
 
         return ['SUCCESS', {'token': self.token, 'data': ret}]
 
@@ -1146,7 +1182,8 @@ class SpiderFootWebUi:
         if not id:
             return self.jsonify_error('404', "No scan specified")
 
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
         ids = id.split(',')
 
         for scan_id in ids:
@@ -1211,7 +1248,8 @@ class SpiderFootWebUi:
 
         # Save settings
         try:
-            dbh = SpiderFootDb(self.config)
+            cfg = self.config if self.config is not None else self.defaultConfig
+            dbh = SpiderFootDb(cfg)
             useropts = json.loads(allopts)
             cleanopts = dict()
             for opt in list(useropts.keys()):
@@ -1221,9 +1259,19 @@ class SpiderFootWebUi:
 
             # Make a new config where the user options override
             # the current system config.
-            sf = SpiderFoot(self.config)
-            self.config = sf.configUnserialize(cleanopts, currentopts)
-            dbh.configSet(sf.configSerialize(self.config))
+            cfg = self.config if self.config is not None else self.defaultConfig
+            sf = SpiderFoot(cfg)
+            # Defensive: ensure currentopts is a dict, not None
+            currentopts = currentopts if currentopts is not None else self.defaultConfig
+            unserialized = sf.configUnserialize(cleanopts, currentopts)
+            self.config = unserialized if unserialized is not None else deepcopy(self.defaultConfig)
+            cfg = self.config if self.config is not None else self.defaultConfig
+            cfg = cfg if cfg is not None else self.defaultConfig
+            serialized = sf.configSerialize(cfg) if cfg is not None else sf.configSerialize(self.defaultConfig)
+            if isinstance(serialized, dict):
+                dbh.configSet(serialized)
+            else:
+                raise ValueError("Failed to serialize config for saving.")
         except Exception as e:
             return self.error(f"Processing one or more of your inputs failed: {e}")
 
@@ -1253,7 +1301,8 @@ class SpiderFootWebUi:
 
         # Save settings
         try:
-            dbh = SpiderFootDb(self.config)
+            cfg = self.config if self.config is not None else self.defaultConfig
+            dbh = SpiderFootDb(cfg)
             useropts = json.loads(allopts)
             cleanopts = dict()
             for opt in list(useropts.keys()):
@@ -1263,9 +1312,19 @@ class SpiderFootWebUi:
 
             # Make a new config where the user options override
             # the current system config.
-            sf = SpiderFoot(self.config)
-            self.config = sf.configUnserialize(cleanopts, currentopts)
-            dbh.configSet(sf.configSerialize(self.config))
+            cfg = self.config if self.config is not None else self.defaultConfig
+            sf = SpiderFoot(cfg)
+            # Defensive: ensure currentopts is a dict, not None
+            currentopts = currentopts if currentopts is not None else self.defaultConfig
+            unserialized = sf.configUnserialize(cleanopts, currentopts)
+            self.config = unserialized if unserialized is not None else deepcopy(self.defaultConfig)
+            cfg = self.config if self.config is not None else self.defaultConfig
+            cfg = cfg if cfg is not None else self.defaultConfig
+            serialized = sf.configSerialize(cfg) if cfg is not None else sf.configSerialize(self.defaultConfig)
+            if isinstance(serialized, dict):
+                dbh.configSet(serialized)
+            else:
+                return json.dumps(["ERROR", "Failed to serialize config for saving."]).encode('utf-8')
         except Exception as e:
             return json.dumps(["ERROR", f"Processing one or more of your inputs failed: {e}"]).encode('utf-8')
 
@@ -1278,7 +1337,8 @@ class SpiderFootWebUi:
             bool: success
         """
         try:
-            dbh = SpiderFootDb(self.config)
+            cfg = self.config if self.config is not None else self.defaultConfig
+            dbh = SpiderFootDb(cfg)
             dbh.configClear()  # Clear it in the DB
             self.config = deepcopy(self.defaultConfig)  # Clear in memory
         except Exception:
@@ -1300,7 +1360,8 @@ class SpiderFootWebUi:
         """
         cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
 
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
 
         if fp not in ["0", "1"]:
             return json.dumps(["ERROR", "No FP flag set or not set correctly."])
@@ -1352,7 +1413,8 @@ class SpiderFootWebUi:
         """
         cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
 
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
         types = dbh.eventTypes()
         ret = list()
 
@@ -1373,7 +1435,8 @@ class SpiderFootWebUi:
 
         ret = list()
 
-        modinfo = list(self.config['__modules__'].keys())
+        config = self.config if self.config is not None else self.defaultConfig
+        modinfo = list(config['__modules__'].keys()) if config and '__modules__' in config else []
         if not modinfo:
             return ret
 
@@ -1382,7 +1445,8 @@ class SpiderFootWebUi:
         for m in modinfo:
             if "__" in m:
                 continue
-            ret.append({'name': m, 'descr': self.config['__modules__'][m]['descr']})
+            if config and '__modules__' in config and m in config['__modules__']:
+                ret.append({'name': m, 'descr': config['__modules__'][m]['descr']})
 
         return ret
 
@@ -1398,7 +1462,8 @@ class SpiderFootWebUi:
 
         ret = list()
 
-        rules = self.config['__correlationrules__']
+        cfg = self.config if self.config is not None else self.defaultConfig
+        rules = cfg.get('__correlationrules__', [])
         if not rules:
             return ret
 
@@ -1433,7 +1498,8 @@ class SpiderFootWebUi:
         Returns:
             list: query results as JSON
         """
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
 
         if not query:
             # Always return a list for @json_out endpoints
@@ -1500,8 +1566,10 @@ class SpiderFootWebUi:
                 return json.dumps(["ERROR", "Unrecognised target type."])
             return self.error("Invalid target type. Could not recognize it as a target SpiderFoot supports.")
 
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
         cfg = deepcopy(self.config)
+        cfg = cfg if cfg is not None else self.defaultConfig
         sf = SpiderFoot(cfg)
         modlist = list()
 
@@ -1524,9 +1592,11 @@ class SpiderFootWebUi:
                 newmods = list()
 
         if len(modlist) == 0 and usecase:
-            for mod in self.config['__modules__']:
-                if usecase == 'all' or usecase in self.config['__modules__'][mod]['group']:
-                    modlist.append(mod)
+            config = self.config if self.config is not None else self.defaultConfig
+            if config and '__modules__' in config:
+                for mod in config['__modules__']:
+                    if usecase == 'all' or (config['__modules__'][mod].get('group') and usecase in config['__modules__'][mod]['group']):
+                        modlist.append(mod)
 
         if not modlist:
             if is_json_request():
@@ -1581,7 +1651,8 @@ class SpiderFootWebUi:
         if not id:
             return self.jsonify_error('404', "No scan specified")
 
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
         ids = id.split(',')
 
         for scan_id in ids:
@@ -1609,7 +1680,8 @@ class SpiderFootWebUi:
     @cherrypy.expose
     @json_out()
     def vacuum(self):
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
         try:
             if dbh.vacuumDB():
                 return json.dumps(["SUCCESS", ""]).encode('utf-8')
@@ -1635,7 +1707,8 @@ class SpiderFootWebUi:
         Returns:
             list: scan log
         """
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
         retdata = []
 
         try:
@@ -1664,7 +1737,8 @@ class SpiderFootWebUi:
         Returns:
             list: scan errors
         """
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
         retdata = []
 
         try:
@@ -1687,7 +1761,8 @@ class SpiderFootWebUi:
         Returns:
             list: scan list
         """
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
         data = dbh.scanInstanceList()
         retdata = []
 
@@ -1729,7 +1804,8 @@ class SpiderFootWebUi:
         Returns:
             list: scan status
         """
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
         data = dbh.scanInstanceGet(id)
 
         if not data:
@@ -1765,7 +1841,8 @@ class SpiderFootWebUi:
         """
         retdata = []
 
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
 
         try:
             scandata = dbh.scanResultSummary(id, by)
@@ -1798,7 +1875,8 @@ class SpiderFootWebUi:
         """
         retdata = []
 
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
 
         try:
             corrdata = dbh.scanCorrelationList(id)
@@ -1826,7 +1904,8 @@ class SpiderFootWebUi:
         """
         retdata = []
 
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
 
         eventType_str = eventType if eventType is not None else 'ALL'
         correlationId_str = correlationId if correlationId is not None else ''
@@ -1867,7 +1946,8 @@ class SpiderFootWebUi:
         Returns:
             list: unique search results
         """
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
         retdata = []
 
         filterfp_bool = bool(int(filterfp)) if filterfp is not None else False
@@ -1917,7 +1997,8 @@ class SpiderFootWebUi:
         if not id:
             return [{"error": {"http_status": '404', "message": "No scan specified"}}]
 
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
 
         try:
             return dbh.scanResultHistory(id)
@@ -1936,7 +2017,8 @@ class SpiderFootWebUi:
         Returns:
             dict
         """
-        dbh = SpiderFootDb(self.config)
+        cfg = self.config if self.config is not None else self.defaultConfig
+        dbh = SpiderFootDb(cfg)
         pc = dict()
         datamap = dict()
         retdata = dict()

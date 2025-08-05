@@ -51,6 +51,7 @@ class SpiderFootEvent:
 # -------------------------------------------------------------------------------
 
 import hashlib
+import typing
 import inspect
 import io
 import json
@@ -69,6 +70,7 @@ from copy import deepcopy
 from datetime import datetime
 
 import cryptography
+import cryptography.x509
 import dns.resolver
 import netaddr
 import OpenSSL
@@ -129,20 +131,20 @@ class SpiderFoot:
         return self._dbh
 
     @property
-    def scanId(self) -> str:
+    def scanId(self) -> typing.Optional[str]:
         """Scan instance ID
 
         Returns:
-            str: scan instance ID
+            Optional[str]: scan instance ID
         """
         return self._scanId
 
     @property
-    def socksProxy(self) -> str:
+    def socksProxy(self) -> typing.Optional[str]:
         """SOCKS proxy
 
         Returns:
-            str: socks proxy
+            Optional[str]: socks proxy
         """
         return self._socksProxy
 
@@ -158,7 +160,7 @@ class SpiderFoot:
         self._dbh = dbh
 
     @scanId.setter
-    def scanId(self, scanId: str) -> str:
+    def scanId(self, scanId: str) -> None:
         """Set the scan ID this instance of SpiderFoot is being used in.
 
         Args:
@@ -167,7 +169,7 @@ class SpiderFoot:
         self._scanId = scanId
 
     @socksProxy.setter
-    def socksProxy(self, socksProxy: str) -> str:
+    def socksProxy(self, socksProxy: str) -> None:
         """SOCKS proxy
 
         Bit of a hack to support SOCKS because of the loading order of
@@ -179,7 +181,7 @@ class SpiderFoot:
         """
         self._socksProxy = socksProxy
 
-    def optValueToData(self, val: str) -> str:
+    def optValueToData(self, val: str) -> typing.Optional[str]:
         """Supplied an option value, return the data based on what the
         value is. If val is a URL, you'll get back the fetched content,
         if val is a file path it will be loaded and get back the contents,
@@ -211,7 +213,6 @@ class SpiderFoot:
                 self.info(f"Downloading configuration data from: {val}")
                 session = self.getSession()
                 res = session.get(val)
-
                 return res.content.decode('utf-8')
             except BaseException as e:
                 self.error(f"Unable to open option URL, {val}: {e}")
@@ -313,7 +314,7 @@ class SpiderFoot:
             else:
                 fp.write(data)
 
-    def cacheGet(self, label: str, timeoutHrs: int) -> str:
+    def cacheGet(self, label: str, timeoutHrs: int) -> typing.Optional[str]:
         """Retreive data from the cache.
 
         Args:
@@ -343,7 +344,7 @@ class SpiderFoot:
 
         return None
 
-    def configSerialize(self, opts: dict, filterSystem: bool = True):
+    def configSerialize(self, opts: dict, filterSystem: bool = True) -> typing.Optional[dict]:
         """Convert a Python dictionary to something storable in the database.
 
         Args:
@@ -351,13 +352,13 @@ class SpiderFoot:
             filterSystem (bool): TBD
 
         Returns:
-            dict: config options
+            Optional[dict]: config options or None on error
 
         Raises:
             TypeError: arg type was invalid
         """
         if not isinstance(opts, dict):
-            raise TypeError(f"opts is {type(opts)}; expected dict()")
+            return None
 
         storeopts = dict()
 
@@ -373,20 +374,20 @@ class SpiderFoot:
                 storeopts[opt] = opts[opt]
 
             if isinstance(opts[opt], bool):
-                if opts[opt]:
-                    storeopts[opt] = 1
-                else:
-                    storeopts[opt] = 0
+                storeopts[opt] = 1 if opts[opt] else 0
+
             if isinstance(opts[opt], list):
-                storeopts[opt] = ','.join(opts[opt])
+                storeopts[opt] = ','.join(str(x) for x in opts[opt])
 
         if '__modules__' not in opts:
             return storeopts
 
         if not isinstance(opts['__modules__'], dict):
-            raise TypeError(f"opts['__modules__'] is {type(opts['__modules__'])}; expected dict()")
+            return None
 
         for mod in opts['__modules__']:
+            if 'opts' not in opts['__modules__'][mod]:
+                continue
             for opt in opts['__modules__'][mod]['opts']:
                 if opt.startswith('_') and filterSystem:
                     continue
@@ -398,16 +399,14 @@ class SpiderFoot:
                     storeopts[mod_opt] = mod_opt_val
 
                 if isinstance(mod_opt_val, bool):
-                    if mod_opt_val:
-                        storeopts[mod_opt] = 1
-                    else:
-                        storeopts[mod_opt] = 0
+                    storeopts[mod_opt] = 1 if mod_opt_val else 0
+
                 if isinstance(mod_opt_val, list):
                     storeopts[mod_opt] = ','.join(str(x) for x in mod_opt_val)
 
         return storeopts
 
-    def configUnserialize(self, opts: dict, referencePoint: dict, filterSystem: bool = True):
+    def configUnserialize(self, opts: dict, referencePoint: dict, filterSystem: bool = True) -> typing.Optional[dict]:
         """Take strings, etc. from the database or UI and convert them
         to a dictionary for Python to process.
 
@@ -417,18 +416,18 @@ class SpiderFoot:
             filterSystem (bool): Ignore global "system" configuration options
 
         Returns:
-            dict: TBD
+            Optional[dict]: config options or None on error
 
         Raises:
             TypeError: arg type was invalid
         """
-
         if not isinstance(opts, dict):
-            raise TypeError(f"opts is {type(opts)}; expected dict()")
+            return None
         if not isinstance(referencePoint, dict):
-            raise TypeError(f"referencePoint is {type(referencePoint)}; expected dict()")
+            return None
 
-        returnOpts = referencePoint
+        from copy import deepcopy
+        returnOpts = deepcopy(referencePoint)
 
         # Global options
         for opt in list(referencePoint.keys()):
@@ -440,10 +439,7 @@ class SpiderFoot:
                 continue
 
             if isinstance(referencePoint[opt], bool):
-                if opts[opt] == "1":
-                    returnOpts[opt] = True
-                else:
-                    returnOpts[opt] = False
+                returnOpts[opt] = True if opts[opt] == "1" else False
                 continue
 
             if isinstance(referencePoint[opt], str):
@@ -451,14 +447,20 @@ class SpiderFoot:
                 continue
 
             if isinstance(referencePoint[opt], int):
-                returnOpts[opt] = int(opts[opt])
+                try:
+                    returnOpts[opt] = int(opts[opt])
+                except Exception:
+                    return None
                 continue
 
             if isinstance(referencePoint[opt], list):
-                if isinstance(referencePoint[opt][0], int):
+                if len(referencePoint[opt]) > 0 and isinstance(referencePoint[opt][0], int):
                     returnOpts[opt] = list()
                     for x in str(opts[opt]).split(","):
-                        returnOpts[opt].append(int(x))
+                        try:
+                            returnOpts[opt].append(int(x))
+                        except Exception:
+                            return None
                 else:
                     returnOpts[opt] = str(opts[opt]).split(",")
 
@@ -466,39 +468,44 @@ class SpiderFoot:
             return returnOpts
 
         if not isinstance(referencePoint['__modules__'], dict):
-            raise TypeError(f"referencePoint['__modules__'] is {type(referencePoint['__modules__'])}; expected dict()")
+            return None
 
         # Module options
-        # A lot of mess to handle typing..
         for modName in referencePoint['__modules__']:
+            if 'opts' not in referencePoint['__modules__'][modName]:
+                continue
             for opt in referencePoint['__modules__'][modName]['opts']:
                 if opt.startswith('_') and filterSystem:
                     continue
 
-                if modName + ":" + opt in opts:
+                key = modName + ":" + opt
+                if key in opts:
                     ref_mod = referencePoint['__modules__'][modName]['opts'][opt]
                     if isinstance(ref_mod, bool):
-                        if opts[modName + ":" + opt] == "1":
-                            returnOpts['__modules__'][modName]['opts'][opt] = True
-                        else:
-                            returnOpts['__modules__'][modName]['opts'][opt] = False
+                        returnOpts['__modules__'][modName]['opts'][opt] = True if opts[key] == "1" else False
                         continue
 
                     if isinstance(ref_mod, str):
-                        returnOpts['__modules__'][modName]['opts'][opt] = str(opts[modName + ":" + opt])
+                        returnOpts['__modules__'][modName]['opts'][opt] = str(opts[key])
                         continue
 
                     if isinstance(ref_mod, int):
-                        returnOpts['__modules__'][modName]['opts'][opt] = int(opts[modName + ":" + opt])
+                        try:
+                            returnOpts['__modules__'][modName]['opts'][opt] = int(opts[key])
+                        except Exception:
+                            return None
                         continue
 
                     if isinstance(ref_mod, list):
-                        if isinstance(ref_mod[0], int):
+                        if len(ref_mod) > 0 and isinstance(ref_mod[0], int):
                             returnOpts['__modules__'][modName]['opts'][opt] = list()
-                            for x in str(opts[modName + ":" + opt]).split(","):
-                                returnOpts['__modules__'][modName]['opts'][opt].append(int(x))
+                            for x in str(opts[key]).split(","):
+                                try:
+                                    returnOpts['__modules__'][modName]['opts'][opt].append(int(x))
+                                except Exception:
+                                    return None
                         else:
-                            returnOpts['__modules__'][modName]['opts'][opt] = str(opts[modName + ":" + opt]).split(",")
+                            returnOpts['__modules__'][modName]['opts'][opt] = str(opts[key]).split(",")
 
         return returnOpts
 
@@ -627,7 +634,7 @@ class SpiderFoot:
 
         return evtlist
 
-    def urlFQDN(self, url: str) -> str:
+    def urlFQDN(self, url: str) -> typing.Optional[str]:
         """Extract the FQDN from a URL.
 
         Args:
@@ -641,15 +648,17 @@ class SpiderFoot:
             return None
 
         baseurl = SpiderFootHelpers.urlBaseUrl(url)
-        if '://' in baseurl:
+        if baseurl and '://' in baseurl:
             count = 2
         else:
             count = 0
 
         # http://abc.com will split to ['http:', '', 'abc.com']
-        return baseurl.split('/')[count].lower()
+        if baseurl:
+            return baseurl.split('/')[count].lower()
+        return None
 
-    def domainKeyword(self, domain: str, tldList: list) -> str:
+    def domainKeyword(self, domain: str, tldList: list) -> typing.Optional[str]:
         """Extract the keyword (the domain without the TLD or any subdomains) from a domain.
 
         Args:
@@ -698,7 +707,7 @@ class SpiderFoot:
         self.debug(f"Keywords: {keywords}")
         return set([k for k in keywords if k])
 
-    def hostDomain(self, hostname: str, tldList: list) -> str:
+    def hostDomain(self, hostname: str, tldList: list) -> typing.Optional[str]:
         """Obtain the domain name for a supplied hostname.
 
         Args:
@@ -714,7 +723,10 @@ class SpiderFoot:
             return None
 
         ps = PublicSuffixList(tldList, only_icann=True)
-        return ps.privatesuffix(hostname)
+        result = ps.privatesuffix(hostname)
+        if result is not None:
+            return result
+        return None
 
     def validHost(self, hostname: str, tldList: str) -> bool:
         """Check if the provided string is a valid hostname with a valid public suffix TLD.
@@ -825,24 +837,41 @@ class SpiderFoot:
         if not self.validIP(ip) and not self.validIP6(ip):
             return False
 
-        if not netaddr.IPAddress(ip).is_unicast():
-            return False
-
-        if netaddr.IPAddress(ip).is_loopback():
-            return False
-        if netaddr.IPAddress(ip).is_reserved():
-            return False
-        if netaddr.IPAddress(ip).is_multicast():
-            return False
-        if netaddr.IPAddress(ip).is_private():
-            return False
+        ip_obj = netaddr.IPAddress(ip)
+        # Manual checks for private, loopback, reserved, multicast
+        if ip_obj.version == 4:
+            if ip_obj in netaddr.IPNetwork('10.0.0.0/8'):
+                return False
+            if ip_obj in netaddr.IPNetwork('172.16.0.0/12'):
+                return False
+            if ip_obj in netaddr.IPNetwork('192.168.0.0/16'):
+                return False
+            if ip_obj in netaddr.IPNetwork('127.0.0.0/8'):
+                return False
+            if ip_obj in netaddr.IPNetwork('224.0.0.0/4'):
+                return False
+            if ip_obj in netaddr.IPNetwork('240.0.0.0/4'):
+                return False
+        else:
+            # IPv6 loopback
+            if ip_obj == netaddr.IPAddress('::1'):
+                return False
+            # IPv6 link-local
+            if ip_obj in netaddr.IPNetwork('fe80::/10'):
+                return False
+            # IPv6 unique local
+            if ip_obj in netaddr.IPNetwork('fc00::/7'):
+                return False
+            # IPv6 multicast
+            if ip_obj in netaddr.IPNetwork('ff00::/8'):
+                return False
         return True
 
-    def normalizeDNS(self, res: list) -> list:
+    def normalizeDNS(self, res: typing.Any) -> list:
         """Clean DNS results to be a simple list
 
         Args:
-            res (list): List of DNS names
+            res (list or tuple): List or tuple of DNS names
 
         Returns:
             list: list of domains
@@ -852,6 +881,10 @@ class SpiderFoot:
         if not res:
             return ret
 
+        # If tuple, DNS results from gethostbyname_ex/gethostbyaddr: (hostname, aliaslist, ipaddrlist)
+        if isinstance(res, tuple) and len(res) == 3:
+            # Only use the last element (ipaddrlist or hostlist)
+            res = res[2]
         for addr in res:
             if isinstance(addr, list):
                 for host in addr:
@@ -980,7 +1013,7 @@ class SpiderFoot:
 
         return any(str(addr) == ip for addr in addrs)
 
-    def safeSocket(self, host: str, port: int, timeout: int) -> 'ssl.SSLSocket':
+    def safeSocket(self, host: str, port: int, timeout: int) -> socket.socket:
         """Create a safe socket that's using SOCKS/TOR if it was enabled.
 
         Args:
@@ -989,13 +1022,13 @@ class SpiderFoot:
             timeout (int): timeout
 
         Returns:
-            sock
+            socket.socket: a connected socket
         """
         sock = socket.create_connection((host, int(port)), int(timeout))
         sock.settimeout(int(timeout))
         return sock
 
-    def safeSSLSocket(self, host: str, port: int, timeout: int) -> 'ssl.SSLSocket':
+    def safeSSLSocket(self, host: str, port: int, timeout: int) -> ssl.SSLSocket:
         """Create a safe SSL connection that's using SOCKs/TOR if it was enabled.
 
         Args:
@@ -1004,16 +1037,17 @@ class SpiderFoot:
             timeout (int): timeout
 
         Returns:
-            sock
+            ssl.SSLSocket: a connected SSL socket
         """
         s = socket.socket()
         s.settimeout(int(timeout))
         s.connect((host, int(port)))
-        sock = ssl.wrap_socket(s)
+        context = ssl.create_default_context()
+        sock = context.wrap_socket(s, server_hostname=host)
         sock.do_handshake()
         return sock
 
-    def parseCert(self, rawcert: str, fqdn: str = None, expiringdays: int = 30) -> dict:
+    def parseCert(self, rawcert: str, fqdn: typing.Optional[str] = None, expiringdays: int = 30) -> typing.Optional[dict]:
         """Parse a PEM-format SSL certificate.
 
         Args:
@@ -1032,11 +1066,13 @@ class SpiderFoot:
         if '\r' in rawcert:
             rawcert = rawcert.replace('\r', '')
         if isinstance(rawcert, str):
-            rawcert = rawcert.encode('utf-8')
+            rawcert_bytes = rawcert.encode('utf-8')
+        else:
+            rawcert_bytes = rawcert
 
         from cryptography.hazmat.backends.openssl import backend
-        cert = cryptography.x509.load_pem_x509_certificate(rawcert, backend)
-        sslcert = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, rawcert)
+        cert = cryptography.x509.load_pem_x509_certificate(rawcert_bytes, backend)
+        sslcert = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, rawcert_bytes)
         sslcert_dump = OpenSSL.crypto.dump_certificate(OpenSSL.crypto.FILETYPE_TEXT, sslcert)
 
         ret['text'] = sslcert_dump.decode('utf-8', errors='replace')
@@ -1050,7 +1086,12 @@ class SpiderFoot:
 
         # Expiry info
         try:
-            notafter = datetime.strptime(sslcert.get_notAfter().decode('utf-8'), "%Y%m%d%H%M%SZ")
+            notafter_bytes = sslcert.get_notAfter()
+            if notafter_bytes:
+                notafter_str = notafter_bytes.decode('utf-8') if isinstance(notafter_bytes, bytes) else str(notafter_bytes)
+                notafter = datetime.strptime(notafter_str, "%Y%m%d%H%M%SZ")
+            else:
+                raise ValueError("Certificate missing notAfter")
             ret['expiry'] = int(notafter.strftime("%s"))
             ret['expirystr'] = notafter.strftime("%Y-%m-%d %H:%M:%S")
             now = int(time.time())
@@ -1069,13 +1110,15 @@ class SpiderFoot:
             ext = cert.extensions.get_extension_for_class(cryptography.x509.SubjectAlternativeName)
             for x in ext.value:
                 if isinstance(x, cryptography.x509.DNSName):
-                    ret['altnames'].append(x.value.lower().encode('raw_unicode_escape').decode("ascii", errors='replace'))
+                    if x.value:
+                        ret['altnames'].append(str(x.value).lower().encode('raw_unicode_escape').decode("ascii", errors='replace'))
         except BaseException as e:
             self.debug(f"Problem processing certificate: {e}")
 
         certhosts = list()
         try:
-            attrs = cert.subject.get_attributes_for_oid(cryptography.x509.oid.NameOID.COMMON_NAME)
+            from cryptography.x509.oid import NameOID
+            attrs = cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
 
             if len(attrs) == 1:
                 name = attrs[0].value.lower()
@@ -1170,12 +1213,10 @@ class SpiderFoot:
         if not self.validIP(ip) and not self.validIP6(ip):
             return False
 
-        if netaddr.IPAddress(ip).is_private():
+        ip_obj = netaddr.IPAddress(ip)
+        # Only fallback manual checks for local/loopback IP
+        if ip_obj in netaddr.IPNetwork('127.0.0.0/8') or ip_obj in netaddr.IPNetwork('10.0.0.0/8') or ip_obj in netaddr.IPNetwork('172.16.0.0/12') or ip_obj in netaddr.IPNetwork('192.168.0.0/16'):
             return True
-
-        if netaddr.IPAddress(ip).is_loopback():
-            return True
-
         return False
 
     def useProxyForUrl(self, url: str) -> bool:
@@ -1190,7 +1231,8 @@ class SpiderFoot:
         Todo:
             Allow using TOR only for .onion addresses
         """
-        host = self.urlFQDN(url).lower()
+        host_fqdn = self.urlFQDN(url)
+        host = host_fqdn.lower() if host_fqdn else ""
 
         if not self.opts['_socks1type']:
             return False
@@ -1211,9 +1253,9 @@ class SpiderFoot:
 
         # Never proxy RFC1918 addresses on the LAN or the local network interface
         if self.validIP(host):
-            if netaddr.IPAddress(host).is_private():
-                return False
-            if netaddr.IPAddress(host).is_loopback():
+            ip_obj = netaddr.IPAddress(host)
+            # Only fallback manual checks for local/loopback IP
+            if ip_obj in netaddr.IPNetwork('127.0.0.0/8') or ip_obj in netaddr.IPNetwork('10.0.0.0/8') or ip_obj in netaddr.IPNetwork('172.16.0.0/12') or ip_obj in netaddr.IPNetwork('192.168.0.0/16'):
                 return False
 
         # Never proxy local hostnames
@@ -1231,34 +1273,35 @@ class SpiderFoot:
     def fetchUrl(
         self,
         url: str,
-        cookies: str = None,
+        cookies: typing.Optional[typing.Union[str, dict]] = None,
         timeout: int = 30,
-        useragent: str = "SpiderFoot",
-        headers: dict = None,
+        useragent: typing.Optional[typing.Union[str, list]] = "SpiderFoot",
+        headers: typing.Optional[dict] = None,
         noLog: bool = False,
-        postData: str = None,
+        postData: typing.Optional[typing.Union[str, bytes, dict]] = None,
         disableContentEncoding: bool = False,
-        sizeLimit: int = None,
+        sizeLimit: typing.Optional[int] = None,
         headOnly: bool = False,
         verify: bool = True
-    ) -> dict:
+    ) -> typing.Optional[dict]:
         """Fetch a URL and return the HTTP response as a dictionary.
 
         Args:
             url (str): URL to fetch
-            cookies (str): cookies
+            cookies (str|dict|None): cookies
             timeout (int): timeout
-            useragent (str): user agent header
-            headers (dict): headers
+            useragent (str|list|None): user agent header
+            headers (dict|None): headers
             noLog (bool): do not log request
-            postData (str): HTTP POST data
+            postData (str|bytes|dict|None): HTTP POST data
             disableContentEncoding (bool): do not UTF-8 encode response body
-            sizeLimit (int): size threshold
+            sizeLimit (int|None): size threshold
             headOnly (bool): use HTTP HEAD method
             verify (bool): use HTTPS SSL/TLS verification
 
+
         Returns:
-            dict: HTTP response
+            Optional[dict]: HTTP response or None on error
         """
         if not url:
             return None
@@ -1279,26 +1322,29 @@ class SpiderFoot:
             self.debug(f"Could not parse URL: {url}")
             return None
 
-        if parsed_url.scheme != 'http' and parsed_url.scheme != 'https':
+        if parsed_url.scheme not in ('http', 'https'):
             self.debug(f"Invalid URL scheme for URL: {url}")
             return None
 
         request_log = []
 
-        proxies = dict()
+        proxies: typing.Optional[dict[str, str]] = None
         if self.useProxyForUrl(url):
-            proxies = {
-                'http': self.socksProxy,
-                'https': self.socksProxy,
-            }
+            if self.socksProxy:
+                proxies = {
+                    'http': self.socksProxy,
+                    'https': self.socksProxy,
+                }
+
 
         header = dict()
         btime = time.time()
 
         if isinstance(useragent, list):
             header['User-Agent'] = random.SystemRandom().choice(useragent)
-        else:
+        elif useragent is not None:
             header['User-Agent'] = useragent
+        # else: don't set User-Agent if useragent is None
 
         # Add custom headers
         if isinstance(headers, dict):
@@ -1306,7 +1352,7 @@ class SpiderFoot:
                 header[k] = str(headers[k])
 
         request_log.append(f"proxy={self.socksProxy}")
-        request_log.append(f"user-agent={header['User-Agent']}")
+        request_log.append(f"user-agent={header.get('User-Agent')}")
         request_log.append(f"timeout={timeout}")
         request_log.append(f"cookies={cookies}")
 
@@ -1325,26 +1371,24 @@ class SpiderFoot:
                     timeout=timeout
                 )
             except Exception as e:
-                if noLog:
-                    self.debug(f"Unexpected exception ({e}) occurred fetching (HEAD only) URL: {url}", exc_info=True)
-                else:
-                    self.error(f"Unexpected exception ({e}) occurred fetching (HEAD only) URL: {url}", exc_info=True)
-
+                self.error(f"Unexpected exception ({e}) occurred fetching (HEAD only) URL: {url}")
                 return result
 
             size = int(hdr.headers.get('content-length', 0))
-            newloc = hdr.headers.get('location', url).strip()
-
-            # Relative re-direct
-            if newloc.startswith("/") or newloc.startswith("../"):
-                newloc = SpiderFootHelpers.urlBaseUrl(url) + newloc
-            result['realurl'] = newloc
+            newloc = hdr.headers.get('location', url)
+            if newloc:
+                newloc = newloc.strip()
+                base_url = SpiderFootHelpers.urlBaseUrl(url)
+                # Relative re-direct
+                if (newloc.startswith("/") or newloc.startswith("../")) and base_url:
+                    newloc = base_url + newloc
+                result['realurl'] = newloc
             result['code'] = str(hdr.status_code)
 
             if headOnly:
                 return result
 
-            if size > sizeLimit:
+            if sizeLimit is not None and size > sizeLimit:
                 return result
 
             if result['realurl'] != url:
@@ -1365,30 +1409,27 @@ class SpiderFoot:
                     result['realurl'] = hdr.headers.get('location', result['realurl'])
                     result['code'] = str(hdr.status_code)
 
-                    if size > sizeLimit:
+                    if sizeLimit is not None and size > sizeLimit:
                         return result
 
                 except Exception as e:
-                    if noLog:
-                        self.debug(f"Unexpected exception ({e}) occurred fetching (HEAD only) URL: {result['realurl']}", exc_info=True)
-                    else:
-                        self.error(f"Unexpected exception ({e}) occurred fetching (HEAD only) URL: {result['realurl']}", exc_info=True)
-
+                    self.error(f"Unexpected exception ({e}) occurred fetching (HEAD only) URL: {result['realurl']}")
                     return result
 
         try:
-            if postData:
+            if postData is not None:
                 if noLog:
                     self.debug(f"Fetching (POST): {self.removeUrlCreds(url)} ({', '.join(request_log)})")
                 else:
                     self.info(f"Fetching (POST): {self.removeUrlCreds(url)} ({', '.join(request_log)})")
+                req_cookies = cookies if isinstance(cookies, dict) else None
                 res = self.getSession().post(
                     url,
                     data=postData,
                     headers=header,
                     proxies=proxies,
                     allow_redirects=True,
-                    cookies=cookies,
+                    cookies=req_cookies,
                     timeout=timeout,
                     verify=verify
                 )
@@ -1397,12 +1438,13 @@ class SpiderFoot:
                     self.debug(f"Fetching (GET): {self.removeUrlCreds(url)} ({', '.join(request_log)})")
                 else:
                     self.info(f"Fetching (GET): {self.removeUrlCreds(url)} ({', '.join(request_log)})")
+                req_cookies = cookies if isinstance(cookies, dict) else None
                 res = self.getSession().get(
                     url,
                     headers=header,
                     proxies=proxies,
                     allow_redirects=True,
-                    cookies=cookies,
+                    cookies=req_cookies,
                     timeout=timeout,
                     verify=verify
                 )
@@ -1410,11 +1452,7 @@ class SpiderFoot:
             self.error(f"Failed to connect to {url}: {e}")
             return result
         except Exception as e:
-            if noLog:
-                self.debug(f"Unexpected exception ({e}) occurred fetching URL: {url}", exc_info=True)
-            else:
-                self.error(f"Unexpected exception ({e}) occurred fetching URL: {url}", exc_info=True)
-
+            self.error(f"Unexpected exception ({e}) occurred fetching URL: {url}")
             return result
 
         try:
@@ -1426,7 +1464,7 @@ class SpiderFoot:
                 result['headers'][str(header).lower()] = str(value)
 
             # Sometimes content exceeds the size limit after decompression
-            if sizeLimit and len(res.content) > sizeLimit:
+            if sizeLimit is not None and len(res.content) > sizeLimit:
                 self.debug(f"Content exceeded size limit ({sizeLimit}), so returning no data just headers")
                 return result
 
@@ -1467,7 +1505,7 @@ class SpiderFoot:
                     result["content"] = res.content
 
         except Exception as e:
-            self.error(f"Unexpected exception ({e}) occurred parsing response for URL: {url}", exc_info=True)
+            self.error(f"Unexpected exception ({e}) occurred parsing response for URL: {url}")
             result['content'] = None
             result['status'] = str(e)
 
@@ -1496,7 +1534,7 @@ class SpiderFoot:
 
         return True
 
-    def cveInfo(self, cveId: str, sources: str = "circl,nist") -> (str, str):
+    def cveInfo(self, cveId: str, sources: str = "circl,nist") -> typing.Tuple[typing.Optional[str], typing.Optional[str]]:
         """Look up a CVE ID for more information in the first available source.
 
         Args:
@@ -1506,14 +1544,14 @@ class SpiderFoot:
         Returns:
             (str, str): Appropriate event type and descriptive text
         """
-        sources = sources.split(",")
+        sources_list = sources.split(",") if isinstance(sources, str) else sources
         # VULNERABILITY_GENERAL is the generic type in case we don't have
         # a real/mappable CVE.
         eventType = "VULNERABILITY_GENERAL"
 
         def cveRating(score: int) -> str:
             if score == "Unknown":
-                return None
+                return "UNKNOWN"
             if score >= 0 and score <= 3.9:
                 return "LOW"
             if score >= 4.0 and score <= 6.9:
@@ -1522,9 +1560,9 @@ class SpiderFoot:
                 return "HIGH"
             if score >= 9.0:
                 return "CRITICAL"
-            return None
+            return "UNKNOWN"
 
-        for source in sources:
+        for source in sources_list:
             jsondata = self.cacheGet(f"{source}-{cveId}", 86400)
 
             if not jsondata:
@@ -1579,7 +1617,7 @@ class SpiderFoot:
 
         return (eventType, f"{cveId}\nScore: Unknown\nDescription: Unknown")
 
-    def googleIterate(self, searchString: str, opts: dict = None) -> dict:
+    def googleIterate(self, searchString: str, opts: typing.Optional[dict] = None) -> typing.Optional[dict]:
         """Request search results from the Google API.
 
         Will return a dict:
@@ -1616,17 +1654,17 @@ class SpiderFoot:
             timeout=opts["timeout"],
         )
 
-        if response['code'] != '200':
+        if not response or response.get('code') != '200':
             self.error("Failed to get a valid response from the Google API")
             return None
 
         try:
-            response_json = json.loads(response['content'])
+            response_json = json.loads(response['content']) if response and response.get('content') else None
         except ValueError:
             self.error("The key 'content' in the Google API response doesn't contain valid JSON.")
             return None
 
-        if "items" not in response_json:
+        if not response_json or "items" not in response_json:
             return None
 
         # We attempt to make the URL params look as authentically human as possible
@@ -1643,7 +1681,7 @@ class SpiderFoot:
             "webSearchUrl": f"https://www.google.com/search?q={search_string}&{params}"
         }
 
-    def bingIterate(self, searchString: str, opts: dict = None) -> dict:
+    def bingIterate(self, searchString: str, opts: typing.Optional[dict] = None) -> typing.Optional[dict]:
         """Request search results from the Bing API.
 
         Will return a dict:
@@ -1662,7 +1700,7 @@ class SpiderFoot:
             opts (dict): TBD
 
         Returns:
-            dict: Search results as {"webSearchUrl": "URL", "urls": [results]}
+            Optional[dict]: Search results as {"webSearchUrl": "URL", "urls": [results]}, or None on error
         """
         if not searchString:
             return None
@@ -1670,33 +1708,45 @@ class SpiderFoot:
         if opts is None:
             opts = {}
 
+        # Use .get() for all dict accesses to avoid KeyError
+        count = opts.get("count", 10)
+        timeout = opts.get("timeout", 10)
+        useragent = opts.get("useragent", "SpiderFoot")
+        api_key = opts.get("api_key")
+        if not api_key:
+            self.error("No Bing API key provided in opts['api_key']")
+            return None
+
         search_string = searchString.replace(" ", "%20")
         params = urllib.parse.urlencode({
             "responseFilter": "Webpages",
-            "count": opts["count"],
+            "count": count,
         })
 
         response = self.fetchUrl(
             f"https://api.cognitive.microsoft.com/bing/v7.0/search?q={search_string}&{params}",
-            timeout=opts["timeout"],
-            useragent=opts["useragent"],
-            headers={"Ocp-Apim-Subscription-Key": opts["api_key"]},
+            timeout=timeout,
+            useragent=useragent,
+            headers={"Ocp-Apim-Subscription-Key": api_key},
         )
 
-        if response['code'] != '200':
+        if not response or response.get('code') != '200':
             self.error("Failed to get a valid response from the Bing API")
             return None
 
         try:
-            response_json = json.loads(response['content'])
+            response_json = json.loads(response.get('content', '{}'))
         except ValueError:
             self.error("The key 'content' in the bing API response doesn't contain valid JSON.")
             return None
 
-        if ("webPages" in response_json and "value" in response_json["webPages"] and "webSearchUrl" in response_json["webPages"]):
+        web_pages = response_json.get("webPages", {})
+        value = web_pages.get("value")
+        web_search_url = web_pages.get("webSearchUrl")
+        if value and web_search_url:
             return {
-                "urls": [result["url"] for result in response_json["webPages"]["value"]],
-                "webSearchUrl": response_json["webPages"]["webSearchUrl"],
+                "urls": [result.get("url") for result in value if result.get("url")],
+                "webSearchUrl": web_search_url,
             }
 
         return None

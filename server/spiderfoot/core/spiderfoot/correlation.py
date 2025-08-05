@@ -46,7 +46,7 @@ class SpiderFootCorrelator:
         "rawYaml": {}
     }
 
-    def __init__(self, dbh: SpiderFootDb, ruleset: dict, scanId: str = None) -> None:
+    def __init__(self, dbh: SpiderFootDb, ruleset: dict, scanId: str = "") -> None:
         """Initialize SpiderFoot correlator engine with scan ID and ruleset.
 
         Args:
@@ -111,7 +111,9 @@ class SpiderFootCorrelator:
         Raises:
             ValueError: correlation rules cannot be run on specified scanId
         """
-        scan_instance = self.dbh.scanInstanceGet(self.scanId)
+        if not self.dbh or not self.scanId:
+            raise ValueError("Database handle or scanId is not set.")
+        scan_instance = self.dbh.scanInstanceGet(str(self.scanId))
         if not scan_instance:
             raise ValueError(f"Invalid scan ID. Scan {self.scanId} does not exist.")
 
@@ -125,7 +127,10 @@ class SpiderFootCorrelator:
                 self.log.debug(f"No results for rule {rule['id']}.")
                 continue
 
-            self.log.info(f"Rule {rule['id']} returned {len(results.keys())} results.")
+            if isinstance(results, dict):
+                self.log.info(f"Rule {rule['id']} returned {len(results.keys())} results.")
+            elif isinstance(results, list):
+                self.log.info(f"Rule {rule['id']} returned {len(results)} results.")
 
             for result in results:
                 self.create_correlation(rule, results[result])
@@ -149,15 +154,15 @@ class SpiderFootCorrelator:
 
         if "." in matchrule['field']:
             self.log.error("The first collection must either be data, type or module.")
-            return None
+            return {}
 
         if matchrule['field'] == "data" and matchrule['type'] == "regex":
             self.log.error("The first collection cannot use regex on data.")
-            return None
+            return {}
 
         if matchrule['field'] == "module" and matchrule['method'] != 'exact':
             self.log.error("Collection based on module names doesn't support regex.")
-            return None
+            return {}
 
         # Build up the event type part of the query
         if matchrule['field'] == "type":
@@ -171,6 +176,8 @@ class SpiderFootCorrelator:
                     regexps = matchrule['value']
 
                 for r in regexps:
+                    if not self.types:
+                        return {}
                     for t in self.types:
                         if re.search(r, t[1]):
                             criterias['eventType'].append(t[1])
@@ -183,13 +190,15 @@ class SpiderFootCorrelator:
 
                 for m in matches:
                     matched = False
-                    for t in self.types:
-                        if t[1] == m:
-                            matched = True
-                            criterias['eventType'].append(t[1])
-                    if not matched:
-                        self.log.error(f"Invalid type specified: {m}")
-                        return None
+        if not self.types:
+            return {}
+        for t in self.types:
+            if t[1] == m:
+                matched = True
+                criterias['eventType'].append(t[1])
+        if not matched:
+            self.log.error(f"Invalid type specified: {m}")
+            return {}
 
         # Match by module(s)
         if matchrule['field'] == "module":
@@ -232,7 +241,9 @@ class SpiderFootCorrelator:
         for chunk in event_chunks:
             # Get sources
             self.log.debug(f"Getting sources for {len(chunk)} events")
-            source_data = self.dbh.scanElementSourcesDirect(self.scanId, chunk)
+            if not self.dbh or not self.scanId:
+                continue
+            source_data = self.dbh.scanElementSourcesDirect(str(self.scanId), chunk)
             for row in source_data:
                 events[row[8]]['source'].append({
                     'type': row[15],
@@ -259,7 +270,9 @@ class SpiderFootCorrelator:
         for chunk in event_chunks:
             # Get children
             self.log.debug(f"Getting children for {len(chunk)} events")
-            child_data = self.dbh.scanResultEvent(self.scanId, sourceId=chunk)
+            if not self.dbh or not self.scanId:
+                continue
+            child_data = self.dbh.scanResultEvent(str(self.scanId), sourceId=chunk)
             for row in child_data:
                 events[row[9]]['child'].append({
                     'type': row[4],
@@ -312,10 +325,14 @@ class SpiderFootCorrelator:
                 self.log.debug("Fetching data in chunks")
                 for chunk in chunks:
                     self.log.debug(f"chunk size: {len(chunk)}")
-                    entity_data.extend(self.dbh.scanElementSourcesDirect(self.scanId, chunk))
+                    if not self.dbh or not self.scanId:
+                        continue
+                    entity_data.extend(self.dbh.scanElementSourcesDirect(str(self.scanId), chunk))
             else:
                 self.log.debug(f"fetching sources for {len(entity_missing)} items")
-                entity_data = self.dbh.scanElementSourcesDirect(self.scanId, list(entity_missing.keys()))
+                if not self.dbh or not self.scanId:
+                    continue
+                entity_data = self.dbh.scanElementSourcesDirect(str(self.scanId), list(entity_missing.keys()))
 
             for entity_candidate in entity_data:
                 event_id = entity_missing[entity_candidate[8]]
@@ -357,10 +374,12 @@ class SpiderFootCorrelator:
         query_args = self.build_db_criteria(matchrule)
         if not query_args:
             self.log.error(f"Error encountered parsing match rule: {matchrule}.")
-            return None
+            return []
 
         query_args['instanceId'] = self.scanId
         self.log.debug(f"db query: {query_args}")
+        if not self.dbh:
+            return []
         for row in self.dbh.scanResultEvent(**query_args):
             events[row[8]] = {
                 'type': row[4],
@@ -481,7 +500,9 @@ class SpiderFootCorrelator:
         # Go through each event, remove it if we shouldn't keep it
         # according to the match rule patterns.
         for event in events[:]:
-            if not self.event_keep(event, field, patterns, matchrule['method']):
+            # event_keep expects patterns as str, but we pass a list, so join if needed
+            pat_arg = patterns if isinstance(patterns, str) else ",".join(patterns)
+            if not self.event_keep(event, field, pat_arg, matchrule['method']):
                 self.log.debug(f"removing {event} because of {field}")
                 events.remove(event)
 
@@ -543,7 +564,7 @@ class SpiderFootCorrelator:
         """
         if 'field' not in rule:
             self.log.error(f"Unable to find field definition for aggregation in {rule['id']}")
-            return False
+            return {}
 
         def event_strip(event: dict, field: str, value: str) -> None:
             """Strip sub fields that don't match value.
@@ -657,6 +678,7 @@ class SpiderFootCorrelator:
             for event in buckets[bucket]:
                 if event['_collection'] == 0:
                     reference.update(self.event_extract(event, rule['field']))
+        reference = list(reference)
 
         for bucket in list(buckets.keys()):
             pluszerocount = 0
@@ -837,7 +859,7 @@ class SpiderFootCorrelator:
                 if e:
                     entity = True
 
-        return children, source, entity
+        return [children, source, entity]
 
     def process_rule(self, rule: dict) -> list:
         """Work through all the components of the rule to produce a final
@@ -861,7 +883,8 @@ class SpiderFootCorrelator:
         fetchChildren, fetchSources, fetchEntities = self.analyze_rule_scope(rule)
 
         # Go through collections and collect the data from the DB
-        for collectIndex, c in enumerate(rule.get('collections')):
+        collections = rule.get('collections') or []
+        for collectIndex, c in enumerate(collections):
             events.extend(self.collect_events(c['collect'],
                           fetchChildren,
                           fetchSources,
@@ -870,7 +893,7 @@ class SpiderFootCorrelator:
 
         if not events:
             self.log.debug("No events found after going through collections.")
-            return None
+            return []
 
         self.log.debug(f"{len(events)} proceeding to next stage: aggregation.")
         self.log.debug(f"{events} ready to be processed.")
@@ -881,7 +904,7 @@ class SpiderFootCorrelator:
             buckets = self.aggregate_events(rule['aggregation'], events)
             if not buckets:
                 self.log.debug("no buckets found after aggregation")
-                return None
+                return []
         else:
             buckets = {'default': events}
 
@@ -892,6 +915,9 @@ class SpiderFootCorrelator:
                 # and empty it if the analysis doesn't yield results.
                 self.analyze_events(method, buckets)
 
+        # Return as a list for type compatibility
+        if isinstance(buckets, dict):
+            return list(buckets.values())
         return buckets
 
     def build_correlation_title(self, rule: dict, data: list) -> str:
@@ -947,7 +973,10 @@ class SpiderFootCorrelator:
         for e in data:
             eventIds.append(e['id'])
 
-        corrId = self.dbh.correlationResultCreate(self.scanId,
+        if not self.dbh or not self.scanId:
+            self.log.error(f"Database handle or scanId not set for correlation creation.")
+            return False
+        corrId = self.dbh.correlationResultCreate(str(self.scanId),
                                                   rule['id'],
                                                   rule['meta']['name'],
                                                   rule['meta']['description'],

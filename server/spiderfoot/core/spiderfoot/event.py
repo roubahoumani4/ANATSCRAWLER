@@ -22,18 +22,18 @@ class SpiderFootEvent():
         __id (str): Unique ID of the event, generated using eventType, generated, module, and a random integer
     """
 
-    _generated = None
-    _eventType = None
-    _confidence = None
-    _visibility = None
-    _risk = None
-    _module = None
-    _data = None
-    _sourceEvent = None
-    _sourceEventHash = None
-    _moduleDataSource = None
-    _actualSource = None
-    __id = None
+    _generated: float
+    _eventType: str
+    _confidence: int
+    _visibility: int
+    _risk: int
+    _module: str
+    _data: str
+    _sourceEvent: 'SpiderFootEvent' = None  # type: ignore
+    _sourceEventHash: str = ''
+    _moduleDataSource: str = ''
+    _actualSource: str = ''
+    __id: str = ''
 
     def __init__(self, eventType: str, data: str, module: str, sourceEvent: 'SpiderFootEvent') -> None:
         """Initialize SpiderFoot event object.
@@ -61,7 +61,7 @@ class SpiderFootEvent():
         Returns:
             float: timestamp of event creation time
         """
-        return self._generated
+        return self._generated if self._generated is not None else 0.0
 
     @property
     def eventType(self) -> str:
@@ -70,7 +70,7 @@ class SpiderFootEvent():
         Returns:
             str: event type
         """
-        return self._eventType
+        return self._eventType if self._eventType is not None else ''
 
     @property
     def confidence(self) -> int:
@@ -79,7 +79,7 @@ class SpiderFootEvent():
         Returns:
             int: confidence score (0 to 100).
         """
-        return self._confidence
+        return self._confidence if self._confidence is not None else 0
 
     @property
     def visibility(self) -> int:
@@ -88,7 +88,7 @@ class SpiderFootEvent():
         Returns:
             int: visibility score (0 to 100).
         """
-        return self._visibility
+        return self._visibility if self._visibility is not None else 0
 
     @property
     def risk(self) -> int:
@@ -97,15 +97,15 @@ class SpiderFootEvent():
         Returns:
             int: risk score (0 to 100).
         """
-        return self._risk
+        return self._risk if self._risk is not None else 0
 
     @property
     def module(self) -> str:
-        return self._module
+        return self._module if self._module is not None else ''
 
     @property
     def data(self) -> str:
-        return self._data
+        return self._data if self._data is not None else ''
 
     @property
     def sourceEvent(self) -> 'SpiderFootEvent':
@@ -113,15 +113,15 @@ class SpiderFootEvent():
 
     @property
     def sourceEventHash(self) -> str:
-        return self._sourceEventHash
+        return self._sourceEventHash if self._sourceEventHash is not None else ''
 
     @property
     def actualSource(self) -> str:
-        return self._actualSource
+        return self._actualSource if self._actualSource is not None else ''
 
     @property
     def moduleDataSource(self) -> str:
-        return self._moduleDataSource
+        return self._moduleDataSource if self._moduleDataSource is not None else ''
 
     @property
     def hash(self) -> str:
@@ -132,7 +132,8 @@ class SpiderFootEvent():
         """
         if self.eventType == "ROOT":
             return "ROOT"
-
+        if not self.__id:
+            return ''
         digestStr = self.__id.encode('raw_unicode_escape')
         return hashlib.sha256(digestStr).hexdigest()
 
@@ -263,7 +264,7 @@ class SpiderFootEvent():
         # "ROOT" is a special "hash" reserved for elements with no parent,
         # such as targets provided via the web UI or CLI.
         if self.eventType == "ROOT":
-            self._sourceEvent = None
+            self._sourceEvent = None  # type: ignore
             self._sourceEventHash = "ROOT"
             return
 
