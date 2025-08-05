@@ -13,10 +13,17 @@
 
 import json
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
 
 
 class sfp_neutrinoapi(SpiderFootPlugin):
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     meta = {
         'name': "NeutrinoAPI",
@@ -60,14 +67,12 @@ class sfp_neutrinoapi(SpiderFootPlugin):
         'timeout': "Query timeout, in seconds."
     }
 
-    results = None
-    errorState = False
 
     # Initialize module and module options
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
         self.__dataSource__ = "NeutrinoAPI"
-        self.results = self.tempStorage()
+        self.results = dict()
         self.errorState = False
 
         for opt in list(userOpts.keys()):

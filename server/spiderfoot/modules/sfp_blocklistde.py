@@ -12,7 +12,8 @@
 
 from netaddr import IPAddress, IPNetwork
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_blocklistde(SpiderFootPlugin):
@@ -56,12 +57,15 @@ class sfp_blocklistde(SpiderFootPlugin):
         'checksubnets': "Check if any malicious IPs are found within the same subnet of the target?"
     }
 
-    results = None
-    errorState = False
+
+    def __init__(self):
+        super().__init__()
+        self.results = {}
+        self.errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = {}
         self.errorState = False
 
         for opt in list(userOpts.keys()):

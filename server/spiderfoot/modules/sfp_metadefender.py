@@ -13,7 +13,9 @@
 import json
 import time
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
 
 
 class sfp_metadefender(SpiderFootPlugin):
@@ -58,15 +60,17 @@ class sfp_metadefender(SpiderFootPlugin):
         'delay': 'Delay between requests, in seconds.'
     }
 
-    results = None
-    errorState = False
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     # Initialize module and module options
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.errorState = False
-
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 

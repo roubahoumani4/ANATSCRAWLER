@@ -16,10 +16,18 @@ from pathlib import Path
 from shutil import which
 from subprocess import PIPE, Popen, TimeoutExpired
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin, SpiderFootHelpers
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.helpers import SpiderFootHelpers
+
 
 
 class sfp_tool_dnstwist(SpiderFootPlugin):
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     meta = {
         'name': "Tool - DNSTwist",
@@ -52,15 +60,13 @@ class sfp_tool_dnstwist(SpiderFootPlugin):
         'skipwildcards': "Skip TLDs and sub-TLDs that have wildcard DNS."
     }
 
-    results = None
-    errorState = False
+    # results and errorState are now instance-level, initialized in __init__
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.errorState = False
         self.__dataSource__ = "DNS"
-
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 
@@ -140,7 +146,10 @@ class sfp_tool_dnstwist(SpiderFootPlugin):
                 content = stdout
             else:
                 self.error("Unable to read DNSTwist content.")
-                self.debug("Error running DNSTwist: " + stderr + ", " + stdout)
+                # Defensive: decode bytes for error message
+                err_str = stderr.decode(errors='replace') if isinstance(stderr, bytes) else str(stderr)
+                out_str = stdout.decode(errors='replace') if isinstance(stdout, bytes) else str(stdout)
+                self.debug("Error running DNSTwist: " + err_str + ", " + out_str)
                 return
 
             # For each line in output, generate a SIMILARDOMAIN event
@@ -151,7 +160,8 @@ class sfp_tool_dnstwist(SpiderFootPlugin):
                     domain = r.get('domain-name')
                     if not domain:
                         domain = r.get('domain')
-                    if self.getTarget().matches(domain, includeParents=True):
+                    target = self.getTarget()
+                    if hasattr(target, "matches") and not isinstance(target, str) and target.matches(domain, includeParents=True):
                         continue
 
                     evt = SpiderFootEvent("SIMILARDOMAIN", domain,

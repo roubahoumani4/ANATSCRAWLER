@@ -15,7 +15,8 @@ import random
 import threading
 import time
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_digitaloceanspace(SpiderFootPlugin):
@@ -50,9 +51,12 @@ class sfp_digitaloceanspace(SpiderFootPlugin):
         "_maxthreads": "Maximum threads"
     }
 
-    results = None
-    s3results = dict()
-    lock = None
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.s3results = dict()
+        self.lock = threading.Lock()
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc

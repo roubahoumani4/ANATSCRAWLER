@@ -15,7 +15,9 @@
 
 import re
 
-from spiderfoot import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.helpers import SpiderFootHelpers
 
 
 class sfp_crossref(SpiderFootPlugin):
@@ -36,11 +38,14 @@ class sfp_crossref(SpiderFootPlugin):
         "checkbase": "Check the base URL of the potential affiliate if no direct affiliation found?"
     }
 
-    fetched = None
+
+    def __init__(self):
+        super().__init__()
+        self.fetched = dict()
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.fetched = self.tempStorage()
+        self.fetched = dict()
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
@@ -78,9 +83,21 @@ class sfp_crossref(SpiderFootPlugin):
         fqdn = self.sf.urlFQDN(url)
 
         # We are only interested in external sites for the crossref
-        if self.getTarget().matches(fqdn):
-            self.debug(f"Ignoring {url} as not external")
-            return
+        target = self.getTarget()
+        # Defensive: only call matches if it exists and is not a string
+        if hasattr(target, 'matches') and not isinstance(target, str):
+            try:
+                if target.matches(fqdn):
+                    self.debug(f"Ignoring {url} as not external")
+                    return
+            except Exception:
+                if fqdn == str(target):
+                    self.debug(f"Ignoring {url} as not external")
+                    return
+        else:
+            if fqdn == str(target):
+                self.debug(f"Ignoring {url} as not external")
+                return
 
         if eventData in self.fetched:
             self.debug(f"Ignoring {url} as already tested")
@@ -107,10 +124,20 @@ class sfp_crossref(SpiderFootPlugin):
             return
 
         matched = False
-        for name in self.getTarget().getNames():
+        target = self.getTarget()
+        names = []
+        if hasattr(target, 'getNames') and not isinstance(target, str):
+            try:
+                names = target.getNames()
+            except Exception:
+                names = [str(target)]
+        else:
+            names = [str(target)]
+
+        for name in names:
             # Search for mentions of our host/domain in the external site's data
             pat = re.compile(
-                r"([\.\'\/\"\ ]" + re.escape(name) + r"[\.\'\/\"\ ])",
+                r"([\.\'/\"\ ]" + re.escape(name) + r"[\.\'/\"\ ])",
                 re.IGNORECASE
             )
             matches = re.findall(pat, str(res['content']))
@@ -139,9 +166,19 @@ class sfp_crossref(SpiderFootPlugin):
                 )
 
                 if res['content'] is not None:
-                    for name in self.getTarget().getNames():
+                    target = self.getTarget()
+                    names = []
+                    if hasattr(target, 'getNames') and not isinstance(target, str):
+                        try:
+                            names = target.getNames()
+                        except Exception:
+                            names = [str(target)]
+                    else:
+                        names = [str(target)]
+
+                    for name in names:
                         pat = re.compile(
-                            r"([\.\'\/\"\ ]" + re.escape(name) + r"[\'\/\"\ ])",
+                            r"([\.\'/\"\ ]" + re.escape(name) + r"[\'/\"\ ])",
                             re.IGNORECASE
                         )
                         matches = re.findall(pat, str(res['content']))

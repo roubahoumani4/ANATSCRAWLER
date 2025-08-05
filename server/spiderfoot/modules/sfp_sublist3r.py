@@ -13,7 +13,8 @@
 
 import json
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_sublist3r(SpiderFootPlugin):
@@ -36,12 +37,15 @@ class sfp_sublist3r(SpiderFootPlugin):
     # Option descriptions
     optdescs = {}
 
-    results = None
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
         self.debug("Setting up sfp_sublist3r")
-        self.results = self.tempStorage()
+        self.results = dict()
         self.opts.update(userOpts)
 
     def watchedEvents(self):
@@ -91,14 +95,14 @@ class sfp_sublist3r(SpiderFootPlugin):
         target = self.getTarget()
         eventDataHash = self.sf.hashstring(query)
         if eventDataHash in self.results or \
-                (target.matches(query, includeParents=True) and not
+                (hasattr(target, "matches") and not isinstance(target, str) and target.matches(query, includeParents=True) and not
                  target.matches(query, includeChildren=False)):
             self.debug(f"Skipping already-processed event, {event.eventType}, from {event.module}")
             return
         self.results[eventDataHash] = True
 
         for hostname in self.query(query):
-            if target.matches(hostname, includeParents=True) and not \
+            if hasattr(target, "matches") and not isinstance(target, str) and target.matches(hostname, includeParents=True) and not \
                     target.matches(hostname, includeChildren=False):
                 self.sendEvent(event, hostname)
             else:

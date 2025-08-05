@@ -12,7 +12,9 @@
 
 from urllib.parse import urlparse
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin, SpiderFootHelpers
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.helpers import SpiderFootHelpers
 
 
 class sfp_sslcert(SpiderFootPlugin):
@@ -44,15 +46,14 @@ class sfp_sslcert(SpiderFootPlugin):
     # Be sure to completely clear any class variables in setup()
     # or you run the risk of data persisting between scan runs.
 
-    results = None
+
+    def __init__(self):
+        super(sfp_sslcert, self).__init__()
+        self.results = dict()
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
-
-        # Clear / reset any other class member variables here
-        # or you risk them persisting between threads.
-
+        self.results = dict()
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 
@@ -143,7 +144,8 @@ class sfp_sslcert(SpiderFootPlugin):
         for san in set(cert.get('altnames', list())):
             domain = san.replace("*.", "")
 
-            if self.getTarget().matches(domain, includeChildren=True):
+            target = self.getTarget()
+            if hasattr(target, "matches") and not isinstance(target, str) and target.matches(domain, includeChildren=True):
                 evt_type = 'INTERNET_NAME'
                 if self.opts['verify'] and not self.sf.resolveHost(domain) and not self.sf.resolveHost6(domain):
                     self.debug(f"Host {domain} could not be resolved")

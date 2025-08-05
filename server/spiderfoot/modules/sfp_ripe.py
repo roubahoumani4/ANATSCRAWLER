@@ -14,7 +14,8 @@
 import json
 import re
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_ripe(SpiderFootPlugin):
@@ -48,21 +49,23 @@ class sfp_ripe(SpiderFootPlugin):
     opts = {}
     optdescs = {}
 
-    results = None
-    currentEventSrc = None
-    memCache = None
-    nbreported = None
-    keywords = None
-    lastContent = None
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.currentEventSrc = None
+        self.memCache = dict()
+        self.nbreported = dict()
+        self.keywords = None
+        self.lastContent = None
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
-        self.memCache = self.tempStorage()
+        self.results = dict()
+        self.memCache = dict()
         self.currentEventSrc = None
-        self.nbreported = self.tempStorage()
+        self.nbreported = dict()
         self.lastContent = None
-
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 
@@ -250,13 +253,19 @@ class sfp_ripe(SpiderFootPlugin):
     # and the string supplied.
     def findName(self, string):
         # Simplest check to perform..
-        for n in self.getTarget().getNames():
+        target = self.getTarget()
+        names = []
+        if hasattr(target, "getNames") and not isinstance(target, str):
+            names = target.getNames()
+        else:
+            names = [str(target)]
+        for n in names:
             if n in string:
                 return True
 
         if self.keywords is None:
             self.keywords = self.sf.domainKeywords(
-                self.getTarget().getNames(),
+                names,
                 self.opts['_internettlds']
             )
 
@@ -357,8 +366,9 @@ class sfp_ripe(SpiderFootPlugin):
                     evt = SpiderFootEvent("NETBLOCK_OWNER", netblock, self.__name__, event)
                     self.notifyListeners(evt)
 
-            evt = SpiderFootEvent("RAW_RIR_DATA", self.lastContent, self.__name__, event)
-            self.notifyListeners(evt)
+            if self.lastContent is not None:
+                evt = SpiderFootEvent("RAW_RIR_DATA", self.lastContent, self.__name__, event)
+                self.notifyListeners(evt)
 
             return
 
@@ -373,8 +383,9 @@ class sfp_ripe(SpiderFootPlugin):
             if eventName in ["NETBLOCK_OWNER", "NETBLOCKV6_OWNER"] and self.ownsAs(asn):
                 asevt = SpiderFootEvent("BGP_AS_OWNER", asn, self.__name__, event)
                 self.notifyListeners(asevt)
-                evt = SpiderFootEvent("RAW_RIR_DATA", self.lastContent, self.__name__, event)
-                self.notifyListeners(evt)
+                if self.lastContent is not None:
+                    evt = SpiderFootEvent("RAW_RIR_DATA", self.lastContent, self.__name__, event)
+                    self.notifyListeners(evt)
             else:
                 asevt = SpiderFootEvent("BGP_AS_MEMBER", asn, self.__name__, event)
                 self.notifyListeners(asevt)

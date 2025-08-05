@@ -18,10 +18,16 @@ from datetime import datetime
 
 from netaddr import IPNetwork
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_xforce(SpiderFootPlugin):
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
+        self.cohostcount = 0
 
     meta = {
         'name': "XForce Exchange",
@@ -86,15 +92,12 @@ class sfp_xforce(SpiderFootPlugin):
         'verify': "Verify co-hosts are valid by checking if they still resolve to the shared IP.",
     }
 
-    results = None
-    errorState = False
-    cohostcount = 0
+
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.cohostcount = 0
-
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 
@@ -407,17 +410,18 @@ class sfp_xforce(SpiderFootPlugin):
                             continue
 
                     if not self.opts["cohostsamedomain"]:
-                        if self.getTarget().matches(host, includeParents=True):
-                            if self.sf.resolveHost(host) or self.sf.resolveHost6(host):
-                                e = SpiderFootEvent("INTERNET_NAME", host, self.__name__, event)
-                            else:
-                                e = SpiderFootEvent("INTERNET_NAME_UNRESOLVED", host, self.__name__, event)
-                            self.notifyListeners(e)
-
-                            if self.sf.isDomain(host, self.opts['_internettlds']):
-                                e = SpiderFootEvent("DOMAIN_NAME", host, self.__name__, event)
+                        if hasattr(self, '_currentTarget') and self._currentTarget and hasattr(self._currentTarget, 'matches'):
+                            if self._currentTarget.matches(host, includeParents=True):
+                                if self.sf.resolveHost(host) or self.sf.resolveHost6(host):
+                                    e = SpiderFootEvent("INTERNET_NAME", host, self.__name__, event)
+                                else:
+                                    e = SpiderFootEvent("INTERNET_NAME_UNRESOLVED", host, self.__name__, event)
                                 self.notifyListeners(e)
-                            continue
+
+                                if self.sf.isDomain(host, self.opts['_internettlds']):
+                                    e = SpiderFootEvent("DOMAIN_NAME", host, self.__name__, event)
+                                    self.notifyListeners(e)
+                                continue
 
                     e = SpiderFootEvent("CO_HOSTED_SITE", host, self.__name__, event)
                     self.notifyListeners(e)

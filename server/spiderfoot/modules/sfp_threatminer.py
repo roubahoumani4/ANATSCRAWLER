@@ -16,10 +16,21 @@ from datetime import datetime
 
 from netaddr import IPNetwork
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
+
 
 
 class sfp_threatminer(SpiderFootPlugin):
+
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.cohostcount = 0
+        self.reportedhosts = dict()
+        self.checkedips = dict()
 
     meta = {
         'name': "ThreatMiner",
@@ -75,9 +86,9 @@ class sfp_threatminer(SpiderFootPlugin):
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
-        self.reportedhosts = self.tempStorage()
-        self.checkedips = self.tempStorage()
+        self.results = dict()
+        self.reportedhosts = dict()
+        self.checkedips = dict()
         self.cohostcount = 0
 
         # Clear / reset any other class member variables here
@@ -133,10 +144,15 @@ class sfp_threatminer(SpiderFootPlugin):
 
         self.debug(f"Received event, {eventName}, from {srcModuleName}")
 
+        if not isinstance(self.results, dict):
+            self.results = dict()
+        if not isinstance(self.reportedhosts, dict):
+            self.reportedhosts = dict()
+        if not isinstance(self.checkedips, dict):
+            self.checkedips = dict()
         if eventData in self.results:
             self.debug(f"Skipping {eventData}, already checked.")
             return
-
         self.results[eventData] = True
 
         if eventName == 'NETBLOCK_OWNER':
@@ -161,7 +177,8 @@ class sfp_threatminer(SpiderFootPlugin):
         if eventName.startswith("NETBLOCK_"):
             for ipaddr in IPNetwork(eventData):
                 qrylist.append(str(ipaddr))
-                self.results[str(ipaddr)] = True
+                if isinstance(self.results, dict):
+                    self.results[str(ipaddr)] = True
 
         if eventName == "IP_ADDRESS":
             qrylist.append(eventData)
@@ -195,13 +212,15 @@ class sfp_threatminer(SpiderFootPlugin):
                 host = rec['domain']
                 if host == eventData:
                     continue
-                if self.getTarget().matches(host, includeParents=True):
+                target = self.getTarget()
+                if hasattr(target, "matches") and not isinstance(target, str) and target.matches(host, includeParents=True):
                     if self.opts['verify'] and not self.sf.resolveHost(host) and not self.sf.resolveHost6(host):
                         evt = SpiderFootEvent("INTERNET_NAME_UNRESOLVED", host, self.__name__, event)
                     else:
                         evt = SpiderFootEvent("INTERNET_NAME", host, self.__name__, event)
                     self.notifyListeners(evt)
-                    self.reportedhosts[host] = True
+                    if isinstance(self.reportedhosts, dict):
+                        self.reportedhosts[host] = True
                     continue
 
                 if self.cohostcount < self.opts['maxcohost']:
@@ -223,10 +242,10 @@ class sfp_threatminer(SpiderFootPlugin):
             for host in ret.get("results"):
                 self.debug("Found host results in ThreatMiner")
 
-                if host in self.reportedhosts:
+                if isinstance(self.reportedhosts, dict) and host in self.reportedhosts:
                     continue
-
-                self.reportedhosts[host] = True
+                if isinstance(self.reportedhosts, dict):
+                    self.reportedhosts[host] = True
 
                 if self.opts['verify'] and not self.sf.resolveHost(host) and not self.sf.resolveHost6(host):
                     evt = SpiderFootEvent("INTERNET_NAME_UNRESOLVED", host, self.__name__, event)

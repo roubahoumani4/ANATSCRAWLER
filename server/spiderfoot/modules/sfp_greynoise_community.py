@@ -16,7 +16,8 @@ import json
 import time
 from datetime import datetime
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_greynoise_community(SpiderFootPlugin):
@@ -62,16 +63,15 @@ class sfp_greynoise_community(SpiderFootPlugin):
     # Be sure to completely clear any class variables in setup()
     # or you run the risk of data persisting between scan runs.
 
-    results = None
-    errorState = False
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
-
-        # Clear / reset any other class member variables here
-        # or you risk them persisting between threads.
-
+        self.results = dict()
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 
@@ -162,8 +162,9 @@ class sfp_greynoise_community(SpiderFootPlugin):
                 self.notifyListeners(e)
 
                 # Only report meta data about the target, not affiliates
-                if ret.get("name", "unknown") != "unknown":
-                    e = SpiderFootEvent("COMPANY_NAME", ret.get("name"), self.__name__, event)
+                name_val = ret.get("name")
+                if name_val and name_val != "unknown":
+                    e = SpiderFootEvent("COMPANY_NAME", str(name_val), self.__name__, event)
                     self.notifyListeners(e)
 
                 if ret.get("classification"):
@@ -173,7 +174,10 @@ class sfp_greynoise_community(SpiderFootPlugin):
                         + "]\n - Classification: "
                         + ret.get("classification")
                     )
-                    descr += "\n<SFURL>https://viz.greynoise.io/ip/" + ret.get("ip") + "</SFURL>"
+                    ip_val = ret.get("ip")
+                    if ip_val is None:
+                        ip_val = ""
+                    descr += f"\n<SFURL>https://viz.greynoise.io/ip/{ip_val}</SFURL>"
                     e = SpiderFootEvent(evtType, descr, self.__name__, event)
                     self.notifyListeners(e)
 

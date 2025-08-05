@@ -12,7 +12,9 @@
 
 import string
 
-from spiderfoot import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.helpers import SpiderFootHelpers
 
 
 class sfp_binstring(SpiderFootPlugin):
@@ -47,17 +49,23 @@ class sfp_binstring(SpiderFootPlugin):
         'filterchars': "Ignore strings with these characters, as they may just be garbage ASCII."
     }
 
-    results = list()
-    d = None
-    n = None
-    fq = None
+
+    def __init__(self):
+        super().__init__()
+        self.results = list()
+        self.d = []
+        self.n = None
+        self.fq = None
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
         self.results = list()
         self.__dataSource__ = "Target Website"
 
-        self.d = SpiderFootHelpers.dictionaryWordsFromWordlists()
+        try:
+            self.d = SpiderFootHelpers.dictionaryWordsFromWordlists()
+        except Exception:
+            self.d = []
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]

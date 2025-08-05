@@ -11,7 +11,8 @@
 
 import re
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_h1nobbdde(SpiderFootPlugin):
@@ -46,15 +47,14 @@ class sfp_h1nobbdde(SpiderFootPlugin):
     # Be sure to completely clear any class variables in setup()
     # or you run the risk of data persisting between scan runs.
 
-    results = None
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
-
-        # Clear / reset any other class member variables here
-        # or you risk them persisting between threads.
-
+        self.results = dict()
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 

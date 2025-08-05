@@ -15,10 +15,18 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
 
 
 class sfp_viewdns(SpiderFootPlugin):
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
+        self.accum = list()
+        self.cohostcount = 0
 
     meta = {
         'name': "ViewDNS.info",
@@ -59,17 +67,14 @@ class sfp_viewdns(SpiderFootPlugin):
         "maxcohost": "Stop reporting co-hosted sites after this many are found, as it would likely indicate web hosting."
     }
 
-    results = None
-    errorState = False
-    accum = list()
-    cohostcount = 0
+
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.accum = list()
         self.cohostcount = 0
-
+        self.errorState = False
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 
@@ -185,7 +190,8 @@ class sfp_viewdns(SpiderFootPlugin):
             ident = "reverseip"
             valkey = "name"
         elif eventName == "PROVIDER_DNS":
-            if not self.getTarget().matches(eventData):
+            target = self.getTarget()
+            if not hasattr(target, "matches") or isinstance(target, str) or not target.matches(eventData):
                 self.debug(f"DNS provider {eventData} not related to target, skipping")
                 return
             ident = "reversens"

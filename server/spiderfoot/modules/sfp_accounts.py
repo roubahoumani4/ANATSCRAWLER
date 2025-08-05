@@ -18,7 +18,7 @@ import time
 from queue import Empty as QueueEmpty
 from queue import Queue
 
-from spiderfoot import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
+from core.sflib import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
 
 
 class sfp_accounts(SpiderFootPlugin):
@@ -52,23 +52,23 @@ class sfp_accounts(SpiderFootPlugin):
         "_maxthreads": "Maximum threads"
     }
 
-    results = None
+    results = {}
     reportedUsers = list()
     siteResults = dict()
     sites = list()
     errorState = False
     distrustedChecked = False
-    lock = None
+    lock = threading.Lock()
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = {}
         self.commonNames = list()
         self.reportedUsers = list()
         self.errorState = False
         self.distrustedChecked = False
         self.__dataSource__ = "Social Media"
-        self.lock = threading.Lock()
+        # self.lock is already initialized at class level
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
@@ -82,7 +82,7 @@ class sfp_accounts(SpiderFootPlugin):
             data = self.sf.fetchUrl(url, useragent="SpiderFoot")
 
             if data['content'] is None:
-                self.error(f"Unable to fetch {url}")
+                print(f"[sfp_accounts] Unable to fetch {url}")
                 self.errorState = True
                 return
 
@@ -92,7 +92,7 @@ class sfp_accounts(SpiderFootPlugin):
         try:
             self.sites = [site for site in json.loads(content)['sites'] if not site.get('valid', True) is False]
         except Exception as e:
-            self.error(f"Unable to parse social media accounts list: {e}")
+            print(f"[sfp_accounts] Unable to parse social media accounts list: {e}")
             self.errorState = True
             return
 
@@ -145,7 +145,7 @@ class sfp_accounts(SpiderFootPlugin):
 
         if self.opts['musthavename']:
             if name.lower() not in res['content'].lower():
-                self.debug(f"Skipping {site['name']} as username not mentioned.")
+                print(f"[sfp_accounts] Skipping {site['name']} as username not mentioned.")
                 with self.lock:
                     self.siteResults[retname] = False
                 return
@@ -170,7 +170,7 @@ class sfp_accounts(SpiderFootPlugin):
                     try:
                         self.checkSite(username, site)
                     except Exception as e:
-                        self.debug(f'Thread {threading.current_thread().name} exception: {e}')
+                        print(f"[sfp_accounts] Thread {threading.current_thread().name} exception: {e}")
             except QueueEmpty:
                 return
 
@@ -202,7 +202,7 @@ class sfp_accounts(SpiderFootPlugin):
 
         duration = time.monotonic() - startTime
         scanRate = len(sites) / duration
-        self.debug(f'Scan statistics: name={username}, count={len(self.siteResults)}, duration={duration:.2f}, rate={scanRate:.0f}')
+        print(f"[sfp_accounts] Scan statistics: name={username}, count={len(self.siteResults)}, duration={duration:.2f}, rate={scanRate:.0f}")
 
         return [site for site, found in self.siteResults.items() if found]
 
@@ -295,11 +295,11 @@ class sfp_accounts(SpiderFootPlugin):
         if self.errorState:
             return
 
-        self.debug(f"Received event, {eventName}, from {srcModuleName}")
+        print(f"[sfp_accounts] Received event, {eventName}, from {srcModuleName}")
 
         # Skip events coming from me unless they are USERNAME events
         if eventName != "USERNAME" and srcModuleName == "sfp_accounts":
-            self.debug(f"Ignoring {eventName}, from self.")
+            print(f"[sfp_accounts] Ignoring {eventName}, from self.")
             return
 
         if eventData in list(self.results.keys()):
@@ -328,7 +328,7 @@ class sfp_accounts(SpiderFootPlugin):
                     delsites = list()
                     for site in res:
                         sitename = site.split(" (Category:")[0]
-                        self.debug(f"Distrusting {sitename}")
+                        print(f"[sfp_accounts] Distrusting {sitename}")
                         delsites.append(sitename)
                     self.sites = [d for d in self.sites if d['name'] not in delsites]
                 else:
@@ -359,24 +359,25 @@ class sfp_accounts(SpiderFootPlugin):
 
         for user in set(users):
             if user in self.opts['_genericusers'].split(","):
-                self.debug(f"{user} is a generic account name, skipping.")
+                print(f"[sfp_accounts] {user} is a generic account name, skipping.")
                 continue
 
             if self.opts['ignorenamedict'] and user in self.commonNames:
-                self.debug(f"{user} is found in our name dictionary, skipping.")
+                print(f"[sfp_accounts] {user} is found in our name dictionary, skipping.")
                 continue
 
             if self.opts['ignoreworddict'] and user in self.words:
-                self.debug(f"{user} is found in our word dictionary, skipping.")
+                print(f"[sfp_accounts] {user} is found in our word dictionary, skipping.")
                 continue
 
             if user not in self.reportedUsers and eventData != user:
                 if len(user) < self.opts['usernamesize']:
-                    self.debug(f"{user} is too short, skipping.")
+                    print(f"[sfp_accounts] {user} is too short, skipping.")
                     continue
 
-                evt = SpiderFootEvent("USERNAME", user, self.__name__, event)
-                self.notifyListeners(evt)
+                evt = SpiderFootEvent("USERNAME", user, self.__class__.__name__, event)
+                if hasattr(self.sf, 'notifyListeners'):
+                    self.sf.notifyListeners(evt)
                 self.reportedUsers.append(user)
 
         # Only look up accounts when we've received a USERNAME event (possibly from
@@ -389,10 +390,11 @@ class sfp_accounts(SpiderFootPlugin):
                 evt = SpiderFootEvent(
                     "ACCOUNT_EXTERNAL_OWNED",
                     site,
-                    self.__name__,
+                    self.__class__.__name__,
                     event
                 )
-                self.notifyListeners(evt)
+                if hasattr(self.sf, 'notifyListeners'):
+                    self.sf.notifyListeners(evt)
 
             if self.opts['permutate']:
                 permutations = self.generatePermutations(user)
@@ -402,8 +404,9 @@ class sfp_accounts(SpiderFootPlugin):
                         evt = SpiderFootEvent(
                             "SIMILAR_ACCOUNT_EXTERNAL",
                             site,
-                            self.__name__,
+                            self.__class__.__name__,
                             event
                         )
-                        self.notifyListeners(evt)
+                        if hasattr(self.sf, 'notifyListeners'):
+                            self.sf.notifyListeners(evt)
 # End of sfp_accounts class

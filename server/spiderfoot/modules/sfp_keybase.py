@@ -18,7 +18,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_keybase(SpiderFootPlugin):
@@ -48,13 +49,15 @@ class sfp_keybase(SpiderFootPlugin):
     optdescs = {
     }
 
-    results = None
-    errorState = False
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
-
+        self.results = dict()
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 
@@ -67,7 +70,7 @@ class sfp_keybase(SpiderFootPlugin):
             "GEOINFO", "BITCOIN_ADDRESS", "PGP_KEY"
         ]
 
-    def query(self, selector: str, qry: str) -> str:
+    def query(self, selector: str, qry: str):
         """Search Keybase for a domain name or username.
 
         Args:
@@ -78,10 +81,10 @@ class sfp_keybase(SpiderFootPlugin):
             str: Search results as JSON string
         """
         if not selector:
-            return None
+            return []
 
         if not qry:
-            return None
+            return []
 
         params = {
             selector: qry.encode('raw_unicode_escape').decode("ascii", errors='replace')
@@ -102,27 +105,27 @@ class sfp_keybase(SpiderFootPlugin):
         # The actual response codes are stored in status tag of the response
         if res['code'] != '200':
             self.error(f"Unexpected reply from Keybase: {res['code']}")
-            return None
+            return []
 
         try:
             content = json.loads(res['content'])
         except Exception as e:
             self.debug(f"Error processing JSON response: {e}")
-            return None
+            return []
 
         status = content.get('status')
         if not status:
-            return None
+            return []
 
         code = status.get('code')
 
         if code != 0:
             self.error(f"Unexpected JSON response code reply from Keybase: {code}")
-            return None
+            return []
 
         them = content.get('them')
         if not isinstance(them, list):
-            return None
+            return []
 
         return them
 

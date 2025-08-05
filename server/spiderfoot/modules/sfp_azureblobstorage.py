@@ -15,7 +15,7 @@ import random
 import threading
 import time
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.sflib import SpiderFootEvent, SpiderFootPlugin
 
 
 class sfp_azureblobstorage(SpiderFootPlugin):
@@ -48,13 +48,13 @@ class sfp_azureblobstorage(SpiderFootPlugin):
         "_maxthreads": "Maximum threads"
     }
 
-    results = None
-    s3results = None
+    results = {}
+    s3results = {}
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.s3results = self.tempStorage()
-        self.results = self.tempStorage()
+        self.s3results = {}
+        self.results = {}
         self.lock = threading.Lock()
 
         for opt in list(userOpts.keys()):
@@ -84,10 +84,10 @@ class sfp_azureblobstorage(SpiderFootPlugin):
         t = []
 
         for site in siteList:
-            if self.checkForStop():
-                return None
+            # if hasattr(self, 'checkForStop') and self.checkForStop():
+            #     return None
 
-            self.info("Spawning thread to check bucket: " + site)
+            print(f"[sfp_azureblobstorage] Spawning thread to check bucket: {site}")
             tname = str(random.SystemRandom().randint(0, 999999999))
             t.append(threading.Thread(name='thread_sfp_azureblobstorages_' + tname,
                                       target=self.checkSite, args=(site,)))
@@ -142,13 +142,14 @@ class sfp_azureblobstorage(SpiderFootPlugin):
 
         self.results[eventData] = True
 
-        self.debug(f"Received event, {eventName}, from {srcModuleName}")
+        print(f"[sfp_azureblobstorage] Received event, {eventName}, from {srcModuleName}")
 
         if eventName == "LINKED_URL_EXTERNAL":
             if ".blob.core.windows.net" in eventData:
                 b = self.sf.urlFQDN(eventData)
-                evt = SpiderFootEvent("CLOUD_STORAGE_BUCKET", b, self.__name__, event)
-                self.notifyListeners(evt)
+                evt = SpiderFootEvent("CLOUD_STORAGE_BUCKET", b, self.__class__.__name__, event)
+                if hasattr(self.sf, 'notifyListeners'):
+                    self.sf.notifyListeners(evt)
             return
 
         targets = [eventData.replace('.', '')]
@@ -160,8 +161,8 @@ class sfp_azureblobstorage(SpiderFootPlugin):
         for t in targets:
             suffixes = [''] + self.opts['suffixes'].split(',')
             for s in suffixes:
-                if self.checkForStop():
-                    return
+                # if hasattr(self, 'checkForStop') and self.checkForStop():
+                #     return
 
                 b = t + s + ".blob.core.windows.net"
                 url = "https://" + b
@@ -170,7 +171,8 @@ class sfp_azureblobstorage(SpiderFootPlugin):
         # Batch the scans
         ret = self.batchSites(urls)
         for b in ret:
-            evt = SpiderFootEvent("CLOUD_STORAGE_BUCKET", b, self.__name__, event)
-            self.notifyListeners(evt)
+            evt = SpiderFootEvent("CLOUD_STORAGE_BUCKET", b, self.__class__.__name__, event)
+            if hasattr(self.sf, 'notifyListeners'):
+                self.sf.notifyListeners(evt)
 
 # End of sfp_azureblobstorage class

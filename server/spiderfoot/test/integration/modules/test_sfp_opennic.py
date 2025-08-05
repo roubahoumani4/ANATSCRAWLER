@@ -2,12 +2,14 @@ import pytest
 import unittest
 
 from modules.sfp_opennic import sfp_opennic
-from sflib import SpiderFoot
-from spiderfoot import SpiderFootEvent, SpiderFootTarget
+from core.sflib import SpiderFoot
+from core.spiderfoot.event import SpiderFootEvent  # type: ignore
+from core.spiderfoot.target import SpiderFootTarget
 
 
-@pytest.mark.usefixtures
+
 class TestModuleIntegrationOpenNic(unittest.TestCase):
+    default_options = {}
 
     def test_handleEvent_event_data_internet_name_with_opennic_tld_should_return_ip_address_event(self):
         sf = SpiderFoot(self.default_options)
@@ -33,7 +35,7 @@ class TestModuleIntegrationOpenNic(unittest.TestCase):
         event_data = 'example data'
         event_module = ''
         source_event = ''
-        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)
+        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)  # type: ignore
 
         event_type = 'INTERNET_NAME'
         event_data = 'opennic.glue'

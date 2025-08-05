@@ -51,16 +51,19 @@ class sfp_cinsscore(SpiderFootPlugin):
         'checksubnets': "Check if any malicious IPs are found within the same subnet of the target?"
     }
 
-    results = None
+
+    errorState = False
+
 
     def __init__(self):
         super().__init__()
-        self.results = {}
-    errorState = False
+        self.results = dict()
+        self.errorState = False
+
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = {}
+        self.results = dict()
         self.errorState = False
 
         for opt in list(userOpts.keys()):

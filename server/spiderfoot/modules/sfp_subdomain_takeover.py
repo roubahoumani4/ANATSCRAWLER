@@ -14,7 +14,8 @@
 
 import json
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_subdomain_takeover(SpiderFootPlugin):
@@ -35,16 +36,18 @@ class sfp_subdomain_takeover(SpiderFootPlugin):
     optdescs = {
     }
 
-    results = None
-    errorState = False
-    fingerprints = dict()
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
+        self.fingerprints = dict()
 
     # Initialize module and module options
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.errorState = False
-
         for opt in userOpts.keys():
             self.opts[opt] = userOpts[opt]
 

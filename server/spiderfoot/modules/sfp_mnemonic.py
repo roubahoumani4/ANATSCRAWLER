@@ -17,7 +17,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
 
 
 class sfp_mnemonic(SpiderFootPlugin):
@@ -67,16 +69,18 @@ class sfp_mnemonic(SpiderFootPlugin):
         'maxcohost': "Stop reporting co-hosted sites after this many are found, as it would likely indicate web hosting.",
     }
 
-    cohostcount = 0
-    results = None
-    errorState = False
+
+    def __init__(self):
+        super().__init__()
+        self.cohostcount = 0
+        self.results = dict()
+        self.errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.cohostcount = 0
         self.errorState = False
-
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 
@@ -222,7 +226,8 @@ class sfp_mnemonic(SpiderFootPlugin):
                         continue
 
                     if r['rrtype'] == 'cname':
-                        if not self.getTarget().matches(r['query'], includeParents=True):
+                        target = self.getTarget()
+                        if not (hasattr(target, "matches") and not isinstance(target, str) and target.matches(r['query'], includeParents=True)):
                             continue
 
                         cohosts.append(r['query'])
@@ -271,7 +276,8 @@ class sfp_mnemonic(SpiderFootPlugin):
                     self.cohostcount += 1
                 continue
 
-            if self.getTarget().matches(co, includeParents=True):
+            target = self.getTarget()
+            if hasattr(target, "matches") and not isinstance(target, str) and target.matches(co, includeParents=True):
                 if self.opts['verify'] and not self.sf.resolveHost(co) and not self.sf.resolveHost6(co):
                     self.debug(f"Host {co} could not be resolved")
                     evt = SpiderFootEvent("INTERNET_NAME_UNRESOLVED", co, self.__name__, event)

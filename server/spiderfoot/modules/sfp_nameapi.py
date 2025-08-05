@@ -13,10 +13,17 @@
 
 import json
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
 
 
 class sfp_nameapi(SpiderFootPlugin):
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     meta = {
         'name': "NameAPI",
@@ -53,12 +60,11 @@ class sfp_nameapi(SpiderFootPlugin):
         'api_key': "API Key for NameAPI"
     }
 
-    results = None
-    errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
+        self.errorState = False
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]

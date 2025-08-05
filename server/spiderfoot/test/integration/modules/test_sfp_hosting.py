@@ -2,12 +2,14 @@ import pytest
 import unittest
 
 from modules.sfp_hosting import sfp_hosting
-from sflib import SpiderFoot
-from spiderfoot import SpiderFootEvent, SpiderFootTarget
+from core.sflib import SpiderFoot
+from core.spiderfoot.event import SpiderFootEvent  # type: ignore
+from core.spiderfoot.target import SpiderFootTarget
 
 
-@pytest.mark.usefixtures
+
 class TestModuleIntegrationHosting(unittest.TestCase):
+    default_options = {}
 
     @unittest.skip("todo")
     def test_handleEvent_event_data_ip_address_hosted_should_return_event(self):
@@ -39,7 +41,7 @@ class TestModuleIntegrationHosting(unittest.TestCase):
         event_module = ''
         source_event = ''
 
-        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)
+        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)  # type: ignore
 
         with self.assertRaises(Exception) as cm:
             module.handleEvent(evt)
@@ -66,9 +68,9 @@ class TestModuleIntegrationHosting(unittest.TestCase):
         event_type = 'ROOT'
         event_data = '127.0.0.1'
         event_module = ''
-        source_event = ''
 
-        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)
+        source_event = None  # type: ignore
+        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)  # type: ignore
         result = module.handleEvent(evt)
 
         self.assertIsNone(result)

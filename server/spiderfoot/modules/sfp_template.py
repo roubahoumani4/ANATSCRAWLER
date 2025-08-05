@@ -14,7 +14,8 @@ import json
 
 from netaddr import IPNetwork
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_template(SpiderFootPlugin):
@@ -175,7 +176,10 @@ class sfp_template(SpiderFootPlugin):
     }
 
     # Tracking results can be helpful to avoid reporting/processing duplicates
-    results = None
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     # Tracking the error state of the module can be useful to detect when a third party
     # has failed and you don't wish to process any more events.
@@ -183,22 +187,8 @@ class sfp_template(SpiderFootPlugin):
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        # self.tempStorage() basically returns a dict(), but we use self.tempStorage()
-        # instead since on SpiderFoot HX, different mechanisms are used to persist
-        # data for load distribution, avoiding excess memory consumption and fault
-        # tolerance. This keeps modules transparently compatible with both versions.
-        self.results = self.tempStorage()
-
-        # Clear / reset any other class member variables here
-        # or you risk them persisting between threads.
-
-        # The data source for a module is, by default, set to the module name.
-        # If you want to override that, for instance in cases where the module
-        # is purely processing data from other modules instead of producing
-        # data itself, you can do so with the following. Note that this is only
-        # utilised in SpiderFoot HX and not the open source version.
+        self.results = dict()
         self.__dataSource__ = "Some Data Source"
-
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 

@@ -13,10 +13,18 @@
 
 import re
 
-from spiderfoot import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.helpers import SpiderFootHelpers
+
 
 
 class sfp_pastebin(SpiderFootPlugin):
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     meta = {
         'name': "PasteBin",
@@ -63,12 +71,10 @@ class sfp_pastebin(SpiderFootPlugin):
         'pastebin': "pastebin.com"
     }
 
-    results = None
-    errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.errorState = False
 
         for opt in list(userOpts.keys()):
@@ -123,9 +129,11 @@ class sfp_pastebin(SpiderFootPlugin):
             for link in new_links:
                 self.results[link] = True
 
-            relevant_links = [
-                link for link in new_links if SpiderFootHelpers.urlBaseUrl(link).endswith(target)
-            ]
+            relevant_links = []
+            for link in new_links:
+                base_url = SpiderFootHelpers.urlBaseUrl(link)
+                if base_url is not None and base_url.endswith(target):
+                    relevant_links.append(link)
 
             for link in relevant_links:
                 self.debug("Found a link: " + link)

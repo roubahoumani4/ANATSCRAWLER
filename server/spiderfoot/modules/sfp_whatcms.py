@@ -16,10 +16,16 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
 
 
 class sfp_whatcms(SpiderFootPlugin):
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     meta = {
         'name': "WhatCMS",
@@ -66,14 +72,12 @@ class sfp_whatcms(SpiderFootPlugin):
         'delay': 'Delay between requests, in seconds.'
     }
 
-    results = None
-    errorState = False
+
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.errorState = False
-
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 

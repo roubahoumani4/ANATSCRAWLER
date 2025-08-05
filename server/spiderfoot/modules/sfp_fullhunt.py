@@ -12,7 +12,8 @@
 
 import json
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_fullhunt(SpiderFootPlugin):
@@ -50,8 +51,11 @@ class sfp_fullhunt(SpiderFootPlugin):
         "api_key": "FullHunt API key.",
     }
 
-    results = None
-    errorState = False
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
@@ -229,10 +233,14 @@ class sfp_fullhunt(SpiderFootPlugin):
 
             self.results[host] = True
 
-            if self.getTarget().matches(host, includeChildren=True):
-                evt_type = "INTERNET_NAME"
+            target = self.getTarget()
+            if hasattr(target, 'matches') and not isinstance(target, str):
+                if target.matches(host, includeChildren=True):
+                    evt_type = "INTERNET_NAME"
+                else:
+                    evt_type = "AFFILIATE_INTERNET_NAME"
             else:
-                evt_type = "AFFILIATE_INTERNET_NAME"
+                evt_type = "INTERNET_NAME"
 
             if not self.sf.resolveHost(host) and not self.sf.resolveHost6(host):
                 self.debug(f"Host {host} could not be resolved")

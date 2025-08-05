@@ -9,11 +9,13 @@
 # Copyright:   (c) Steve Micallef 2017
 # -------------------------------------------------------------------------------
 
+
 import base64
 import re
 import urllib.parse
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_base64(SpiderFootPlugin):

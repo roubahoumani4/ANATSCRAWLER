@@ -12,7 +12,8 @@
 
 import json
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_cookie(SpiderFootPlugin):
@@ -28,11 +29,14 @@ class sfp_cookie(SpiderFootPlugin):
     opts = {}
     optdescs = {}
 
-    results = None
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.__dataSource__ = "Target Website"
 
         for opt in list(userOpts.keys()):
@@ -61,9 +65,20 @@ class sfp_cookie(SpiderFootPlugin):
         self.results[eventSource] = True
 
         fqdn = self.sf.urlFQDN(eventSource)
-        if not self.getTarget().matches(fqdn):
-            self.debug(f"Not collecting cookies from external sites. Ignoring HTTP headers from {fqdn}")
-            return
+        target = self.getTarget()
+        if hasattr(target, 'matches') and not isinstance(target, str):
+            try:
+                if not target.matches(fqdn):
+                    self.debug(f"Not collecting cookies from external sites. Ignoring HTTP headers from {fqdn}")
+                    return
+            except Exception:
+                if fqdn != str(target):
+                    self.debug(f"Not collecting cookies from external sites. Ignoring HTTP headers from {fqdn}")
+                    return
+        else:
+            if fqdn != str(target):
+                self.debug(f"Not collecting cookies from external sites. Ignoring HTTP headers from {fqdn}")
+                return
 
         try:
             data = json.loads(eventData)

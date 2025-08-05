@@ -12,7 +12,8 @@
 
 import json
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_duckduckgo(SpiderFootPlugin):
@@ -48,7 +49,10 @@ class sfp_duckduckgo(SpiderFootPlugin):
         "affiliatedomains": "For affiliates, look up the domain name, not the hostname. This will usually return more meaningful information about the affiliate."
     }
 
-    results = None
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc

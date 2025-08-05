@@ -16,7 +16,8 @@ import random
 import threading
 import time
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_dnsbrute(SpiderFootPlugin):
@@ -51,14 +52,18 @@ class sfp_dnsbrute(SpiderFootPlugin):
         "_maxthreads": "Maximum threads"
     }
 
-    events = None
-    sublist = None
-    lock = None
+
+    def __init__(self):
+        super().__init__()
+        self.events = dict()
+        self.sublist = dict()
+        self.lock = threading.Lock()
+
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.sublist = self.tempStorage()
-        self.events = self.tempStorage()
+        self.sublist = dict()
+        self.events = dict()
         self.__dataSource__ = "DNS"
         self.lock = threading.Lock()
 
@@ -66,13 +71,15 @@ class sfp_dnsbrute(SpiderFootPlugin):
             self.opts[opt] = userOpts[opt]
 
         if self.opts['commons']:
-            with importlib.resources.open_text('spiderfoot.dicts', 'subdomains.txt') as f:
+            import importlib.resources as importlib_resources
+            with importlib_resources.open_text('core.spiderfoot.dicts', 'subdomains.txt') as f:
                 for s in f.readlines():
                     s = s.strip()
                     self.sublist[s] = True
 
         if self.opts['top10000']:
-            with importlib.resources.open_text('spiderfoot.dicts', 'subdomains-10000.txt') as f:
+            import importlib.resources as importlib_resources
+            with importlib_resources.open_text('core.spiderfoot.dicts', 'subdomains-10000.txt') as f:
                 for s in f.readlines():
                     s = s.strip()
                     self.sublist[s] = True
@@ -152,7 +159,8 @@ class sfp_dnsbrute(SpiderFootPlugin):
             return
         self.events[eventDataHash] = True
 
-        if eventName == "INTERNET_NAME" and not self.getTarget().matches(eventData, includeChildren=False):
+        target = self.getTarget()
+        if eventName == "INTERNET_NAME" and (isinstance(target, str) or not hasattr(target, 'matches') or not target.matches(eventData, includeChildren=False)):
             if not self.opts['numbersuffix']:
                 return
 
@@ -183,7 +191,8 @@ class sfp_dnsbrute(SpiderFootPlugin):
             return
 
         # Only for the target, from this point forward...
-        if not self.getTarget().matches(eventData, includeChildren=False):
+        target = self.getTarget()
+        if isinstance(target, str) or not hasattr(target, 'matches') or not target.matches(eventData, includeChildren=False):
             return
 
         # Try resolving common names

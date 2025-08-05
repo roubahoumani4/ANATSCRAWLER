@@ -15,7 +15,8 @@ import random
 import threading
 import time
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_googleobjectstorage(SpiderFootPlugin):
@@ -49,9 +50,13 @@ class sfp_googleobjectstorage(SpiderFootPlugin):
         "_maxthreads": "Maximum threads"
     }
 
-    results = None
-    gosresults = dict()
-    lock = None
+
+    def __init__(self):
+        super().__init__()
+        import threading
+        self.results = dict()
+        self.gosresults = dict()
+        self.lock = threading.Lock()
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc

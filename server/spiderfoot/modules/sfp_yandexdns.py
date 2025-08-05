@@ -13,10 +13,14 @@
 
 import dns.resolver
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_yandexdns(SpiderFootPlugin):
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     meta = {
         'name': "Yandex DNS",
@@ -47,7 +51,7 @@ class sfp_yandexdns(SpiderFootPlugin):
     optdescs = {
     }
 
-    results = None
+
 
     checks = {
         "213.180.193.250": "Yandex - Infected",
@@ -56,7 +60,7 @@ class sfp_yandexdns(SpiderFootPlugin):
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]

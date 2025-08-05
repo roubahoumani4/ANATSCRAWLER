@@ -12,9 +12,9 @@
 
 import json
 import time
-import urllib
+import urllib.parse
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.sflib import SpiderFootEvent, SpiderFootPlugin
 
 
 class sfp_abstractapi(SpiderFootPlugin):
@@ -56,13 +56,13 @@ class sfp_abstractapi(SpiderFootPlugin):
         "ipgeolocation_api_key": "AbstractAPI IP Geolocation API key.",
     }
 
-    results = None
+    results = {}
     errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
         self.errorState = False
-        self.results = self.tempStorage()
+        self.results = {}
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
@@ -75,35 +75,35 @@ class sfp_abstractapi(SpiderFootPlugin):
 
     def parseApiResponse(self, res: dict):
         if not res:
-            self.error("No response from Abstract API.")
+            print("[sfp_abstractapi] No response from Abstract API.")
             return None
 
         # Rate limited to one request per second
         if res['code'] == '429':
-            self.error("You are being rate-limited by AbstractAPI.")
+            print("[sfp_abstractapi] You are being rate-limited by AbstractAPI.")
             return None
 
         if res['code'] == '401':
-            self.error("Unauthorized. Invalid AbstractAPI API key.")
+            print("[sfp_abstractapi] Unauthorized. Invalid AbstractAPI API key.")
             self.errorState = True
             return None
 
         if res['code'] == '422':
-            self.error("Usage quota reached. Insufficient API credit.")
+            print("[sfp_abstractapi] Usage quota reached. Insufficient API credit.")
             self.errorState = True
             return None
 
         if res['code'] == '500' or res['code'] == '502' or res['code'] == '503':
-            self.error("Abstract API service is unavailable")
+            print("[sfp_abstractapi] Abstract API service is unavailable")
             self.errorState = True
             return None
 
         if res['code'] == '204':
-            self.debug("No response data for target")
+            print("[sfp_abstractapi] No response data for target")
             return None
 
         if res['code'] != '200':
-            self.error(f"Unexpected reply from AbstractAPI: {res['code']}")
+            print(f"[sfp_abstractapi] Unexpected reply from AbstractAPI: {res['code']}")
             return None
 
         if res['content'] is None:
@@ -112,7 +112,7 @@ class sfp_abstractapi(SpiderFootPlugin):
         try:
             return json.loads(res['content'])
         except Exception as e:
-            self.debug(f"Error processing JSON response: {e}")
+            print(f"[sfp_abstractapi] Error processing JSON response: {e}")
 
         return None
 
@@ -143,7 +143,7 @@ class sfp_abstractapi(SpiderFootPlugin):
         time.sleep(1)
 
         if not res:
-            self.debug("No response from AbstractAPI Company Enrichment API endpoint")
+            print("[sfp_abstractapi] No response from AbstractAPI Company Enrichment API endpoint")
             return None
 
         return self.parseApiResponse(res)
@@ -175,7 +175,7 @@ class sfp_abstractapi(SpiderFootPlugin):
         time.sleep(1)
 
         if not res:
-            self.debug("No response from AbstractAPI Phone Validation API endpoint")
+            print("[sfp_abstractapi] No response from AbstractAPI Phone Validation API endpoint")
             return None
 
         return self.parseApiResponse(res)
@@ -207,7 +207,7 @@ class sfp_abstractapi(SpiderFootPlugin):
         time.sleep(1)
 
         if not res:
-            self.debug("No response from AbstractAPI Phone Validation API endpoint")
+            print("[sfp_abstractapi] No response from AbstractAPI Phone Validation API endpoint")
             return None
 
         return self.parseApiResponse(res)
@@ -217,18 +217,16 @@ class sfp_abstractapi(SpiderFootPlugin):
         srcModuleName = event.module
         eventData = event.data
 
-        self.debug(f"Received event, {eventName}, from {srcModuleName}")
+        print(f"[sfp_abstractapi] Received event, {eventName}, from {srcModuleName}")
 
         if eventData in self.results:
-            self.debug(f"Skipping {eventData}, already checked.")
+            print(f"[sfp_abstractapi] Skipping {eventData}, already checked.")
             return
 
         self.results[eventData] = True
 
         if self.opts["companyenrichment_api_key"] == "" and self.opts["phonevalidation_api_key"] == "" and self.opts["ipgeolocation_api_key"] == "":
-            self.error(
-                f"You enabled {self.__class__.__name__} but did not set any API keys!"
-            )
+            print(f"[sfp_abstractapi] You enabled {self.__class__.__name__} but did not set any API keys!")
             self.errorState = True
             return
 
@@ -237,9 +235,7 @@ class sfp_abstractapi(SpiderFootPlugin):
 
         if eventName == "DOMAIN_NAME":
             if self.opts["companyenrichment_api_key"] == "":
-                self.info(
-                    f"No API key set for Company Enrichment API endpoint. Ignoring {eventData}"
-                )
+                print(f"[sfp_abstractapi] No API key set for Company Enrichment API endpoint. Ignoring {eventData}")
                 return
 
             data = self.queryCompanyEnrichment(eventData)
@@ -254,18 +250,21 @@ class sfp_abstractapi(SpiderFootPlugin):
             if name == 'To Be Confirmed':
                 return
 
-            e = SpiderFootEvent("RAW_RIR_DATA", str(data), self.__name__, event)
-            self.notifyListeners(e)
+            e = SpiderFootEvent("RAW_RIR_DATA", str(data), self.__class__.__name__, event)
+            if hasattr(self.sf, 'notifyListeners'):
+                self.sf.notifyListeners(e)
 
-            e = SpiderFootEvent("COMPANY_NAME", name, self.__name__, event)
-            self.notifyListeners(e)
+            e = SpiderFootEvent("COMPANY_NAME", name, self.__class__.__name__, event)
+            if hasattr(self.sf, 'notifyListeners'):
+                self.sf.notifyListeners(e)
 
             linkedin_url = data.get('linkedin_url')
             if linkedin_url:
                 if linkedin_url.startswith('linkedin.com'):
                     linkedin_url = f"https://{linkedin_url}"
-                e = SpiderFootEvent("SOCIAL_MEDIA", f"LinkedIn (Company): <SFURL>{linkedin_url}</SFURL>", self.__name__, event)
-                self.notifyListeners(e)
+                e = SpiderFootEvent("SOCIAL_MEDIA", f"LinkedIn (Company): <SFURL>{linkedin_url}</SFURL>", self.__class__.__name__, event)
+                if hasattr(self.sf, 'notifyListeners'):
+                    self.sf.notifyListeners(e)
 
             locality = data.get('locality')
             country = data.get('country')
@@ -274,14 +273,13 @@ class sfp_abstractapi(SpiderFootPlugin):
             )
 
             if geoinfo:
-                e = SpiderFootEvent("GEOINFO", geoinfo, self.__name__, event)
-                self.notifyListeners(e)
+                e = SpiderFootEvent("GEOINFO", geoinfo, self.__class__.__name__, event)
+                if hasattr(self.sf, 'notifyListeners'):
+                    self.sf.notifyListeners(e)
 
         elif eventName == "PHONE_NUMBER":
             if self.opts["phonevalidation_api_key"] == "":
-                self.info(
-                    f"No API key set for Phone Validation API endpoint. Ignoring {eventData}"
-                )
+                print(f"[sfp_abstractapi] No API key set for Phone Validation API endpoint. Ignoring {eventData}")
                 return
 
             data = self.queryPhoneValidation(eventData)
@@ -293,13 +291,15 @@ class sfp_abstractapi(SpiderFootPlugin):
             if not valid:
                 return
 
-            e = SpiderFootEvent("RAW_RIR_DATA", str(data), self.__name__, event)
-            self.notifyListeners(e)
+            e = SpiderFootEvent("RAW_RIR_DATA", str(data), self.__class__.__name__, event)
+            if hasattr(self.sf, 'notifyListeners'):
+                self.sf.notifyListeners(e)
 
             carrier = data.get('carrier')
             if carrier:
-                e = SpiderFootEvent("PROVIDER_TELCO", carrier, self.__name__, event)
-                self.notifyListeners(e)
+                e = SpiderFootEvent("PROVIDER_TELCO", carrier, self.__class__.__name__, event)
+                if hasattr(self.sf, 'notifyListeners'):
+                    self.sf.notifyListeners(e)
 
             location = data.get('location')
             country = data.get('country')
@@ -312,14 +312,13 @@ class sfp_abstractapi(SpiderFootPlugin):
             )
 
             if geoinfo:
-                e = SpiderFootEvent("GEOINFO", geoinfo, self.__name__, event)
-                self.notifyListeners(e)
+                e = SpiderFootEvent("GEOINFO", geoinfo, self.__class__.__name__, event)
+                if hasattr(self.sf, 'notifyListeners'):
+                    self.sf.notifyListeners(e)
 
         elif eventName in ['IP_ADDRESS', 'IPV6_ADDRESS']:
             if self.opts["ipgeolocation_api_key"] == "":
-                self.info(
-                    f"No API key set for IP Geolocation API endpoint. Ignoring {eventData}"
-                )
+                print(f"[sfp_abstractapi] No API key set for IP Geolocation API endpoint. Ignoring {eventData}")
                 return
 
             data = self.queryIpGeolocation(eventData)
@@ -327,8 +326,9 @@ class sfp_abstractapi(SpiderFootPlugin):
             if not data:
                 return
 
-            e = SpiderFootEvent("RAW_RIR_DATA", str(data), self.__name__, event)
-            self.notifyListeners(e)
+            e = SpiderFootEvent("RAW_RIR_DATA", str(data), self.__class__.__name__, event)
+            if hasattr(self.sf, 'notifyListeners'):
+                self.sf.notifyListeners(e)
 
             geoinfo = ', '.join(
                 [
@@ -343,13 +343,15 @@ class sfp_abstractapi(SpiderFootPlugin):
             )
 
             if geoinfo:
-                e = SpiderFootEvent("GEOINFO", geoinfo, self.__name__, event)
-                self.notifyListeners(e)
+                e = SpiderFootEvent("GEOINFO", geoinfo, self.__class__.__name__, event)
+                if hasattr(self.sf, 'notifyListeners'):
+                    self.sf.notifyListeners(e)
 
             latitude = data.get('latitude')
             longitude = data.get('longitude')
             if latitude and longitude:
-                e = SpiderFootEvent("PHYSICAL_COORDINATES", f"{latitude}, {longitude}", self.__name__, event)
-                self.notifyListeners(e)
+                e = SpiderFootEvent("PHYSICAL_COORDINATES", f"{latitude}, {longitude}", self.__class__.__name__, event)
+                if hasattr(self.sf, 'notifyListeners'):
+                    self.sf.notifyListeners(e)
 
 # End of sfp_abstractapi class

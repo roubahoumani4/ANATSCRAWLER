@@ -13,10 +13,16 @@
 
 import dns.resolver
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
 
 
 class sfp_opendns(SpiderFootPlugin):
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     meta = {
         'name': "OpenDNS",
@@ -48,7 +54,6 @@ class sfp_opendns(SpiderFootPlugin):
     optdescs = {
     }
 
-    results = None
 
     checks = {
         "146.112.61.105": "OpenDNS - Botnet",
@@ -61,7 +66,7 @@ class sfp_opendns(SpiderFootPlugin):
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]

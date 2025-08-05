@@ -16,7 +16,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.sflib import SpiderFootEvent, SpiderFootPlugin
 
 
 class sfp_citadel(SpiderFootPlugin):
@@ -70,7 +70,7 @@ class sfp_citadel(SpiderFootPlugin):
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.errorState = False
         self.__dataSource__ = "Leak-Lookup.com"
 
@@ -90,7 +90,7 @@ class sfp_citadel(SpiderFootPlugin):
     # Query email address
     # https://leak-lookup.com/api
     def queryEmail(self, email):
-        apikey = self.opts['api_key']
+        apikey = self.opts.get('api_key', '')
 
         if not apikey:
             # Public API key
@@ -104,38 +104,43 @@ class sfp_citadel(SpiderFootPlugin):
 
         res = self.sf.fetchUrl("https://leak-lookup.com/api/search",
                                postData=urllib.parse.urlencode(params),
-                               timeout=self.opts['timeout'],
-                               useragent=self.opts['_useragent'])
+                               timeout=self.opts.get('timeout', 60),
+                               useragent=self.opts.get('_useragent', 'SpiderFoot'))
 
-        if res['code'] == "429":
+        if res.get('code') == "429":
             time.sleep(10)
             return self.queryEmail(email)
 
-        if res['content'] is None:
-            self.debug('No response from Leak-Lookup.com')
+        if res.get('content') is None:
+            print('[sfp_citadel] No response from Leak-Lookup.com')
             return None
 
         try:
             return json.loads(res['content'])
         except Exception as e:
-            self.debug(f"Error processing JSON response: {e}")
+            print(f"[sfp_citadel] Error processing JSON response: {e}")
 
         return None
 
     # Handle events sent to this module
+
     def handleEvent(self, event):
         eventName = event.eventType
         srcModuleName = event.module
         eventData = event.data
 
-        self.debug(f"Received event, {eventName}, from {srcModuleName}")
+        # Ensure results is always a dict
+        if self.results is None:
+            self.results = dict()
+
+        print(f"[sfp_citadel] Received event, {eventName}, from {srcModuleName}")
 
         if self.errorState:
             return
 
         # Don't look up stuff twice
         if eventData in self.results:
-            self.debug(f"Skipping {eventData}, already checked.")
+            print(f"[sfp_citadel] Skipping {eventData}, already checked.")
             return
 
         self.results[eventData] = True
@@ -149,7 +154,7 @@ class sfp_citadel(SpiderFootPlugin):
         message = data.get('message')
 
         if error == 'true':
-            self.error(f"Error encountered processing {eventData}: {message}")
+            print(f"[sfp_citadel] Error encountered processing {eventData}: {message}")
             if "MISSING API" in message:
                 self.errorState = True
                 return
@@ -159,8 +164,9 @@ class sfp_citadel(SpiderFootPlugin):
             return
 
         for site in message:
-            self.info(f"Found Leak-Lookup entry for {eventData}: {site}")
-            evt = SpiderFootEvent("EMAILADDR_COMPROMISED", f"{eventData} [{site}]", self.__name__, event)
-            self.notifyListeners(evt)
+            print(f"[sfp_citadel] Found Leak-Lookup entry for {eventData}: {site}")
+            evt = SpiderFootEvent("EMAILADDR_COMPROMISED", f"{eventData} [{site}]", self.__class__.__name__, event)
+            if hasattr(self.sf, 'notifyListeners'):
+                self.sf.notifyListeners(evt)
 
 # End of sfp_citadel class

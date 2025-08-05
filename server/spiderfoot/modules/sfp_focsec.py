@@ -13,7 +13,8 @@
 import json
 import urllib
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_focsec(SpiderFootPlugin):
@@ -50,8 +51,11 @@ class sfp_focsec(SpiderFootPlugin):
         "api_key": "Focsec API Key.",
     }
 
-    results = None
-    errorState = False
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
@@ -87,6 +91,7 @@ class sfp_focsec(SpiderFootPlugin):
             dict: JSON formatted results
         """
 
+        import urllib.parse
         params = urllib.parse.urlencode({
             'api_key': self.opts["api_key"],
         })

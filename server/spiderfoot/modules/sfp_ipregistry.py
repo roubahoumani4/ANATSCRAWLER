@@ -13,7 +13,9 @@
 import json
 import urllib.parse
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
 
 
 class sfp_ipregistry(SpiderFootPlugin):
@@ -50,14 +52,15 @@ class sfp_ipregistry(SpiderFootPlugin):
         "api_key": "Ipregistry API Key.",
     }
 
-    results = None
 
-    errorState = False
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     def setup(self, sfc, userOpts=None):
         self.sf = sfc
-        self.results = self.tempStorage()
-
+        self.results = dict()
         if userOpts:
             self.opts.update(userOpts)
 

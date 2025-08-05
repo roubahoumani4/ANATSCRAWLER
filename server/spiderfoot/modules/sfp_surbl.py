@@ -13,7 +13,8 @@
 
 from netaddr import IPNetwork
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_surbl(SpiderFootPlugin):
@@ -55,13 +56,17 @@ class sfp_surbl(SpiderFootPlugin):
         'maxsubnet': "If looking up subnets, the maximum subnet size to look up all the IPs within (CIDR value, 24 = /24, 16 = /16, etc.)"
     }
 
-    results = None
-    errorState = False
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     def setup(self, sfc, userOpts=dict()):
+
         self.sf = sfc
         self.errorState = False
-        self.results = self.tempStorage()
+        self.results = dict()
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
@@ -111,8 +116,12 @@ class sfp_surbl(SpiderFootPlugin):
         Returns:
             list: SURBL DNS entries
         """
+
         if self.sf.validIP(qaddr):
-            lookup = self.reverseAddr(qaddr) + '.multi.surbl.org'
+            rev = self.reverseAddr(qaddr)
+            if rev is None:
+                return None
+            lookup = rev + '.multi.surbl.org'
         else:
             lookup = f"{qaddr}.multi.surbl.org"
 
@@ -131,9 +140,9 @@ class sfp_surbl(SpiderFootPlugin):
 
         self.debug(f"Received event, {eventName}, from {event.module}")
 
+
         if eventData in self.results:
             return
-
         self.results[eventData] = True
 
         if eventName == "AFFILIATE_IPADDR":
@@ -193,33 +202,23 @@ class sfp_surbl(SpiderFootPlugin):
         for addr in addrs:
             if self.checkForStop():
                 return
-
             if self.errorState:
                 return
-
             res = self.query(addr)
-
             self.results[addr] = True
-
             if not res:
                 continue
-
             self.debug(f"{addr} found in SURBL DNS")
-
             for result in res:
                 k = str(result)
-
                 if not k.startswith('127.0.0.'):
                     continue
-
                 if k == '127.0.0.1':
                     self.error('SURBL rejected lookup request.')
                     self.errorState = True
                     continue
-
                 evt = SpiderFootEvent(blacklist_type, f"SURBL [{addr}]", self.__name__, event)
                 self.notifyListeners(evt)
-
                 evt = SpiderFootEvent(malicious_type, f"SURBL [{addr}]", self.__name__, event)
                 self.notifyListeners(evt)
 

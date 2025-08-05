@@ -1,4 +1,9 @@
-import { users, type User, type InsertUser } from "@shared/schema";
+
+// Use local types instead of @shared/schema
+import type { User } from "./types/User";
+
+// InsertUser type omits id, lastLogin, isActive from User
+export type InsertUser = Omit<User, "_id" | "id" | "lastLogin" | "isActive"> & { password: string };
 
 // modify the interface with any CRUD methods
 // you might need
@@ -32,8 +37,8 @@ export class MemStorage implements IStorage {
     const id = this.currentId++;
     const user: User = { 
       ...insertUser, 
-      id,
-      lastLogin: null,
+      _id: id.toString(),
+      lastLogin: undefined,
       isActive: true
     };
     this.users.set(id, user);

@@ -13,10 +13,14 @@ import json
 import time
 from datetime import datetime
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_fullcontact(SpiderFootPlugin):
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     meta = {
         'name': "FullContact",
@@ -180,6 +184,8 @@ class sfp_fullcontact(SpiderFootPlugin):
             self.debug(f"Skipping {eventData}, already checked.")
             return
 
+        if self.results is None:
+            self.results = dict()
         self.results[eventData] = True
 
         if eventName == "EMAILADDR":

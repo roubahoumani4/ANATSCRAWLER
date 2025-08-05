@@ -2,12 +2,14 @@ import pytest
 import unittest
 
 from modules.sfp_greensnow import sfp_greensnow
-from sflib import SpiderFoot
-from spiderfoot import SpiderFootEvent, SpiderFootTarget
+from core.sflib import SpiderFoot
+from core.spiderfoot.event import SpiderFootEvent  # type: ignore
+from core.spiderfoot.target import SpiderFootTarget
 
 
-@pytest.mark.usefixtures
+
 class TestModuleIntegrationgreensnow(unittest.TestCase):
+    default_options = {}
 
     @unittest.skip("todo")
     def test_handleEvent(self):
@@ -25,7 +27,8 @@ class TestModuleIntegrationgreensnow(unittest.TestCase):
         event_data = 'example data'
         event_module = ''
         source_event = ''
-        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)
+
+        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)  # type: ignore
 
         result = module.handleEvent(evt)
 

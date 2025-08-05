@@ -36,10 +36,13 @@ ASCII_LOGO = r"""
                 Open Source Intelligence Automation."""
 COPYRIGHT_INFO = "               by Steve Micallef | @spiderfoot\n"
 
+
+# Try to import readline, fallback to pyreadline if available, else disable history features gracefully
 try:
     import readline
 except ImportError:
-    import pyreadline as readline
+    # pyreadline is only available on Windows; on Linux just disable history if readline is missing
+    readline = None
 
 
 # Colors to make things purty
@@ -188,8 +191,11 @@ class SpiderFootCli(cmd.Cmd):
         c = self.myparseline(line)
 
         if '-l' in c[0]:
-            i = 0
-            while i < readline.get_current_history_length():
+            if readline is None:
+                self.dprint("History functionality is not available (no readline module).", err=True)
+                return None
+            i = 1
+            while i <= readline.get_current_history_length():
                 self.dprint(readline.get_history_item(i), plain=True)
                 i += 1
             return None
@@ -354,27 +360,31 @@ class SpiderFootCli(cmd.Cmd):
             self.edprint(f"Invalid request URL: {url}")
             return None
 
-        # logging.basicConfig()
-        # logging.getLogger().setLevel(logging.DEBUG)
-        # requests_log = logging.getLogger("requests.packages.urllib3")
-        # requests_log.setLevel(logging.DEBUG)
-        # requests_log.propagate = True
         headers = {
             "User-agent": "SpiderFoot-CLI/" + self.version,
             "Accept": "application/json"
         }
 
+        # Import HTTPDigestAuth directly to avoid attribute errors
+        try:
+            from requests.auth import HTTPDigestAuth
+        except ImportError:
+            HTTPDigestAuth = None
+
         try:
             self.ddprint(f"Fetching: {url}")
+            auth = None
+            if HTTPDigestAuth and self.ownopts['cli.username'] and self.ownopts['cli.password']:
+                auth = HTTPDigestAuth(
+                    self.ownopts['cli.username'],
+                    self.ownopts['cli.password']
+                )
             if not post:
                 r = requests.get(
                     url,
                     headers=headers,
                     verify=self.ownopts['cli.ssl_verify'],
-                    auth=requests.auth.HTTPDigestAuth(
-                        self.ownopts['cli.username'],
-                        self.ownopts['cli.password']
-                    )
+                    auth=auth
                 )
             else:
                 self.ddprint(f"Posting: {post}")
@@ -382,10 +392,7 @@ class SpiderFootCli(cmd.Cmd):
                     url,
                     headers=headers,
                     verify=self.ownopts['cli.ssl_verify'],
-                    auth=requests.auth.HTTPDigestAuth(
-                        self.ownopts['cli.username'],
-                        self.ownopts['cli.password']
-                    ),
+                    auth=auth,
                     data=post
                 )
             self.ddprint(f"Response: {r}")
@@ -1368,14 +1375,15 @@ if __name__ == "__main__":
     # Load commands from a file
     if args.e:
         try:
-            with open(args.e, 'r') as f:
-                cin = f.read()
+            cin = open(args.e, 'r')
         except BaseException as e:
             print(f"Unable to open {args.e}: ({e})")
             sys.exit(-1)
     else:
         cin = sys.stdin
-    s = SpiderFootCli(stdin=cin)
+
+    # Only pass file-like objects to SpiderFootCli
+    s = SpiderFootCli()
     s.identchars += "$"
 
     # Map command-line to config
@@ -1421,11 +1429,11 @@ if __name__ == "__main__":
             s.prompt = ""
             s.cmdloop()
         finally:
-            cin.close()
+            if args.e:
+                cin.close()
         sys.exit(0)
 
     if not args.q:
-        s = SpiderFootCli()
         s.dprint(ASCII_LOGO, plain=True, color=bcolors.GREYBLUE)
         s.dprint(COPYRIGHT_INFO, plain=True,
                  color=bcolors.GREYBLUE_DARK)
@@ -1436,7 +1444,7 @@ if __name__ == "__main__":
     # Test connectivity to the server
     s.do_ping("")
 
-    if not args.n:
+    if not args.n and readline is not None:
         try:
             f = codecs.open(s.ownopts['cli.history_file'], "r", encoding="utf-8")
             for line in f.readlines():

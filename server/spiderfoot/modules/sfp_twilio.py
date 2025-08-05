@@ -13,10 +13,16 @@
 import base64
 import json
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
 
 
 class sfp_twilio(SpiderFootPlugin):
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     meta = {
         'name': "Twilio",
@@ -55,13 +61,12 @@ class sfp_twilio(SpiderFootPlugin):
         'api_key_auth_token': 'Twilio Auth Token'
     }
 
-    results = None
-    errorState = False
+
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
-
+        self.results = dict()
+        self.errorState = False
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 

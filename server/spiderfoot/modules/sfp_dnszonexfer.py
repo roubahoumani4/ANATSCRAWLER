@@ -10,12 +10,14 @@
 # Licence:     MIT
 # -------------------------------------------------------------------------------
 
-import re
 
+import re
 import dns.query
 import dns.zone
+import dns.resolver
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_dnszonexfer(SpiderFootPlugin):
@@ -36,7 +38,10 @@ class sfp_dnszonexfer(SpiderFootPlugin):
         "timeout": "Timeout in seconds"
     }
 
-    events = None
+
+    def __init__(self):
+        super().__init__()
+        self.events = dict()
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
@@ -71,9 +76,11 @@ class sfp_dnszonexfer(SpiderFootPlugin):
 
         self.events[eventDataHash] = True
 
+
         res = dns.resolver.Resolver()
         if self.opts.get('_dnsserver', "") != "":
-            res.nameservers = [self.opts['_dnsserver']]
+            # Ensure the DNS server is a string
+            res.nameservers = [str(self.opts['_dnsserver'])]
 
         # Get the name server's IP. This is to avoid DNS leaks
         # when attempting to resolve the name server during
@@ -94,13 +101,21 @@ class sfp_dnszonexfer(SpiderFootPlugin):
         else:
             nsip = eventData
 
-        for name in self.getTarget().getNames():
+
+        target = self.getTarget()
+        # Defensive: Only call getNames if target is not a string and has getNames
+        if hasattr(target, 'getNames') and not isinstance(target, str):
+            names = target.getNames()
+        else:
+            names = []
+
+        for name in names:
             self.debug("Trying for name: " + name)
             try:
                 ret = list()
                 z = dns.zone.from_xfr(dns.query.xfr(nsip, name, timeout=int(self.opts["timeout"])))
-                names = list(z.nodes.keys())
-                for n in names:
+                names2 = list(z.nodes.keys())
+                for n in names2:
                     ret.append(z[n].to_text(n))
 
                 evt = SpiderFootEvent("RAW_DNS_RECORDS", "\n".join(ret), self.__name__, parentEvent)

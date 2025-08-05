@@ -13,7 +13,8 @@
 import base64
 import json
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_riskiq(SpiderFootPlugin):
@@ -173,6 +174,8 @@ class sfp_riskiq(SpiderFootPlugin):
             self.debug(f"Skipping {eventData}, already checked.")
             return
 
+        if self.results is None:
+            self.results = dict()
         self.results[eventData] = True
 
         if eventName == 'DOMAIN_NAME':
@@ -191,7 +194,21 @@ class sfp_riskiq(SpiderFootPlugin):
                     if host == eventData:
                         continue
 
-                    if self.getTarget().matches(host, includeChildren=True):
+                    target = self.getTarget()
+                    if hasattr(target, "matches") and not isinstance(target, str):
+                        if target.matches(host, includeChildren=True):
+                            if self.sf.resolveHost(host) or self.sf.resolveHost6(host):
+                                e = SpiderFootEvent("INTERNET_NAME", host, self.__name__, event)
+                            else:
+                                e = SpiderFootEvent("INTERNET_NAME_UNRESOLVED", host, self.__name__, event)
+                            self.notifyListeners(e)
+                    else:
+                        if host in str(target):
+                            if self.sf.resolveHost(host) or self.sf.resolveHost6(host):
+                                e = SpiderFootEvent("INTERNET_NAME", host, self.__name__, event)
+                            else:
+                                e = SpiderFootEvent("INTERNET_NAME_UNRESOLVED", host, self.__name__, event)
+                            self.notifyListeners(e)
                         if self.sf.resolveHost(host) or self.sf.resolveHost6(host):
                             e = SpiderFootEvent("INTERNET_NAME", host, self.__name__, event)
                         else:
@@ -236,7 +253,14 @@ class sfp_riskiq(SpiderFootPlugin):
                         r['focusPoint'] = r['focusPoint'][:-1]
 
                     # Record could be pointing to our IP, or from our IP
-                    if not self.getTarget().matches(r['focusPoint']) and "*" not in r['focusPoint']:
+                    target = self.getTarget()
+                    if hasattr(target, "matches") and not isinstance(target, str):
+                        if not target.matches(r['focusPoint']) and "*" not in r['focusPoint']:
+                            # We found a co-host
+                            cohosts.append(r['focusPoint'])
+                    else:
+                        if r['focusPoint'] not in str(target) and "*" not in r['focusPoint']:
+                            cohosts.append(r['focusPoint'])
                         # We found a co-host
                         cohosts.append(r['focusPoint'])
 
@@ -258,7 +282,27 @@ class sfp_riskiq(SpiderFootPlugin):
                     continue
 
                 if not self.opts['cohostsamedomain']:
-                    if self.getTarget().matches(co, includeParents=True):
+                    target = self.getTarget()
+                    if hasattr(target, "matches") and not isinstance(target, str):
+                        if target.matches(co, includeParents=True):
+                            if self.sf.resolveHost(co) or self.sf.resolveHost6(co):
+                                e = SpiderFootEvent("INTERNET_NAME", co, self.__name__, event)
+                            else:
+                                e = SpiderFootEvent("INTERNET_NAME_UNRESOLVED", co, self.__name__, event)
+                            self.notifyListeners(e)
+                            if self.sf.isDomain(co, self.opts['_internettlds']):
+                                e = SpiderFootEvent("DOMAIN_NAME", co, self.__name__, event)
+                                self.notifyListeners(e)
+                    else:
+                        if co in str(target):
+                            if self.sf.resolveHost(co) or self.sf.resolveHost6(co):
+                                e = SpiderFootEvent("INTERNET_NAME", co, self.__name__, event)
+                            else:
+                                e = SpiderFootEvent("INTERNET_NAME_UNRESOLVED", co, self.__name__, event)
+                            self.notifyListeners(e)
+                            if self.sf.isDomain(co, self.opts['_internettlds']):
+                                e = SpiderFootEvent("DOMAIN_NAME", co, self.__name__, event)
+                                self.notifyListeners(e)
                         if self.sf.resolveHost(co) or self.sf.resolveHost6(co):
                             e = SpiderFootEvent("INTERNET_NAME", co, self.__name__, event)
                         else:

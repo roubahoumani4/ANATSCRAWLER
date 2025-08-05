@@ -13,7 +13,8 @@
 
 import json
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_blockchain(SpiderFootPlugin):
@@ -46,11 +47,14 @@ class sfp_blockchain(SpiderFootPlugin):
     opts = {}
     optdescs = {}
 
-    results = None
+
+    def __init__(self):
+        super().__init__()
+        self.results = {}
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = {}
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]

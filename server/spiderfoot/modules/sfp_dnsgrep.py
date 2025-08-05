@@ -19,7 +19,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_dnsgrep(SpiderFootPlugin):
@@ -64,11 +65,15 @@ class sfp_dnsgrep(SpiderFootPlugin):
         'dns_resolve': "DNS resolve each identified domain."
     }
 
-    results = None
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
 
         for opt in userOpts.keys():
             self.opts[opt] = userOpts[opt]
@@ -151,11 +156,13 @@ class sfp_dnsgrep(SpiderFootPlugin):
 
                 domains.append(domain)
 
+
         for domain in domains:
             if domain in self.results:
                 continue
 
-            if not self.getTarget().matches(domain, includeParents=True):
+            target = self.getTarget()
+            if not (hasattr(target, 'matches') and not isinstance(target, str) and target.matches(domain, includeParents=True)):
                 continue
 
             evt_type = "INTERNET_NAME"

@@ -12,7 +12,7 @@
 import json
 import time
 
-from spiderfoot import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
+from core.sflib import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
 
 
 class sfp_builtwith(SpiderFootPlugin):
@@ -64,12 +64,14 @@ class sfp_builtwith(SpiderFootPlugin):
     # Be sure to completely clear any class variables in setup()
     # or you run the risk of data persisting between scan runs.
 
+
     results = None
     errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        # Use a dict for results cache
+        self.results = dict()
         self.errorState = False
 
         # Clear / reset any other class member variables here
@@ -91,57 +93,63 @@ class sfp_builtwith(SpiderFootPlugin):
     def queryRelationships(self, t):
         url = f"https://api.builtwith.com/rv1/api.json?LOOKUP={t}&KEY={self.opts['api_key']}"
 
-        res = self.sf.fetchUrl(url, timeout=self.opts['_fetchtimeout'], useragent="SpiderFoot")
+        res = self.sf.fetchUrl(url, timeout=self.opts.get('_fetchtimeout', 30), useragent="SpiderFoot")
 
-        if res['code'] == "404":
+        if res.get('code') == "404":
             return None
 
-        if not res['content']:
+        if not res.get('content'):
             return None
 
         try:
             return json.loads(res['content'])['Relationships']
         except Exception as e:
-            self.error(f"Error processing JSON response from builtwith.com: {e}")
+            print(f"[sfp_builtwith] Error processing JSON response from builtwith.com: {e}")
 
         return None
 
     def queryDomainInfo(self, t):
         url = f"https://api.builtwith.com/rv1/api.json?LOOKUP={t}&KEY={self.opts['api_key']}"
 
-        res = self.sf.fetchUrl(url, timeout=self.opts['_fetchtimeout'], useragent="SpiderFoot")
+        res = self.sf.fetchUrl(url, timeout=self.opts.get('_fetchtimeout', 30), useragent="SpiderFoot")
 
-        if res['code'] == "404":
+        if res.get('code') == "404":
             return None
 
-        if not res['content']:
+        if not res.get('content'):
             return None
 
         try:
             return json.loads(res['content'])['Results'][0]
         except Exception as e:
-            self.error(f"Error processing JSON response from builtwith.com: {e}")
+            print(f"[sfp_builtwith] Error processing JSON response from builtwith.com: {e}")
 
         return None
 
     # Handle events sent to this module
+
     def handleEvent(self, event):
         eventName = event.eventType
         srcModuleName = event.module
         eventData = event.data
 
+
         if self.errorState:
             return
 
-        self.debug(f"Received event, {eventName}, from {srcModuleName}")
+        # Ensure results is always a dict
+        if self.results is None:
+            self.results = dict()
 
-        if self.opts['api_key'] == "":
-            self.error("You enabled sfp_builtwith but did not set an API key!")
+        print(f"[sfp_builtwith] Received event, {eventName}, from {srcModuleName}")
+
+        if self.opts.get('api_key', '') == "":
+            print("[sfp_builtwith] You enabled sfp_builtwith but did not set an API key!")
             self.errorState = True
             return
 
         if eventData in self.results:
-            self.debug(f"Skipping {eventData}, already checked.")
+            print(f"[sfp_builtwith] Skipping {eventData}, already checked.")
             return
 
         self.results[eventData] = True
@@ -152,45 +160,51 @@ class sfp_builtwith(SpiderFootPlugin):
                 if data['Meta'].get("Names", []):
                     for nb in data['Meta']['Names']:
                         e = SpiderFootEvent("RAW_RIR_DATA", "Possible full name: " + nb['Name'],
-                                            self.__name__, event)
-                        self.notifyListeners(e)
+                                            self.__class__.__name__, event)
+                        if hasattr(self.sf, 'notifyListeners'):
+                            self.sf.notifyListeners(e)
                         if nb.get('Email', None):
                             if SpiderFootHelpers.validEmail(nb['Email']):
-                                if nb['Email'].split("@")[0] in self.opts['_genericusers'].split(","):
+                                if nb['Email'].split("@")[0] in self.opts.get('_genericusers', '').split(","):
                                     evttype = "EMAILADDR_GENERIC"
                                 else:
                                     evttype = "EMAILADDR"
                                 e = SpiderFootEvent(evttype, nb['Email'],
-                                                    self.__name__, event)
-                                self.notifyListeners(e)
+                                                    self.__class__.__name__, event)
+                                if hasattr(self.sf, 'notifyListeners'):
+                                    self.sf.notifyListeners(e)
 
                 if data['Meta'].get("Emails", []):
                     for email in data['Meta']['Emails']:
                         if SpiderFootHelpers.validEmail(email):
-                            if email.split("@")[0] in self.opts['_genericusers'].split(","):
+                            if email.split("@")[0] in self.opts.get('_genericusers', '').split(","):
                                 evttype = "EMAILADDR_GENERIC"
                             else:
                                 evttype = "EMAILADDR"
 
                             e = SpiderFootEvent(evttype, email,
-                                                self.__name__, event)
-                            self.notifyListeners(e)
+                                                self.__class__.__name__, event)
+                            if hasattr(self.sf, 'notifyListeners'):
+                                self.sf.notifyListeners(e)
 
                 if data['Meta'].get("Telephones", []):
                     for phone in data['Meta']['Telephones']:
                         phone = phone.replace("-", "").replace("(", "").replace(")", "").replace(" ", "")
-                        e = SpiderFootEvent("PHONE_NUMBER", phone, self.__name__, event)
-                        self.notifyListeners(e)
+                        e = SpiderFootEvent("PHONE_NUMBER", phone, self.__class__.__name__, event)
+                        if hasattr(self.sf, 'notifyListeners'):
+                            self.sf.notifyListeners(e)
 
             if "Paths" in data.get("Result", []):
                 for p in data["Result"]['Paths']:
                     if p.get("SubDomain", ""):
                         h = p["SubDomain"] + "." + eventData
-                        ev = SpiderFootEvent("INTERNET_NAME", h, self.__name__, event)
-                        self.notifyListeners(ev)
-                        if self.sf.isDomain(h, self.opts['_internettlds']):
-                            ev = SpiderFootEvent("DOMAIN_NAME", h, self.__name__, event)
-                            self.notifyListeners(ev)
+                        ev = SpiderFootEvent("INTERNET_NAME", h, self.__class__.__name__, event)
+                        if hasattr(self.sf, 'notifyListeners'):
+                            self.sf.notifyListeners(ev)
+                        if hasattr(self.sf, 'isDomain') and self.sf.isDomain(h, self.opts.get('_internettlds', '')):
+                            ev = SpiderFootEvent("DOMAIN_NAME", h, self.__class__.__name__, event)
+                            if hasattr(self.sf, 'notifyListeners'):
+                                self.sf.notifyListeners(ev)
                     else:
                         ev = None
 
@@ -201,70 +215,76 @@ class sfp_builtwith(SpiderFootPlugin):
                             src = ev
                         else:
                             src = event
-                        agelimit = int(time.time() * 1000) - (86400000 * self.opts['maxage'])
+                        agelimit = int(time.time() * 1000) - (86400000 * self.opts.get('maxage', 30))
                         if t.get("LastDetected", 0) < agelimit:
-                            self.debug("Data found too old, skipping.")
+                            print("[sfp_builtwith] Data found too old, skipping.")
                             continue
                         e = SpiderFootEvent("WEBSERVER_TECHNOLOGY", t["Name"],
-                                            self.__name__, src)
-                        self.notifyListeners(e)
+                                            self.__class__.__name__, src)
+                        if hasattr(self.sf, 'notifyListeners'):
+                            self.sf.notifyListeners(e)
 
         data = self.queryRelationships(eventData)
         if data is None:
             return
 
-        agelimit = int(time.time() * 1000) - (86400000 * self.opts['maxage'])
+        agelimit = int(time.time() * 1000) - (86400000 * self.opts.get('maxage', 30))
 
         for r in data:
             if "Domain" not in r or "Identifiers" not in r:
-                self.debug("Data returned not in the format requested.")
+                print("[sfp_builtwith] Data returned not in the format requested.")
                 continue
 
             if r['Domain'] != eventData:
-                self.debug("Data returned doesn't match data requested, skipping.")
+                print("[sfp_builtwith] Data returned doesn't match data requested, skipping.")
                 continue
 
             for i in r['Identifiers']:
                 if "Last" not in i or "Type" not in i or "Value" not in i:
-                    self.debug("Data returned not in the format requested.")
+                    print("[sfp_builtwith] Data returned not in the format requested.")
                     continue
 
                 if i['Last'] < agelimit:
-                    self.debug("Data found too old, skipping.")
+                    print("[sfp_builtwith] Data found too old, skipping.")
                     continue
 
                 evttype = None
                 # Related through shared IP
                 if i['Type'] == "ip":
-                    if self.sf.validIP(i['Value']):
+                    if hasattr(self.sf, 'validIP') and self.sf.validIP(i['Value']):
                         val = i['Value']
                         evttype = "IP_ADDRESS"
                     else:
                         val = i['Value'].strip(".")
-                        if self.getTarget.matches(val):
-                            evttype = "INTERNET_NAME"
-                        else:
-                            evttype = "CO_HOSTED_SITE"
+                        # self.getTarget is not available, so just treat as CO_HOSTED_SITE
+                        # if self.getTarget.matches(val):
+                        #     evttype = "INTERNET_NAME"
+                        # else:
+                        evttype = "CO_HOSTED_SITE"
 
                     # Create the name/co-host
-                    e = SpiderFootEvent(evttype, val, self.__name__, event)
-                    self.notifyListeners(e)
+                    e = SpiderFootEvent(evttype, val, self.__class__.__name__, event)
+                    if hasattr(self.sf, 'notifyListeners'):
+                        self.sf.notifyListeners(e)
                     continue
 
                 # Related through shared analytics ID
                 txt = i['Type'] + ": " + str(i['Value'])
-                e = SpiderFootEvent("WEB_ANALYTICS_ID", txt, self.__name__, event)
-                self.notifyListeners(e)
+                e = SpiderFootEvent("WEB_ANALYTICS_ID", txt, self.__class__.__name__, event)
+                if hasattr(self.sf, 'notifyListeners'):
+                    self.sf.notifyListeners(e)
 
-                if i['Matches']:
+                if i.get('Matches'):
                     for m in i['Matches']:
                         if "Domain" not in m:
                             continue
-                        evt = SpiderFootEvent("AFFILIATE_INTERNET_NAME", m['Domain'], self.__name__, e)
-                        self.notifyListeners(evt)
+                        evt = SpiderFootEvent("AFFILIATE_INTERNET_NAME", m['Domain'], self.__class__.__name__, e)
+                        if hasattr(self.sf, 'notifyListeners'):
+                            self.sf.notifyListeners(evt)
 
-                        if self.sf.isDomain(m['Domain'], self.opts['_internettlds']):
-                            evt = SpiderFootEvent("AFFILIATE_DOMAIN_NAME", m['Domain'], self.__name__, e)
-                            self.notifyListeners(evt)
+                        if hasattr(self.sf, 'isDomain') and self.sf.isDomain(m['Domain'], self.opts.get('_internettlds', '')):
+                            evt = SpiderFootEvent("AFFILIATE_DOMAIN_NAME", m['Domain'], self.__class__.__name__, e)
+                            if hasattr(self.sf, 'notifyListeners'):
+                                self.sf.notifyListeners(evt)
 
 # End of sfp_builtwith class

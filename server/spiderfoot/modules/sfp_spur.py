@@ -14,8 +14,8 @@
 import json
 
 from netaddr import IPNetwork
-
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_spur(SpiderFootPlugin):
@@ -67,13 +67,15 @@ class sfp_spur(SpiderFootPlugin):
         'maxsubnet': "If looking up subnets, the maximum subnet size to look up all the IPs within (CIDR value, 24 = /24, 16 = /16, etc.)"
     }
 
-    results = None
-    errorState = False
+
+    def __init__(self):
+        super(sfp_spur, self).__init__()
+        self.results = dict()
+        self.errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
-
+        self.results = dict()
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 

@@ -10,7 +10,9 @@
 # Licence:     MIT
 # -------------------------------------------------------------------------------
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
 
 
 class sfp_intfiles(SpiderFootPlugin):
@@ -33,7 +35,10 @@ class sfp_intfiles(SpiderFootPlugin):
         'fileexts': "File extensions of files you consider interesting."
     }
 
-    results = None
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc

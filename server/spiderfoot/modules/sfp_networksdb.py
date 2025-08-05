@@ -17,10 +17,18 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
 
 
 class sfp_networksdb(SpiderFootPlugin):
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
+        self.cohostcount = 0
 
     meta = {
         'name': "NetworksDB",
@@ -65,14 +73,11 @@ class sfp_networksdb(SpiderFootPlugin):
         'maxcohost': "Stop reporting co-hosted sites after this many are found, as it would likely indicate web hosting."
     }
 
-    cohostcount = 0
-    results = None
-    errorState = False
 
     # Initialize module and module options
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.cohostcount = 0
         self.errorState = False
 
@@ -331,13 +336,15 @@ class sfp_networksdb(SpiderFootPlugin):
                     continue
 
                 if not self.opts['cohostsamedomain']:
-                    if self.getTarget().matches(co, includeParents=True):
-                        evt = SpiderFootEvent('INTERNET_NAME', co, self.__name__, event)
-                        self.notifyListeners(evt)
-                        if self.sf.isDomain(co, self.opts['_internettlds']):
-                            evt = SpiderFootEvent('DOMAIN_NAME', co, self.__name__, event)
+                    target = self.getTarget()
+                    if hasattr(target, 'matches') and not isinstance(target, str):
+                        if target.matches(co, includeParents=True):
+                            evt = SpiderFootEvent('INTERNET_NAME', co, self.__name__, event)
                             self.notifyListeners(evt)
-                        continue
+                            if self.sf.isDomain(co, self.opts['_internettlds']):
+                                evt = SpiderFootEvent('DOMAIN_NAME', co, self.__name__, event)
+                                self.notifyListeners(evt)
+                            continue
 
                 if self.cohostcount < self.opts['maxcohost']:
                     evt = SpiderFootEvent('CO_HOSTED_SITE', co, self.__name__, event)

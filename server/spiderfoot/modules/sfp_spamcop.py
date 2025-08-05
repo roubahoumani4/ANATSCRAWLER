@@ -14,7 +14,8 @@
 
 from netaddr import IPNetwork
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_spamcop(SpiderFootPlugin):
@@ -56,11 +57,13 @@ class sfp_spamcop(SpiderFootPlugin):
         'maxsubnet': "If looking up subnets, the maximum subnet size to look up all the IPs within (CIDR value, 24 = /24, 16 = /16, etc.)"
     }
 
-    results = None
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
@@ -106,11 +109,15 @@ class sfp_spamcop(SpiderFootPlugin):
             return None
 
         try:
-            lookup = self.reverseAddr(qaddr) + '.bl.spamcop.net'
+            rev = self.reverseAddr(qaddr)
+            if rev is None:
+                self.debug(f"Could not reverse address for {qaddr}, skipping SpamCop lookup.")
+                return None
+            lookup = rev + '.bl.spamcop.net'
             self.debug(f"Checking SpamCop blacklist: {lookup}")
             return self.sf.resolveHost(lookup)
         except Exception as e:
-            self.debug(f"SpamCop did not resolve {qaddr} / {lookup}: {e}")
+            self.debug(f"SpamCop did not resolve {qaddr} / {lookup if 'lookup' in locals() else 'N/A'}: {e}")
 
         return None
 

@@ -15,10 +15,18 @@ import json
 import re
 import time
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
+
 
 
 class sfp_circllu(SpiderFootPlugin):
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
+        self.cohostcount = 0
 
     meta = {
         'name': "CIRCL.LU",
@@ -75,13 +83,11 @@ class sfp_circllu(SpiderFootPlugin):
     # Be sure to completely clear any class variables in setup()
     # or you run the risk of data persisting between scan runs.
 
-    results = None
-    errorState = False
-    cohostcount = 0
+
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.cohostcount = 0
 
         # Clear / reset any other class member variables here
@@ -213,29 +219,61 @@ class sfp_circllu(SpiderFootPlugin):
                     continue
 
                 cohosts = list()
+
                 if eventName == "IP_ADDRESS":
                     # Record could be pointing to our IP, or from our IP
                     if rec['rrtype'] == "A" and rec['rdata'] == eventData:
-                        if not self.getTarget().matches(rec['rrname']):
-                            # We found a co-host
-                            cohosts.append(rec['rrname'])
+                        target = self.getTarget()
+                        # Defensive: only call matches if it exists and is not a string
+                        if hasattr(target, 'matches') and not isinstance(target, str):
+                            try:
+                                if not target.matches(rec['rrname']):
+                                    # We found a co-host
+                                    cohosts.append(rec['rrname'])
+                            except Exception:
+                                if rec['rrname'] != str(target):
+                                    cohosts.append(rec['rrname'])
+                        else:
+                            if rec['rrname'] != str(target):
+                                cohosts.append(rec['rrname'])
 
                 if eventName in ["INTERNET_NAME", "DOMAIN_NAME"]:
                     # Record could be an A/CNAME of this entity, or something pointing to it
                     if rec['rdata'] == eventData:
-                        if not self.getTarget().matches(rec['rrname']):
-                            # We found a co-host
-                            cohosts.append(rec['rrname'])
+                        target = self.getTarget()
+                        if hasattr(target, 'matches') and not isinstance(target, str):
+                            try:
+                                if not target.matches(rec['rrname']):
+                                    # We found a co-host
+                                    cohosts.append(rec['rrname'])
+                            except Exception:
+                                if rec['rrname'] != str(target):
+                                    cohosts.append(rec['rrname'])
+                        else:
+                            if rec['rrname'] != str(target):
+                                cohosts.append(rec['rrname'])
 
                 for co in cohosts:
                     if eventName == "IP_ADDRESS" and (self.opts['verify'] and not self.sf.validateIP(co, eventData)):
                         self.debug("Host no longer resolves to our IP.")
                         continue
 
+
                     if not self.opts['cohostsamedomain']:
-                        if self.getTarget().matches(co, includeParents=True):
-                            self.debug("Skipping " + co + " because it is on the same domain.")
-                            continue
+                        target = self.getTarget()
+                        if hasattr(target, 'matches') and not isinstance(target, str):
+                            try:
+                                if target.matches(co, includeParents=True):
+                                    self.debug("Skipping " + co + " because it is on the same domain.")
+                                    continue
+                            except Exception:
+                                if co == str(target):
+                                    self.debug("Skipping " + co + " because it is on the same domain.")
+                                    continue
+                        else:
+                            if co == str(target):
+                                self.debug("Skipping " + co + " because it is on the same domain.")
+                                continue
 
                     if self.cohostcount < self.opts['maxcohost']:
                         e = SpiderFootEvent("CO_HOSTED_SITE", co, self.__name__, event)

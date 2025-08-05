@@ -12,7 +12,8 @@
 
 import dns.resolver
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_dns_for_family(SpiderFootPlugin):
@@ -43,7 +44,10 @@ class sfp_dns_for_family(SpiderFootPlugin):
     optdescs = {
     }
 
-    results = None
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc

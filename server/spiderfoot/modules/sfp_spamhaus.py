@@ -14,7 +14,8 @@
 
 from netaddr import IPNetwork
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_spamhaus(SpiderFootPlugin):
@@ -61,8 +62,10 @@ class sfp_spamhaus(SpiderFootPlugin):
         'maxsubnet': "If looking up subnets, the maximum subnet size to look up all the IPs within (CIDR value, 24 = /24, 16 = /16, etc.)"
     }
 
-    results = None
-    errorState = False
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     checks = {
         '127.0.0.2': "Spamhaus (Zen) - Spammer",
@@ -78,7 +81,7 @@ class sfp_spamhaus(SpiderFootPlugin):
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
         self.errorState = False
-        self.results = self.tempStorage()
+        self.results = dict()
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
@@ -124,11 +127,15 @@ class sfp_spamhaus(SpiderFootPlugin):
             return None
 
         try:
-            lookup = self.reverseAddr(qaddr) + '.zen.spamhaus.org'
+            rev = self.reverseAddr(qaddr)
+            if rev is None:
+                self.debug(f"Could not reverse address for {qaddr}, skipping Spamhaus Zen lookup.")
+                return None
+            lookup = rev + '.zen.spamhaus.org'
             self.debug(f"Checking Spamhaus Zen blacklist: {lookup}")
             return self.sf.resolveHost(lookup)
         except Exception as e:
-            self.debug(f"Spamhaus Zen did not resolve {qaddr} / {lookup}: {e}")
+            self.debug(f"Spamhaus Zen did not resolve {qaddr} / {lookup if 'lookup' in locals() else 'N/A'}: {e}")
 
         return None
 

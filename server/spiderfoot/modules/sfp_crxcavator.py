@@ -16,7 +16,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_crxcavator(SpiderFootPlugin):
@@ -46,13 +47,16 @@ class sfp_crxcavator(SpiderFootPlugin):
         "verify": "Verify identified hostnames resolve.",
     }
 
-    results = None
-    errorState = False
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
+
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
-
+        self.results = dict()
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 
@@ -214,11 +218,16 @@ class sfp_crxcavator(SpiderFootPlugin):
                 if not privacy_policy and not support_site and not offered_by and not website:
                     continue
 
+
+                target = self.getTarget()
+                def matches_target(val):
+                    return val and hasattr(target, 'matches') and not isinstance(target, str) and target.matches(self.sf.urlFQDN(val), includeChildren=True, includeParents=True)
+
                 if (
-                    not self.getTarget().matches(self.sf.urlFQDN(privacy_policy), includeChildren=True, includeParents=True)
-                    and not self.getTarget().matches(self.sf.urlFQDN(website), includeChildren=True, includeParents=True)
-                    and not self.getTarget().matches(self.sf.urlFQDN(offered_by), includeChildren=True, includeParents=True)
-                    and not self.getTarget().matches(self.sf.urlFQDN(support_site), includeChildren=True, includeParents=True)
+                    not matches_target(privacy_policy)
+                    and not matches_target(website)
+                    and not matches_target(offered_by)
+                    and not matches_target(support_site)
                 ):
                     self.debug(f"Extension {app_full_name} does not match {eventData}, skipping")
                     continue
@@ -254,7 +263,9 @@ class sfp_crxcavator(SpiderFootPlugin):
             if not host:
                 continue
 
-            if self.getTarget().matches(host, includeChildren=True, includeParents=True):
+
+            target = self.getTarget()
+            if hasattr(target, 'matches') and not isinstance(target, str) and target.matches(host, includeChildren=True, includeParents=True):
                 evt = SpiderFootEvent('LINKED_URL_INTERNAL', url, self.__name__, event)
                 self.notifyListeners(evt)
 
@@ -264,7 +275,9 @@ class sfp_crxcavator(SpiderFootPlugin):
             if not host:
                 continue
 
-            if self.getTarget().matches(host, includeChildren=True, includeParents=True):
+
+            target = self.getTarget()
+            if hasattr(target, 'matches') and not isinstance(target, str) and target.matches(host, includeChildren=True, includeParents=True):
                 evt_type = 'INTERNET_NAME'
             else:
                 evt_type = 'AFFILIATE_INTERNET_NAME'

@@ -18,10 +18,18 @@ import tempfile
 from netaddr import IPNetwork
 from subprocess import PIPE, Popen, TimeoutExpired
 
-from spiderfoot import SpiderFootPlugin, SpiderFootEvent, SpiderFootHelpers
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.helpers import SpiderFootHelpers
+
 
 
 class sfp_tool_testsslsh(SpiderFootPlugin):
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     meta = {
         'name': "Tool - testssl.sh",
@@ -54,8 +62,7 @@ class sfp_tool_testsslsh(SpiderFootPlugin):
         'mincve': "Only report CVEs equal to or higher than this level, must be either LOW, MEDIUM, HIGH or CRITICAL."
     }
 
-    results = None
-    errorState = False
+    # results and errorState are now instance-level, initialized in __init__
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc

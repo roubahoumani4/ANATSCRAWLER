@@ -54,7 +54,7 @@ class sfp_searchcode(SpiderFootPlugin):
     def __init__(self):
         super().__init__()
         self.results = {}
-    errorState = False
+        self.errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
@@ -157,7 +157,8 @@ class sfp_searchcode(SpiderFootPlugin):
                     continue
 
                 mail_domain = email.lower().split('@')[1]
-                if not self.getTarget().matches(mail_domain):
+                target = self.getTarget()
+                if not (hasattr(target, "matches") and not isinstance(target, str) and target.matches(mail_domain)):
                     self.debug(f"Skipped email address: {email}")
                     continue
 
@@ -182,8 +183,8 @@ class sfp_searchcode(SpiderFootPlugin):
                     continue
 
                 host = self.sf.urlFQDN(link)
-
-                if not self.getTarget().matches(host, includeChildren=True, includeParents=True):
+                target = self.getTarget()
+                if not (hasattr(target, "matches") and not isinstance(target, str) and target.matches(host, includeChildren=True, includeParents=True)):
                     self.debug(f"Skipped unrelated URL: {link}")
                     continue
 

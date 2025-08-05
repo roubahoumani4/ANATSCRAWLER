@@ -13,7 +13,8 @@
 import json
 import urllib.parse
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_bitcoinwhoswho(SpiderFootPlugin):
@@ -54,13 +55,15 @@ class sfp_bitcoinwhoswho(SpiderFootPlugin):
         "api_key": "Bitcoin Who's Who API Key."
     }
 
-    results = None
 
-    errorState = False
+    def __init__(self):
+        super().__init__()
+        self.results = {}
+        self.errorState = False
 
     def setup(self, sfc, userOpts=None):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = {}
 
         if userOpts:
             self.opts.update(userOpts)

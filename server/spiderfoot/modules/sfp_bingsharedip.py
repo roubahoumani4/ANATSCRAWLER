@@ -12,7 +12,8 @@
 
 from netaddr import IPNetwork
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_bingsharedip(SpiderFootPlugin):
@@ -60,13 +61,16 @@ class sfp_bingsharedip(SpiderFootPlugin):
         "api_key": "Bing API Key for shared IP search."
     }
 
-    results = None
-    cohostcount = 0
-    errorState = False
+
+    def __init__(self):
+        super().__init__()
+        self.results = {}
+        self.cohostcount = 0
+        self.errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = {}
         self.cohostcount = 0
         self.__dataSource__ = "Bing"
         self.errorState = False
@@ -150,11 +154,14 @@ class sfp_bingsharedip(SpiderFootPlugin):
                 site = self.sf.urlFQDN(url.lower())
                 if site not in myres and site != ip:
                     if not self.opts["cohostsamedomain"]:
-                        if self.getTarget().matches(site, includeParents=True):
-                            self.debug(
-                                f"Skipping {site} because it is on the same domain."
-                            )
-                            continue
+                        target = self.getTarget()
+                        # Only call matches if target is not a string and has that method
+                        if not isinstance(target, str) and hasattr(target, "matches") and callable(getattr(target, "matches", None)):
+                            if target.matches(site, includeParents=True):
+                                self.debug(
+                                    f"Skipping {site} because it is on the same domain."
+                                )
+                                continue
                     if self.opts["verify"] and not self.sf.validateIP(site, ip):
                         self.debug(f"Host {site} no longer resolves to {ip}")
                         continue

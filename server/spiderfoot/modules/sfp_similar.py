@@ -11,7 +11,8 @@
 # Licence:     MIT
 # -------------------------------------------------------------------------------
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 nearchars = {
     'a': ['4', 's'],
@@ -79,11 +80,13 @@ class sfp_similar(SpiderFootPlugin):
     }
 
     # Internal results tracking
-    results = None
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.__dataSource__ = "DNS"
 
         for opt in list(userOpts.keys()):

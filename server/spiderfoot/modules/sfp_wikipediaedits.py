@@ -16,9 +16,11 @@ import re
 import urllib.error
 import urllib.parse
 import urllib.request
-from html.parser import HTMLParser
+import html
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
 
 
 class sfp_wikipediaedits(SpiderFootPlugin):
@@ -52,11 +54,14 @@ class sfp_wikipediaedits(SpiderFootPlugin):
         "days_limit": "Maximum age of data to be considered valid (0 = unlimited)."
     }
 
-    results = None
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.__dataSource__ = "Wikipedia"
 
         for opt in list(userOpts.keys()):
@@ -95,14 +100,12 @@ class sfp_wikipediaedits(SpiderFootPlugin):
         links = list()
 
         try:
-            parser = HTMLParser()
-
             for line in res['content'].split("\n"):
                 matches = re.findall("<link>(.*?)</link>", line, re.IGNORECASE)
                 for m in matches:
                     if "Special:Contributions" in m:
                         continue
-                    d = parser.unescape(m)
+                    d = html.unescape(m)
                     links.append(d)
             return set(links)
         except Exception as e:

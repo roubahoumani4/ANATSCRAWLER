@@ -11,14 +11,21 @@
 # Licence:     MIT
 # -------------------------------------------------------------------------------
 
+
 import json
 import os.path
 from subprocess import PIPE, Popen, TimeoutExpired
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin, SpiderFootHelpers
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.helpers import SpiderFootHelpers
 
 
 class sfp_tool_wafw00f(SpiderFootPlugin):
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
     meta = {
         'name': "Tool - WAFW00F",
         'summary': "Identify what web application firewall (WAF) is in use on the specified website.",
@@ -43,8 +50,7 @@ class sfp_tool_wafw00f(SpiderFootPlugin):
         'wafw00f_path': "Path to the wafw00f executable file. Must be set."
     }
 
-    results = None
-    errorState = False
+
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc

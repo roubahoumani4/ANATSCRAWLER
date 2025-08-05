@@ -15,7 +15,9 @@ import hashlib
 import json
 import time
 
-from spiderfoot import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.helpers import SpiderFootHelpers
 
 
 class sfp_gravatar(SpiderFootPlugin):
@@ -49,14 +51,16 @@ class sfp_gravatar(SpiderFootPlugin):
     optdescs = {
     }
 
-    results = None
-    reportedUsers = None
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.reportedUsers = dict()
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
-        self.reportedUsers = self.tempStorage()
-
+        self.results = dict()
+        self.reportedUsers = dict()
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 

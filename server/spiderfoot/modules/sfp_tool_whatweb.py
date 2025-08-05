@@ -15,10 +15,17 @@ import json
 import os.path
 from subprocess import PIPE, Popen, TimeoutExpired
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin, SpiderFootHelpers
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.helpers import SpiderFootHelpers
+
 
 
 class sfp_tool_whatweb(SpiderFootPlugin):
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     meta = {
         'name': "Tool - WhatWeb",
@@ -52,15 +59,13 @@ class sfp_tool_whatweb(SpiderFootPlugin):
         'whatweb_path': "Path to the whatweb executable file. Must be set."
     }
 
-    results = None
-    errorState = False
+
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.errorState = False
         self.__dataSource__ = "Target Website"
-
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 
@@ -128,20 +133,21 @@ class sfp_tool_whatweb(SpiderFootPlugin):
             eventData
         ]
         try:
-            p = Popen(args, stdout=PIPE, stderr=PIPE, timeout=300)
-            stdout, stderr = p.communicate(input=None)
-        except TimeoutExpired:
-            p.kill()
-            stdout, stderr = p.communicate()
-            self.debug(f"Timed out waiting for WhatWeb to finish against {eventData}")
-            return
+            p = Popen(args, stdout=PIPE, stderr=PIPE)
+            try:
+                stdout, stderr = p.communicate(input=None, timeout=300)
+            except TimeoutExpired:
+                p.kill()
+                stdout, stderr = p.communicate()
+                self.debug(f"Timed out waiting for WhatWeb to finish against {eventData}")
+                return
         except Exception as e:
             self.error(f"Unable to run WhatWeb: {e}")
             return
 
         if p.returncode != 0:
             self.error("Unable to read WhatWeb output.")
-            self.debug("Error running WhatWeb: " + stderr + ", " + stdout)
+            self.debug(f"Error running WhatWeb: {stderr.decode(errors='replace')}, {stdout.decode(errors='replace')}")
             return
 
         if not stdout:

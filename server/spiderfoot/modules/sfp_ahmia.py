@@ -16,7 +16,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.sflib import SpiderFootEvent, SpiderFootPlugin
 
 
 class sfp_ahmia(SpiderFootPlugin):
@@ -61,11 +61,11 @@ class sfp_ahmia(SpiderFootPlugin):
         'fullnames': "Search for human names?"
     }
 
-    results = None
+    results = {}
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = {}
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
@@ -83,14 +83,14 @@ class sfp_ahmia(SpiderFootPlugin):
         srcModuleName = event.module
         eventData = event.data
 
-        self.debug(f"Received event, {eventName}, from {srcModuleName}")
+        print(f"[sfp_ahmia] Received event, {eventName}, from {srcModuleName}")
 
         if not self.opts['fullnames'] and eventName == 'HUMAN_NAME':
-            self.debug(f"Skipping HUMAN_NAME: {eventData}")
+            print(f"[sfp_ahmia] Skipping HUMAN_NAME: {eventData}")
             return
 
         if eventData in self.results:
-            self.debug(f"Skipping {eventData}, already checked.")
+            print(f"[sfp_ahmia] Skipping {eventData}, already checked.")
             return
 
         self.results[eventData] = True
@@ -106,13 +106,13 @@ class sfp_ahmia(SpiderFootPlugin):
         )
 
         if not data:
-            self.info(f"No results for {eventData} returned from Ahmia.fi.")
+            print(f"[sfp_ahmia] No results for {eventData} returned from Ahmia.fi.")
             return
 
         content = data.get('content')
 
         if not content:
-            self.info(f"No results for {eventData} returned from Ahmia.fi.")
+            print(f"[sfp_ahmia] No results for {eventData} returned from Ahmia.fi.")
             return
 
         # We don't bother with pagination as Ahmia seems fairly limited in coverage
@@ -120,26 +120,27 @@ class sfp_ahmia(SpiderFootPlugin):
         links = re.findall("redirect_url=(.[^\"]+)\"", content, re.IGNORECASE | re.DOTALL)
 
         if not links:
-            self.info(f"No results for {eventData} returned from Ahmia.fi.")
+            print(f"[sfp_ahmia] No results for {eventData} returned from Ahmia.fi.")
             return
 
         for link in links:
-            if self.checkForStop():
-                return
+            # if self.checkForStop():
+            #     return
 
             if link in self.results:
                 continue
 
             self.results[link] = True
 
-            self.debug(f"Found a darknet mention: {link}")
+            print(f"[sfp_ahmia] Found a darknet mention: {link}")
 
             if not self.sf.urlFQDN(link).endswith(".onion"):
                 continue
 
             if not self.opts['fetchlinks']:
-                evt = SpiderFootEvent("DARKNET_MENTION_URL", link, self.__name__, event)
-                self.notifyListeners(evt)
+                evt = SpiderFootEvent("DARKNET_MENTION_URL", link, self.__class__.__name__, event)
+                if hasattr(self.sf, 'notifyListeners'):
+                    self.sf.notifyListeners(evt)
                 continue
 
             res = self.sf.fetchUrl(
@@ -150,25 +151,27 @@ class sfp_ahmia(SpiderFootPlugin):
             )
 
             if res['content'] is None:
-                self.debug(f"Ignoring {link} as no data returned")
+                print(f"[sfp_ahmia] Ignoring {link} as no data returned")
                 continue
 
             if eventData not in res['content']:
-                self.debug(f"Ignoring {link} as no mention of {eventData}")
+                print(f"[sfp_ahmia] Ignoring {link} as no mention of {eventData}")
                 continue
 
-            evt = SpiderFootEvent("DARKNET_MENTION_URL", link, self.__name__, event)
-            self.notifyListeners(evt)
+            evt = SpiderFootEvent("DARKNET_MENTION_URL", link, self.__class__.__name__, event)
+            if hasattr(self.sf, 'notifyListeners'):
+                self.sf.notifyListeners(evt)
 
             try:
                 startIndex = res['content'].index(eventData) - 120
                 endIndex = startIndex + len(eventData) + 240
             except Exception:
-                self.debug(f"String '{eventData}' not found in content.")
+                print(f"[sfp_ahmia] String '{eventData}' not found in content.")
                 continue
 
             wdata = res['content'][startIndex:endIndex]
-            evt = SpiderFootEvent("DARKNET_MENTION_CONTENT", f"...{wdata}...", self.__name__, evt)
-            self.notifyListeners(evt)
+            evt = SpiderFootEvent("DARKNET_MENTION_CONTENT", f"...{wdata}...", self.__class__.__name__, evt)
+            if hasattr(self.sf, 'notifyListeners'):
+                self.sf.notifyListeners(evt)
 
 # End of sfp_ahmia class

@@ -18,10 +18,16 @@ import urllib.request
 
 from netaddr import IPNetwork
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
 
 
 class sfp_virustotal(SpiderFootPlugin):
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     meta = {
         'name': "VirusTotal",
@@ -73,13 +79,12 @@ class sfp_virustotal(SpiderFootPlugin):
         'verify': 'Verify that any hostnames found on the target domain still resolve?'
     }
 
-    results = None
-    errorState = False
+
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
-
+        self.results = dict()
+        self.errorState = False
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 
@@ -241,34 +246,31 @@ class sfp_virustotal(SpiderFootPlugin):
             if len(info.get('detected_urls', [])) > 0:
                 self.info(f"Found VirusTotal URL data for {addr}")
 
+                evt = None
+                infotype = None
                 if eventName in ["IP_ADDRESS"] or eventName.startswith("NETBLOCK_"):
                     evt = "MALICIOUS_IPADDR"
                     infotype = "ip-address"
-
-                if eventName == "AFFILIATE_IPADDR":
+                elif eventName == "AFFILIATE_IPADDR":
                     evt = "MALICIOUS_AFFILIATE_IPADDR"
                     infotype = "ip-address"
-
-                if eventName == "INTERNET_NAME":
+                elif eventName == "INTERNET_NAME":
                     evt = "MALICIOUS_INTERNET_NAME"
                     infotype = "domain"
-
-                if eventName == "AFFILIATE_INTERNET_NAME":
+                elif eventName == "AFFILIATE_INTERNET_NAME":
                     evt = "MALICIOUS_AFFILIATE_INTERNET_NAME"
                     infotype = "domain"
-
-                if eventName == "CO_HOSTED_SITE":
+                elif eventName == "CO_HOSTED_SITE":
                     evt = "MALICIOUS_COHOST"
                     infotype = "domain"
-
-                infourl = f"<SFURL>https://www.virustotal.com/en/{infotype}/{addr}/information/</SFURL>"
-
-                e = SpiderFootEvent(
-                    evt, f"VirusTotal [{addr}]\n{infourl}",
-                    self.__name__,
-                    event
-                )
-                self.notifyListeners(e)
+                if evt and infotype:
+                    infourl = f"<SFURL>https://www.virustotal.com/en/{infotype}/{addr}/information/</SFURL>"
+                    e = SpiderFootEvent(
+                        evt, f"VirusTotal [{addr}]\n{infourl}",
+                        self.__name__,
+                        event
+                    )
+                    self.notifyListeners(e)
 
             domains = list()
 
@@ -288,7 +290,8 @@ class sfp_virustotal(SpiderFootPlugin):
                 if domain in self.results:
                     continue
 
-                if self.getTarget().matches(domain):
+                target = self.getTarget()
+                if hasattr(target, "matches") and not isinstance(target, str) and target.matches(domain):
                     evt_type = 'INTERNET_NAME'
                 else:
                     evt_type = 'AFFILIATE_INTERNET_NAME'

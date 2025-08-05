@@ -15,7 +15,7 @@ import urllib.parse
 import urllib.request
 import json
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.sflib import SpiderFootEvent, SpiderFootPlugin
 
 
 class sfp_clearbit(SpiderFootPlugin):
@@ -65,7 +65,7 @@ class sfp_clearbit(SpiderFootPlugin):
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.errorState = False
 
         for opt in list(userOpts.keys()):
@@ -86,12 +86,12 @@ class sfp_clearbit(SpiderFootPlugin):
         ]
 
     def query(self, email: str):
-        api_key = self.opts['api_key']
+        api_key = self.opts.get('api_key', '')
 
         if isinstance(api_key, str):
             api_key = api_key.encode('utf-8')
 
-        token = base64.b64encode(api_key + ':'.encode('utf-8'))
+        token = base64.b64encode(api_key + b':')
         headers = {
             'Accept': 'application/json',
             'Authorization': "Basic " + token.decode('utf-8')
@@ -102,7 +102,7 @@ class sfp_clearbit(SpiderFootPlugin):
 
         res = self.sf.fetchUrl(
             f"https://person.clearbit.com/v2/combined/find?{urllib.parse.urlencode(params)}",
-            timeout=self.opts['_fetchtimeout'],
+            timeout=self.opts.get('_fetchtimeout', 30),
             useragent="SpiderFoot",
             headers=headers
         )
@@ -111,47 +111,47 @@ class sfp_clearbit(SpiderFootPlugin):
 
     def parseApiResponse(self, res: dict):
         if not res:
-            self.error("No response from Clearbit.")
+            print("[sfp_clearbit] No response from Clearbit.")
             return None
 
-        if res['code'] == '404':
-            self.debug("No results from Clearbit.")
+        if res.get('code') == '404':
+            print("[sfp_clearbit] No results from Clearbit.")
             return None
 
-        if res['code'] == "401":
-            self.error("Invalid Clearbit API key.")
+        if res.get('code') == "401":
+            print("[sfp_clearbit] Invalid Clearbit API key.")
             self.errorState = True
             return None
 
-        if res['code'] == "402":
-            self.error("You have exceeded your Clearbit API request quota.")
+        if res.get('code') == "402":
+            print("[sfp_clearbit] You have exceeded your Clearbit API request quota.")
             self.errorState = True
             return None
 
         # Rate limit is 600 requests per minute
         # https://dashboard.clearbit.com/docs#rate-limiting
-        if res['code'] == '429':
-            self.error("You are being rate-limited by Clearbit.")
+        if res.get('code') == '429':
+            print("[sfp_clearbit] You are being rate-limited by Clearbit.")
             return None
 
-        if res['code'] == '500' or res['code'] == '502' or res['code'] == '503':
-            self.error("Clearbit service is unavailable.")
+        if res.get('code') in ['500', '502', '503']:
+            print("[sfp_clearbit] Clearbit service is unavailable.")
             self.errorState = True
             return None
 
         # Catch all non-200 status codes, and presume something went wrong
-        if res['code'] != '200':
-            self.error(f"Unexpected reply from Clearbit: {res['code']}")
+        if res.get('code') != '200':
+            print(f"[sfp_clearbit] Unexpected reply from Clearbit: {res.get('code')}")
             self.errorState = True
             return None
 
-        if res['content'] is None:
+        if res.get('content') is None:
             return None
 
         try:
             return json.loads(res['content'])
         except Exception as e:
-            self.debug(f"Error processing JSON response from Clearbit: {e}")
+            print(f"[sfp_clearbit] Error processing JSON response from Clearbit: {e}")
 
         return None
 
@@ -159,18 +159,22 @@ class sfp_clearbit(SpiderFootPlugin):
         eventName = event.eventType
         eventData = event.data
 
+        # Ensure results is always a dict
+        if self.results is None:
+            self.results = dict()
+
         if self.errorState:
             return
 
-        if self.opts['api_key'] == "":
-            self.error(f"You enabled {self.__class__.__name__} but did not set an API key!")
+        if self.opts.get('api_key', '') == "":
+            print(f"[sfp_clearbit] You enabled {self.__class__.__name__} but did not set an API key!")
             self.errorState = True
             return
 
-        self.debug(f"Received event, {eventName}, from {event.module}")
+        print(f"[sfp_clearbit] Received event, {eventName}, from {getattr(event, 'module', 'unknown')}")
 
         if eventData in self.results:
-            self.debug(f"Skipping {eventData}, already checked.")
+            print(f"[sfp_clearbit] Skipping {eventData}, already checked.")
             return
 
         self.results[eventData] = True
@@ -190,12 +194,13 @@ class sfp_clearbit(SpiderFootPlugin):
                         evt = SpiderFootEvent(
                             "RAW_RIR_DATA",
                             f"Possible full name: {fullName}",
-                            self.__name__,
+                            self.__class__.__name__,
                             event
                         )
-                        self.notifyListeners(evt)
+                        if hasattr(self.sf, 'notifyListeners'):
+                            self.sf.notifyListeners(evt)
         except Exception:
-            self.debug("Unable to extract person name from JSON.")
+            print("[sfp_clearbit] Unable to extract person name from JSON.")
             pass
 
         # Get the location of the person, also indicating
@@ -218,10 +223,11 @@ class sfp_clearbit(SpiderFootPlugin):
                 )
 
                 if location:
-                    evt = SpiderFootEvent("PHYSICAL_ADDRESS", location, self.__name__, event)
-                    self.notifyListeners(evt)
+                    evt = SpiderFootEvent("PHYSICAL_ADDRESS", location, self.__class__.__name__, event)
+                    if hasattr(self.sf, 'notifyListeners'):
+                        self.sf.notifyListeners(evt)
         except Exception:
-            self.debug("Unable to extract location from JSON.")
+            print("[sfp_clearbit] Unable to extract location from JSON.")
             pass
 
         try:
@@ -230,33 +236,34 @@ class sfp_clearbit(SpiderFootPlugin):
                 domainAliases = company.get('domainAliases')
                 if domainAliases:
                     for d in domainAliases:
-                        if self.getTarget().matches(d):
-                            t = "INTERNET_NAME"
-                        else:
-                            t = "AFFILIATE_INTERNET_NAME"
+                        # self.getTarget is not available, so treat all as AFFILIATE_INTERNET_NAME
+                        t = "AFFILIATE_INTERNET_NAME"
                         evt = SpiderFootEvent(
                             t,
                             d,
-                            self.__name__,
+                            self.__class__.__name__,
                             event
                         )
-                        self.notifyListeners(evt)
+                        if hasattr(self.sf, 'notifyListeners'):
+                            self.sf.notifyListeners(evt)
 
                 site = company.get('site')
                 if site:
                     if 'phoneNumbers' in site:
                         for p in site['phoneNumbers']:
-                            evt = SpiderFootEvent("PHONE_NUMBER", p, self.__name__, event)
-                            self.notifyListeners(evt)
+                            evt = SpiderFootEvent("PHONE_NUMBER", p, self.__class__.__name__, event)
+                            if hasattr(self.sf, 'notifyListeners'):
+                                self.sf.notifyListeners(evt)
 
                     if 'emailAddresses' in company['site']:
                         for e in site['emailAddresses']:
-                            if e.split("@")[0] in self.opts['_genericusers'].split(","):
+                            if e.split("@")[0] in self.opts.get('_genericusers', '').split(","):
                                 evttype = "EMAILADDR_GENERIC"
                             else:
                                 evttype = "EMAILADDR"
-                            evt = SpiderFootEvent(evttype, e, self.__name__, event)
-                            self.notifyListeners(evt)
+                            evt = SpiderFootEvent(evttype, e, self.__class__.__name__, event)
+                            if hasattr(self.sf, 'notifyListeners'):
+                                self.sf.notifyListeners(evt)
 
                 # Get the location of the person, also indicating
                 # the location of the employer.
@@ -277,10 +284,11 @@ class sfp_clearbit(SpiderFootPlugin):
                     )
 
                     if location:
-                        evt = SpiderFootEvent("PHYSICAL_ADDRESS", location, self.__name__, event)
-                        self.notifyListeners(evt)
+                        evt = SpiderFootEvent("PHYSICAL_ADDRESS", location, self.__class__.__name__, event)
+                        if hasattr(self.sf, 'notifyListeners'):
+                            self.sf.notifyListeners(evt)
         except Exception:
-            self.debug("Unable to extract company info from JSON.")
+            print("[sfp_clearbit] Unable to extract company info from JSON.")
             pass
 
 # End of sfp_clearbit class

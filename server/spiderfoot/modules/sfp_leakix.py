@@ -13,7 +13,9 @@
 import json
 import time
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
 
 
 class sfp_leakix(SpiderFootPlugin):
@@ -59,13 +61,16 @@ class sfp_leakix(SpiderFootPlugin):
         "verify": "Verify discovered hostnames are valid by checking if they still resolve.",
     }
 
-    results = None
-    errorState = False
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     # Initialize module and module options
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.errorState = False
 
         for opt in userOpts.keys():
@@ -176,7 +181,8 @@ class sfp_leakix(SpiderFootPlugin):
                     src = event
                     ipevt = None
                     hostname = service.get('host')
-                    if hostname and eventName == "DOMAIN_NAME" and self.getTarget().matches(hostname) and hostname not in hosts:
+                    target = self.getTarget()
+                    if hostname and eventName == "DOMAIN_NAME" and hasattr(target, "matches") and not isinstance(target, str) and target.matches(hostname) and hostname not in hosts:
                         if self.opts["verify"] and not self.sf.resolveHost(hostname) and not self.sf.resolveHost6(hostname):
                             self.debug(f"Host {hostname} could not be resolved")
                             evt = SpiderFootEvent("INTERNET_NAME_UNRESOLVED", hostname, self.__name__, event)
@@ -238,7 +244,8 @@ class sfp_leakix(SpiderFootPlugin):
                     hostname = leak.get('host')
                     # If protocol is web, our hostname not empty and is not an IP ,
                     # and doesn't belong to our target, discard ( happens when sharing Hosting/CDN IPs )
-                    if leak_protocol == "web" and hostname and not self.sf.validIP(hostname) and not self.getTarget().matches(hostname):
+                    target = self.getTarget()
+                    if leak_protocol == "web" and hostname and not self.sf.validIP(hostname) and (not hasattr(target, "matches") or isinstance(target, str) or not target.matches(hostname)):
                         continue
                     leak_data = leak.get('data')
                     if leak_data:

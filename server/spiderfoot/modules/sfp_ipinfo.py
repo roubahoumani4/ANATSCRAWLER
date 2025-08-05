@@ -13,7 +13,9 @@
 
 import json
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
 
 
 class sfp_ipinfo(SpiderFootPlugin):
@@ -52,12 +54,15 @@ class sfp_ipinfo(SpiderFootPlugin):
         "api_key": "Ipinfo.io access token."
     }
 
-    results = None
-    errorState = False
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.errorState = False
 
         for opt in list(userOpts.keys()):

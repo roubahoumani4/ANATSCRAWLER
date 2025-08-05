@@ -12,7 +12,8 @@
 
 import re
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 # Taken from Google Dorks on exploit-db.com
 regexps = dict({
@@ -48,7 +49,10 @@ class sfp_errors(SpiderFootPlugin):
     }
 
     # Target
-    results = None
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
@@ -87,7 +91,15 @@ class sfp_errors(SpiderFootPlugin):
             self.results[eventSource] = list()
 
         # We only want web content for pages on the target site
-        if not self.getTarget().matches(self.sf.urlFQDN(eventSource)):
+
+        target = self.getTarget()
+        # Defensive: Only call matches if target is not a string and has matches
+        is_own = False
+        if hasattr(target, 'matches') and not isinstance(target, str):
+            if target.matches(self.sf.urlFQDN(eventSource)):
+                is_own = True
+        # If we can't check, default to not own
+        if not is_own:
             self.debug("Not collecting web content information for external sites.")
             return
 

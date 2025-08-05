@@ -17,10 +17,17 @@ import shutil
 import tempfile
 from subprocess import Popen, PIPE, TimeoutExpired
 
-from spiderfoot import SpiderFootPlugin, SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
 
 
 class sfp_tool_retirejs(SpiderFootPlugin):
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     meta = {
         "name": "Tool - Retire.js",
@@ -47,13 +54,11 @@ class sfp_tool_retirejs(SpiderFootPlugin):
     }
 
     # Target
-    results = None
-    errorState = False
+    # results and errorState are now instance-level, initialized in __init__
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
-
+        self.results = dict()
         for opt in userOpts.keys():
             self.opts[opt] = userOpts[opt]
 

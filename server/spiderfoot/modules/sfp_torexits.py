@@ -15,10 +15,15 @@ import json
 
 from netaddr import IPNetwork
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_torexits(SpiderFootPlugin):
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     meta = {
         'name': "TOR Exit Nodes",
@@ -50,12 +55,11 @@ class sfp_torexits(SpiderFootPlugin):
         'checknetblocks': "Report if any malicious IPs are found within owned netblocks?",
     }
 
-    results = None
-    errorState = False
+
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.errorState = False
         self.__dataSource__ = "torproject.org"
 

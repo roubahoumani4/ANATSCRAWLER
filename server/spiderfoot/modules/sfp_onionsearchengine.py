@@ -16,10 +16,16 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
 
 
 class sfp_onionsearchengine(SpiderFootPlugin):
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     meta = {
         'name': "Onionsearchengine.com",
@@ -59,11 +65,10 @@ class sfp_onionsearchengine(SpiderFootPlugin):
         'fullnames': "Search for human names?"
     }
 
-    results = None
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]

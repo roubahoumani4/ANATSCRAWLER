@@ -17,7 +17,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_emailcrawlr(SpiderFootPlugin):
@@ -62,8 +63,11 @@ class sfp_emailcrawlr(SpiderFootPlugin):
         "delay": "Delay between requests, in seconds.",
     }
 
-    results = None
-    errorState = False
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     # Initialize module and module options
     def setup(self, sfc, userOpts=dict()):
@@ -187,7 +191,15 @@ class sfp_emailcrawlr(SpiderFootPlugin):
                 email = res.get('email')
                 if email:
                     mail_domain = email.lower().split('@')[1]
-                    if self.getTarget().matches(mail_domain, includeChildren=True):
+
+                    target = self.getTarget()
+                    # Defensive: Only call matches if target is not a string and has matches
+                    is_own = False
+                    if hasattr(target, 'matches') and not isinstance(target, str):
+                        if target.matches(mail_domain, includeChildren=True):
+                            is_own = True
+                    # If we can't check, default to not own
+                    if is_own:
                         if email.split("@")[0] in self.opts['_genericusers'].split(","):
                             evttype = "EMAILADDR_GENERIC"
                         else:

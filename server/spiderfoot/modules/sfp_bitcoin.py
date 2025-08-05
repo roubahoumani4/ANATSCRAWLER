@@ -15,7 +15,7 @@ import codecs
 import re
 from hashlib import sha256
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.sflib import SpiderFootEvent, SpiderFootPlugin
 
 
 class sfp_bitcoin(SpiderFootPlugin):
@@ -31,11 +31,11 @@ class sfp_bitcoin(SpiderFootPlugin):
     opts = {}
     optdescs = {}
 
-    results = None
+    results = {}
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = {}
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
@@ -72,7 +72,7 @@ class sfp_bitcoin(SpiderFootPlugin):
 
         self.results[sourceData] = True
 
-        self.debug(f"Received event, {eventName}, from {srcModuleName}")
+        print(f"[sfp_bitcoin] Received event, {eventName}, from {srcModuleName}")
 
         addrs = list()
 
@@ -81,7 +81,7 @@ class sfp_bitcoin(SpiderFootPlugin):
         matches = re.findall(r"[\s:=\>](bc(0([ac-hj-np-z02-9]{39}|[ac-hj-np-z02-9]{59})|1[ac-hj-np-z02-9]{8,87})|[13][a-km-zA-HJ-NP-Z1-9]{25,35})", eventData)
         for m in matches:
             address = m[0]
-            self.debug(f"Potential Bitcoin address match: {address}")
+            print(f"[sfp_bitcoin] Potential Bitcoin address match: {address}")
 
             if address.startswith('1') or address.startswith('3'):
                 if self.check_bc(address):
@@ -90,7 +90,8 @@ class sfp_bitcoin(SpiderFootPlugin):
                 addrs.append(address)
 
         for address in set(addrs):
-            evt = SpiderFootEvent("BITCOIN_ADDRESS", address, self.__name__, event)
-            self.notifyListeners(evt)
+            evt = SpiderFootEvent("BITCOIN_ADDRESS", address, self.__class__.__name__, event)
+            if hasattr(self.sf, 'notifyListeners'):
+                self.sf.notifyListeners(evt)
 
 # End of sfp_bitcoin class

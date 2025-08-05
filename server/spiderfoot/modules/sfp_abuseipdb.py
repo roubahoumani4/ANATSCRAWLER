@@ -16,7 +16,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.sflib import SpiderFootEvent, SpiderFootPlugin
 
 
 class sfp_abuseipdb(SpiderFootPlugin):
@@ -69,11 +69,11 @@ class sfp_abuseipdb(SpiderFootPlugin):
         'limit': 'Maximum number of results to retrieve.',
     }
 
-    results = None
+    results = {}
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = {}
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
@@ -121,22 +121,17 @@ class sfp_abuseipdb(SpiderFootPlugin):
         time.sleep(1)
 
         if res['code'] == '429':
-            self.error("You are being rate-limited by AbuseIPDB")
+            print("[sfp_abuseipdb] You are being rate-limited by AbuseIPDB")
             self.errorState = True
             return None
 
         if res['code'] != "200":
-            self.error(f"Error retrieving search results, code {res['code']}")
-            self.errorState = True
-            return None
-
-        if res['code'] != "200":
-            self.error("Error retrieving search results from AbuseIPDB")
+            print(f"[sfp_abuseipdb] Error retrieving search results, code {res['code']}")
             self.errorState = True
             return None
 
         if res['content'] is None:
-            self.error("Received no content from AbuseIPDB")
+            print("[sfp_abuseipdb] Received no content from AbuseIPDB")
             self.errorState = True
             return None
 
@@ -200,24 +195,24 @@ class sfp_abuseipdb(SpiderFootPlugin):
         time.sleep(1)
 
         if res['code'] == '429':
-            self.error("You are being rate-limited by AbuseIPDB")
+            print("[sfp_abuseipdb] You are being rate-limited by AbuseIPDB")
             self.errorState = True
             return None
 
         if res['code'] != "200":
-            self.error("Error retrieving search results from AbuseIPDB")
+            print("[sfp_abuseipdb] Error retrieving search results from AbuseIPDB")
             self.errorState = True
             return None
 
         if res['content'] is None:
-            self.error("Received no content from AbuseIPDB")
+            print("[sfp_abuseipdb] Received no content from AbuseIPDB")
             self.errorState = True
             return None
 
         try:
             return json.loads(res['content'])
         except Exception as e:
-            self.debug(f"Error processing JSON response: {e}")
+            print(f"[sfp_abuseipdb] Error processing JSON response: {e}")
             return None
 
         return None
@@ -254,24 +249,25 @@ class sfp_abuseipdb(SpiderFootPlugin):
         time.sleep(1)
 
         if res['code'] == '429':
-            self.error("You are being rate-limited by AbuseIPDB")
+            print("[sfp_abuseipdb] You are being rate-limited by AbuseIPDB")
             self.errorState = True
             return None
 
         if res['code'] != "200":
-            self.error("Error retrieving search results from AbuseIPDB")
+            print("[sfp_abuseipdb] Error retrieving search results from AbuseIPDB")
             self.errorState = True
             return None
 
         if res['content'] is None:
-            self.error("Received no content from AbuseIPDB")
+            print("[sfp_abuseipdb] Received no content from AbuseIPDB")
             self.errorState = True
             return None
 
         try:
             return json.loads(res['content'])
         except Exception as e:
-            self.debug(f"Error processing JSON response: {e}")
+            print(f"[sfp_abuseipdb] Error processing JSON response: {e}")
+            return None
 
         return None
 
@@ -280,17 +276,15 @@ class sfp_abuseipdb(SpiderFootPlugin):
         srcModuleName = event.module
         eventData = event.data
 
-        self.debug(f"Received event, {eventName}, from {srcModuleName}")
+        print(f"[sfp_abuseipdb] Received event, {eventName}, from {srcModuleName}")
 
         if self.opts["api_key"] == "":
-            self.error(
-                f"You enabled {self.__class__.__name__} but did not set an API key!"
-            )
+            print(f"[sfp_abuseipdb] You enabled {self.__class__.__name__} but did not set an API key!")
             self.errorState = True
             return
 
         if eventData in self.results:
-            self.debug(f"Skipping {eventData}, already checked.")
+            print(f"[sfp_abuseipdb] Skipping {eventData}, already checked.")
             return
 
         self.results[eventData] = True
@@ -305,10 +299,10 @@ class sfp_abuseipdb(SpiderFootPlugin):
             blacklist_type = "BLACKLISTED_AFFILIATE_IPADDR"
             malicious_type = 'MALICIOUS_AFFILIATE_IPADDR'
         else:
-            self.debug(f"Unexpected event type {eventName}, skipping")
+            print(f"[sfp_abuseipdb] Unexpected event type {eventName}, skipping")
             return
 
-        self.debug(f"Checking maliciousness of IP address {eventData} with AbuseIPDB")
+        print(f"[sfp_abuseipdb] Checking maliciousness of IP address {eventData} with AbuseIPDB")
 
         blacklist = self.queryBlacklist()
 
@@ -318,24 +312,26 @@ class sfp_abuseipdb(SpiderFootPlugin):
         if eventData not in blacklist:
             return
 
-        self.info(f"Malicious IP address {eventData} found in AbuseIPDB blacklist")
+        print(f"[sfp_abuseipdb] Malicious IP address {eventData} found in AbuseIPDB blacklist")
 
         url = f"https://www.abuseipdb.com/check/{eventData}"
 
         evt = SpiderFootEvent(
             malicious_type,
             f"AbuseIPDB [{eventData}]\n<SFURL>{url}</SFURL>",
-            self.__name__,
+            self.__class__.__name__,
             event
         )
-        self.notifyListeners(evt)
+        if hasattr(self.sf, 'notifyListeners'):
+            self.sf.notifyListeners(evt)
 
         evt = SpiderFootEvent(
             blacklist_type,
             f"AbuseIPDB [{eventData}]\n<SFURL>{url}</SFURL>",
-            self.__name__,
+            self.__class__.__name__,
             event
         )
-        self.notifyListeners(evt)
+        if hasattr(self.sf, 'notifyListeners'):
+            self.sf.notifyListeners(evt)
 
 # End of sfp_abuseipdb class

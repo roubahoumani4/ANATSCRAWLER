@@ -14,7 +14,8 @@ import json
 import re
 import time
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_dnsdb(SpiderFootPlugin):
@@ -63,13 +64,17 @@ class sfp_dnsdb(SpiderFootPlugin):
         "maxcohost": "Stop reporting co-hosted sites after this many are found, as it would likely indicate web hosting.",
     }
 
-    results = None
-    errorState = False
-    cohostcount = 0
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
+        self.cohostcount = 0
+
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.cohostcount = 0
 
         for opt in list(userOpts.keys()):
@@ -217,9 +222,8 @@ class sfp_dnsdb(SpiderFootPlugin):
 
                     if record.get("rrtype") == "AAAA":
 
-                        if not self.getTarget().matches(
-                            data, includeChildren=True, includeParents=True
-                        ):
+                        target = self.getTarget()
+                        if isinstance(target, str) or not hasattr(target, 'matches') or not target.matches(data, includeChildren=True, includeParents=True):
                             continue
 
                         if not self.sf.validIP6(data):
@@ -244,7 +248,8 @@ class sfp_dnsdb(SpiderFootPlugin):
                         data = data.replace('"', '')
                         evt = SpiderFootEvent("DNS_TEXT", data, self.__name__, event)
                     elif record.get("rrtype") == "CNAME":
-                        if not self.getTarget().matches(data):
+                        target = self.getTarget()
+                        if isinstance(target, str) or not hasattr(target, 'matches') or not target.matches(data):
                             coHosts.add(data)
 
                     self.notifyListeners(evt)
@@ -272,7 +277,8 @@ class sfp_dnsdb(SpiderFootPlugin):
                 if record.get("rrtype") == "NS":
                     evt = SpiderFootEvent("PROVIDER_DNS", data, self.__name__, event)
                 elif record.get("rrtype") == "CNAME":
-                    if not self.getTarget().matches(data):
+                    target = self.getTarget()
+                    if isinstance(target, str) or not hasattr(target, 'matches') or not target.matches(data):
                         coHosts.add(data)
 
         elif eventName in ("IP_ADDRESS", "IPV6_ADDRESS"):
@@ -300,7 +306,8 @@ class sfp_dnsdb(SpiderFootPlugin):
                     continue
                 responseData.add(data)
 
-                if not self.getTarget().matches(data):
+                target = self.getTarget()
+                if isinstance(target, str) or not hasattr(target, 'matches') or not target.matches(data):
                     coHosts.add(data)
                     continue
 
@@ -319,7 +326,8 @@ class sfp_dnsdb(SpiderFootPlugin):
                 continue
 
             if not self.opts["cohostsamedomain"]:
-                if self.getTarget().matches(co, includeParents=True):
+                target = self.getTarget()
+                if hasattr(target, 'matches') and not isinstance(target, str) and target.matches(co, includeParents=True):
                     self.debug(
                         "Skipping " + co + " because it is on the same domain."
                     )

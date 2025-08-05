@@ -13,7 +13,8 @@
 
 import dns.resolver
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_dnscommonsrv(SpiderFootPlugin):
@@ -30,7 +31,10 @@ class sfp_dnscommonsrv(SpiderFootPlugin):
 
     optdescs = {}
 
-    events = None
+
+    def __init__(self):
+        super().__init__()
+        self.events = dict()
 
     commonsrv = [
         # LDAP/Kerberos, used for Active Directory
@@ -73,9 +77,10 @@ class sfp_dnscommonsrv(SpiderFootPlugin):
         '_xmpp-server._tcp'
     ]
 
+
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.events = self.tempStorage()
+        self.events = dict()
         self.__dataSource__ = "DNS"
 
         for opt in list(userOpts.keys()):
@@ -124,7 +129,7 @@ class sfp_dnscommonsrv(SpiderFootPlugin):
                 continue
 
             try:
-                answers = res.query(name, 'SRV', timeout=10)
+                answers = res.resolve(name, 'SRV', lifetime=10)
             except Exception:
                 answers = []
 
@@ -139,11 +144,20 @@ class sfp_dnscommonsrv(SpiderFootPlugin):
             )
             self.notifyListeners(evt)
 
-            for a in answers:
-                # Strip off the trailing .
-                tgt_clean = a.target.to_text().rstrip(".")
 
-                if self.getTarget().matches(tgt_clean):
+            for a in answers:
+                # Defensive: try to extract the target from SRV record
+                tgt_clean = None
+                # dnspython SRV Rdata: priority weight port target
+                parts = str(a).split()
+                if len(parts) == 4:
+                    tgt_clean = parts[3].rstrip('.')
+                else:
+                    self.debug(f"SRV answer cannot parse target: {a}")
+                    continue
+
+                target = self.getTarget()
+                if hasattr(target, 'matches') and not isinstance(target, str) and target.matches(tgt_clean):
                     evt_type = "INTERNET_NAME"
                 else:
                     evt_type = "AFFILIATE_INTERNET_NAME"

@@ -13,7 +13,8 @@
 
 import ipaddress
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_dnsneighbor(SpiderFootPlugin):
@@ -38,15 +39,19 @@ class sfp_dnsneighbor(SpiderFootPlugin):
         'lookasidebits': "If look-aside is enabled, the netmask size (in CIDR notation) to check. Default is 4 bits (16 hosts)."
     }
 
-    events = None
-    domresults = None
-    hostresults = None
+
+    def __init__(self):
+        super().__init__()
+        self.events = dict()
+        self.domresults = dict()
+        self.hostresults = dict()
+
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.events = self.tempStorage()
-        self.domresults = self.tempStorage()
-        self.hostresults = self.tempStorage()
+        self.events = dict()
+        self.domresults = dict()
+        self.hostresults = dict()
         self.__dataSource__ = "DNS"
 
         for opt in list(userOpts.keys()):
@@ -80,7 +85,10 @@ class sfp_dnsneighbor(SpiderFootPlugin):
 
         try:
             address = ipaddress.ip_address(eventData)
-            netmask = address.max_prefixlen - min(address.max_prefixlen, max(1, int(self.opts.get("lookasidebits"))))
+            lookasidebits = self.opts.get("lookasidebits")
+            if lookasidebits is None:
+                lookasidebits = 4
+            netmask = address.max_prefixlen - min(address.max_prefixlen, max(1, int(lookasidebits)))
             network = ipaddress.ip_network(f"{eventData}/{netmask}", strict=False)
         except ValueError:
             self.error(f"Invalid IP address received: {eventData}")
@@ -94,7 +102,7 @@ class sfp_dnsneighbor(SpiderFootPlugin):
             if self.checkForStop():
                 return
 
-            if sip in self.hostresults or sip == eventData:
+            if (self.hostresults is not None and sip in self.hostresults) or sip == eventData:
                 continue
 
             addrs = self.sf.resolveIP(sip)
@@ -104,17 +112,19 @@ class sfp_dnsneighbor(SpiderFootPlugin):
 
             # Report addresses that resolve to hostnames on the same
             # domain or sub-domain as the target.
-            if self.getTarget().matches(sip):
+            target = self.getTarget()
+            if hasattr(target, 'matches') and not isinstance(target, str) and target.matches(sip):
                 affil = False
             else:
                 affil = True
                 for a in addrs:
-                    if self.getTarget().matches(a):
+                    if hasattr(target, 'matches') and not isinstance(target, str) and target.matches(a):
                         affil = False
 
             # Generate the event for the look-aside IP, but don't let it re-trigger
             # this module by adding it to self.events first.
-            self.events[sip] = True
+            if self.events is not None:
+                self.events[sip] = True
             ev = self.processHost(sip, parentEvent, affil)
 
             if not ev:
@@ -133,7 +143,8 @@ class sfp_dnsneighbor(SpiderFootPlugin):
                     # Hostnames from the IP need to be linked to the IP
                     parent = ev
 
-                if self.getTarget().matches(addr):
+                target = self.getTarget()
+                if hasattr(target, 'matches') and not isinstance(target, str) and target.matches(addr):
                     # Generate an event for the IP, then
                     # let the handling by this module take
                     # care of follow-up processing.
@@ -143,20 +154,22 @@ class sfp_dnsneighbor(SpiderFootPlugin):
 
     def processHost(self, host, parentEvent, affiliate=None):
         parentHash = self.sf.hashstring(parentEvent.data)
-        if host not in self.hostresults:
-            self.hostresults[host] = [parentHash]
-        else:
-            if parentHash in self.hostresults[host] or parentEvent.data == host:
-                self.debug("Skipping host, " + host + ", already processed.")
-                return None
-            self.hostresults[host] = self.hostresults[host] + [parentHash]
+        if self.hostresults is not None:
+            if host not in self.hostresults:
+                self.hostresults[host] = [parentHash]
+            else:
+                if parentHash in self.hostresults[host] or parentEvent.data == host:
+                    self.debug("Skipping host, " + host + ", already processed.")
+                    return None
+                self.hostresults[host] = self.hostresults[host] + [parentHash]
 
         self.debug("Found host: " + host)
         # If the returned hostname is aliased to our
         # target in some way, flag it as an affiliate
         if affiliate is None:
             affil = True
-            if self.getTarget().matches(host):
+            target = self.getTarget()
+            if hasattr(target, 'matches') and not isinstance(target, str) and target.matches(host):
                 affil = False
             else:
                 # If the IP the host resolves to is in our
@@ -165,13 +178,15 @@ class sfp_dnsneighbor(SpiderFootPlugin):
                     hostips = self.sf.resolveHost(host)
                     if hostips:
                         for hostip in hostips:
-                            if self.getTarget().matches(hostip):
+                            target = self.getTarget()
+                            if hasattr(target, 'matches') and not isinstance(target, str) and target.matches(hostip):
                                 affil = False
                                 break
                     hostips6 = self.sf.resolveHost6(host)
                     if hostips6:
                         for hostip in hostips6:
-                            if self.getTarget().matches(hostip):
+                            target = self.getTarget()
+                            if hasattr(target, 'matches') and not isinstance(target, str) and target.matches(hostip):
                                 affil = False
                                 break
         else:

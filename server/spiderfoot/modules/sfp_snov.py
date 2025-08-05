@@ -16,7 +16,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from spiderfoot import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.helpers import SpiderFootHelpers
 
 
 class sfp_snov(SpiderFootPlugin):
@@ -58,15 +60,17 @@ class sfp_snov(SpiderFootPlugin):
         'api_key_client_secret': "Snov.io API Client Secret"
     }
 
-    results = None
-    errorState = False
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     # More than 100 per response is not supported by Snov API
     limit = 100
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]

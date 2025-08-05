@@ -13,7 +13,8 @@
 
 import json
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 # Standard headers, taken from http://en.wikipedia.org/wiki/List_of_HTTP_header_fields
 headers = [
@@ -92,13 +93,15 @@ class sfp_strangeheaders(SpiderFootPlugin):
     opts = {}
     optdescs = {}
 
-    results = None
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.__dataSource__ = "Target Website"
-
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 
@@ -123,8 +126,10 @@ class sfp_strangeheaders(SpiderFootPlugin):
 
         self.results[eventSource] = True
 
+
         fqdn = self.sf.urlFQDN(eventSource)
-        if not self.getTarget().matches(fqdn):
+        target = self.getTarget()
+        if not (hasattr(target, "matches") and not isinstance(target, str) and target.matches(fqdn)):
             self.debug(f"Not collecting header information for external sites. Ignoring HTTP headers from {fqdn}")
             return
 

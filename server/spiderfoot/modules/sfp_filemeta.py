@@ -22,7 +22,8 @@ import exifread
 
 import pptx
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_filemeta(SpiderFootPlugin):
@@ -47,7 +48,10 @@ class sfp_filemeta(SpiderFootPlugin):
         'timeout': "Download timeout for files, in seconds."
     }
 
-    results = None
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
@@ -160,23 +164,25 @@ class sfp_filemeta(SpiderFootPlugin):
 
                     val = list()
                     try:
-                        if "/Producer" in data:
-                            val.append(str(data['/Producer']))
-
-                        if "/Creator" in data:
-                            val.append(str(data['/Creator']))
-
-                        if "Application" in data:
-                            val.append(str(data['Application']))
-
-                        if "Image Software" in data:
-                            val.append(str(data['Image Software']))
+                        if isinstance(data, list):
+                            self.debug(f"PDF metadata extraction: data is a list, skipping key extraction. Data: {data}")
+                        else:
+                            for key in ["/Producer", "/Creator", "Application", "Image Software"]:
+                                v = None
+                                if hasattr(data, 'get'):
+                                    v = data.get(key)
+                                elif isinstance(data, dict):
+                                    v = data.get(key)
+                                elif hasattr(data, key):
+                                    v = getattr(data, key)
+                                if v is not None:
+                                    val.append(str(v))
                     except Exception as e:
                         self.error("Failed to parse PDF, " + eventData + ": " + str(e))
                         return
 
                     for v in val:
-                        if v and not isinstance(v, PyPDF2.generic.NullObject):
+                        if v:
                             self.debug("VAL: " + str(val))
                             # Strip non-ASCII
                             v = ''.join([i if ord(i) < 128 else ' ' for i in v])

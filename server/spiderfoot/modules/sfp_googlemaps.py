@@ -14,7 +14,8 @@
 import json
 import urllib
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_googlemaps(SpiderFootPlugin):
@@ -74,6 +75,7 @@ class sfp_googlemaps(SpiderFootPlugin):
         return ["PHYSICAL_ADDRESS", "PHYSICAL_COORDINATES", "RAW_RIR_DATA"]
 
     def query(self, address):
+        import urllib.parse
         params = urllib.parse.urlencode({
             'key': self.opts['api_key'],
             'address': address.encode('raw_unicode_escape').decode("ascii", errors='replace')
@@ -103,6 +105,8 @@ class sfp_googlemaps(SpiderFootPlugin):
             self.debug(f"Skipping {eventData}, already checked.")
             return
 
+        if self.results is None:
+            self.results = dict()
         self.results[eventData] = True
 
         self.debug(f"Received event, {eventName}, from {srcModuleName}")

@@ -14,7 +14,8 @@
 
 from netaddr import IPNetwork
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_dronebl(SpiderFootPlugin):
@@ -57,7 +58,10 @@ class sfp_dronebl(SpiderFootPlugin):
         'maxsubnet': "If looking up subnets, the maximum subnet size to look up all the IPs within (CIDR value, 24 = /24, 16 = /16, etc.)"
     }
 
-    results = None
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     checks = {
         "127.0.0.3": "dronebl.org - IRC Drone",
@@ -129,7 +133,10 @@ class sfp_dronebl(SpiderFootPlugin):
             return None
 
         try:
-            lookup = self.reverseAddr(qaddr) + '.dnsbl.dronebl.org'
+            rev = self.reverseAddr(qaddr)
+            if not rev:
+                return None
+            lookup = rev + '.dnsbl.dronebl.org'
             self.debug(f"Checking DroneBL blacklist: {lookup}")
             return self.sf.resolveHost(lookup)
         except Exception as e:

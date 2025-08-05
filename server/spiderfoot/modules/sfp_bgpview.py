@@ -13,7 +13,7 @@
 import json
 import time
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.sflib import SpiderFootEvent, SpiderFootPlugin
 
 
 class sfp_bgpview(SpiderFootPlugin):
@@ -43,12 +43,12 @@ class sfp_bgpview(SpiderFootPlugin):
     optdescs = {
     }
 
-    results = None
+    results = {}
     errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = {}
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
@@ -84,17 +84,17 @@ class sfp_bgpview(SpiderFootPlugin):
         try:
             json_data = json.loads(res['content'])
         except Exception as e:
-            self.debug(f"Error processing JSON response from BGPView: {e}")
+            print(f"[sfp_bgpview] Error processing JSON response from BGPView: {e}")
             return None
 
         if json_data.get('status') != 'ok':
-            self.debug("No results found for ASN " + qry)
+            print(f"[sfp_bgpview] No results found for ASN {qry}")
             return None
 
         data = json_data.get('data')
 
         if not data:
-            self.debug("No results found for ASN " + qry)
+            print(f"[sfp_bgpview] No results found for ASN {qry}")
             return None
 
         return data
@@ -112,17 +112,17 @@ class sfp_bgpview(SpiderFootPlugin):
         try:
             json_data = json.loads(res['content'])
         except Exception as e:
-            self.debug(f"Error processing JSON response from BGPView: {e}")
+            print(f"[sfp_bgpview] Error processing JSON response from BGPView: {e}")
             return None
 
         if json_data.get('status') != 'ok':
-            self.debug("No results found for IP address " + qry)
+            print(f"[sfp_bgpview] No results found for IP address {qry}")
             return None
 
         data = json_data.get('data')
 
         if not data:
-            self.debug("No results found for IP address " + qry)
+            print(f"[sfp_bgpview] No results found for IP address {qry}")
             return None
 
         return data
@@ -140,17 +140,17 @@ class sfp_bgpview(SpiderFootPlugin):
         try:
             json_data = json.loads(res['content'])
         except Exception as e:
-            self.debug(f"Error processing JSON response from BGPView: {e}")
+            print(f"[sfp_bgpview] Error processing JSON response from BGPView: {e}")
             return None
 
         if json_data.get('status') != 'ok':
-            self.debug("No results found for netblock " + qry)
+            print(f"[sfp_bgpview] No results found for netblock {qry}")
             return None
 
         data = json_data.get('data')
 
         if not data:
-            self.debug("No results found for netblock " + qry)
+            print(f"[sfp_bgpview] No results found for netblock {qry}")
             return None
 
         return data
@@ -163,10 +163,10 @@ class sfp_bgpview(SpiderFootPlugin):
         if self.errorState:
             return
 
-        self.debug(f"Received event, {eventName}, from {srcModuleName}")
+        print(f"[sfp_bgpview] Received event, {eventName}, from {srcModuleName}")
 
         if eventData in self.results:
-            self.debug(f"Skipping {eventData}, already checked.")
+            print(f"[sfp_bgpview] Skipping {eventData}, already checked.")
             return
 
         self.results[eventData] = True
@@ -175,52 +175,57 @@ class sfp_bgpview(SpiderFootPlugin):
             data = self.queryAsn(eventData)
 
             if not data:
-                self.info("No results found for ASN " + eventData)
+                print(f"[sfp_bgpview] No results found for ASN {eventData}")
                 return
 
-            e = SpiderFootEvent('RAW_RIR_DATA', str(data), self.__name__, event)
-            self.notifyListeners(e)
+            e = SpiderFootEvent('RAW_RIR_DATA', str(data), self.__class__.__name__, event)
+            if hasattr(self.sf, 'notifyListeners'):
+                self.sf.notifyListeners(e)
 
             address = data.get('owner_address')
 
             if not address:
                 return
 
-            evt = SpiderFootEvent('PHYSICAL_ADDRESS', ', '.join([_f for _f in address if _f]), self.__name__, event)
-            self.notifyListeners(evt)
+            evt = SpiderFootEvent('PHYSICAL_ADDRESS', ', '.join([_f for _f in address if _f]), self.__class__.__name__, event)
+            if hasattr(self.sf, 'notifyListeners'):
+                self.sf.notifyListeners(evt)
 
         if eventName in ['NETBLOCK_MEMBER', 'NETBLOCKV6_MEMBER']:
             data = self.queryNetblock(eventData)
 
             if not data:
-                self.info("No results found for netblock " + eventData)
+                print(f"[sfp_bgpview] No results found for netblock {eventData}")
                 return
 
-            e = SpiderFootEvent('RAW_RIR_DATA', str(data), self.__name__, event)
-            self.notifyListeners(e)
+            e = SpiderFootEvent('RAW_RIR_DATA', str(data), self.__class__.__name__, event)
+            if hasattr(self.sf, 'notifyListeners'):
+                self.sf.notifyListeners(e)
 
             address = data.get('owner_address')
 
             if not address:
                 return
 
-            evt = SpiderFootEvent('PHYSICAL_ADDRESS', ', '.join([_f for _f in address if _f]), self.__name__, event)
-            self.notifyListeners(evt)
+            evt = SpiderFootEvent('PHYSICAL_ADDRESS', ', '.join([_f for _f in address if _f]), self.__class__.__name__, event)
+            if hasattr(self.sf, 'notifyListeners'):
+                self.sf.notifyListeners(evt)
 
         if eventName in ['IP_ADDRESS', 'IPV6_ADDRESS']:
             data = self.queryIp(eventData)
 
             if not data:
-                self.info("No results found for IP address " + eventData)
+                print(f"[sfp_bgpview] No results found for IP address {eventData}")
                 return
 
-            e = SpiderFootEvent('RAW_RIR_DATA', str(data), self.__name__, event)
-            self.notifyListeners(e)
+            e = SpiderFootEvent('RAW_RIR_DATA', str(data), self.__class__.__name__, event)
+            if hasattr(self.sf, 'notifyListeners'):
+                self.sf.notifyListeners(e)
 
             prefixes = data.get('prefixes')
 
             if not prefixes:
-                self.info("No prefixes found for IP address " + eventData)
+                print(f"[sfp_bgpview] No prefixes found for IP address {eventData}")
                 return
 
             for prefix in prefixes:
@@ -235,15 +240,17 @@ class sfp_bgpview(SpiderFootPlugin):
                 if not asn:
                     continue
 
-                self.info(f"Netblock found: {p} ({asn})")
-                evt = SpiderFootEvent("BGP_AS_MEMBER", str(asn), self.__name__, event)
-                self.notifyListeners(evt)
+                print(f"[sfp_bgpview] Netblock found: {p} ({asn})")
+                evt = SpiderFootEvent("BGP_AS_MEMBER", str(asn), self.__class__.__name__, event)
+                if hasattr(self.sf, 'notifyListeners'):
+                    self.sf.notifyListeners(evt)
 
                 if self.sf.validIpNetwork(p):
                     if ":" in p:
-                        evt = SpiderFootEvent("NETBLOCKV6_MEMBER", p, self.__name__, event)
+                        evt = SpiderFootEvent("NETBLOCKV6_MEMBER", p, self.__class__.__name__, event)
                     else:
-                        evt = SpiderFootEvent("NETBLOCK_MEMBER", p, self.__name__, event)
-                    self.notifyListeners(evt)
+                        evt = SpiderFootEvent("NETBLOCK_MEMBER", p, self.__class__.__name__, event)
+                    if hasattr(self.sf, 'notifyListeners'):
+                        self.sf.notifyListeners(evt)
 
 # End of sfp_bgpview class

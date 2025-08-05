@@ -15,7 +15,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 sites = {
     # Search string to use, domain name the profile will sit on within
@@ -102,13 +103,15 @@ class sfp_socialprofiles(SpiderFootPlugin):
         "google_cse_id": "Google Custom Search Engine ID.",
     }
 
-    keywords = None
-    results = None
-    errorState = False
+    def __init__(self):
+        super().__init__()
+        self.keywords = None
+        self.results = dict()
+        self.errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.keywords = None
         self.errorState = False
 
@@ -149,8 +152,10 @@ class sfp_socialprofiles(SpiderFootPlugin):
         self.results[eventData] = True
 
         if self.keywords is None:
+            target = self.getTarget()
+            names = target.getNames() if hasattr(target, "getNames") and not isinstance(target, str) else [str(target)]
             self.keywords = self.sf.domainKeywords(
-                self.getTarget().getNames(), self.opts["_internettlds"]
+                names, self.opts["_internettlds"]
             )
             if len(self.keywords) == 0:
                 self.keywords = None

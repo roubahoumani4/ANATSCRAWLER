@@ -12,10 +12,19 @@
 
 import re
 
-from spiderfoot import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.helpers import SpiderFootHelpers
+
 
 
 class sfp_names(SpiderFootPlugin):
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.d = None
+        self.n = None
 
     meta = {
         'name': "Human Name Extractor",
@@ -39,13 +48,10 @@ class sfp_names(SpiderFootPlugin):
         'filterjscss': "Filter out names that originated from CSS/JS content. Enabling this avoids detection of popular Javascript and web framework author names."
     }
 
-    results = None
-    d = None
-    n = None
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.d = SpiderFootHelpers.dictionaryWordsFromWordlists()
         self.n = SpiderFootHelpers.humanNamesFromWordlists()
 

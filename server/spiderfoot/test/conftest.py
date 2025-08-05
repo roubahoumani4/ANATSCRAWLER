@@ -1,5 +1,5 @@
 import pytest
-from spiderfoot import SpiderFootHelpers
+from core.spiderfoot.helpers import SpiderFootHelpers
 
 
 @pytest.fixture(autouse=True)

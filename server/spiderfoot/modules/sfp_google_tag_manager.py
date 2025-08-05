@@ -15,7 +15,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from spiderfoot import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.helpers import SpiderFootHelpers
 
 
 class sfp_google_tag_manager(SpiderFootPlugin):
@@ -71,7 +73,7 @@ class sfp_google_tag_manager(SpiderFootPlugin):
         ]
 
     # from: https://stackoverflow.com/a/43211062
-    def is_valid_hostname(self, hostname: str = None) -> bool:
+    def is_valid_hostname(self, hostname: str) -> bool:
         if not hostname:
             return False
         if len(hostname) > 255:
@@ -81,9 +83,9 @@ class sfp_google_tag_manager(SpiderFootPlugin):
         allowed = re.compile("(?!-)[A-Z0-9-_]{1,63}(?<!-)$", re.IGNORECASE)
         return all(allowed.match(x) for x in hostname.split("."))
 
-    def queryGoogleTagId(self, tag_id: str = None) -> set:
+    def queryGoogleTagId(self, tag_id: str) -> set:
         if not tag_id:
-            return None
+            return set()
 
         params = urllib.parse.urlencode({
             'id': tag_id,
@@ -97,13 +99,13 @@ class sfp_google_tag_manager(SpiderFootPlugin):
 
         if res['code'] != "200":
             self.debug(f"Invalid GTM tag id: {tag_id}")
-            return None
+            return set()
 
         data = res['content']
 
         if not data:
             self.debug(f"Invalid GTM tag id: {tag_id}")
-            return None
+            return set()
 
         hosts = list()
 
@@ -138,6 +140,8 @@ class sfp_google_tag_manager(SpiderFootPlugin):
         if event.data in self.results:
             return
 
+        if self.results is None:
+            self.results = dict()
         self.results[event.data] = True
 
         try:
@@ -164,10 +168,14 @@ class sfp_google_tag_manager(SpiderFootPlugin):
                 self.debug(f"Potential host name '{host}' could not be resolved")
                 continue
 
-            if self.getTarget().matches(host, includeChildren=True, includeParents=True):
-                evt_type = 'INTERNET_NAME'
+            target = self.getTarget()
+            if hasattr(target, 'matches') and not isinstance(target, str):
+                if target.matches(host, includeChildren=True, includeParents=True):
+                    evt_type = 'INTERNET_NAME'
+                else:
+                    evt_type = 'AFFILIATE_INTERNET_NAME'
             else:
-                evt_type = 'AFFILIATE_INTERNET_NAME'
+                evt_type = 'INTERNET_NAME'
 
             evt = SpiderFootEvent(evt_type, host, self.__name__, event)
             self.notifyListeners(evt)

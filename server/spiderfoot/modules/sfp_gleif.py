@@ -14,7 +14,9 @@
 import json
 import urllib
 
-from spiderfoot import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.helpers import SpiderFootHelpers
 
 
 class sfp_gleif(SpiderFootPlugin):
@@ -45,7 +47,10 @@ class sfp_gleif(SpiderFootPlugin):
     optdescs = {
     }
 
-    results = None
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
@@ -70,6 +75,7 @@ class sfp_gleif(SpiderFootPlugin):
             dict: search results
         """
 
+        import urllib.parse
         params = urllib.parse.urlencode({
             'q': qry.encode('raw_unicode_escape').decode("ascii", errors='replace'),
             'field': "entity.legalName"
@@ -114,6 +120,7 @@ class sfp_gleif(SpiderFootPlugin):
             dict: search results
         """
 
+        import urllib.parse
         params = urllib.parse.urlencode({
             'q': qry.encode('raw_unicode_escape').decode("ascii", errors='replace'),
             'field': "fulltext"

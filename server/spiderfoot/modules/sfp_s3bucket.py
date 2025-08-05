@@ -15,7 +15,8 @@ import random
 import threading
 import time
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_s3bucket(SpiderFootPlugin):
@@ -85,10 +86,14 @@ class sfp_s3bucket(SpiderFootPlugin):
         if res['code'] in ["301", "302", "200"]:
             # Bucket has files
             if "ListBucketResult" in res['content']:
+                if self.lock is None:
+                    self.lock = threading.Lock()
                 with self.lock:
                     self.s3results[url] = res['content'].count("<Key>")
             else:
                 # Bucket has no files
+                if self.lock is None:
+                    self.lock = threading.Lock()
                 with self.lock:
                     self.s3results[url] = 0
 
@@ -133,10 +138,11 @@ class sfp_s3bucket(SpiderFootPlugin):
                 if data is None:
                     return res
 
-                for ret in list(data.keys()):
-                    if data[ret]:
-                        # bucket:filecount
-                        res.append(f"{ret}:{data[ret]}")
+                if isinstance(data, dict):
+                    for ret in list(data.keys()):
+                        if data[ret]:
+                            # bucket:filecount
+                            res.append(f"{ret}:{data[ret]}")
                 i = 0
                 siteList = list()
 
@@ -154,6 +160,8 @@ class sfp_s3bucket(SpiderFootPlugin):
         if eventData in self.results:
             return
 
+        if self.results is None:
+            self.results = dict()
         self.results[eventData] = True
 
         self.debug(f"Received event, {eventName}, from {srcModuleName}")

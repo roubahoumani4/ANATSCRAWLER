@@ -13,7 +13,7 @@
 
 import json
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.sflib import SpiderFootEvent, SpiderFootPlugin
 
 
 class sfp_arin(SpiderFootPlugin):
@@ -51,13 +51,13 @@ class sfp_arin(SpiderFootPlugin):
     opts = {}
     optdescs = {}
 
-    results = None
+    results = {}
     currentEventSrc = None
     keywords = None
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = {}
         self.currentEventSrc = None
 
         for opt in list(userOpts.keys()):
@@ -98,7 +98,7 @@ class sfp_arin(SpiderFootPlugin):
                     lname = t
                 url += "pocs;first=" + fname + ";last=" + lname
         except Exception as e:
-            self.debug("Couldn't process name: " + value + " (" + str(e) + ")")
+            print(f"[sfp_arin] Couldn't process name: {value} ({e})")
             return None
 
         if qtype == "contact":
@@ -106,17 +106,18 @@ class sfp_arin(SpiderFootPlugin):
 
         res = self.fetchRir(url)
         if not res:
-            self.debug("No info found/available for " + value + " at ARIN.")
+            print(f"[sfp_arin] No info found/available for {value} at ARIN.")
             return None
 
         try:
             data = json.loads(res['content'])
         except Exception as e:
-            self.debug(f"Error processing JSON response: {e}")
+            print(f"[sfp_arin] Error processing JSON response: {e}")
             return None
 
-        evt = SpiderFootEvent("RAW_RIR_DATA", str(data), self.__name__, self.currentEventSrc)
-        self.notifyListeners(evt)
+        evt = SpiderFootEvent("RAW_RIR_DATA", str(data), self.__class__.__name__, self.currentEventSrc)
+        if hasattr(self.sf, 'notifyListeners'):
+            self.sf.notifyListeners(evt)
         return data
 
     # Handle events sent to this module
@@ -126,11 +127,11 @@ class sfp_arin(SpiderFootPlugin):
         eventData = event.data
         self.currentEventSrc = event
 
-        self.debug(f"Received event, {eventName}, from {srcModuleName}")
+        print(f"[sfp_arin] Received event, {eventName}, from {srcModuleName}")
 
         # Don't look up stuff twice
         if eventData in self.results:
-            self.debug(f"Skipping {eventData}, already checked.")
+            print(f"[sfp_arin] Skipping {eventData}, already checked.")
             return
 
         self.results[eventData] = True
@@ -154,8 +155,9 @@ class sfp_arin(SpiderFootPlugin):
                             name = sname[1] + " " + sname[0]
 
                         evt = SpiderFootEvent("HUMAN_NAME", name,
-                                              self.__name__, self.currentEventSrc)
-                        self.notifyListeners(evt)
+                                              self.__class__.__name__, self.currentEventSrc)
+                        if hasattr(self.sf, 'notifyListeners'):
+                            self.sf.notifyListeners(evt)
 
                         # We just want the raw data so we can get potential
                         # e-mail addresses.

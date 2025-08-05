@@ -13,7 +13,7 @@
 
 import dns.resolver
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.sflib import SpiderFootEvent, SpiderFootPlugin
 
 
 class sfp_adguard_dns(SpiderFootPlugin):
@@ -44,11 +44,11 @@ class sfp_adguard_dns(SpiderFootPlugin):
     optdescs = {
     }
 
-    results = None
+    results = {}
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = {}
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
@@ -74,7 +74,7 @@ class sfp_adguard_dns(SpiderFootPlugin):
         try:
             return res.resolve(qaddr)
         except Exception:
-            self.debug(f"Unable to resolve {qaddr}")
+            print(f"[sfp_adguard_dns] Unable to resolve {qaddr}")
 
         return None
 
@@ -85,7 +85,7 @@ class sfp_adguard_dns(SpiderFootPlugin):
         try:
             return res.resolve(qaddr)
         except Exception:
-            self.debug(f"Unable to resolve {qaddr}")
+            print(f"[sfp_adguard_dns] Unable to resolve {qaddr}")
 
         return None
 
@@ -93,7 +93,7 @@ class sfp_adguard_dns(SpiderFootPlugin):
         eventName = event.eventType
         eventData = event.data
 
-        self.debug(f"Received event, {eventName}, from {event.module}")
+        print(f"[sfp_adguard_dns] Received event, {eventName}, from {event.module}")
 
         if eventData in self.results:
             return
@@ -107,7 +107,7 @@ class sfp_adguard_dns(SpiderFootPlugin):
         elif eventName == "CO_HOSTED_SITE":
             blacklist_type = "BLACKLISTED_COHOST"
         else:
-            self.debug(f"Unexpected event type {eventName}, skipping")
+            print(f"[sfp_adguard_dns] Unexpected event type {eventName}, skipping")
             return
 
         family = self.sf.normalizeDNS(self.queryFamilyDNS(eventData))
@@ -117,13 +117,15 @@ class sfp_adguard_dns(SpiderFootPlugin):
             return
 
         if '94.140.14.35' in family:
-            self.debug(f"{eventData} blocked by AdGuard Family DNS")
-            evt = SpiderFootEvent(blacklist_type, f"AdGuard - Family Filter [{eventData}]", self.__name__, event)
-            self.notifyListeners(evt)
+            print(f"[sfp_adguard_dns] {eventData} blocked by AdGuard Family DNS")
+            evt = SpiderFootEvent(blacklist_type, f"AdGuard - Family Filter [{eventData}]", self.__class__.__name__, event)
+            if hasattr(self.sf, 'notifyListeners'):
+                self.sf.notifyListeners(evt)
 
         if '94.140.14.35' in default:
-            self.debug(f"{eventData} blocked by AdGuard Default DNS")
-            evt = SpiderFootEvent(blacklist_type, f"AdGuard - Default Filter [{eventData}]", self.__name__, event)
-            self.notifyListeners(evt)
+            print(f"[sfp_adguard_dns] {eventData} blocked by AdGuard Default DNS")
+            evt = SpiderFootEvent(blacklist_type, f"AdGuard - Default Filter [{eventData}]", self.__class__.__name__, event)
+            if hasattr(self.sf, 'notifyListeners'):
+                self.sf.notifyListeners(evt)
 
 # End of sfp_adguard_dns class

@@ -12,10 +12,16 @@
 
 import datetime
 
-from spiderfoot import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.helpers import SpiderFootHelpers
+
 
 
 class sfp_wikileaks(SpiderFootPlugin):
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     meta = {
         'name': "Wikileaks",
@@ -50,12 +56,11 @@ class sfp_wikileaks(SpiderFootPlugin):
         'external': "Include external leak sources such as Associated Twitter accounts, Snowden + Hammond Documents, Cryptome Documents, ICWatch, This Day in WikiLeaks Blog and WikiLeaks Press, WL Central."
     }
 
-    results = None
+
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
-
+        self.results = dict()
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 
@@ -105,11 +110,11 @@ class sfp_wikileaks(SpiderFootPlugin):
             return
 
         links = dict()
-        p = SpiderFootHelpers.extractLinksFromHtml(wlurl, res['content'], "wikileaks.org")
+        p = SpiderFootHelpers.extractLinksFromHtml(wlurl, res['content'], ["wikileaks.org"])
         if p:
             links.update(p)
 
-        p = SpiderFootHelpers.extractLinksFromHtml(wlurl, res['content'], "cryptome.org")
+        p = SpiderFootHelpers.extractLinksFromHtml(wlurl, res['content'], ["cryptome.org"])
         if p:
             links.update(p)
 
@@ -158,11 +163,11 @@ class sfp_wikileaks(SpiderFootPlugin):
                     break
 
                 links = dict()
-                p = SpiderFootHelpers.extractLinksFromHtml(wlurl, res['content'], "wikileaks.org")
+                p = SpiderFootHelpers.extractLinksFromHtml(wlurl, res['content'], ["wikileaks.org"])
                 if p:
                     links.update(p)
 
-                p = SpiderFootHelpers.extractLinksFromHtml(wlurl, res['content'], "cryptome.org")
+                p = SpiderFootHelpers.extractLinksFromHtml(wlurl, res['content'], ["cryptome.org"])
                 if p:
                     links.update(p)
 

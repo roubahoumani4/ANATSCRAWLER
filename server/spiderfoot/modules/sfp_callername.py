@@ -13,7 +13,8 @@
 import re
 import time
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_callername(SpiderFootPlugin):
@@ -49,12 +50,15 @@ class sfp_callername(SpiderFootPlugin):
     optdescs = {
     }
 
-    results = None
-    errorState = False
+
+    def __init__(self):
+        super().__init__()
+        self.results = {}
+        self.errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = {}
         self.errorState = False
 
         for opt in list(userOpts.keys()):

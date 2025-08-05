@@ -12,10 +12,18 @@
 # Licence:     MIT
 # -------------------------------------------------------------------------------
 
-from spiderfoot import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.helpers import SpiderFootHelpers
+
 
 
 class sfp_pgp(SpiderFootPlugin):
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     meta = {
         'name': "PGP Key Servers",
@@ -25,8 +33,6 @@ class sfp_pgp(SpiderFootPlugin):
         'categories': ["Public Registries"]
     }
 
-    results = None
-    errorState = False
 
     # Sample key servers:
     # https://pgp.key-server.io
@@ -52,7 +58,7 @@ class sfp_pgp(SpiderFootPlugin):
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.errorState = False
 
         for opt in list(userOpts.keys()):
@@ -139,8 +145,16 @@ class sfp_pgp(SpiderFootPlugin):
                     evttype = "EMAILADDR"
 
                 mailDom = email.lower().split('@')[1]
-                if not self.getTarget().matches(mailDom):
-                    evttype = "AFFILIATE_EMAILADDR"
+                target = self.getTarget()
+                # Defensive: only call matches if target is not a string and has the method
+                if hasattr(target, "matches") and not isinstance(target, str):
+                    if not target.matches(mailDom):
+                        evttype = "AFFILIATE_EMAILADDR"
+                else:
+                    # Fallback: if target is a string, do a simple comparison
+                    if mailDom not in str(target):
+                        evttype = "AFFILIATE_EMAILADDR"
+                
 
                 self.debug(f"Found e-mail address: {email}")
                 evt = SpiderFootEvent(evttype, email, self.__name__, event)

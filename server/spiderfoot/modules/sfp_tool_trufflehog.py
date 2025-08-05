@@ -16,10 +16,17 @@ import json
 import os
 from subprocess import PIPE, Popen, TimeoutExpired
 
-from spiderfoot import SpiderFootPlugin, SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
 
 
 class sfp_tool_trufflehog(SpiderFootPlugin):
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     meta = {
         'name': "Tool - TruffleHog",
@@ -49,15 +56,13 @@ class sfp_tool_trufflehog(SpiderFootPlugin):
         'allrepos': "Search all code repositories found. By default TruffleHog only searches those linked from the target website."
     }
 
-    results = None
-    errorState = False
+    # results and errorState are now instance-level, initialized in __init__
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
         self.results = dict()
         self.errorState = False
         self.__dataSource__ = "Target Website"
-
         for opt in userOpts.keys():
             self.opts[opt] = userOpts[opt]
 

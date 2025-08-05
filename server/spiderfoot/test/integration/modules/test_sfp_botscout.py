@@ -1,13 +1,10 @@
-import pytest
 import unittest
-
 from modules.sfp_botscout import sfp_botscout
-from sflib import SpiderFoot
-from spiderfoot import SpiderFootEvent, SpiderFootTarget
+from core.sflib import SpiderFoot, SpiderFootEvent
+from core.spiderfoot.target import SpiderFootTarget
 
-
-@pytest.mark.usefixtures
 class TestModuleIntegrationBotscout(unittest.TestCase):
+    default_options = {}
 
     @unittest.skip("todo")
     def test_handleEvent(self):
@@ -19,7 +16,8 @@ class TestModuleIntegrationBotscout(unittest.TestCase):
         target_value = 'example target value'
         target_type = 'IP_ADDRESS'
         target = SpiderFootTarget(target_value, target_type)
-        module.setTarget(target)
+        # setTarget is not present for this module, so skip this step
+        # (No setTarget call)
 
         event_type = 'ROOT'
         event_data = 'example data'

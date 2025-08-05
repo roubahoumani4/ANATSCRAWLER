@@ -12,7 +12,9 @@
 # -------------------------------------------------------------------------------
 import json
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
 
 
 class sfp_ipqualityscore(SpiderFootPlugin):
@@ -56,13 +58,17 @@ class sfp_ipqualityscore(SpiderFootPlugin):
         "strictness": "Depth of the reputation checks to be performed on the target (0 - 2)"
     }
 
-    errorState = False
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     def setup(self, sfc, userOpts=None):
         if userOpts is None:
             userOpts = {}
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.opts.update(userOpts)
 
     def watchedEvents(self):

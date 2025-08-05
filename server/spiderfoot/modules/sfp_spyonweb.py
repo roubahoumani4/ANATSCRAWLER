@@ -14,8 +14,8 @@
 import datetime
 import json
 import time
-
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_spyonweb(SpiderFootPlugin):
@@ -68,15 +68,17 @@ class sfp_spyonweb(SpiderFootPlugin):
         'maxcohost': "Stop reporting co-hosted sites after this many are found, as it would likely indicate web hosting.",
     }
 
-    cohostcount = 0
-    results = None
-    errorState = False
+
+    def __init__(self):
+        super(sfp_spyonweb, self).__init__()
+        self.cohostcount = 0
+        self.results = dict()
+        self.errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.cohostcount = 0
-
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 
@@ -290,7 +292,8 @@ class sfp_spyonweb(SpiderFootPlugin):
                     continue
 
                 if not self.opts['cohostsamedomain']:
-                    if self.getTarget().matches(co, includeParents=True):
+                    target = self.getTarget()
+                    if hasattr(target, "matches") and not isinstance(target, str) and target.matches(co, includeParents=True):
                         evt = SpiderFootEvent("INTERNET_NAME", co, self.__name__, event)
                         self.notifyListeners(evt)
                         if self.sf.isDomain(co, self.opts['_internettlds']):

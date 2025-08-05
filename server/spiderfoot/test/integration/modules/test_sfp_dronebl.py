@@ -1,13 +1,11 @@
-import pytest
 import unittest
-
 from modules.sfp_dronebl import sfp_dronebl
-from sflib import SpiderFoot
-from spiderfoot import SpiderFootEvent, SpiderFootTarget
+from core.sflib import SpiderFoot
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.target import SpiderFootTarget
 
-
-@pytest.mark.usefixtures
 class TestModuleIntegrationDronebl(unittest.TestCase):
+    default_options = {}
 
     def test_handleEvent_event_data_safe_ip_address_not_blocked_should_not_return_event(self):
         sf = SpiderFoot(self.default_options)
@@ -28,8 +26,8 @@ class TestModuleIntegrationDronebl(unittest.TestCase):
         event_type = 'ROOT'
         event_data = 'example data'
         event_module = ''
-        source_event = ''
-        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)
+        source_event = None  # type: ignore
+        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)  # type: ignore
 
         event_type = 'IP_ADDRESS'
         event_data = '1.0.0.1'

@@ -15,10 +15,16 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
 
 
 class sfp_urlscan(SpiderFootPlugin):
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     meta = {
         'name': "URLScan.io",
@@ -51,14 +57,12 @@ class sfp_urlscan(SpiderFootPlugin):
         'verify': 'Verify that any hostnames found on the target domain still resolve?'
     }
 
-    results = None
-    errorState = False
+
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.errorState = False
-
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 
@@ -145,7 +149,8 @@ class sfp_urlscan(SpiderFootPlugin):
             if not domain:
                 continue
 
-            if not self.getTarget().matches(domain, includeParents=True):
+            target = self.getTarget()
+            if not hasattr(target, "matches") or isinstance(target, str) or not target.matches(domain, includeParents=True):
                 continue
 
             if domain.lower() != eventData.lower():
@@ -173,7 +178,8 @@ class sfp_urlscan(SpiderFootPlugin):
 
             url = task.get('url')
 
-            if self.getTarget().matches(self.sf.urlFQDN(url), includeParents=True):
+            target = self.getTarget()
+            if hasattr(target, "matches") and not isinstance(target, str) and target.matches(self.sf.urlFQDN(url), includeParents=True):
                 urls.append(url)
 
         for url in set(urls):

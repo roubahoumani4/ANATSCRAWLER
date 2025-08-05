@@ -14,7 +14,8 @@
 
 import re
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 # Indentify pages that use Javascript libs, handle passwords, have forms,
 # permit file uploads and more to come.
@@ -28,7 +29,12 @@ regexps = dict({
 })
 
 
+
 class sfp_pageinfo(SpiderFootPlugin):
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     meta = {
         'name': "Page Information",
@@ -42,11 +48,10 @@ class sfp_pageinfo(SpiderFootPlugin):
     opts = {}
     optdescs = {}
 
-    results = None
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.__dataSource__ = "Target Website"
 
         for opt in list(userOpts.keys()):
@@ -81,7 +86,8 @@ class sfp_pageinfo(SpiderFootPlugin):
 
         # We aren't interested in describing pages that are not hosted on
         # our base domain.
-        if not self.getTarget().matches(self.sf.urlFQDN(eventSource)):
+        target = self.getTarget()
+        if not (hasattr(target, 'matches') and not isinstance(target, str) and target.matches(self.sf.urlFQDN(eventSource))):
             self.debug("Not gathering page info for external site " + eventSource)
             return
 
@@ -129,7 +135,8 @@ class sfp_pageinfo(SpiderFootPlugin):
                     continue
                 if not self.sf.urlFQDN(match):
                     continue
-                if self.getTarget().matches(self.sf.urlFQDN(match)):
+                target = self.getTarget()
+                if hasattr(target, 'matches') and not isinstance(target, str) and target.matches(self.sf.urlFQDN(match)):
                     continue
                 self.debug(f"Externally hosted JavaScript found at: {match}")
                 evt = SpiderFootEvent("PROVIDER_JAVASCRIPT", match, self.__name__, event)

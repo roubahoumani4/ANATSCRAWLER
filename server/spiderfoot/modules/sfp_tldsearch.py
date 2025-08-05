@@ -17,10 +17,18 @@ import time
 
 import dns.resolver
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
 
 
 class sfp_tldsearch(SpiderFootPlugin):
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.tldResults = dict()
+        self.lock = threading.Lock()
 
     meta = {
         'name': "TLD Searcher",
@@ -45,18 +53,14 @@ class sfp_tldsearch(SpiderFootPlugin):
     }
 
     # Internal results tracking
-    results = None
-
-    # Track TLD search results between threads
-    tldResults = dict()
-    lock = None
+    # results, tldResults, and lock are now instance-level, initialized in __init__
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
-        self.__dataSource__ = "DNS"
+        self.results = dict()
+        self.tldResults = dict()
         self.lock = threading.Lock()
-
+        self.__dataSource__ = "DNS"
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 
@@ -118,7 +122,8 @@ class sfp_tldsearch(SpiderFootPlugin):
             time.sleep(0.1)
 
         for res in self.tldResults:
-            if self.getTarget().matches(res, includeParents=True, includeChildren=True):
+            target = self.getTarget()
+            if hasattr(target, "matches") and not isinstance(target, str) and target.matches(res, includeParents=True, includeChildren=True):
                 continue
             if self.tldResults[res] and res not in self.results:
                 self.sendEvent(sourceEvent, res)

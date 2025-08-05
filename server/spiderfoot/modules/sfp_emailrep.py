@@ -13,7 +13,8 @@
 import json
 import time
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_emailrep(SpiderFootPlugin):
@@ -53,9 +54,12 @@ class sfp_emailrep(SpiderFootPlugin):
         'api_key': 'EmailRep API key.',
     }
 
-    results = None
-    errorState = False
-    errorWarned = False
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
+        self.errorWarned = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc

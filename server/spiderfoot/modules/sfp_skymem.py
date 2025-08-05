@@ -13,7 +13,9 @@
 
 import re
 
-from spiderfoot import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.helpers import SpiderFootHelpers
 
 
 class sfp_skymem(SpiderFootPlugin):
@@ -36,7 +38,9 @@ class sfp_skymem(SpiderFootPlugin):
         }
     }
 
-    results = None
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     # Default options
     opts = {
@@ -48,7 +52,7 @@ class sfp_skymem(SpiderFootPlugin):
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
@@ -88,7 +92,8 @@ class sfp_skymem(SpiderFootPlugin):
         for email in emails:
             # Skip unrelated emails
             mailDom = email.lower().split('@')[1]
-            if not self.getTarget().matches(mailDom):
+            target = self.getTarget()
+            if not (hasattr(target, "matches") and not isinstance(target, str) and target.matches(mailDom)):
                 self.debug("Skipped address: " + email)
                 continue
 
@@ -124,9 +129,10 @@ class sfp_skymem(SpiderFootPlugin):
             for email in emails:
                 # Skip unrelated emails
                 mailDom = email.lower().split('@')[1]
-                if not self.getTarget().matches(mailDom):
-                    self.debug("Skipped address: " + email)
-                    continue
+            target = self.getTarget()
+            if not (hasattr(target, "matches") and not isinstance(target, str) and target.matches(mailDom)):
+                self.debug("Skipped address: " + email)
+                continue
 
                 self.info("Found e-mail address: " + email)
                 if email not in self.results:

@@ -15,7 +15,8 @@ import re
 
 from bs4 import BeautifulSoup
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_dnsdumpster(SpiderFootPlugin):
@@ -38,10 +39,15 @@ class sfp_dnsdumpster(SpiderFootPlugin):
     # Option descriptions
     optdescs = {}
 
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
         self.debug("Setting up sfp_dnsdumpster")
-        self.results = self.tempStorage()
+        self.results = dict()
         self.opts.update(userOpts)
 
     def watchedEvents(self):
@@ -65,12 +71,24 @@ class sfp_dnsdumpster(SpiderFootPlugin):
         html = BeautifulSoup(str(res1["content"]), features="lxml")
         csrftoken = None
         csrfmiddlewaretoken = None
+
         try:
             for cookie in res1["headers"].get("set-cookie", "").split(";"):
                 k, v = cookie.split('=', 1)
                 if k == "csrftoken":
                     csrftoken = str(v)
-            csrfmiddlewaretoken = html.find("input", {"name": "csrfmiddlewaretoken"}).attrs.get("value", None)
+            csrf_input = html.find("input", {"name": "csrfmiddlewaretoken"})
+            if csrf_input:
+                try:
+                    from bs4.element import Tag
+                    if isinstance(csrf_input, Tag):
+                        csrfmiddlewaretoken = csrf_input.get("value", None)
+                    else:
+                        csrfmiddlewaretoken = None
+                except Exception:
+                    csrfmiddlewaretoken = None
+            else:
+                csrfmiddlewaretoken = None
         except Exception:
             pass
 
@@ -108,7 +126,8 @@ class sfp_dnsdumpster(SpiderFootPlugin):
         html = BeautifulSoup(str(res2["content"]), features="lxml")
         escaped_domain = re.escape(domain)
         match_pattern = re.compile(r"^[\w\.-]+\." + escaped_domain + r"$")
-        for subdomain in html.findAll(text=match_pattern):
+
+        for subdomain in html.find_all(string=match_pattern):
             subdomains.add(str(subdomain).strip().lower())
 
         return list(subdomains)
@@ -128,16 +147,22 @@ class sfp_dnsdumpster(SpiderFootPlugin):
         # skip if we've already processed this event (or its parent domain/subdomain)
         target = self.getTarget()
         eventDataHash = self.sf.hashstring(query)
-        if eventDataHash in self.results or \
-                (target.matches(query, includeParents=True) and not
-                 target.matches(query, includeChildren=False)):
+        skip = False
+        if eventDataHash in self.results:
+            skip = True
+        elif hasattr(target, 'matches') and not isinstance(target, str):
+            if target.matches(query, includeParents=True) and not target.matches(query, includeChildren=False):
+                skip = True
+        if skip:
             self.debug(f"Skipping already-processed event, {event.eventType}, from {event.module}")
             return
         self.results[eventDataHash] = True
 
         for hostname in self.query(query):
-            if target.matches(hostname, includeParents=True) and not \
-                    target.matches(hostname, includeChildren=False):
-                self.sendEvent(event, hostname)
+            if hasattr(target, 'matches') and not isinstance(target, str):
+                if target.matches(hostname, includeParents=True) and not target.matches(hostname, includeChildren=False):
+                    self.sendEvent(event, hostname)
+                else:
+                    self.debug(f"Invalid subdomain: {hostname}")
             else:
-                self.debug(f"Invalid subdomain: {hostname}")
+                self.sendEvent(event, hostname)

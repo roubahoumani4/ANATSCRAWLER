@@ -12,7 +12,8 @@
 
 import re
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 regexps = dict({
     "jQuery": list(['jquery']),  # unlikely false positive
@@ -27,7 +28,11 @@ regexps = dict({
 })
 
 
+
 class sfp_webframework(SpiderFootPlugin):
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     meta = {
         'name': "Web Framework Identifier",
@@ -48,13 +53,12 @@ class sfp_webframework(SpiderFootPlugin):
     }
 
     # Target
-    results = None
+
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.__dataSource__ = "Target Website"
-
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 
@@ -86,7 +90,8 @@ class sfp_webframework(SpiderFootPlugin):
             self.results[eventSource] = list()
 
         # We only want web content for pages on the target site
-        if not self.getTarget().matches(self.sf.urlFQDN(eventSource)):
+        target = self.getTarget()
+        if not hasattr(target, "matches") or isinstance(target, str) or not target.matches(self.sf.urlFQDN(eventSource)):
             self.debug("Not collecting web content information for external sites.")
             return
 

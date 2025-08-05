@@ -51,12 +51,18 @@ class sfp__stor_db(SpiderFootPlugin):
         if not self.opts['_store']:
             return
 
-        if self.opts['maxstorage'] != 0 and len(sfEvent.data) > self.opts['maxstorage']:
-            self.debug("Storing an event: " + sfEvent.eventType)
-            self.__sfdb__.scanEventStore(self.getScanId(), sfEvent, self.opts['maxstorage'])
+        scan_id = getattr(self.sf, 'scanId', None)
+        dbh = getattr(self.sf, 'dbh', None)
+        if dbh is None or scan_id is None:
+            print("[sfp__stor_db] Missing DB handle or scanId, cannot store event.")
             return
 
-        self.debug("Storing an event: " + sfEvent.eventType)
-        self.__sfdb__.scanEventStore(self.getScanId(), sfEvent)
+        if self.opts['maxstorage'] != 0 and len(sfEvent.data) > self.opts['maxstorage']:
+            print("Storing an event: " + getattr(sfEvent, 'eventType', str(sfEvent)))
+            dbh.scanEventStore(scan_id, sfEvent, self.opts['maxstorage'])
+            return
+
+        print("Storing an event: " + getattr(sfEvent, 'eventType', str(sfEvent)))
+        dbh.scanEventStore(scan_id, sfEvent)
 
 # End of sfp__stor_db class

@@ -23,21 +23,34 @@ import sys
 import time
 from copy import deepcopy
 
-# Ensure the script's directory is in sys.path for module imports
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Ensure the script's directory and its parent are in sys.path for module imports
+
+# Add core/ to sys.path for local and package imports
+script_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(script_dir)
+core_dir = os.path.join(script_dir, "core")
+if core_dir not in sys.path:
+    sys.path.insert(0, core_dir)
+if script_dir not in sys.path:
+    sys.path.insert(0, script_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
 import cherrypy
 import cherrypy_cors
 from cherrypy.lib import auth_digest
 
-from .sflib import SpiderFoot
-from .sfscan import startSpiderFootScanner
-from .sfwebui import SpiderFootWebUi
-from .spiderfoot.helpers import SpiderFootHelpers
-from .spiderfoot.db import SpiderFootDb
-from .spiderfoot.logger import logListenerSetup, logWorkerSetup
-from .spiderfoot.correlation import SpiderFootCorrelator
-from .spiderfoot.__version__ import __version__
+
+# Local core modules
+from core import sflib
+from core import sfscan
+import sfwebui
+# SpiderFoot package modules
+from core.spiderfoot.helpers import SpiderFootHelpers
+from core.spiderfoot.db import SpiderFootDb
+from core.spiderfoot.logger import logListenerSetup, logWorkerSetup
+from core.spiderfoot.correlation import SpiderFootCorrelator
+from core.spiderfoot.__version__ import __version__
 
 scanId = None
 dbh = None
@@ -251,7 +264,7 @@ def start_scan(sfConfig: dict, sfModules: dict, args, loggingQueue) -> None:
     global scanId
 
     dbh = SpiderFootDb(sfConfig, init=True)
-    sf = SpiderFoot(sfConfig)
+    sf = sflib.SpiderFoot(sfConfig)
 
     if not args.s:
         log.error("You must specify a target when running in scan mode. Try --help for guidance.")
@@ -432,7 +445,7 @@ def start_scan(sfConfig: dict, sfModules: dict, args, loggingQueue) -> None:
     scanName = target
     scanId = SpiderFootHelpers.genScanInstanceId()
     try:
-        p = mp.Process(target=startSpiderFootScanner, args=(loggingQueue, scanName, scanId, target, targetType, modlist, cfg))
+        p = mp.Process(target=sfscan.startSpiderFootScanner, args=(loggingQueue, scanName, scanId, target, targetType, modlist, cfg))
         p.daemon = True
         p.start()
     except BaseException as e:
@@ -555,8 +568,8 @@ def start_web_server(sfWebUiConfig: dict, sfConfig: dict, loggingQueue=None) -> 
 
         log.info("Enabling SSL based on supplied key and certificate file.")
         cherrypy.server.ssl_module = 'builtin'
-        cherrypy.server.ssl_certificate = crt_path
-        cherrypy.server.ssl_private_key = key_path
+        cherrypy.server.ssl_certificate = crt_path  # type: ignore[attr-defined]
+        cherrypy.server.ssl_private_key = key_path  # type: ignore[attr-defined]
         using_ssl = True
 
     if using_ssl:
@@ -584,10 +597,9 @@ def start_web_server(sfWebUiConfig: dict, sfConfig: dict, loggingQueue=None) -> 
     print("*************************************************************")
     print("")
 
-    # Disable auto-reloading of content
-    cherrypy.engine.autoreload.unsubscribe()
+    # Disable auto-reloading of content if available (removed for portability)
 
-    cherrypy.quickstart(SpiderFootWebUi(sfWebUiConfig, sfConfig, loggingQueue), script_name=web_root, config=conf)
+    cherrypy.quickstart(sfwebui.SpiderFootWebUi(sfWebUiConfig, sfConfig, loggingQueue), script_name=web_root, config=conf)
 
 
 def handle_abort(signal, frame) -> None:

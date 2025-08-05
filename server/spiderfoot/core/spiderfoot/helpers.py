@@ -14,7 +14,8 @@ from pathlib import Path
 from importlib import resources
 
 import networkx as nx
-from bs4 import BeautifulSoup, SoupStrainer
+from bs4 import BeautifulSoup
+from bs4.filter import SoupStrainer
 from networkx.readwrite.gexf import GEXFWriter
 import phonenumbers
 
@@ -490,7 +491,7 @@ class SpiderFootHelpers():
             graph.add_edge(src, dst)
 
         gexf = GEXFWriter(graph=graph)
-        return str(gexf).encode('utf-8')
+        return str(gexf)
 
     @staticmethod
     def buildGraphJson(root: str, data: typing.List[str], flt: typing.Optional[typing.List[str]] = None) -> str:
@@ -674,8 +675,10 @@ class SpiderFootHelpers():
             if haystack[needle] is None:
                 return None
 
-            for c in haystack[needle]:
-                ret.append({"name": c, "children": get_children(c, haystack)})
+            children = haystack[needle]
+            if children is not None:
+                for c in children:
+                    ret.append({"name": c, "children": get_children(c, haystack)})
             return ret
 
         # Find the element with no parents, that's our root.
@@ -689,7 +692,7 @@ class SpiderFootHelpers():
                 if data[ck] is None:
                     continue
 
-                if k in data[ck]:
+                if data[ck] is not None and isinstance(data[ck], list) and any(isinstance(item, str) and k == item for item in data[ck]):  # type: ignore
                     contender = False
 
             if contender:
@@ -833,8 +836,12 @@ class SpiderFootHelpers():
         try:
             for t in list(tags.keys()):
                 for lnk in BeautifulSoup(data, features="lxml", parse_only=SoupStrainer(t)).find_all(t):
-                    if lnk.has_attr(tags[t]):
-                        links.append(lnk[tags[t]])
+                    has_attr = getattr(lnk, 'has_attr', None)
+                    getitem = getattr(lnk, '__getitem__', None)
+                    if callable(has_attr) and has_attr(tags[t]) and callable(getitem):
+                        val = getitem(tags[t])
+                        if isinstance(val, str):
+                            links.append(val)
         except BaseException:
             return returnLinks
 
@@ -885,20 +892,27 @@ class SpiderFootHelpers():
 
             # If the link starts with a /, the absolute link is off the base URL
             elif link.startswith('/'):
-                absLink = SpiderFootHelpers.urlBaseUrl(url) + link
+                base_url = SpiderFootHelpers.urlBaseUrl(url)
+                if base_url is not None:
+                    absLink = base_url + link
 
             # Maybe the domain was just mentioned and not a link, so we make it one
-            for domain in domains:
-                if absLink is None and domain.lower() in link.lower():
-                    absLink = proto + '://' + link
+            if domains is not None:
+                for domain in domains:
+                    if absLink is None and domain.lower() in link.lower():
+                        absLink = proto + '://' + link
 
             # Otherwise, it's a flat link within the current directory
             if absLink is None:
-                absLink = SpiderFootHelpers.urlBaseDir(url) + link
+                base_dir = SpiderFootHelpers.urlBaseDir(url)
+                if base_dir is not None:
+                    absLink = base_dir + link
 
             # Translate any relative pathing (../)
-            absLink = SpiderFootHelpers.urlRelativeToAbsolute(absLink)
-            returnLinks[absLink] = {'source': url, 'original': link}
+            if absLink is not None:
+                absLink = SpiderFootHelpers.urlRelativeToAbsolute(absLink)
+                if absLink is not None:
+                    returnLinks[absLink] = {'source': url, 'original': link}
 
         return returnLinks
 

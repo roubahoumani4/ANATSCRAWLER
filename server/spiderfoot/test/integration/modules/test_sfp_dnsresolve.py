@@ -1,13 +1,11 @@
-import pytest
 import unittest
-
 from modules.sfp_dnsresolve import sfp_dnsresolve
-from sflib import SpiderFoot
-from spiderfoot import SpiderFootEvent, SpiderFootTarget
+from core.sflib import SpiderFoot
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.target import SpiderFootTarget
 
-
-@pytest.mark.usefixtures
 class TestModuleIntegrationDnsResolve(unittest.TestCase):
+    default_options = {}
 
     def test_enrichTarget_should_return_SpiderFootTarget(self):
         sf = SpiderFoot(self.default_options)
@@ -19,10 +17,10 @@ class TestModuleIntegrationDnsResolve(unittest.TestCase):
         target_type = 'IP_ADDRESS'
         target = SpiderFootTarget(target_value, target_type)
 
-        result = module.enrichTarget(target)
+        result = module.enrichTarget(target)  # type: ignore
         self.assertIsInstance(result, SpiderFootTarget)
-        self.assertEqual(result.targetType, target_type)
-        self.assertEqual(result.targetValue, target_value)
+        self.assertEqual(getattr(result, 'targetType', None), target_type)
+        self.assertEqual(getattr(result, 'targetValue', None), target_value)
 
     def test_resolveTargets_should_return_list(self):
         sf = SpiderFoot(self.default_options)
@@ -89,8 +87,8 @@ class TestModuleIntegrationDnsResolve(unittest.TestCase):
         event_type = 'ROOT'
         event_data = 'example data'
         event_module = ''
-        source_event = ''
-        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)
+        source_event = None  # type: ignore
+        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)  # type: ignore
 
         event_type = 'IP_ADDRESS'
         event_data = '1.1.1.1'
@@ -131,8 +129,8 @@ class TestModuleIntegrationDnsResolve(unittest.TestCase):
         event_type = 'ROOT'
         event_data = 'example data'
         event_module = ''
-        source_event = ''
-        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)
+        source_event = None  # type: ignore
+        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)  # type: ignore
 
         event_type = 'IPV6_ADDRESS'
         event_data = '2606:4700:4700::1111'
@@ -173,8 +171,8 @@ class TestModuleIntegrationDnsResolve(unittest.TestCase):
         event_type = 'ROOT'
         event_data = 'example data'
         event_module = ''
-        source_event = ''
-        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)
+        source_event = None  # type: ignore
+        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)  # type: ignore
 
         event_type = 'AFFILIATE_IPADDR'
         event_data = '1.1.1.1'
@@ -217,8 +215,8 @@ class TestModuleIntegrationDnsResolve(unittest.TestCase):
         event_type = 'ROOT'
         event_data = 'example data'
         event_module = ''
-        source_event = ''
-        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)
+        source_event = None  # type: ignore
+        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)  # type: ignore
 
         event_type = 'RAW_RIR_DATA'
         event_data = 'example data www.spiderfoot.net example data'

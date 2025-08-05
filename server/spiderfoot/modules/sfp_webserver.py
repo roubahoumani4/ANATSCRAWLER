@@ -13,10 +13,15 @@
 
 import json
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
 
 
 class sfp_webserver(SpiderFootPlugin):
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     meta = {
         'name': "Web Server Identifier",
@@ -30,13 +35,12 @@ class sfp_webserver(SpiderFootPlugin):
     opts = {}
     optdescs = {}
 
-    results = None
+
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.__dataSource__ = "Target Website"
-
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 
@@ -62,7 +66,8 @@ class sfp_webserver(SpiderFootPlugin):
 
         self.results[eventSource] = True
 
-        if not self.getTarget().matches(self.sf.urlFQDN(eventSource)):
+        target = self.getTarget()
+        if not hasattr(target, "matches") or isinstance(target, str) or not target.matches(self.sf.urlFQDN(eventSource)):
             self.debug("Not collecting web server information for external sites.")
             return
 
@@ -77,7 +82,8 @@ class sfp_webserver(SpiderFootPlugin):
         # Check location header for linked URLs
         if 'location' in jdata:
             if jdata['location'].startswith('http://') or jdata['location'].startswith('https://'):
-                if self.getTarget().matches(self.sf.urlFQDN(jdata['location'])):
+                target = self.getTarget()
+                if hasattr(target, "matches") and not isinstance(target, str) and target.matches(self.sf.urlFQDN(jdata['location'])):
                     evt = SpiderFootEvent('LINKED_URL_INTERNAL', jdata['location'], self.__name__, event)
                     self.notifyListeners(evt)
                 else:
@@ -89,7 +95,8 @@ class sfp_webserver(SpiderFootPlugin):
             for directive in jdata['content-security-policy'].split(';'):
                 for string in directive.split(' '):
                     if string.startswith('http://') or string.startswith('https://'):
-                        if self.getTarget().matches(self.sf.urlFQDN(string)):
+                        target = self.getTarget()
+                        if hasattr(target, "matches") and not isinstance(target, str) and target.matches(self.sf.urlFQDN(string)):
                             evt = SpiderFootEvent('LINKED_URL_INTERNAL', string, self.__name__, event)
                             self.notifyListeners(evt)
                         else:

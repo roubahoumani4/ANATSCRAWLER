@@ -13,7 +13,8 @@
 import json
 import time
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_threatjammer(SpiderFootPlugin):
@@ -63,8 +64,7 @@ class sfp_threatjammer(SpiderFootPlugin):
         'checkaffiliates': "Apply checks to affiliates?",
     }
 
-    results = None
-    errorState = False
+    # results and errorState are now instance-level, initialized in __init__
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc

@@ -13,7 +13,8 @@
 import json
 import time
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_securitytrails(SpiderFootPlugin):
@@ -65,13 +66,15 @@ class sfp_securitytrails(SpiderFootPlugin):
     # Be sure to completely clear any class variables in setup()
     # or you run the risk of data persisting between scan runs.
 
-    results = None
-    errorState = False
-    cohostcount = 0
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
+        self.cohostcount = 0
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.cohostcount = 0
 
         # Clear / reset any other class member variables here
@@ -95,6 +98,8 @@ class sfp_securitytrails(SpiderFootPlugin):
     # Search SecurityTrails
     def query(self, qry, querytype, page=1, accum=None):
         info = None
+        if accum is None:
+            accum = []
 
         headers = {
             'APIKEY': self.opts['api_key']
@@ -130,10 +135,7 @@ class sfp_securitytrails(SpiderFootPlugin):
                 if len(info.get('records', [])) >= 100:
                     # Avoid throttling
                     time.sleep(1)
-                    if accum:
-                        accum.extend(info.get('records'))
-                    else:
-                        accum = info.get('records')
+                    accum.extend(info.get('records', []))
                     return self.query(qry, querytype, page + 1, accum)
 
                 # We are at the last page
@@ -193,7 +195,8 @@ class sfp_securitytrails(SpiderFootPlugin):
                         if not h:
                             continue
                         if not self.opts['cohostsamedomain']:
-                            if self.getTarget().matches(h, includeParents=True):
+                            target = self.getTarget()
+                            if hasattr(target, "matches") and not isinstance(target, str) and target.matches(h, includeParents=True):
                                 self.debug("Skipping " + h + " because it is on the same domain.")
                                 continue
 

@@ -13,11 +13,17 @@
 import json
 from urllib.parse import urlencode
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_zetalytics(SpiderFootPlugin):
     BASE_URL = "https://zonecruncher.com/api/v1"
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
+
     meta = {
         "name": "Zetalytics",
         "summary": "Query the Zetalytics database for hosts on your target domain(s).",
@@ -45,12 +51,11 @@ class sfp_zetalytics(SpiderFootPlugin):
         "verify": "Verify that any hostnames found on the target domain still resolve?",
     }
 
-    results = None
-    errorState = False
+
 
     def setup(self, sfc, userOpts=None):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         if userOpts:
             self.opts.update(userOpts)
 
@@ -71,7 +76,7 @@ class sfp_zetalytics(SpiderFootPlugin):
         if f"INTERNET_NAME:{hostname}" in self.results:
             return False
 
-        if not self.getTarget().matches(hostname):
+        if not (hasattr(self, '_currentTarget') and self._currentTarget and hasattr(self._currentTarget, 'matches') and self._currentTarget.matches(hostname)):
             return False
 
         if self.opts["verify"] and not self.sf.resolveHost(hostname) and not self.sf.resolveHost6(hostname):

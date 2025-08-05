@@ -13,10 +13,16 @@
 import json
 import time
 
-from spiderfoot import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.helpers import SpiderFootHelpers
 
 
 class sfp_zonefiles(SpiderFootPlugin):
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     meta = {
         'name': "ZoneFile.io",
@@ -52,12 +58,11 @@ class sfp_zonefiles(SpiderFootPlugin):
         "delay": "Delay between requests, in seconds."
     }
 
-    results = None
-    errorState = False
+
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.errorState = False
 
         for opt in userOpts.keys():
@@ -187,7 +192,7 @@ class sfp_zonefiles(SpiderFootPlugin):
         if emails:
             for email in set(emails.split(',')):
                 mail_domain = email.lower().split('@')[1]
-                if not self.getTarget().matches(mail_domain):
+                if not (hasattr(self, '_currentTarget') and self._currentTarget and hasattr(self._currentTarget, 'matches') and self._currentTarget.matches(mail_domain)):
                     self.debug(f"Ignored affiliate email address: {email}")
                     continue
 

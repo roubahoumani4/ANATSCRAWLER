@@ -13,11 +13,11 @@
 
 import re
 
-import dns.query
-import dns.rdatatype
-import dns.resolver
+import dns.message
+from dns import query, rdatatype, resolver
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_dnsraw(SpiderFootPlugin):
@@ -40,13 +40,17 @@ class sfp_dnsraw(SpiderFootPlugin):
         'verify': "Verify identified hostnames resolve."
     }
 
-    events = None
-    checked = None
+
+    def __init__(self):
+        super().__init__()
+        self.events = dict()
+        self.checked = dict()
+
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.events = self.tempStorage()
-        self.checked = self.tempStorage()
+        self.events = dict()
+        self.checked = dict()
         self.__dataSource__ = "DNS"
 
         for opt in list(userOpts.keys()):
@@ -97,15 +101,21 @@ class sfp_dnsraw(SpiderFootPlugin):
                 return
 
             try:
-                req = dns.message.make_query(eventData, dns.rdatatype.from_text(rec))
+
+
+                req = dns.message.make_query(eventData, rdatatype.from_text(rec))
 
                 if self.opts.get('_dnsserver', "") != "":
                     n = self.opts['_dnsserver']
                 else:
-                    ns = dns.resolver.get_default_resolver()
-                    n = ns.nameservers[0]
+                    ns = resolver.get_default_resolver()
+                    n = ns.nameservers[0] if ns.nameservers and isinstance(ns.nameservers[0], str) else None
 
-                res = dns.query.udp(req, n, timeout=30)
+                if not n or not isinstance(n, str):
+                    self.error(f"No valid DNS server found for querying {eventData}")
+                    continue
+
+                res = query.udp(req, n, timeout=30)
 
                 if not len(res.answer):
                     continue
@@ -115,10 +125,12 @@ class sfp_dnsraw(SpiderFootPlugin):
 
             # Iterate through DNS answers
             for x in res.answer:
-                if str(x) in self.checked:
+
+                if self.checked is not None and str(x) in self.checked:
                     continue
 
-                self.checked[str(x)] = True
+                if self.checked is not None:
+                    self.checked[str(x)] = True
 
                 evt = SpiderFootEvent("RAW_DNS_RECORDS", str(x), self.__name__, parentEvent)
                 self.notifyListeners(evt)
@@ -163,8 +175,10 @@ class sfp_dnsraw(SpiderFootPlugin):
                                             continue
                                         domains.append(domain.lower())
 
+
         for domain in set(domains):
-            if self.getTarget().matches(domain, includeChildren=True, includeParents=True):
+            target = self.getTarget()
+            if hasattr(target, 'matches') and not isinstance(target, str) and target.matches(domain, includeChildren=True, includeParents=True):
                 evt_type = 'INTERNET_NAME'
             else:
                 evt_type = 'AFFILIATE_INTERNET_NAME'

@@ -15,7 +15,9 @@ import re
 
 from bs4 import BeautifulSoup
 
-from spiderfoot import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.helpers import SpiderFootHelpers
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_emailformat(SpiderFootPlugin):
@@ -46,7 +48,10 @@ class sfp_emailformat(SpiderFootPlugin):
     optdescs = {
     }
 
-    results = None
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
@@ -84,8 +89,9 @@ class sfp_emailformat(SpiderFootPlugin):
             return
 
         tbody = html.find('tbody')
-        if tbody:
-            data = str(tbody.contents)
+
+        if tbody and hasattr(tbody, 'get_text'):
+            data = tbody.get_text()
         else:
             # fall back to raw page contents
             data = res["content"]
@@ -94,7 +100,15 @@ class sfp_emailformat(SpiderFootPlugin):
         for email in emails:
             # Skip unrelated emails
             mailDom = email.lower().split('@')[1]
-            if not self.getTarget().matches(mailDom):
+
+            target = self.getTarget()
+            # Defensive: Only call matches if target is not a string and has matches
+            is_own = False
+            if hasattr(target, 'matches') and not isinstance(target, str):
+                if target.matches(mailDom):
+                    is_own = True
+            # If we can't check, default to not own
+            if not is_own:
                 self.debug(f"Skipped address: {email}")
                 continue
 

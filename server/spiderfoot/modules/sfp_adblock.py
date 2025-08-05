@@ -13,7 +13,7 @@
 
 import adblockparser
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.sflib import SpiderFootEvent, SpiderFootPlugin
 
 
 class sfp_adblock(SpiderFootPlugin):
@@ -57,13 +57,13 @@ class sfp_adblock(SpiderFootPlugin):
         'cacheperiod': "Hours to cache list data before re-fetching.",
     }
 
-    results = None
+    results = {}
     rules = None
     errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = {}
         self.rules = None
         self.errorState = False
 
@@ -90,12 +90,12 @@ class sfp_adblock(SpiderFootPlugin):
         res = self.sf.fetchUrl(blocklist_url, timeout=30)
 
         if res['code'] != "200":
-            self.error(f"Unexpected HTTP response code {res['code']} for {blocklist_url}")
+            print(f"[sfp_adblock] Unexpected HTTP response code {res['code']} for {blocklist_url}")
             self.errorState = True
             return None
 
         if res['content'] is None:
-            self.error(f"Unable to download AdBlock Plus blocklist: {blocklist_url}")
+            print(f"[sfp_adblock] Unable to download AdBlock Plus blocklist: {blocklist_url}")
             self.errorState = True
             return None
 
@@ -113,12 +113,12 @@ class sfp_adblock(SpiderFootPlugin):
             return
 
         lines = blocklist.split('\n')
-        self.debug(f"Retrieved {len(lines)} AdBlock blocklist rules")
+        print(f"[sfp_adblock] Retrieved {len(lines)} AdBlock blocklist rules")
         try:
             self.rules = adblockparser.AdblockRules(lines)
         except adblockparser.AdblockParsingError as e:
             self.errorState = True
-            self.error(f"Parsing error handling AdBlock list: {e}")
+            print(f"[sfp_adblock] Parsing error handling AdBlock list: {e}")
 
     # Handle events sent to this module
     def handleEvent(self, event):
@@ -126,10 +126,10 @@ class sfp_adblock(SpiderFootPlugin):
         srcModuleName = event.module
         eventData = event.data
 
-        self.debug(f"Received event, {eventName}, from {srcModuleName}")
+        print(f"[sfp_adblock] Received event, {eventName}, from {srcModuleName}")
 
         if eventData in self.results:
-            self.debug("Already checked this URL for AdBlock matching, skipping.")
+            print("[sfp_adblock] Already checked this URL for AdBlock matching, skipping.")
             return
 
         self.results[eventData] = True
@@ -138,9 +138,7 @@ class sfp_adblock(SpiderFootPlugin):
             return
 
         if not self.opts["blocklist"]:
-            self.error(
-                f"You enabled {self.__class__.__name__} but did not set a blocklist URL!"
-            )
+            print(f"[sfp_adblock] You enabled {self.__class__.__name__} but did not set a blocklist URL!")
             self.errorState = True
             return
 
@@ -148,28 +146,31 @@ class sfp_adblock(SpiderFootPlugin):
             self.retrieveBlocklist(self.opts['blocklist'])
 
         if not self.rules:
-            self.error("No AdBlock Plus rules loaded")
+            print("[sfp_adblock] No AdBlock Plus rules loaded")
             self.errorState = True
             return
 
         try:
             if eventName == 'PROVIDER_JAVASCRIPT':
                 if self.rules and self.rules.should_block(eventData, {'third-party': True, 'script': True}):
-                    evt = SpiderFootEvent("URL_ADBLOCKED_EXTERNAL", eventData, self.__name__, event)
-                    self.notifyListeners(evt)
+                    evt = SpiderFootEvent("URL_ADBLOCKED_EXTERNAL", eventData, self.__class__.__name__, event)
+                    if hasattr(self.sf, 'notifyListeners'):
+                        self.sf.notifyListeners(evt)
 
             if eventName == 'LINKED_URL_EXTERNAL':
                 if self.rules and self.rules.should_block(eventData, {'third-party': True}):
-                    evt = SpiderFootEvent("URL_ADBLOCKED_EXTERNAL", eventData, self.__name__, event)
-                    self.notifyListeners(evt)
+                    evt = SpiderFootEvent("URL_ADBLOCKED_EXTERNAL", eventData, self.__class__.__name__, event)
+                    if hasattr(self.sf, 'notifyListeners'):
+                        self.sf.notifyListeners(evt)
 
             if eventName == 'LINKED_URL_INTERNAL':
                 if self.rules and self.rules.should_block(eventData):
-                    evt = SpiderFootEvent("URL_ADBLOCKED_INTERNAL", eventData, self.__name__, event)
-                    self.notifyListeners(evt)
+                    evt = SpiderFootEvent("URL_ADBLOCKED_INTERNAL", eventData, self.__class__.__name__, event)
+                    if hasattr(self.sf, 'notifyListeners'):
+                        self.sf.notifyListeners(evt)
 
         except ValueError as e:
-            self.error(f"Parsing error handling AdBlock list: {e}")
+            print(f"[sfp_adblock] Parsing error handling AdBlock list: {e}")
             self.errorState = True
 
 # End of sfp_adblock class

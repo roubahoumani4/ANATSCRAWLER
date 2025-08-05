@@ -14,10 +14,33 @@
 import json
 import time
 
-from spiderfoot import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.helpers import SpiderFootHelpers
 
 
 class sfp_spider(SpiderFootPlugin):
+
+    def _make_dummy_parent_event(self):
+        # Create a valid dummy parent event chain: ROOT <- DUMMY
+        # We must pass a SpiderFootEvent as sourceEvent, so we create a ROOT event with itself as sourceEvent
+        root_event = SpiderFootEvent.__new__(SpiderFootEvent)
+        # Manually set the required attributes for ROOT
+        root_event._generated = 0.0
+        root_event._eventType = "ROOT"
+        root_event._confidence = 100
+        root_event._visibility = 100
+        root_event._risk = 0
+        root_event._module = self.__name__
+        root_event._data = "ROOT"
+        root_event._sourceEvent = None
+        root_event._sourceEventHash = "ROOT"
+        root_event._moduleDataSource = None
+        root_event._actualSource = None
+        root_event.__id = "ROOT"
+        dummy_event = SpiderFootEvent("DUMMY", "", self.__name__, root_event)
+        return dummy_event
+
 
     meta = {
         'name': "Web Spider",
@@ -61,23 +84,18 @@ class sfp_spider(SpiderFootPlugin):
         'reportduplicates': "Report links every time one is found, even if found before?"
     }
 
-    # If using robots.txt, this will get populated with filter rules
-    robotsRules = dict()
-
-    # Pages already fetched
-    fetchedPages = None
-
-    # Events for links identified
-    urlEvents = None
-
-    # Tracked cookies per site
-    siteCookies = None
+    def __init__(self):
+        super(sfp_spider, self).__init__()
+        self.robotsRules = dict()
+        self.fetchedPages = dict()
+        self.urlEvents = dict()
+        self.siteCookies = dict()
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.fetchedPages = self.tempStorage()
-        self.urlEvents = self.tempStorage()
-        self.siteCookies = self.tempStorage()
+        self.fetchedPages = dict()
+        self.urlEvents = dict()
+        self.siteCookies = dict()
         self.__dataSource__ = "Target Website"
 
         for opt in list(userOpts.keys()):
@@ -113,7 +131,7 @@ class sfp_spider(SpiderFootPlugin):
         # Filter out certain file types (if user chooses to)
         if list(filter(lambda ext: url.lower().split('?')[0].endswith('.' + ext.lower()), self.opts['filterfiles'])):
             # self.debug(f"Ignoring URL with filtered file extension: {link}")
-            return None
+            return {}
 
         if site in self.siteCookies:
             self.debug(f"Restoring cookies for {site}: {self.siteCookies[site]}")
@@ -131,7 +149,7 @@ class sfp_spider(SpiderFootPlugin):
         self.fetchedPages[url] = True
 
         if not fetched:
-            return None
+            return {}
 
         # Track cookies a site has sent, then send the back in subsquent requests
         if self.opts['usecookies'] and fetched['headers'] is not None:
@@ -159,21 +177,26 @@ class sfp_spider(SpiderFootPlugin):
         data = fetched['content']
 
         if not data:
-            return None
+            return {}
 
         if isinstance(data, bytes):
             data = data.decode('utf-8', errors='replace')
 
         # Extract links from the content
+        target = self.getTarget()
+        if hasattr(target, "getNames") and not isinstance(target, str):
+            names = target.getNames()
+        else:
+            names = []
         links = SpiderFootHelpers.extractLinksFromHtml(
             url,
             data,
-            self.getTarget().getNames()
+            names
         )
 
         if not links:
             self.debug(f"No links found at {url}")
-            return None
+            return {}
 
         # Notify modules about the links found
         # Aside from the first URL, this will be the first time a new
@@ -198,39 +221,28 @@ class sfp_spider(SpiderFootPlugin):
             list: links suitable for spidering
         """
         returnLinks = dict()
-
+        target = self.getTarget()
         for link in links:
             linkBase = SpiderFootHelpers.urlBaseUrl(link)
             linkFQDN = self.sf.urlFQDN(link)
 
-            # Skip external sites (typical behaviour..)
-            if not self.getTarget().matches(linkFQDN):
-                # self.debug('Ignoring external site: ' + link)
+            # Defensive: check for matches method
+            if not (hasattr(target, "matches") and not isinstance(target, str) and target.matches(linkFQDN)):
                 continue
 
-            # Optionally skip sub-domain sites
-            if self.opts['nosubs'] and not \
-                    self.getTarget().matches(linkFQDN, includeChildren=False):
-                # self.debug("Ignoring subdomain: " + link)
+            if self.opts['nosubs'] and not (hasattr(target, "matches") and not isinstance(target, str) and target.matches(linkFQDN, includeChildren=False)):
                 continue
 
-            # Skip parent domain sites
-            if not self.getTarget().matches(linkFQDN, includeParents=False):
-                # self.debug("Ignoring parent domain: " + link)
+            if not (hasattr(target, "matches") and not isinstance(target, str) and target.matches(linkFQDN, includeParents=False)):
                 continue
 
-            # Optionally skip user directories
             if self.opts['filterusers'] and '/~' in link:
-                # self.debug("Ignoring user folder: " + link)
                 continue
 
-            # If we are respecting robots.txt, filter those out too
             if linkBase in self.robotsRules and self.opts['robotsonly']:
                 if list(filter(lambda blocked: type(blocked).lower(blocked) in link.lower() or blocked == '*', self.robotsRules[linkBase])):
-                    # self.debug("Ignoring page found in robots.txt: " + link)
                     continue
 
-            # All tests passed, add link to be spidered
             self.debug(f"Adding URL for spidering: {link}")
             returnLinks[link] = links[link]
 
@@ -238,13 +250,17 @@ class sfp_spider(SpiderFootPlugin):
 
     # Notify listening modules about links
     def linkNotify(self, url: str, parentEvent=None):
-        if self.getTarget().matches(self.sf.urlFQDN(url)):
+        target = self.getTarget()
+        if hasattr(target, "matches") and not isinstance(target, str) and target.matches(self.sf.urlFQDN(url)):
             utype = "LINKED_URL_INTERNAL"
         else:
             utype = "LINKED_URL_EXTERNAL"
 
         if type(url) != str:
-            url = str(url, "utf-8", errors='replace')
+            url = str(url)
+        # Defensive: parentEvent must be SpiderFootEvent, else create a dummy chain
+        if not isinstance(parentEvent, SpiderFootEvent):
+            parentEvent = self._make_dummy_parent_event()
         event = SpiderFootEvent(utype, url, self.__name__, parentEvent)
         self.notifyListeners(event)
         return event
@@ -254,6 +270,9 @@ class sfp_spider(SpiderFootPlugin):
         if not isinstance(httpresult, dict):
             return
 
+        # Defensive: parentEvent must be SpiderFootEvent, else create a dummy chain
+        if not isinstance(parentEvent, SpiderFootEvent):
+            parentEvent = self._make_dummy_parent_event()
         event = SpiderFootEvent(
             "HTTP_CODE",
             str(httpresult['code']),
@@ -267,6 +286,8 @@ class sfp_spider(SpiderFootPlugin):
         headers = httpresult.get('headers')
 
         if headers:
+            if not isinstance(parentEvent, SpiderFootEvent):
+                parentEvent = self._make_dummy_parent_event()
             event = SpiderFootEvent(
                 "WEBSERVER_HTTPHEADERS",
                 json.dumps(headers, ensure_ascii=False),
@@ -282,6 +303,8 @@ class sfp_spider(SpiderFootPlugin):
                     if ctype.startswith(mt):
                         store_content = False
 
+                if not isinstance(parentEvent, SpiderFootEvent):
+                    parentEvent = self._make_dummy_parent_event()
                 event = SpiderFootEvent(
                     "TARGET_WEB_CONTENT_TYPE",
                     ctype.replace(" ", "").lower(),
@@ -294,6 +317,8 @@ class sfp_spider(SpiderFootPlugin):
         if store_content:
             content = httpresult.get('content')
             if content:
+                if not isinstance(parentEvent, SpiderFootEvent):
+                    parentEvent = self._make_dummy_parent_event()
                 event = SpiderFootEvent(
                     "TARGET_WEB_CONTENT",
                     str(content),
@@ -320,7 +345,7 @@ class sfp_spider(SpiderFootPlugin):
             self.debug(f"Ignoring {eventData} as already spidered or is being spidered.")
             return None
 
-        self.urlEvents[eventData] = event
+        self.urlEvents[eventData] = event if isinstance(event, SpiderFootEvent) else None
 
         # Determine where to start spidering from if it's a INTERNET_NAME event
         if eventName == "INTERNET_NAME":
@@ -350,7 +375,7 @@ class sfp_spider(SpiderFootPlugin):
 
         if not spiderTarget:
             self.info(f"No reply from {eventData}, aborting.")
-            return None
+            return
 
         self.debug(f"Initiating spider of {spiderTarget} from {srcModuleName}")
 
@@ -365,9 +390,9 @@ class sfp_spider(SpiderFootPlugin):
         # Are we respecting robots.txt?
         if self.opts['robotsonly']:
             targetBase = SpiderFootHelpers.urlBaseUrl(startingPoint)
-            if targetBase not in self.robotsRules:
+            if targetBase is not None and targetBase not in self.robotsRules:
                 res = self.sf.fetchUrl(
-                    targetBase + '/robots.txt',
+                    str(targetBase) + '/robots.txt',
                     timeout=self.opts['_fetchtimeout'],
                     useragent=self.opts['_useragent'],
                     verify=False
@@ -412,7 +437,8 @@ class sfp_spider(SpiderFootPlugin):
                     self.info(f"Maximum number of pages ({self.opts['maxpages']}) reached.")
                     return
 
-            nextLinks = self.cleanLinks(links)
+            # Defensive: links should be a dict, but cleanLinks expects a list of URLs
+            nextLinks = self.cleanLinks(list(links.keys()))
             self.debug(f"Found links: {nextLinks}")
 
             # We've scanned through another layer of the site

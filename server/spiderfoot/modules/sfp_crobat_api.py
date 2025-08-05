@@ -14,12 +14,17 @@
 
 import json
 import time
-import urllib
+import urllib.parse
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_crobat_api(SpiderFootPlugin):
+    def __init__(self):
+        SpiderFootPlugin.__init__(self)
+        self.results = dict()
+        self.errorState = False
 
     meta = {
         'name': "Crobat API",
@@ -48,12 +53,10 @@ class sfp_crobat_api(SpiderFootPlugin):
         "delay": "Delay between requests, in seconds."
     }
 
-    results = None
-    errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.errorState = False
 
         for opt in userOpts.keys():
@@ -161,8 +164,17 @@ class sfp_crobat_api(SpiderFootPlugin):
                 if domain in self.results:
                     continue
 
-                if not self.getTarget().matches(domain, includeChildren=True, includeParents=True):
-                    continue
+                target = self.getTarget()
+                if hasattr(target, 'matches') and not isinstance(target, str):
+                    try:
+                        if not target.matches(domain, includeChildren=True, includeParents=True):
+                            continue
+                    except Exception:
+                        if domain != str(target):
+                            continue
+                else:
+                    if domain != str(target):
+                        continue
 
                 if self.opts['verify'] and not self.sf.resolveHost(domain) and not self.sf.resolveHost6(domain):
                     self.debug(f"Host {domain} could not be resolved")

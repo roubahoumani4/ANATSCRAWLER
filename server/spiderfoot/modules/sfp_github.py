@@ -13,10 +13,14 @@
 
 import json
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_github(SpiderFootPlugin):
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     meta = {
         'name': "Github",
@@ -95,6 +99,8 @@ class sfp_github(SpiderFootPlugin):
             self.debug(f"Already did a search for {eventData}, skipping.")
             return
 
+        if self.results is None:
+            self.results = dict()
         self.results[eventData] = True
 
         # Extract name and location from profile
@@ -195,12 +201,12 @@ class sfp_github(SpiderFootPlugin):
                 failed = True
 
         if not failed:
-            if ret.get('total_count', "0") == "0" or len(ret['items']) == 0:
+            if not isinstance(ret, dict) or 'items' not in ret or ret.get('total_count', "0") == "0" or len(ret['items']) == 0:
                 self.debug(f"No Github information for {username}")
                 failed = True
 
-        if not failed:
-            for item in ret['items']:
+        if not failed and isinstance(ret, dict):
+            for item in ret.get('items', []):
                 repo_info = self.buildRepoInfo(item)
                 if repo_info is not None:
                     if self.opts['namesonly'] and username != item['name']:
@@ -233,13 +239,13 @@ class sfp_github(SpiderFootPlugin):
                 failed = True
 
         if not failed:
-            if ret.get('total_count', "0") == "0" or len(ret['items']) == 0:
+            if not isinstance(ret, dict) or 'items' not in ret or ret.get('total_count', "0") == "0" or len(ret['items']) == 0:
                 self.debug("No Github information for " + username)
                 failed = True
 
-        if not failed:
+        if not failed and isinstance(ret, dict):
             # For each user matching the username, get their repos
-            for item in ret['items']:
+            for item in ret.get('items', []):
                 if item.get('repos_url') is None:
                     self.debug("Incomplete Github information found (repos_url).")
                     continue

@@ -13,7 +13,7 @@
 
 from netaddr import IPAddress, IPNetwork
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.sflib import SpiderFootEvent, SpiderFootPlugin
 
 
 class sfp_alienvaultiprep(SpiderFootPlugin):
@@ -56,12 +56,12 @@ class sfp_alienvaultiprep(SpiderFootPlugin):
         'checksubnets': "Check if any malicious IPs are found within the same subnet of the target?"
     }
 
-    results = None
+    results = {}
     errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = {}
         self.errorState = False
 
         for opt in list(userOpts.keys()):
@@ -95,13 +95,13 @@ class sfp_alienvaultiprep(SpiderFootPlugin):
 
         if targetType == "ip":
             if target in blacklist:
-                self.debug(f"IP address {target} found in AlienVault IP Reputation Database blacklist.")
+                print(f"[sfp_alienvaultiprep] IP address {target} found in AlienVault IP Reputation Database blacklist.")
                 return True
         elif targetType == "netblock":
             netblock = IPNetwork(target)
             for ip in blacklist:
                 if IPAddress(ip) in netblock:
-                    self.debug(f"IP address {ip} found within netblock/subnet {target} in AlienVault IP Reputation Database blacklist.")
+                    print(f"[sfp_alienvaultiprep] IP address {ip} found within netblock/subnet {target} in AlienVault IP Reputation Database blacklist.")
                     return True
 
         return False
@@ -119,12 +119,12 @@ class sfp_alienvaultiprep(SpiderFootPlugin):
         )
 
         if res['code'] != "200":
-            self.error(f"Unexpected HTTP response code {res['code']} from AlienVault IP Reputation Database.")
+            print(f"[sfp_alienvaultiprep] Unexpected HTTP response code {res['code']} from AlienVault IP Reputation Database.")
             self.errorState = True
             return None
 
         if res['content'] is None:
-            self.error("Received no content from AlienVault IP Reputation Database")
+            print("[sfp_alienvaultiprep] Received no content from AlienVault IP Reputation Database")
             self.errorState = True
             return None
 
@@ -161,10 +161,10 @@ class sfp_alienvaultiprep(SpiderFootPlugin):
         eventName = event.eventType
         eventData = event.data
 
-        self.debug(f"Received event, {eventName}, from {event.module}")
+        print(f"[sfp_alienvaultiprep] Received event, {eventName}, from {event.module}")
 
         if eventData in self.results:
-            self.debug(f"Skipping {eventData}, already checked.")
+            print(f"[sfp_alienvaultiprep] Skipping {eventData}, already checked.")
             return
 
         if self.errorState:
@@ -195,10 +195,10 @@ class sfp_alienvaultiprep(SpiderFootPlugin):
             malicious_type = "MALICIOUS_SUBNET"
             blacklist_type = "BLACKLISTED_SUBNET"
         else:
-            self.debug(f"Unexpected event type {eventName}, skipping")
+            print(f"[sfp_alienvaultiprep] Unexpected event type {eventName}, skipping")
             return
 
-        self.debug(f"Checking maliciousness of {eventData} ({eventName}) with AlienVault IP Reputation Database")
+        print(f"[sfp_alienvaultiprep] Checking maliciousness of {eventData} ({eventName}) with AlienVault IP Reputation Database")
 
         if not self.queryBlacklist(eventData, targetType):
             return
@@ -206,10 +206,12 @@ class sfp_alienvaultiprep(SpiderFootPlugin):
         url = "https://reputation.alienvault.com/reputation.generic"
         text = f"AlienVault IP Reputation Database [{eventData}]\n<SFURL>{url}</SFURL>"
 
-        evt = SpiderFootEvent(malicious_type, text, self.__name__, event)
-        self.notifyListeners(evt)
+        evt = SpiderFootEvent(malicious_type, text, self.__class__.__name__, event)
+        if hasattr(self.sf, 'notifyListeners'):
+            self.sf.notifyListeners(evt)
 
-        evt = SpiderFootEvent(blacklist_type, text, self.__name__, event)
-        self.notifyListeners(evt)
+        evt = SpiderFootEvent(blacklist_type, text, self.__class__.__name__, event)
+        if hasattr(self.sf, 'notifyListeners'):
+            self.sf.notifyListeners(evt)
 
 # End of sfp_alienvaultiprep class

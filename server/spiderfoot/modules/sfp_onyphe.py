@@ -15,10 +15,18 @@ import json
 import time
 from datetime import datetime
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
 
 
 class sfp_onyphe(SpiderFootPlugin):
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
+        self.cohostcount = 0
 
     meta = {
         "name": "Onyphe",
@@ -69,13 +77,12 @@ class sfp_onyphe(SpiderFootPlugin):
         "cohostsamedomain": "Treat co-hosted sites on the same target domain as co-hosting?",
     }
 
-    results = None
-    errorState = False
-    cohostcount = 0
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
+        self.cohostcount = 0
+        self.errorState = False
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
@@ -196,27 +203,31 @@ class sfp_onyphe(SpiderFootPlugin):
                 domains.add(subDomain)
 
         for domain in domains:
-            if self.getTarget().matches(domain):
-                if self.opts['verify']:
-                    if self.sf.resolveHost(domain) or self.sf.resolveHost6(domain):
-                        evt = SpiderFootEvent('INTERNET_NAME', domain, self.__name__, event)
-                    else:
-                        evt = SpiderFootEvent('INTERNET_NAME_UNRESOLVED', domain, self.__name__, event)
-                    self.notifyListeners(evt)
+            target = self.getTarget()
+            if hasattr(target, 'matches') and not isinstance(target, str):
+                if target.matches(domain):
+                    if self.opts['verify']:
+                        if self.sf.resolveHost(domain) or self.sf.resolveHost6(domain):
+                            evt = SpiderFootEvent('INTERNET_NAME', domain, self.__name__, event)
+                        else:
+                            evt = SpiderFootEvent('INTERNET_NAME_UNRESOLVED', domain, self.__name__, event)
+                        self.notifyListeners(evt)
 
-                if self.sf.isDomain(domain, self.opts['_internettlds']):
-                    evt = SpiderFootEvent('DOMAIN_NAME', domain, self.__name__, event)
-                    self.notifyListeners(evt)
-                continue
+                    if self.sf.isDomain(domain, self.opts['_internettlds']):
+                        evt = SpiderFootEvent('DOMAIN_NAME', domain, self.__name__, event)
+                        self.notifyListeners(evt)
+                    continue
 
             if self.cohostcount < self.opts['maxcohost']:
                 if self.opts["verify"] and not self.sf.validateIP(domain, eventData):
                     self.debug("Host no longer resolves to our IP.")
                     continue
 
-                if not self.opts["cohostsamedomain"] and self.getTarget().matches(domain, includeParents=True):
-                    self.debug(f"Skipping {domain} because it is on the same domain.")
-                    continue
+                target = self.getTarget()
+                if not self.opts["cohostsamedomain"] and hasattr(target, 'matches') and not isinstance(target, str):
+                    if target.matches(domain, includeParents=True):
+                        self.debug(f"Skipping {domain} because it is on the same domain.")
+                        continue
 
                 evt = SpiderFootEvent("CO_HOSTED_SITE", domain, self.__name__, event)
                 self.notifyListeners(evt)

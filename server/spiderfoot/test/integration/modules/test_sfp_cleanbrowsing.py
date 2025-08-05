@@ -1,13 +1,13 @@
-import pytest
+
 import unittest
-
 from modules.sfp_cleanbrowsing import sfp_cleanbrowsing
-from sflib import SpiderFoot
-from spiderfoot import SpiderFootEvent, SpiderFootTarget
+from core.sflib import SpiderFoot
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.target import SpiderFootTarget
 
-
-@pytest.mark.usefixtures
 class TestModuleIntegrationcleanbrowsing(unittest.TestCase):
+    default_options = {}
+
 
     def test_handleEvent_event_data_adult_internet_name_blocked_should_return_event(self):
         sf = SpiderFoot(self.default_options)
@@ -36,8 +36,8 @@ class TestModuleIntegrationcleanbrowsing(unittest.TestCase):
         event_type = 'ROOT'
         event_data = 'example data'
         event_module = ''
-        source_event = ''
-        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)
+        source_event = None
+        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)  # type: ignore
 
         event_type = 'INTERNET_NAME'
         event_data = 'pornhub.com'
@@ -70,8 +70,8 @@ class TestModuleIntegrationcleanbrowsing(unittest.TestCase):
         event_type = 'ROOT'
         event_data = 'example data'
         event_module = ''
-        source_event = ''
-        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)
+        source_event = None
+        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)  # type: ignore
 
         event_type = 'INTERNET_NAME'
         event_data = 'spiderfoot.net'

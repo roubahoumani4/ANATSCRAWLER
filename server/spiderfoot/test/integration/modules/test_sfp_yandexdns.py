@@ -1,13 +1,12 @@
-import pytest
+
 import unittest
-
 from modules.sfp_yandexdns import sfp_yandexdns
-from sflib import SpiderFoot
-from spiderfoot import SpiderFootEvent, SpiderFootTarget
+from core.sflib import SpiderFoot
+from core.spiderfoot.event import SpiderFootEvent  # type: ignore
+from core.spiderfoot.target import SpiderFootTarget
 
-
-@pytest.mark.usefixtures
 class TestModuleIntegrationYandexDns(unittest.TestCase):
+    default_options = {}
 
     def test_handleEvent_event_data_safe_internet_name_not_blocked_should_not_return_event(self):
         sf = SpiderFoot(self.default_options)
@@ -28,15 +27,15 @@ class TestModuleIntegrationYandexDns(unittest.TestCase):
         event_type = 'ROOT'
         event_data = 'example data'
         event_module = ''
-        source_event = ''
-        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)
+        source_event = None  # type: ignore
+        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)  # type: ignore
 
         event_type = 'INTERNET_NAME'
         event_data = 'yandex.com'
         event_module = 'example module'
         source_event = evt
 
-        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)
+        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)  # type: ignore
         result = module.handleEvent(evt)
 
         self.assertIsNone(result)
@@ -68,15 +67,16 @@ class TestModuleIntegrationYandexDns(unittest.TestCase):
         event_type = 'ROOT'
         event_data = 'example data'
         event_module = ''
-        source_event = ''
-        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)
+        source_event = None  # type: ignore
+        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)  # type: ignore
+
 
         event_type = 'INTERNET_NAME'
         event_data = 'pornhub.com'
         event_module = 'example module'
         source_event = evt
 
-        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)
+        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)  # type: ignore
 
         with self.assertRaises(Exception) as cm:
             module.handleEvent(evt)

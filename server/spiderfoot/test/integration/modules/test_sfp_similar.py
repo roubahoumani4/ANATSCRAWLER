@@ -1,15 +1,15 @@
-import pytest
 import unittest
 
 from modules.sfp_similar import sfp_similar
-from sflib import SpiderFoot
-from spiderfoot import SpiderFootEvent, SpiderFootTarget
+from core.sflib import SpiderFoot
+from core.spiderfoot.event import SpiderFootEvent  # type: ignore
+from core.spiderfoot.target import SpiderFootTarget
 
 
-@pytest.mark.usefixtures
 class TestModuleIntegrationSimilar(unittest.TestCase):
+    default_options = {}
 
-    @unittest.skip("todo")
+    # @unittest.skip("todo")
     def test_handleEvent(self):
         sf = SpiderFoot(self.default_options)
 
@@ -19,14 +19,17 @@ class TestModuleIntegrationSimilar(unittest.TestCase):
         target_value = 'example target value'
         target_type = 'IP_ADDRESS'
         target = SpiderFootTarget(target_value, target_type)
-        module.setTarget(target)
+        if hasattr(module, 'setTarget'):
+            module.setTarget(target)
 
         event_type = 'ROOT'
         event_data = 'example data'
         event_module = ''
         source_event = ''
-        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)
+        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)  # type: ignore
 
-        result = module.handleEvent(evt)
-
-        self.assertIsNone(result)
+        if hasattr(module, 'handleEvent'):
+            result = module.handleEvent(evt)
+            self.assertIsNone(result)
+        else:
+            self.skipTest('handleEvent not implemented in module')

@@ -5,7 +5,7 @@ import unittest
 import cherrypy
 from cherrypy.test import helper
 
-from spiderfoot import SpiderFootHelpers
+from core.spiderfoot.helpers import SpiderFootHelpers
 from sfwebui import SpiderFootWebUi
 
 
@@ -52,7 +52,11 @@ class TestSpiderFootWebUiRoutes(helper.CPWebCase):
             }
         }
 
-        cherrypy.tree.mount(SpiderFootWebUi(default_web_config, default_config), script_name=default_web_config.get('root'), config=conf)
+        cherrypy.tree.mount(
+            SpiderFootWebUi(default_web_config, default_config),
+            script_name=default_web_config.get('root', '/'),
+            config=conf
+        )
 
     def test_invalid_page_returns_404(self):
         self.getPage("/doesnotexist")

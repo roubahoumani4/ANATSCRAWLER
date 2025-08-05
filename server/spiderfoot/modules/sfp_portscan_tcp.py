@@ -17,7 +17,8 @@ import time
 
 from netaddr import IPNetwork
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_portscan_tcp(SpiderFootPlugin):
@@ -56,25 +57,27 @@ class sfp_portscan_tcp(SpiderFootPlugin):
         'netblockscanmax': "Maximum netblock/subnet size to scan IPs within (CIDR value, 24 = /24, 16 = /16, etc.)"
     }
 
-    results = None
-    portlist = list()
-    portResults = dict()
-    lock = None
-    errorState = False
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.portlist = list()
+        self.portResults = dict()
+        self.lock = threading.Lock()
+        self.errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.__dataSource__ = "Target Network"
         self.lock = threading.Lock()
-
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
-
-        portlist = list()
+        self.portlist = []
+        portlist = []
         if self.opts['ports'][0].startswith("http://") or \
                 self.opts['ports'][0].startswith("https://") or \
-                self.opts['ports'][0].startswith("@"):
+                self.opts['ports'][0].startswith("@"): 
             file_ports = self.sf.optValueToData(self.opts['ports'][0])
             if file_ports:
                 portlist = file_ports.split("\n")

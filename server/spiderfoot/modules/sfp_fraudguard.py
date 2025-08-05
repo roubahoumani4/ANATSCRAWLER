@@ -17,7 +17,8 @@ from datetime import datetime
 
 from netaddr import IPNetwork
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_fraudguard(SpiderFootPlugin):
@@ -79,8 +80,11 @@ class sfp_fraudguard(SpiderFootPlugin):
         'checkaffiliates': "Apply checks to affiliates?"
     }
 
-    results = None
-    errorState = False
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc

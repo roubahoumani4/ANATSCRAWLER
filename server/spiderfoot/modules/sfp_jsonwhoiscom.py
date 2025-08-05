@@ -16,7 +16,10 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from spiderfoot import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.helpers import SpiderFootHelpers
+
 
 
 class sfp_jsonwhoiscom(SpiderFootPlugin):
@@ -60,13 +63,16 @@ class sfp_jsonwhoiscom(SpiderFootPlugin):
         "delay": "Delay between requests, in seconds.",
     }
 
-    results = None
-    errorState = False
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     # Initialize module and module options
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.errorState = False
 
         for opt in userOpts.keys():
@@ -234,7 +240,8 @@ class sfp_jsonwhoiscom(SpiderFootPlugin):
 
         for email in set(emails):
             mail_domain = email.lower().split('@')[1]
-            if self.getTarget().matches(mail_domain, includeChildren=True):
+            target = self.getTarget()
+            if hasattr(target, "matches") and not isinstance(target, str) and target.matches(mail_domain, includeChildren=True):
                 if email.split("@")[0] in self.opts['_genericusers'].split(","):
                     evttype = "EMAILADDR_GENERIC"
                 else:

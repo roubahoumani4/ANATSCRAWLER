@@ -12,7 +12,8 @@
 
 import re
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 regexps = dict({
     "LinkedIn (Individual)": list(['.*linkedin.com/in/([a-zA-Z0-9_]+$)']),
@@ -48,11 +49,13 @@ class sfp_social(SpiderFootPlugin):
     optdescs = {
     }
 
-    results = None
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.__dataSource__ = "Target Website"
 
         for opt in list(userOpts.keys()):
@@ -71,7 +74,7 @@ class sfp_social(SpiderFootPlugin):
 
         self.debug(f"Received event, {eventName}, from {srcModuleName}")
 
-        if eventData in list(self.results.keys()):
+        if eventData in self.results:
             return
 
         self.results[eventData] = True

@@ -18,10 +18,18 @@ import json
 from netaddr import IPNetwork
 from subprocess import Popen, PIPE, TimeoutExpired
 
-from spiderfoot import SpiderFootPlugin, SpiderFootEvent, SpiderFootHelpers
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.helpers import SpiderFootHelpers
+
 
 
 class sfp_tool_nuclei(SpiderFootPlugin):
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     meta = {
         "name": "Tool - Nuclei",
@@ -58,13 +66,11 @@ class sfp_tool_nuclei(SpiderFootPlugin):
     }
 
     # Target
-    results = None
-    errorState = False
+    # results and errorState are now instance-level, initialized in __init__
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
-
+        self.results = dict()
         for opt in userOpts.keys():
             self.opts[opt] = userOpts[opt]
 

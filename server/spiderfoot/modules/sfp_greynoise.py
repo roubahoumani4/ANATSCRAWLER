@@ -17,7 +17,8 @@ import time
 from datetime import datetime
 from netaddr import IPNetwork
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_greynoise(SpiderFootPlugin):
@@ -73,16 +74,15 @@ class sfp_greynoise(SpiderFootPlugin):
     # Be sure to completely clear any class variables in setup()
     # or you run the risk of data persisting between scan runs.
 
-    results = None
-    errorState = False
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
-
-        # Clear / reset any other class member variables here
-        # or you risk them persisting between threads.
-
+        self.results = dict()
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 
@@ -213,25 +213,32 @@ class sfp_greynoise(SpiderFootPlugin):
                     # Only report meta data about the target, not affiliates
                     if rec.get("metadata") and eventName == "IP_ADDRESS":
                         met = rec.get("metadata")
-                        if met.get("country", "unknown") != "unknown":
-                            loc = ""
-                            if met.get("city"):
-                                loc = met.get("city") + ", "
-                            loc += met.get("country")
-                            e = SpiderFootEvent("GEOINFO", loc, self.__name__, event)
+                        if met and isinstance(met, dict):
+                            if met.get("country", "unknown") != "unknown":
+                                loc = ""
+                                city_val = met.get("city")
+                                country_val = met.get("country")
+                                if city_val:
+                                    loc = str(city_val) + ", "
+                                if country_val:
+                                    loc += str(country_val)
+                                e = SpiderFootEvent("GEOINFO", loc, self.__name__, event)
+                                self.notifyListeners(e)
+                            asn_val = met.get("asn")
+                            if asn_val and asn_val != "unknown":
+                                asn = str(asn_val).replace("AS", "")
+                                e = SpiderFootEvent("BGP_AS_MEMBER", asn, self.__name__, event)
+                                self.notifyListeners(e)
+                            org_val = met.get("organization")
+                            if org_val and org_val != "unknown":
+                                e = SpiderFootEvent("COMPANY_NAME", str(org_val), self.__name__, event)
+                                self.notifyListeners(e)
+                            os_val = met.get("os")
+                            if os_val and os_val != "unknown":
+                                e = SpiderFootEvent("OPERATING_SYSTEM", str(os_val), self.__name__, event)
+                                self.notifyListeners(e)
+                            e = SpiderFootEvent("RAW_RIR_DATA", str(rec), self.__name__, event)
                             self.notifyListeners(e)
-                        if met.get("asn", "unknown") != "unknown":
-                            asn = met.get("asn").replace("AS", "")
-                            e = SpiderFootEvent("BGP_AS_MEMBER", asn, self.__name__, event)
-                            self.notifyListeners(e)
-                        if met.get("organization", "unknown") != "unknown":
-                            e = SpiderFootEvent("COMPANY_NAME", met.get("organization"), self.__name__, event)
-                            self.notifyListeners(e)
-                        if met.get("os", "unknown") != "unknown":
-                            e = SpiderFootEvent("OPERATING_SYSTEM", met.get("os"), self.__name__, event)
-                            self.notifyListeners(e)
-                        e = SpiderFootEvent("RAW_RIR_DATA", str(rec), self.__name__, event)
-                        self.notifyListeners(e)
 
                     if rec.get("classification"):
                         descr = (
@@ -240,13 +247,18 @@ class sfp_greynoise(SpiderFootPlugin):
                             + "]\n - Classification: "
                             + rec.get("classification")
                         )
-                        if rec.get("tags"):
-                            descr += "\n - " + "Scans For Tags: " + ", ".join(rec.get("tags"))
-                        if rec.get("cve"):
-                            descr += "\n - " + "Scans For CVEs: " + ", ".join(rec.get("cve"))
-                        if rec.get("raw_data") and not (rec.get("tags") or ret.get("cve")):
+                        tags = rec.get("tags")
+                        if tags and isinstance(tags, list):
+                            descr += "\n - " + "Scans For Tags: " + ", ".join(tags)
+                        cve = rec.get("cve")
+                        if cve and isinstance(cve, list):
+                            descr += "\n - " + "Scans For CVEs: " + ", ".join(cve)
+                        if rec.get("raw_data") and not (tags or cve):
                             descr += "\n - " + "Raw data: " + str(rec.get("raw_data"))
-                        descr += "\n<SFURL>https://viz.greynoise.io/ip/" + rec.get("ip") + "</SFURL>"
+                        ip_val = rec.get("ip")
+                        if ip_val is None:
+                            ip_val = ""
+                        descr += f"\n<SFURL>https://viz.greynoise.io/ip/{ip_val}</SFURL>"
                         e = SpiderFootEvent(evtType, descr, self.__name__, event)
                         self.notifyListeners(e)
 
@@ -263,25 +275,32 @@ class sfp_greynoise(SpiderFootPlugin):
                 # Only report meta data about the target, not affiliates
                 if ret.get("metadata") and eventName == "IP_ADDRESS":
                     met = ret.get("metadata")
-                    if met.get("country", "unknown") != "unknown":
-                        loc = ""
-                        if met.get("city"):
-                            loc = met.get("city") + ", "
-                        loc += met.get("country")
-                        e = SpiderFootEvent("GEOINFO", loc, self.__name__, event)
+                    if met and isinstance(met, dict):
+                        if met.get("country", "unknown") != "unknown":
+                            loc = ""
+                            city_val = met.get("city")
+                            country_val = met.get("country")
+                            if city_val:
+                                loc = str(city_val) + ", "
+                            if country_val:
+                                loc += str(country_val)
+                            e = SpiderFootEvent("GEOINFO", loc, self.__name__, event)
+                            self.notifyListeners(e)
+                        asn_val = met.get("asn")
+                        if asn_val and asn_val != "unknown":
+                            asn = str(asn_val).replace("AS", "")
+                            e = SpiderFootEvent("BGP_AS_MEMBER", asn, self.__name__, event)
+                            self.notifyListeners(e)
+                        org_val = met.get("organization")
+                        if org_val and org_val != "unknown":
+                            e = SpiderFootEvent("COMPANY_NAME", str(org_val), self.__name__, event)
+                            self.notifyListeners(e)
+                        os_val = met.get("os")
+                        if os_val and os_val != "unknown":
+                            e = SpiderFootEvent("OPERATING_SYSTEM", str(os_val), self.__name__, event)
+                            self.notifyListeners(e)
+                        e = SpiderFootEvent("RAW_RIR_DATA", str(ret), self.__name__, event)
                         self.notifyListeners(e)
-                    if met.get("asn", "unknown") != "unknown":
-                        asn = met.get("asn").replace("AS", "")
-                        e = SpiderFootEvent("BGP_AS_MEMBER", asn, self.__name__, event)
-                        self.notifyListeners(e)
-                    if met.get("organization", "unknown") != "unknown":
-                        e = SpiderFootEvent("COMPANY_NAME", met.get("organization"), self.__name__, event)
-                        self.notifyListeners(e)
-                    if met.get("os", "unknown") != "unknown":
-                        e = SpiderFootEvent("OPERATING_SYSTEM", met.get("os"), self.__name__, event)
-                        self.notifyListeners(e)
-                    e = SpiderFootEvent("RAW_RIR_DATA", str(ret), self.__name__, event)
-                    self.notifyListeners(e)
 
                 if ret.get("classification"):
                     descr = (
@@ -290,13 +309,18 @@ class sfp_greynoise(SpiderFootPlugin):
                         + "]\n - Classification: "
                         + ret.get("classification")
                     )
-                    if ret.get("tags"):
-                        descr += "\n - " + "Scans For Tags: " + ", ".join(ret.get("tags"))
-                    if ret.get("cve"):
-                        descr += "\n - " + "Scans For CVEs: " + ", ".join(ret.get("cve"))
-                    if ret.get("raw_data") and not (ret.get("tags") or ret.get("cve")):
+                    tags = ret.get("tags")
+                    if tags and isinstance(tags, list):
+                        descr += "\n - " + "Scans For Tags: " + ", ".join(tags)
+                    cve = ret.get("cve")
+                    if cve and isinstance(cve, list):
+                        descr += "\n - " + "Scans For CVEs: " + ", ".join(cve)
+                    if ret.get("raw_data") and not (tags or cve):
                         descr += "\n - " + "Raw data: " + str(ret.get("raw_data"))
-                    descr += "\n<SFURL>https://viz.greynoise.io/ip/" + ret.get("ip") + "</SFURL>"
+                    ip_val = ret.get("ip")
+                    if ip_val is None:
+                        ip_val = ""
+                    descr += f"\n<SFURL>https://viz.greynoise.io/ip/{ip_val}</SFURL>"
                     e = SpiderFootEvent(evtType, descr, self.__name__, event)
                     self.notifyListeners(e)
 

@@ -10,7 +10,7 @@
 # Licence:     MIT
 # -------------------------------------------------------------------------------
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.sflib import SpiderFootEvent, SpiderFootPlugin
 
 
 class sfp_coinblocker(SpiderFootPlugin):
@@ -56,7 +56,7 @@ class sfp_coinblocker(SpiderFootPlugin):
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
         self.errorState = False
-        self.results = self.tempStorage()
+        self.results = dict()
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
@@ -85,7 +85,7 @@ class sfp_coinblocker(SpiderFootPlugin):
             return False
 
         if target.lower() in blocklist:
-            self.debug(f"Host name {target} found in CoinBlocker list.")
+            print(f"[sfp_coinblocker] Host name {target} found in CoinBlocker list.")
             return True
 
         return False
@@ -99,17 +99,17 @@ class sfp_coinblocker(SpiderFootPlugin):
         url = "https://zerodot1.gitlab.io/CoinBlockerLists/list.txt"
         res = self.sf.fetchUrl(
             url,
-            timeout=self.opts['_fetchtimeout'],
-            useragent=self.opts['_useragent'],
+            timeout=self.opts.get('_fetchtimeout', 30),
+            useragent=self.opts.get('_useragent', 'SpiderFoot'),
         )
 
-        if res['code'] != "200":
-            self.error(f"Unexpected HTTP response code {res['code']} from {url}")
+        if res.get('code') != "200":
+            print(f"[sfp_coinblocker] Unexpected HTTP response code {res.get('code')} from {url}")
             self.errorState = True
             return None
 
-        if res['content'] is None:
-            self.error(f"Received no content from {url}")
+        if res.get('content') is None:
+            print(f"[sfp_coinblocker] Received no content from {url}")
             self.errorState = True
             return None
 
@@ -146,15 +146,20 @@ class sfp_coinblocker(SpiderFootPlugin):
 
         return hosts
 
+
     def handleEvent(self, event):
         eventName = event.eventType
         srcModuleName = event.module
         eventData = event.data
 
-        self.debug(f"Received event, {eventName}, from {srcModuleName}")
+        # Ensure results is always a dict
+        if self.results is None:
+            self.results = dict()
+
+        print(f"[sfp_coinblocker] Received event, {eventName}, from {srcModuleName}")
 
         if eventData in self.results:
-            self.debug(f"Skipping {eventData}, already checked.")
+            print(f"[sfp_coinblocker] Skipping {eventData}, already checked.")
             return
 
         if self.errorState:
@@ -174,12 +179,12 @@ class sfp_coinblocker(SpiderFootPlugin):
             if not self.opts.get('checkcohosts', False):
                 return
             malicious_type = "MALICIOUS_COHOST"
-            blacklist_type = "BACKLISTED_COHOST"
+            blacklist_type = "BLACKLISTED_COHOST"
         else:
-            self.debug(f"Unexpected event type {eventName}, skipping")
+            print(f"[sfp_coinblocker] Unexpected event type {eventName}, skipping")
             return
 
-        self.debug(f"Checking maliciousness of {eventData} ({eventName}) with CoinBlocker list")
+        print(f"[sfp_coinblocker] Checking maliciousness of {eventData} ({eventName}) with CoinBlocker list")
 
         if not self.queryBlocklist(eventData):
             return
@@ -187,10 +192,12 @@ class sfp_coinblocker(SpiderFootPlugin):
         url = "https://zerodot1.gitlab.io/CoinBlockerLists/list.txt"
         text = f"CoinBlocker [{eventData}]\n<SFURL>{url}</SFURL>"
 
-        evt = SpiderFootEvent(malicious_type, text, self.__name__, event)
-        self.notifyListeners(evt)
+        evt = SpiderFootEvent(malicious_type, text, self.__class__.__name__, event)
+        if hasattr(self.sf, 'notifyListeners'):
+            self.sf.notifyListeners(evt)
 
-        evt = SpiderFootEvent(blacklist_type, text, self.__name__, event)
-        self.notifyListeners(evt)
+        evt = SpiderFootEvent(blacklist_type, text, self.__class__.__name__, event)
+        if hasattr(self.sf, 'notifyListeners'):
+            self.sf.notifyListeners(evt)
 
 # End of sfp_coinblocker class

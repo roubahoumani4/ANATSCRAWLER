@@ -12,7 +12,10 @@
 
 import random
 
-from spiderfoot import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.helpers import SpiderFootHelpers
+
 
 
 class sfp_junkfiles(SpiderFootPlugin):
@@ -42,17 +45,20 @@ class sfp_junkfiles(SpiderFootPlugin):
         'dirs': "Try to fetch the containing folder with these extensions."
     }
 
-    results = None
-    hosts = None
-    skiphosts = None
-    bases = None
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.hosts = dict()
+        self.skiphosts = dict()
+        self.bases = dict()
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
-        self.hosts = self.tempStorage()
-        self.skiphosts = self.tempStorage()
-        self.bases = self.tempStorage()
+        self.results = dict()
+        self.hosts = dict()
+        self.skiphosts = dict()
+        self.bases = dict()
         self.__dataSource__ = "Target Website"
 
         for opt in list(userOpts.keys()):
@@ -98,13 +104,13 @@ class sfp_junkfiles(SpiderFootPlugin):
         host = SpiderFootHelpers.urlBaseUrl(eventData)
 
         if host in self.skiphosts:
-            self.debug("Skipping " + host + " because it doesn't return 404s.")
+            self.debug(f"Skipping {host or '[unknown host]'} because it doesn't return 404s.")
             return
 
         # http://www/blah/abc.php -> try http://www/blah/abc.php.[fileexts]
         for ext in self.opts['urlextstry']:
             if host in self.skiphosts:
-                self.debug("Skipping " + host + " because it doesn't return 404s.")
+                self.debug(f"Skipping {host or '[unknown host]'} because it doesn't return 404s.")
                 return
 
             if "." + ext + "?" in eventData or "." + ext + "#" in eventData or \
@@ -149,7 +155,7 @@ class sfp_junkfiles(SpiderFootPlugin):
                 return
 
             if host in self.skiphosts:
-                self.debug("Skipping " + host + " because it doesn't return 404s.")
+                self.debug(f"Skipping {host or '[unknown host]'} because it doesn't return 404s.")
                 return
 
             self.debug("Trying " + f + " against " + eventData)
@@ -185,7 +191,7 @@ class sfp_junkfiles(SpiderFootPlugin):
                 return
 
             if host in self.skiphosts:
-                self.debug("Skipping " + host + " because it doesn't return 404s.")
+                self.debug(f"Skipping {host or '[unknown host]'} because it doesn't return 404s.")
                 return
 
             if base.count('/') == 3:

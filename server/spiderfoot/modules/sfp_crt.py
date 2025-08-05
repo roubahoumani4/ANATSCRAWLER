@@ -15,7 +15,8 @@ import json
 import time
 import urllib.parse
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_crt(SpiderFootPlugin):
@@ -49,15 +50,19 @@ class sfp_crt(SpiderFootPlugin):
         'fetchcerts': 'Fetch each certificate found, for processing by other modules.',
     }
 
-    results = None
-    cert_ids = None
-    errorState = False
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.cert_ids = dict()
+        self.errorState = False
+
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
         self.errorState = False
-        self.results = self.tempStorage()
-        self.cert_ids = self.tempStorage()
+        self.results = dict()
+        self.cert_ids = dict()
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
@@ -236,7 +241,8 @@ class sfp_crt(SpiderFootPlugin):
             if not self.sf.validHost(domain, self.opts['_internettlds']):
                 continue
 
-            if self.getTarget().matches(domain, includeChildren=True, includeParents=True):
+            target = self.getTarget()
+            if hasattr(target, 'matches') and not isinstance(target, str) and target.matches(domain, includeChildren=True, includeParents=True):
                 evt_type = 'INTERNET_NAME'
                 if self.opts['verify'] and not self.sf.resolveHost(domain) and not self.sf.resolveHost6(domain):
                     self.debug(f"Host {domain} could not be resolved")

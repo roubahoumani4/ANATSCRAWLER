@@ -14,7 +14,9 @@ import json
 import re
 import time
 
-from spiderfoot import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.helpers import SpiderFootHelpers
 
 
 class sfp_stackoverflow(SpiderFootPlugin):
@@ -55,11 +57,11 @@ class sfp_stackoverflow(SpiderFootPlugin):
         "api_key": "StackApps has an optional API key. Using an API key will increase the amount of requests allowed."
     }
 
-    # Results Tracking
-    results = None
 
-    # Tracking the error state of the module
-    errorState = False
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
@@ -136,44 +138,36 @@ class sfp_stackoverflow(SpiderFootPlugin):
     def extractUsername(self, questionId):
         # Need to query the questions endpoint with the question_id to find the username
         query_results = self.query(questionId, "questions")
-
-        items = query_results.get('items')
-
-        if items is None:
+        if not query_results or not isinstance(query_results, dict):
             return None
-
+        items = query_results.get('items') if query_results else None
+        if not items:
+            return None
         for item in items:
-            owner = item['owner']
+            owner = item.get('owner', {})
             username = owner.get('display_name')
-
-        return str(username)
+            if username:
+                return str(username)
+        return None
 
     def extractIP4s(self, text):
-        ips = list()
-
+        ips = []
         matches = re.findall(r'^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$', text)
-
         if not matches:
             return ips
-
         for m in matches:
             if self.sf.validIP(m) and not self.sf.isValidLocalOrLoopbackIP(m):
-                ips.add(m)
-
+                ips.append(m)
         return list(set(ips))
 
     def extractIP6s(self, text):
-        ips = list()
-
+        ips = []
         matches = re.findall(r'(?:^|(?<=\s))(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))(?=\s|$)', text)
-
         if not matches:
             return ips
-
         for m in matches:
             if self.sf.validIP6(m) and not self.sf.isValidLocalOrLoopbackIP(m):
-                ips.add(m)
-
+                ips.append(m)
         return list(set(ips))
 
     def handleEvent(self, event):
@@ -189,7 +183,7 @@ class sfp_stackoverflow(SpiderFootPlugin):
         self.results[eventData] = True
 
         query_results = self.query(eventData, "excerpts")
-        items = query_results.get('items')
+        items = query_results.get('items') if query_results and isinstance(query_results, dict) else None
         allEmails = []
         allUsernames = []
         allIP4s = []
@@ -238,7 +232,8 @@ class sfp_stackoverflow(SpiderFootPlugin):
         # create events for emails, username and IPs
         for email in set(allEmails):
             email = str(email).lower()
-            if self.getTarget().matches(email):
+            target = self.getTarget()
+            if hasattr(target, 'matches') and not isinstance(target, str) and target.matches(email):
                 e = SpiderFootEvent('EMAILADDR', email, self.__name__, event)
             else:
                 e = SpiderFootEvent('AFFILIATE_EMAILADDR', email, self.__name__, event)

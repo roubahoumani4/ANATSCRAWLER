@@ -10,10 +10,16 @@
 # Licence:     MIT
 # -------------------------------------------------------------------------------
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
 
 
 class sfp_vxvault(SpiderFootPlugin):
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     meta = {
         'name': "VXVault.net",
@@ -51,14 +57,12 @@ class sfp_vxvault(SpiderFootPlugin):
         'cacheperiod': "Hours to cache list data before re-fetching."
     }
 
-    results = None
-    errorState = False
+
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.errorState = False
-
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 

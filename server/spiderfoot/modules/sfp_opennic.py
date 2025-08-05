@@ -13,10 +13,16 @@
 
 import dns.resolver
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
 
 
 class sfp_opennic(SpiderFootPlugin):
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     meta = {
         'name': "OpenNIC DNS",
@@ -44,11 +50,10 @@ class sfp_opennic(SpiderFootPlugin):
         'checkaffiliates': "Apply checks to affiliates?",
     }
 
-    results = None
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
@@ -155,15 +160,20 @@ class sfp_opennic(SpiderFootPlugin):
         self.debug(f"OpenNIC resolved {eventData} to addresses: {addrs}")
 
         for addr in set(addrs):
+            target = self.getTarget()
             if self.sf.validIP(addr):
-                if affiliate and not self.getTarget().matches(addr, includeParents=True):
+                if affiliate and hasattr(target, 'matches') and not isinstance(target, str) and not target.matches(addr, includeParents=True):
+                    evt = SpiderFootEvent("AFFILIATE_IPADDR", addr, self.__name__, event)
+                elif affiliate and (isinstance(target, str) or not hasattr(target, 'matches')):
                     evt = SpiderFootEvent("AFFILIATE_IPADDR", addr, self.__name__, event)
                 else:
                     evt = SpiderFootEvent("IP_ADDRESS", addr, self.__name__, event)
 
                 self.notifyListeners(evt)
             elif self.sf.validIP6(addr):
-                if affiliate and not self.getTarget().matches(addr, includeParents=True):
+                if affiliate and hasattr(target, 'matches') and not isinstance(target, str) and not target.matches(addr, includeParents=True):
+                    evt = SpiderFootEvent("AFFILIATE_IPV6_ADDRESS", addr, self.__name__, event)
+                elif affiliate and (isinstance(target, str) or not hasattr(target, 'matches')):
                     evt = SpiderFootEvent("AFFILIATE_IPV6_ADDRESS", addr, self.__name__, event)
                 else:
                     evt = SpiderFootEvent("IPV6_ADDRESS", addr, self.__name__, event)

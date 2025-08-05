@@ -12,10 +12,15 @@
 # -------------------------------------------------------------------------------
 import json
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_textmagic(SpiderFootPlugin):
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     meta = {
         "name": "TextMagic",
@@ -59,7 +64,7 @@ class sfp_textmagic(SpiderFootPlugin):
         if userOpts is None:
             userOpts = {}
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.opts.update(userOpts)
 
     def watchedEvents(self):

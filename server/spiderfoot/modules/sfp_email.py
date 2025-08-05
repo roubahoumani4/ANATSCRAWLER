@@ -11,7 +11,9 @@
 # Licence:     MIT
 # -------------------------------------------------------------------------------
 
-from spiderfoot import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.helpers import SpiderFootHelpers
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_email(SpiderFootPlugin):
@@ -67,8 +69,19 @@ class sfp_email(SpiderFootPlugin):
                 self.debug(f"Skipping {email} as not a valid e-mail.")
                 continue
 
-            if not self.getTarget().matches(mailDom, includeChildren=True, includeParents=True) and not self.getTarget().matches(email):
-                self.debug("External domain, so possible affiliate e-mail")
+
+            target = self.getTarget()
+            # Defensive: Only call matches if target is not a string and has matches
+            is_affiliate = False
+            if hasattr(target, 'matches') and not isinstance(target, str):
+                if not target.matches(mailDom, includeChildren=True, includeParents=True) and not target.matches(email):
+                    self.debug("External domain, so possible affiliate e-mail")
+                    is_affiliate = True
+            else:
+                # If we can't check, default to not affiliate
+                is_affiliate = False
+
+            if is_affiliate:
                 evttype = "AFFILIATE_EMAILADDR"
 
             if eventName.startswith("AFFILIATE_"):

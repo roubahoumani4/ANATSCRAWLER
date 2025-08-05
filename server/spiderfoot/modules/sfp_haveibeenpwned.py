@@ -13,7 +13,8 @@ import json
 import re
 import time
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_haveibeenpwned(SpiderFootPlugin):
@@ -55,17 +56,16 @@ class sfp_haveibeenpwned(SpiderFootPlugin):
     # Be sure to completely clear any class variables in setup()
     # or you run the risk of data persisting between scan runs.
 
-    results = None
-    errorState = False
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.errorState = False
-
-        # Clear / reset any other class member variables here
-        # or you risk them persisting between threads.
-
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 

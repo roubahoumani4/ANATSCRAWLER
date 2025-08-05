@@ -13,7 +13,9 @@
 import json
 import time
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+
 
 
 class sfp_hybrid_analysis(SpiderFootPlugin):
@@ -59,12 +61,15 @@ class sfp_hybrid_analysis(SpiderFootPlugin):
         "delay": "Delay between requests, in seconds."
     }
 
-    results = None
-    errorState = False
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.errorState = False
 
         for opt in userOpts.keys():
@@ -284,7 +289,11 @@ class sfp_hybrid_analysis(SpiderFootPlugin):
         for url in set(urls):
             host = self.sf.urlFQDN(url.lower())
 
-            if not self.getTarget().matches(host, includeChildren=True, includeParents=True):
+
+            target = self.getTarget()
+            if not (hasattr(target, "matches") and not isinstance(target, str)):
+                continue
+            if not target.matches(host, includeChildren=True, includeParents=True):
                 continue
 
             domains.append(host)
@@ -299,7 +308,11 @@ class sfp_hybrid_analysis(SpiderFootPlugin):
             if domain in self.results:
                 continue
 
-            if not self.getTarget().matches(domain, includeChildren=True, includeParents=True):
+
+            target = self.getTarget()
+            if not (hasattr(target, "matches") and not isinstance(target, str)):
+                continue
+            if not target.matches(domain, includeChildren=True, includeParents=True):
                 continue
 
             if self.opts['verify'] and not self.sf.resolveHost(domain) and not self.sf.resolveHost6(domain):

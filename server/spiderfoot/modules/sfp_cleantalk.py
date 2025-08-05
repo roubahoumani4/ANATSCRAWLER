@@ -12,7 +12,7 @@
 
 from netaddr import IPAddress, IPNetwork
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.sflib import SpiderFootEvent, SpiderFootPlugin
 
 
 class sfp_cleantalk(SpiderFootPlugin):
@@ -66,7 +66,7 @@ class sfp_cleantalk(SpiderFootPlugin):
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.errorState = False
 
         for opt in list(userOpts.keys()):
@@ -100,15 +100,15 @@ class sfp_cleantalk(SpiderFootPlugin):
         data["content"] = self.sf.cacheGet("sfmal_" + cid, self.opts.get('cacheperiod', 0))
 
         if data["content"] is None:
-            data = self.sf.fetchUrl(url, timeout=self.opts['_fetchtimeout'], useragent=self.opts['_useragent'])
+            data = self.sf.fetchUrl(url, timeout=self.opts.get('_fetchtimeout', 30), useragent=self.opts.get('_useragent', 'SpiderFoot'))
 
-            if data["code"] != "200":
-                self.error(f"Unable to fetch {url}")
+            if data.get("code") != "200":
+                print(f"[sfp_cleantalk] Unable to fetch {url}")
                 self.errorState = True
                 return None
 
-            if data["content"] is None:
-                self.error(f"Unable to fetch {url}")
+            if data.get("content") is None:
+                print(f"[sfp_cleantalk] Unable to fetch {url}")
                 self.errorState = True
                 return None
 
@@ -123,27 +123,32 @@ class sfp_cleantalk(SpiderFootPlugin):
             if targetType == "netblock":
                 try:
                     if IPAddress(ip) in IPNetwork(qry):
-                        self.debug(f"{ip} found within netblock/subnet {qry} in CleanTalk Spam List.")
+                        print(f"[sfp_cleantalk] {ip} found within netblock/subnet {qry} in CleanTalk Spam List.")
                         return url
                 except Exception as e:
-                    self.debug(f"Error encountered parsing: {e}")
+                    print(f"[sfp_cleantalk] Error encountered parsing: {e}")
                     continue
 
             if targetType == "ip":
                 if qry.lower() == ip:
-                    self.debug(f"{qry} found in CleanTalk Spam List.")
+                    print(f"[sfp_cleantalk] {qry} found in CleanTalk Spam List.")
                     return url
 
         return None
+
 
     def handleEvent(self, event):
         eventName = event.eventType
         eventData = event.data
 
-        self.debug(f"Received event, {eventName}, from {event.module}")
+        # Ensure results is always a dict
+        if self.results is None:
+            self.results = dict()
+
+        print(f"[sfp_cleantalk] Received event, {eventName}, from {getattr(event, 'module', 'unknown')}")
 
         if eventData in self.results:
-            self.debug(f"Skipping {eventData}, already checked.")
+            print(f"[sfp_cleantalk] Skipping {eventData}, already checked.")
             return
 
         if self.errorState:
@@ -174,24 +179,26 @@ class sfp_cleantalk(SpiderFootPlugin):
             malicious_type = "MALICIOUS_SUBNET"
             blacklist_type = "BLACKLISTED_SUBNET"
         else:
-            self.debug(f"Unexpected event type {eventName}, skipping")
+            print(f"[sfp_cleantalk] Unexpected event type {eventName}, skipping")
             return
 
-        self.debug(f"Checking maliciousness of {eventData} with CleanTalk Spam List")
+        print(f"[sfp_cleantalk] Checking maliciousness of {eventData} with CleanTalk Spam List")
 
         url = self.query(eventData, targetType)
 
         if not url:
             return
 
-        self.debug(f"{eventData} found in Cleantalk Spam List")
+        print(f"[sfp_cleantalk] {eventData} found in Cleantalk Spam List")
 
         text = f"CleanTalk Spam List [{eventData}]\n<SFURL>{url}</SFURL>"
 
-        evt = SpiderFootEvent(blacklist_type, text, self.__name__, event)
-        self.notifyListeners(evt)
+        evt = SpiderFootEvent(blacklist_type, text, self.__class__.__name__, event)
+        if hasattr(self.sf, 'notifyListeners'):
+            self.sf.notifyListeners(evt)
 
-        evt = SpiderFootEvent(malicious_type, text, self.__name__, event)
-        self.notifyListeners(evt)
+        evt = SpiderFootEvent(malicious_type, text, self.__class__.__name__, event)
+        if hasattr(self.sf, 'notifyListeners'):
+            self.sf.notifyListeners(evt)
 
 # End of sfp_cleantalk class

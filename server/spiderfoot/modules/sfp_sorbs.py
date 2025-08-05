@@ -14,7 +14,8 @@
 
 from netaddr import IPNetwork
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_sorbs(SpiderFootPlugin):
@@ -60,7 +61,9 @@ class sfp_sorbs(SpiderFootPlugin):
         'maxsubnet': "If looking up subnets, the maximum subnet size to look up all the IPs within (CIDR value, 24 = /24, 16 = /16, etc.)"
     }
 
-    results = None
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     # Zones:
     # "http.dnsbl.sorbs.net": "127.0.0.2",
@@ -144,11 +147,15 @@ class sfp_sorbs(SpiderFootPlugin):
             return None
 
         try:
-            lookup = self.reverseAddr(qaddr) + '.dnsbl.sorbs.net'
+            rev = self.reverseAddr(qaddr)
+            if rev is None:
+                self.debug(f"Could not reverse address for {qaddr}, skipping SORBS lookup.")
+                return None
+            lookup = rev + '.dnsbl.sorbs.net'
             self.debug(f"Checking SORBS blacklist: {lookup}")
             return self.sf.resolveHost(lookup)
         except Exception as e:
-            self.debug(f"SORBS did not resolve {qaddr} / {lookup}: {e}")
+            self.debug(f"SORBS did not resolve {qaddr} / {lookup if 'lookup' in locals() else 'N/A'}: {e}")
 
         return None
 

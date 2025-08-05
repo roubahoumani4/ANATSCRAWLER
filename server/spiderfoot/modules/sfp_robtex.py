@@ -15,7 +15,8 @@ import time
 
 from netaddr import IPNetwork
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_robtex(SpiderFootPlugin):
@@ -145,6 +146,8 @@ class sfp_robtex(SpiderFootPlugin):
                 return
 
         qrylist = list()
+        if self.results is None:
+            self.results = dict()
         if eventName.startswith("NETBLOCK"):
             for ipaddr in IPNetwork(eventData):
                 qrylist.append(str(ipaddr))
@@ -215,9 +218,15 @@ class sfp_robtex(SpiderFootPlugin):
                     continue
 
                 if not self.opts['cohostsamedomain']:
-                    if self.getTarget().matches(host, includeParents=True):
-                        self.debug(f"Skipping {host} because it is on the same domain.")
-                        continue
+                    target = self.getTarget()
+                    if hasattr(target, "matches") and not isinstance(target, str):
+                        if target.matches(host, includeParents=True):
+                            self.debug(f"Skipping {host} because it is on the same domain.")
+                            continue
+                    else:
+                        if host in str(target):
+                            self.debug(f"Skipping {host} because it is on the same domain.")
+                            continue
 
                 if self.opts['verify'] and not self.sf.validateIP(host, ip):
                     self.debug(f"Host {host} no longer resolves to {ip}")

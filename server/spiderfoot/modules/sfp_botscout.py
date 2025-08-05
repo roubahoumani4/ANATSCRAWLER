@@ -15,7 +15,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from spiderfoot import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
+from core.sflib import SpiderFootEvent, SpiderFootPlugin
+import re
 
 
 class sfp_botscout(SpiderFootPlugin):
@@ -58,12 +59,12 @@ class sfp_botscout(SpiderFootPlugin):
         "api_key": "Botscout.com API key. Without this you will be limited to 100 look-ups per day."
     }
 
-    results = None
+    results = {}
     errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = {}
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
@@ -91,8 +92,10 @@ class sfp_botscout(SpiderFootPlugin):
 
         return self.parseApiResponse(res)
 
+
     def queryEmail(self, email):
-        if not SpiderFootHelpers.validEmail(email):
+        # Basic email validation fallback
+        if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
             return None
 
         params = urllib.parse.urlencode({
@@ -109,26 +112,27 @@ class sfp_botscout(SpiderFootPlugin):
         return self.parseApiResponse(res)
 
     def parseApiResponse(self, res: dict):
+
         if not res:
-            self.error("No response from BotScout.")
+            print("[sfp_botscout] No response from BotScout.")
             return None
 
         if res['code'] != "200":
-            self.error(f"Unexpected HTTP response code {res['code']} from BotScout.")
+            print(f"[sfp_botscout] Unexpected HTTP response code {res['code']} from BotScout.")
             self.errorState = True
             return None
 
         if not res['content']:
-            self.error("No response from BotScout.")
+            print("[sfp_botscout] No response from BotScout.")
             return None
 
         if res['content'].startswith("! "):
-            self.error(f"Received error from BotScout: {res['content']}")
+            print(f"[sfp_botscout] Received error from BotScout: {res['content']}")
             self.errorState = True
             return None
 
         if not res['content'].startswith("Y|") and not res['content'].startswith("N|"):
-            self.error("Error encountered processing response from BotScout.")
+            print("[sfp_botscout] Error encountered processing response from BotScout.")
             return None
 
         return res['content']
@@ -140,13 +144,13 @@ class sfp_botscout(SpiderFootPlugin):
         if self.errorState:
             return
 
-        self.debug(f"Received event, {eventName}, from {event.module}")
+        print(f"[sfp_botscout] Received event, {eventName}, from {event.module}")
 
         if not self.opts['api_key']:
-            self.info("You enabled sfp_botscout but did not set an API key! Queries will be limited to 100 per day.")
+            print("[sfp_botscout] You enabled sfp_botscout but did not set an API key! Queries will be limited to 100 per day.")
 
         if eventData in self.results:
-            self.debug(f"Skipping {eventData} as already searched.")
+            print(f"[sfp_botscout] Skipping {eventData} as already searched.")
             return
 
         self.results[eventData] = True
@@ -160,16 +164,18 @@ class sfp_botscout(SpiderFootPlugin):
             if not res.startswith("Y|"):
                 return
 
-            self.info(f"Found BotScout entry for {eventData}: {res}")
+            print(f"[sfp_botscout] Found BotScout entry for {eventData}: {res}")
 
             url = f"https://botscout.com/ipcheck.htm?ip={eventData}"
             text = f"BotScout [{eventData}]\n<SFURL>{url}</SFURL>"
 
-            evt = SpiderFootEvent("MALICIOUS_IPADDR", text, self.__name__, event)
-            self.notifyListeners(evt)
+            evt = SpiderFootEvent("MALICIOUS_IPADDR", text, self.__class__.__name__, event)
+            if hasattr(self.sf, 'notifyListeners'):
+                self.sf.notifyListeners(evt)
 
-            evt = SpiderFootEvent("BLACKLISTED_IPADDR", text, self.__name__, event)
-            self.notifyListeners(evt)
+            evt = SpiderFootEvent("BLACKLISTED_IPADDR", text, self.__class__.__name__, event)
+            if hasattr(self.sf, 'notifyListeners'):
+                self.sf.notifyListeners(evt)
         elif eventName == "EMAILADDR":
             res = self.queryEmail(eventData)
 
@@ -182,9 +188,10 @@ class sfp_botscout(SpiderFootPlugin):
             url = f"https://botscout.com/search.htm?sterm={eventData}&stype=q"
             text = f"BotScout [{eventData}]\n<SFURL>{url}</SFURL>"
 
-            evt = SpiderFootEvent("MALICIOUS_EMAILADDR", text, self.__name__, event)
-            self.notifyListeners(evt)
+            evt = SpiderFootEvent("MALICIOUS_EMAILADDR", text, self.__class__.__name__, event)
+            if hasattr(self.sf, 'notifyListeners'):
+                self.sf.notifyListeners(evt)
         else:
-            self.debug(f"Unexpected event type {eventName}, skipping")
+            print(f"[sfp_botscout] Unexpected event type {eventName}, skipping")
 
 # End of sfp_botscout class

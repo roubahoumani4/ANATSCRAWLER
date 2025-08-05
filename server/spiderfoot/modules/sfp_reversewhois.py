@@ -12,9 +12,10 @@
 
 import re
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
-from core.sflib import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_reversewhois(SpiderFootPlugin):
@@ -42,17 +43,16 @@ class sfp_reversewhois(SpiderFootPlugin):
     # Be sure to completely clear any class variables in setup()
     # or you run the risk of data persisting between scan runs.
 
-    results = None
-    errorState = False
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
+        self.errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.errorState = False
-
-        # Clear / reset any other class member variables here
-        # or you risk them persisting between threads.
-
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 
@@ -79,8 +79,10 @@ class sfp_reversewhois(SpiderFootPlugin):
         date_regex = re.compile(r'\d{4}-\d{2}-\d{2}')
         registrars = set()
         domains = set()
-        for table_row in html.findAll("tr"):
-            table_cells = table_row.findAll("td")
+        for table_row in html.find_all("tr"):
+            if not isinstance(table_row, Tag):
+                continue
+            table_cells = table_row.find_all("td")
             # make double-sure we're in the right table by checking the date field
             try:
                 if date_regex.match(table_cells[2].text.strip()):
@@ -119,13 +121,23 @@ class sfp_reversewhois(SpiderFootPlugin):
         domains, registrars = self.query(eventData)
 
         for domain in set(domains):
-            # if this domain isn't the main target
-            if not self.getTarget().matches(domain, includeChildren=False):
-                e = SpiderFootEvent("AFFILIATE_INTERNET_NAME", domain, self.__name__, event)
-                self.notifyListeners(e)
-                if self.sf.isDomain(domain, self.opts["_internettlds"]):
-                    evt = SpiderFootEvent("AFFILIATE_DOMAIN_NAME", domain, self.__name__, event)
-                    self.notifyListeners(evt)
+            target = self.getTarget()
+            # Defensive: only call matches if target is not a string and has the method
+            if hasattr(target, "matches") and not isinstance(target, str):
+                if not target.matches(domain, includeChildren=False):
+                    e = SpiderFootEvent("AFFILIATE_INTERNET_NAME", domain, self.__name__, event)
+                    self.notifyListeners(e)
+                    if self.sf.isDomain(domain, self.opts["_internettlds"]):
+                        evt = SpiderFootEvent("AFFILIATE_DOMAIN_NAME", domain, self.__name__, event)
+                        self.notifyListeners(evt)
+            else:
+                # Fallback: if target is a string, do a simple comparison
+                if domain not in str(target):
+                    e = SpiderFootEvent("AFFILIATE_INTERNET_NAME", domain, self.__name__, event)
+                    self.notifyListeners(e)
+                    if self.sf.isDomain(domain, self.opts["_internettlds"]):
+                        evt = SpiderFootEvent("AFFILIATE_DOMAIN_NAME", domain, self.__name__, event)
+                        self.notifyListeners(evt)
 
         for registrar in set(registrars):
             e = SpiderFootEvent("DOMAIN_REGISTRAR", registrar, self.__name__, event)

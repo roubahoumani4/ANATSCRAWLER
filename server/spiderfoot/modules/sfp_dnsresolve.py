@@ -12,11 +12,12 @@
 # -------------------------------------------------------------------------------
 
 import re
-import urllib
+import urllib.parse
 
 from netaddr import IPNetwork
 
-from spiderfoot import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_dnsresolve(SpiderFootPlugin):
@@ -47,15 +48,19 @@ class sfp_dnsresolve(SpiderFootPlugin):
         'maxv6netblock': "Maximum owned IPv6 netblock size to look up all IPs within (CIDR value, 24 = /24, 16 = /16, etc.)"
     }
 
-    events = None
-    domresults = None
-    hostresults = None
+
+    def __init__(self):
+        super().__init__()
+        self.events = dict()
+        self.domresults = dict()
+        self.hostresults = dict()
+
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.events = self.tempStorage()
-        self.domresults = self.tempStorage()
-        self.hostresults = self.tempStorage()
+        self.events = dict()
+        self.domresults = dict()
+        self.hostresults = dict()
         self.__dataSource__ = "DNS"
 
         for opt in list(userOpts.keys()):
@@ -69,26 +74,24 @@ class sfp_dnsresolve(SpiderFootPlugin):
         if not ret:
             return target
 
+
         for host in ret:
             self.debug("Found an alias: " + host)
-            if self.sf.validIP(host):
-                target.setAlias(host, "IP_ADDRESS")
-            elif self.sf.validIP6(host):
-                target.setAlias(host, "IPV6_ADDRESS")
-            else:
-                target.setAlias(host, "INTERNET_NAME")
-                idnahost = host.encode("idna")
-                if idnahost != host:
-                    target.setAlias(idnahost.decode('ascii', errors='replace'), "INTERNET_NAME")
+            # Defensive: only call setAlias if available
+            if hasattr(target, 'setAlias') and not isinstance(target, str):
+                if self.sf.validIP(host):
+                    target.setAlias(host, "IP_ADDRESS")
+                elif self.sf.validIP6(host):
+                    target.setAlias(host, "IPV6_ADDRESS")
+                else:
+                    target.setAlias(host, "INTERNET_NAME")
+                    idnahost = host.encode("idna")
+                    if idnahost != host:
+                        target.setAlias(idnahost.decode('ascii', errors='replace'), "INTERNET_NAME")
 
-                # If the target was a hostname/sub-domain, we can
-                # add the domain as an alias for the target. But
-                # not if the target was an IP or subnet.
-                # if target.targetType == "INTERNET_NAME":
-                #     dom = self.sf.hostDomain(host, self.opts['_internettlds'])
-                #     target.setAlias(dom, "INTERNET_NAME")
-
-        self.info(f"Target aliases identified: {target.targetAliases}")
+        # Defensive: only access targetAliases if available
+        if hasattr(target, 'targetAliases') and not isinstance(target, str):
+            self.info(f"Target aliases identified: {target.targetAliases}")
 
         return target
 
@@ -224,14 +227,16 @@ class sfp_dnsresolve(SpiderFootPlugin):
             self.debug("Skipping duplicate event.")
             return
 
-        self.events[eventDataHash] = True
+        if self.events is not None:
+            self.events[eventDataHash] = True
 
         # Parse Microsoft workaround "ipv6-literal.net" fake domain for IPv6 UNC paths
         # For internal use on Windows systems (should not resolve in DNS)
         if eventData.endswith(".ipv6-literal.net") and eventName == "AFFILIATE_INTERNET_NAME":
             ipv6 = eventData.split(".ipv6-literal.net")[0].replace('-', ':').replace('s', '%').split('%')[0]
             if self.sf.validIP6(ipv6):
-                if self.getTarget().matches(ipv6):
+                target = self.getTarget()
+                if hasattr(target, 'matches') and not isinstance(target, str) and target.matches(ipv6):
                     evt = SpiderFootEvent("IPV6_ADDRESS", ipv6, self.__name__, parentEvent)
                 else:
                     evt = SpiderFootEvent("AFFILIATE_IPV6_ADDRESS", ipv6, self.__name__, parentEvent)
@@ -242,7 +247,8 @@ class sfp_dnsresolve(SpiderFootPlugin):
         if eventData.endswith(".in-addr.arpa") and eventName == "AFFILIATE_INTERNET_NAME":
             ipv4 = '.'.join(reversed(eventData.split('.in-addr.arpa')[0].split('.')))
             if self.sf.validIP(ipv4):
-                if self.getTarget().matches(ipv4):
+                target = self.getTarget()
+                if hasattr(target, 'matches') and not isinstance(target, str) and target.matches(ipv4):
                     evt = SpiderFootEvent("IP_ADDRESS", ipv4, self.__name__, parentEvent)
                 else:
                     evt = SpiderFootEvent("AFFILIATE_IPADDR", ipv4, self.__name__, parentEvent)
@@ -288,7 +294,8 @@ class sfp_dnsresolve(SpiderFootPlugin):
                 # to be part of the target (non-affiliates),
                 # unless the source event was an AFFILIATE event.
                 affiliate = False
-                if self.getTarget().matches(addr):
+                target = self.getTarget()
+                if hasattr(target, 'matches') and not isinstance(target, str) and target.matches(addr):
                     affiliate = False
                 elif eventName.startswith("AFFILIATE_"):
                     affiliate = True
@@ -312,7 +319,8 @@ class sfp_dnsresolve(SpiderFootPlugin):
                 # to be part of the target (non-affiliates),
                 # unless the source event was an AFFILIATE event.
                 affiliate = False
-                if self.getTarget().matches(addr):
+                target = self.getTarget()
+                if hasattr(target, 'matches') and not isinstance(target, str) and target.matches(addr):
                     affiliate = False
                 elif eventName.startswith("AFFILIATE_"):
                     affiliate = True
@@ -371,7 +379,12 @@ class sfp_dnsresolve(SpiderFootPlugin):
             if eventName == 'RAW_RIR_DATA':
                 data = re.sub(r'(\\x[0-f]{2}|\\n|\\r)', '\n', data)
 
-            for name in self.getTarget().getNames():
+            target = self.getTarget()
+            if hasattr(target, 'getNames') and not isinstance(target, str):
+                names_iter = target.getNames()
+            else:
+                names_iter = []
+            for name in names_iter:
                 if self.checkForStop():
                     return
 
@@ -415,13 +428,15 @@ class sfp_dnsresolve(SpiderFootPlugin):
     # Process a host/IP, parentEvent is the event that represents this entity
     def processHost(self, host, parentEvent, affiliate=None) -> None:
         parentHash = self.sf.hashstring(parentEvent.data)
-        if host in self.hostresults:
-            if parentHash in self.hostresults[host] or parentEvent.data == host:
-                self.debug(f"Skipping host, {host}, already processed.")
-                return
-            self.hostresults[host] = self.hostresults[host] + [parentHash]
-        else:
-            self.hostresults[host] = [parentHash]
+
+        if self.hostresults is not None:
+            if host in self.hostresults:
+                if parentHash in self.hostresults[host] or parentEvent.data == host:
+                    self.debug(f"Skipping host, {host}, already processed.")
+                    return
+                self.hostresults[host] = self.hostresults[host] + [parentHash]
+            else:
+                self.hostresults[host] = [parentHash]
 
         self.debug(f"Found host: {host}")
 
@@ -429,7 +444,8 @@ class sfp_dnsresolve(SpiderFootPlugin):
         # target in some way, flag it as an affiliate
         if affiliate is None:
             affil = True
-            if self.getTarget().matches(host):
+            target = self.getTarget()
+            if hasattr(target, 'matches') and not isinstance(target, str) and target.matches(host):
                 affil = False
             # If the IP the host resolves to is in our
             # list of aliases,
@@ -437,13 +453,14 @@ class sfp_dnsresolve(SpiderFootPlugin):
                 hostips = self.sf.resolveHost(host)
                 if hostips:
                     for hostip in hostips:
-                        if self.getTarget().matches(hostip):
+                        if hasattr(target, 'matches') and not isinstance(target, str) and target.matches(hostip):
                             affil = False
                             break
                 hostips6 = self.sf.resolveHost6(host)
                 if hostips6:
                     for hostip6 in hostips6:
-                        if self.getTarget().matches(hostip6):
+                        target = self.getTarget()
+                        if hasattr(target, 'matches') and not isinstance(target, str) and target.matches(hostip6):
                             affil = False
                             break
         else:
@@ -512,11 +529,12 @@ class sfp_dnsresolve(SpiderFootPlugin):
             self.processDomain(dom, evt, True, host)
 
     def processDomain(self, domainName, parentEvent, affil=False, host=None) -> None:
-        if domainName in self.domresults:
-            self.debug(f"Skipping domain, {domainName}, already processed.")
-            return
 
-        self.domresults[domainName] = True
+        if self.domresults is not None:
+            if domainName in self.domresults:
+                self.debug(f"Skipping domain, {domainName}, already processed.")
+                return
+            self.domresults[domainName] = True
 
         if affil:
             domevt = SpiderFootEvent("AFFILIATE_DOMAIN_NAME", domainName,
@@ -524,7 +542,8 @@ class sfp_dnsresolve(SpiderFootPlugin):
             self.notifyListeners(domevt)
             return
 
-        if self.getTarget().matches(domainName):
+        target = self.getTarget()
+        if hasattr(target, 'matches') and not isinstance(target, str) and target.matches(domainName):
             domevt = SpiderFootEvent("DOMAIN_NAME", domainName,
                                      self.__name__, parentEvent)
             self.notifyListeners(domevt)

@@ -16,7 +16,9 @@ import re
 import phonenumbers
 from phonenumbers.phonenumberutil import region_code_for_country_code
 
-from spiderfoot import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.helpers import SpiderFootHelpers
 
 
 class sfp_countryname(SpiderFootPlugin):
@@ -43,11 +45,14 @@ class sfp_countryname(SpiderFootPlugin):
         'similardomain': "Obtain country name from similar domains"
     }
 
-    results = None
+
+    def __init__(self):
+        super().__init__()
+        self.results = dict()
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
 
         # Clear / reset any other class member variables here
         # or you risk them persisting between threads.
@@ -55,7 +60,7 @@ class sfp_countryname(SpiderFootPlugin):
         for opt in userOpts.keys():
             self.opts[opt] = userOpts[opt]
 
-    def detectCountryFromPhone(self, srcPhoneNumber: str) -> str:
+    def detectCountryFromPhone(self, srcPhoneNumber: str) -> str | None:
         """Lookup name of country from phone number region code.
 
         Args:
@@ -74,8 +79,12 @@ class sfp_countryname(SpiderFootPlugin):
             self.debug(f"Skipped invalid phone number: {srcPhoneNumber}")
             return None
 
+        country_code = getattr(phoneNumber, 'country_code', None)
+        if country_code is None:
+            return None
+
         try:
-            countryCode = region_code_for_country_code(phoneNumber.country_code)
+            countryCode = region_code_for_country_code(country_code)
         except Exception:
             self.debug(f"Lookup of region code failed for phone number: {srcPhoneNumber}")
             return None
@@ -85,7 +94,7 @@ class sfp_countryname(SpiderFootPlugin):
 
         return SpiderFootHelpers.countryNameFromCountryCode(countryCode.upper())
 
-    def detectCountryFromDomainName(self, srcDomain: str) -> str:
+    def detectCountryFromDomainName(self, srcDomain: str) -> str | None:
         """Lookup name of country from TLD of domain name.
 
         Args:
@@ -109,7 +118,7 @@ class sfp_countryname(SpiderFootPlugin):
 
         return None
 
-    def detectCountryFromIBAN(self, srcIBAN: str) -> str:
+    def detectCountryFromIBAN(self, srcIBAN: str) -> str | None:
         """Detect name of country from IBAN.
 
         Args:

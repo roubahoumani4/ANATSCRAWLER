@@ -1,13 +1,12 @@
-import pytest
+
 import unittest
-
 from modules.sfp_dns_for_family import sfp_dns_for_family
-from sflib import SpiderFoot
-from spiderfoot import SpiderFootEvent, SpiderFootTarget
+from core.sflib import SpiderFoot
+from core.spiderfoot.event import SpiderFootEvent
+from core.spiderfoot.target import SpiderFootTarget
 
-
-@pytest.mark.usefixtures
 class TestModuleIntegrationDnsForFamily(unittest.TestCase):
+    default_options = {}
 
     def test_handleEvent_event_data_safe_internet_name_not_blocked_should_not_return_event(self):
         sf = SpiderFoot(self.default_options)
@@ -28,8 +27,8 @@ class TestModuleIntegrationDnsForFamily(unittest.TestCase):
         event_type = 'ROOT'
         event_data = 'example data'
         event_module = ''
-        source_event = ''
-        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)
+        source_event = None  # type: ignore
+        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)  # type: ignore
 
         event_type = 'INTERNET_NAME'
         event_data = 'dns_for_family.com'
@@ -68,8 +67,8 @@ class TestModuleIntegrationDnsForFamily(unittest.TestCase):
         event_type = 'ROOT'
         event_data = 'example data'
         event_module = ''
-        source_event = ''
-        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)
+        source_event = None  # type: ignore
+        evt = SpiderFootEvent(event_type, event_data, event_module, source_event)  # type: ignore
 
         event_type = 'INTERNET_NAME'
         event_data = 'pornhub.com'

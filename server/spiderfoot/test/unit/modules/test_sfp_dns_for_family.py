@@ -1,12 +1,9 @@
-import pytest
 import unittest
-
 from modules.sfp_dns_for_family import sfp_dns_for_family
-from sflib import SpiderFoot
+from core.sflib import SpiderFoot
 
-
-@pytest.mark.usefixtures
 class TestModuleDnsForFamily(unittest.TestCase):
+    default_options = {}
 
     def test_opts(self):
         module = sfp_dns_for_family()
