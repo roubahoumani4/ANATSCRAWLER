@@ -7,7 +7,7 @@ import traceback
 WRAPPER_DIR = os.path.abspath(os.path.dirname(__file__))
 SPIDERFOOT_CORE = os.path.join(WRAPPER_DIR, "core")
 MODULES_DIR = os.path.join(WRAPPER_DIR, "modules")
-DB_PATH = os.path.expanduser("~/.spiderfoot/spiderfoot.db")
+DB_PATH = "/var/www/anatscrawler/app/spiderfoot.db"
 
 # Show paths (debugging)
 print("PYTHONPATH:", sys.path, file=sys.stderr)
