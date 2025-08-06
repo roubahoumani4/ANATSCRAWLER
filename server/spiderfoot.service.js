@@ -1,9 +1,3 @@
-// Abort scan stub
-  abortScan: async (scanId) => {
-    scanCache = null; // Invalidate cache
-    // TODO: Implement actual scan abort logic (signal running scan, update status, etc.)
-    return { scanId, aborted: true };
-  },
 const { spawn } = require('child_process');
 const path = require('path');
 
@@ -65,7 +59,6 @@ module.exports = {
   deleteScan: async (scanId) => {
     scanCache = null; // Invalidate cache
     // TODO: Implement actual scan deletion logic (remove scan from DB, files, etc.)
-    // For now, just return success for frontend integration
     return { scanId, deleted: true };
   },
   // Abort scan stub
