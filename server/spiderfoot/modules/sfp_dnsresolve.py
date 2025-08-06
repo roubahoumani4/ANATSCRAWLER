@@ -16,8 +16,12 @@ import urllib.parse
 
 from netaddr import IPNetwork
 
-from core.spiderfoot.event import SpiderFootEvent
-from core.spiderfoot.plugin import SpiderFootPlugin
+try:
+    from core.spiderfoot.event import SpiderFootEvent
+    from core.spiderfoot.plugin import SpiderFootPlugin
+except ImportError:
+    from spiderfoot.event import SpiderFootEvent
+    from spiderfoot.plugin import SpiderFootPlugin
 
 
 class sfp_dnsresolve(SpiderFootPlugin):
