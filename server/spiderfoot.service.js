@@ -58,14 +58,34 @@ module.exports = {
   // Delete scan stub
   deleteScan: async (scanId) => {
     scanCache = null; // Invalidate cache
-    // TODO: Implement actual scan deletion logic (remove scan from DB, files, etc.)
-    return { scanId, deleted: true };
+    // Use SpiderFoot DB to delete the scan
+    try {
+      // Use Python wrapper to call delete_scan
+      const result = await runPythonCommand(['delete_scan', scanId]);
+      // result should be { scanId, deleted: true/false }
+      return result;
+    } catch (error) {
+      console.error('Failed to delete scan:', error);
+      return { scanId, deleted: false, error: error.message };
+    }
   },
   // Abort scan stub
   abortScan: async (scanId) => {
     scanCache = null; // Invalidate cache
     // TODO: Implement actual scan abort logic (signal running scan, update status, etc.)
     return { scanId, aborted: true };
+  },
+  // Stop scan using SpiderFoot DB (stub, real implementation should signal running scan)
+  stopScan: async (scanId) => {
+    try {
+      // Use Python wrapper to call stop_scan
+      const result = await runPythonCommand(['stop_scan', scanId]);
+      // result should be { scanId, stopped: true/false }
+      return result;
+    } catch (error) {
+      console.error('Failed to stop scan:', error);
+      return { scanId, stopped: false, error: error.message };
+    }
   },
   listScans: async () => {
     const now = Date.now();
