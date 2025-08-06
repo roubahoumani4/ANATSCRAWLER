@@ -4,7 +4,7 @@ const path = require('path');
 function runPythonCommand(args, waitForOutput = true) {
   return new Promise((resolve, reject) => {
     // Use relative paths that work in both development and production
-    const wrapperPath = path.join(__dirname, 'spiderfoot', 'spiderfoot_wrapper.py');
+    const wrapperPath = path.resolve(__dirname, 'spiderfoot_wrapper.py');
     const pythonPath = process.env.NODE_ENV === 'production' 
       ? path.join(process.cwd(), 'maigret-venv', 'bin', 'python3.10')
       : 'python3';
@@ -101,7 +101,7 @@ module.exports = {
   startScan: (target, name) => {
     return new Promise((resolve, reject) => {
       // Use relative paths that work in both development and production
-      const wrapperPath = path.join(__dirname, 'spiderfoot', 'spiderfoot_wrapper.py');
+      const wrapperPath = path.resolve(__dirname, 'spiderfoot_wrapper.py');
       const pythonPath = process.env.NODE_ENV === 'production' 
         ? path.join(process.cwd(), 'maigret-venv', 'bin', 'python3.10')
         : 'python3';
