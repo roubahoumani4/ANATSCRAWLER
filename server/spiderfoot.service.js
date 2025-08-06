@@ -93,10 +93,11 @@ module.exports = {
       let scanId = require('crypto').randomBytes(4).toString('hex').toUpperCase();
 
       const args = [actualPath, 'start_scan', target, name];
+      // Pipe stdout/stderr to parent so pm2 logs capture output
       const py = spawn(pythonPath, args, {
         env,
         detached: true,
-        stdio: 'ignore'
+        stdio: ['ignore', process.stdout, process.stderr]
       });
 
       py.unref(); // fire and forget
