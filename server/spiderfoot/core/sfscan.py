@@ -435,11 +435,15 @@ class SpiderFootScanner():
             self.__setStatus("ABORTED", 0.0, time.time() * 1000)
 
         except BaseException as e:
+            import sys
+            import traceback
             if self.__sf is not None:
                 self.__sf.error(
                     f"Unhandled exception ({e.__class__.__name__}) encountered during scan. Please report this as a bug"
                 )
                 self.__sf.status(f"Scan [{self.__scanId}] failed: {e}")
+                self.__sf.error(traceback.format_exc())
+                print(traceback.format_exc(), file=sys.stderr, flush=True)
             self.__setStatus("ERROR-FAILED", 0.0, time.time() * 1000)
 
         finally:
