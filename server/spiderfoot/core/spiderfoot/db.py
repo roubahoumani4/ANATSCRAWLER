@@ -417,7 +417,7 @@ class SpiderFootDb:
                     event_descr = row[1]
                     event_raw = row[2]
                     event_type = row[3]
-                    qry = "INSERT INTO tbl_event_types (event, event_descr, event_raw, event_type) VALUES (?, ?, ?, ?)"
+                    qry = "INSERT OR IGNORE INTO tbl_event_types (event, event_descr, event_raw, event_type) VALUES (?, ?, ?, ?)"
                     self.dbh.execute(qry, (
                         event, event_descr, event_raw, event_type
                     ))
