@@ -3,15 +3,20 @@ const path = require('path');
 
 function runPythonCommand(args, waitForOutput = true) {
   return new Promise((resolve, reject) => {
-    const actualPath = '/var/www/anatscrawler/app/server/spiderfoot/spiderfoot_wrapper.py';
-    const pythonPath = path.join(process.cwd(), 'maigret-venv/bin/python3.10');
+    // Use relative paths that work in both development and production
+    const wrapperPath = path.join(__dirname, 'spiderfoot', 'spiderfoot_wrapper.py');
+    const pythonPath = process.env.NODE_ENV === 'production' 
+      ? path.join(process.cwd(), 'maigret-venv', 'bin', 'python3.10')
+      : 'python3';
 
     const env = {
       ...process.env,
-      PYTHONPATH: '/var/www/anatscrawler/app/server/spiderfoot',
+      PYTHONPATH: path.join(__dirname, 'spiderfoot'),
     };
 
-    const py = spawn(pythonPath, [actualPath, ...args], { env });
+    console.log(`Running SpiderFoot command: ${pythonPath} ${wrapperPath} ${args.join(' ')}`);
+
+    const py = spawn(pythonPath, [wrapperPath, ...args], { env });
 
     if (!waitForOutput) {
       py.unref();
@@ -26,49 +31,61 @@ function runPythonCommand(args, waitForOutput = true) {
 
     py.on('close', code => {
       if (code !== 0) {
-        console.error('PYTHON ERROR:', err);
-        return reject(err || 'Python error');
+        console.error('SpiderFoot Python Error:', err);
+        return reject(new Error(err || 'SpiderFoot Python error'));
       }
       try {
-        resolve(JSON.parse(data));
+        const result = JSON.parse(data);
+        resolve(result);
       } catch (e) {
-        reject('Invalid JSON: ' + data);
+        reject(new Error('Invalid JSON response from SpiderFoot: ' + data));
       }
+    });
+
+    py.on('error', (error) => {
+      console.error('SpiderFoot spawn error:', error);
+      reject(new Error(`Failed to start SpiderFoot process: ${error.message}`));
     });
   });
 }
 
 module.exports = {
   listScans: async () => {
-    // Get the basic scan list (array of arrays)
-    const result = await runPythonCommand(['list_scans']);
-    let scans = result.scans || [];
-    // For each scan, fetch correlation summary and append as 9th element
-    // If correlation summary fails, use default empty object
-    const withCorrelations = await Promise.all(scans.map(async (scan) => {
-      let corr = { HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
-      try {
-        const corrResult = await runPythonCommand(['scan_correlation_summary', scan[0]]);
-        if (corrResult && typeof corrResult === 'object') {
-          // Accept both array and object
-          if (Array.isArray(corrResult)) {
-            // Not expected, but fallback
-            corr = { HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
-          } else {
-            corr = {
-              HIGH: corrResult.HIGH || 0,
-              MEDIUM: corrResult.MEDIUM || 0,
-              LOW: corrResult.LOW || 0,
-              INFO: corrResult.INFO || 0
-            };
+    try {
+      // Get the basic scan list (array of arrays)
+      const result = await runPythonCommand(['list_scans']);
+      let scans = result.scans || [];
+      // For each scan, fetch correlation summary and append as 9th element
+      // If correlation summary fails, use default empty object
+      const withCorrelations = await Promise.all(scans.map(async (scan) => {
+        let corr = { HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
+        try {
+          const corrResult = await runPythonCommand(['scan_correlation_summary', scan[0]]);
+          if (corrResult && typeof corrResult === 'object') {
+            // Accept both array and object
+            if (Array.isArray(corrResult)) {
+              // Not expected, but fallback
+              corr = { HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
+            } else {
+              corr = {
+                HIGH: corrResult.HIGH || 0,
+                MEDIUM: corrResult.MEDIUM || 0,
+                LOW: corrResult.LOW || 0,
+                INFO: corrResult.INFO || 0
+              };
+            }
           }
+        } catch (e) {
+          console.warn(`Failed to get correlation summary for scan ${scan[0]}:`, e.message);
+          // ignore, use default
         }
-      } catch (e) {
-        // ignore, use default
-      }
-      return [...scan, corr];
-    }));
-    return { scans: withCorrelations };
+        return [...scan, corr];
+      }));
+      return { scans: withCorrelations };
+    } catch (error) {
+      console.error('Error in listScans:', error);
+      throw error;
+    }
   },
   scanInfo: (scanId) => runPythonCommand(['scan_info', scanId]),
   scanGraph: (scanId) => runPythonCommand(['scan_graph', scanId]),
@@ -83,16 +100,22 @@ module.exports = {
   // 🔵 Detached version of scan start (non-blocking)
   startScan: (target, name) => {
     return new Promise((resolve, reject) => {
-      const actualPath = '/var/www/anatscrawler/app/server/spiderfoot/spiderfoot_wrapper.py';
-      const pythonPath = path.join(process.cwd(), 'maigret-venv/bin/python3.10');
+      // Use relative paths that work in both development and production
+      const wrapperPath = path.join(__dirname, 'spiderfoot', 'spiderfoot_wrapper.py');
+      const pythonPath = process.env.NODE_ENV === 'production' 
+        ? path.join(process.cwd(), 'maigret-venv', 'bin', 'python3.10')
+        : 'python3';
+      
       const env = {
         ...process.env,
-        PYTHONPATH: '/var/www/anatscrawler/app/server/spiderfoot',
+        PYTHONPATH: path.join(__dirname, 'spiderfoot'),
       };
 
       let scanId = require('crypto').randomBytes(4).toString('hex').toUpperCase();
 
-      const args = [actualPath, 'start_scan', target, name];
+      const args = [wrapperPath, 'start_scan', target, name];
+      console.log(`Starting SpiderFoot scan: ${pythonPath} ${args.join(' ')}`);
+      
       // Pipe stdout/stderr to parent so pm2 logs capture output
       const py = spawn(pythonPath, args, {
         env,
