@@ -21,27 +21,54 @@ const ScanListPage = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Try /api/spiderfoot/scanlist first, fallback to /osint-engine/scans if empty
     fetch("/api/spiderfoot/scanlist")
       .then(res => res.json())
       .then(data => {
-        // The new endpoint returns an array of arrays, map to Scan objects
-        setScans(
-          Array.isArray(data)
-            ? data.filter(arr => arr && arr[0]).map(arr => ({
-                scan_id: arr[0],
-                name: arr[1],
-                target: arr[2],
-                started: arr[3],
-                finished: arr[4],
-                status: arr[5],
-                elements: arr[6],
-                correlations: arr[7],
-                modules: arr[8],
-                scan_type: arr[9],
-              }))
-            : []
-        );
-        setLoading(false);
+        let scanData = Array.isArray(data) && data.length > 0 ? data : null;
+        if (!scanData) {
+          // fallback to legacy route
+          fetch("/osint-engine/scans")
+            .then(res2 => res2.json())
+            .then(data2 => {
+              scanData = Array.isArray(data2) ? data2 : [];
+              setScans(
+                scanData.filter(arr => arr && arr[0]).map(arr => ({
+                  scan_id: arr[0],
+                  name: arr[1],
+                  target: arr[2],
+                  started: arr[3],
+                  finished: arr[4],
+                  status: arr[5],
+                  elements: arr[6],
+                  correlations: arr[7],
+                  modules: arr[8],
+                  scan_type: arr[9],
+                }))
+              );
+              setLoading(false);
+            })
+            .catch(() => {
+              setError("Failed to load scans");
+              setLoading(false);
+            });
+        } else {
+          setScans(
+            scanData.filter(arr => arr && arr[0]).map(arr => ({
+              scan_id: arr[0],
+              name: arr[1],
+              target: arr[2],
+              started: arr[3],
+              finished: arr[4],
+              status: arr[5],
+              elements: arr[6],
+              correlations: arr[7],
+              modules: arr[8],
+              scan_type: arr[9],
+            }))
+          );
+          setLoading(false);
+        }
       })
       .catch(() => {
         setError("Failed to load scans");
