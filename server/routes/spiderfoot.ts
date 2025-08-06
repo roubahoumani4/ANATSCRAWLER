@@ -1,14 +1,6 @@
-// Abort scan
-router.post("/scan/:scanId/abort", async (req, res) => {
-  try {
-    const result = await spiderfoot.abortScan(req.params.scanId);
-    res.json({ success: true, result });
-  } catch (e) {
-    res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
-  }
-});
 import express from "express";
 const router = express.Router();
+const spiderfoot = require("../spiderfoot.service");
 
 // Abort scan
 router.post("/scan/:scanId/abort", async (req, res) => {
@@ -19,7 +11,6 @@ router.post("/scan/:scanId/abort", async (req, res) => {
     res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
   }
 });
-const spiderfoot = require("../spiderfoot.service");
 
 // List available modules
 router.get("/modules", async (req, res) => {
