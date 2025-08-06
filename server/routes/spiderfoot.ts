@@ -21,6 +21,15 @@ router.get("/scanlist", async (req, res) => {
     res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
   }
 });
+// Proxy route for /osint-engine/scans to support legacy frontend
+router.get("/osint-engine/scans", async (req, res) => {
+  try {
+    const scans = await spiderfoot.listScans();
+    res.json(scans);
+  } catch (e) {
+    res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
+  }
+});
 
 // Get scan info (details)
 router.get("/scan/:scanId/status", async (req, res) => {
