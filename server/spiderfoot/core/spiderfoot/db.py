@@ -671,7 +671,7 @@ class SpiderFootDb:
         if not isinstance(scanTarget, str):
             raise TypeError(f"scanTarget is {type(scanTarget)}; expected str()") from None
 
-        qry = "INSERT INTO tbl_scan_instance \
+        qry = "INSERT OR IGNORE INTO tbl_scan_instance \
             (guid, name, seed_target, created, status) \
             VALUES (?, ?, ?, ?, ?)"
 
@@ -683,6 +683,9 @@ class SpiderFootDb:
                     instanceId, scanName, scanTarget, time.time() * 1000, 'CREATED'
                 ))
                 self.conn.commit()
+            except sqlite3.IntegrityError as e:
+                # If duplicate, do not raise, just ignore
+                pass
             except sqlite3.Error as e:
                 raise IOError("Unable to create scan instance in database") from e
 
