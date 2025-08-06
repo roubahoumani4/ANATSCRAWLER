@@ -265,7 +265,7 @@ const OsintScans = () => {
                   ) : scan.status === "abort-requested" ? (
                     <span className="bg-yellow-900/80 text-yellow-300 px-3 py-1 rounded-full text-xs font-bold">ABORT-REQUESTED</span>
                   ) : (
-                    <span className="bg-blue-700/80 text-blue-200 px-3 py-1 rounded-full text-xs font-bold flex items-center justify-center"><Loader className="w-4 h-4 mr-1 animate-spin" />{scan.status?.toUpperCase()}</span>
+                    <span className="bg-blue-700/80 text-blue-200 px-3 py-1 rounded-full text-xs font-bold flex items-center justify-center"><Loader className="w-4 h-4 mr-1 animate-spin" />{typeof scan.status === 'string' ? scan.status.toUpperCase() : (scan.status !== undefined && scan.status !== null ? String(scan.status).toUpperCase() : "-")}</span>
                   )}
                 </td>
                 <td className="p-2 text-center text-coolWhite">{scan.elements ?? '-'}</td>
