@@ -22,18 +22,25 @@ const ScanListPage = () => {
 
   useEffect(() => {
     // Try /api/spiderfoot/scanlist first, fallback to /osint-engine/scans if empty
+    const extractScans = (data: any): any[][] => {
+      // Support both array and object with scans property
+      if (Array.isArray(data)) return data as any[][];
+      if (data && Array.isArray(data.scans)) return data.scans as any[][];
+      return [];
+    };
+
     fetch("/api/spiderfoot/scanlist")
       .then(res => res.json())
       .then(data => {
-        let scanData = Array.isArray(data) && data.length > 0 ? data : null;
-        if (!scanData) {
+        let scanData = extractScans(data);
+        if (!scanData || scanData.length === 0) {
           // fallback to legacy route
           fetch("/osint-engine/scans")
             .then(res2 => res2.json())
             .then(data2 => {
-              scanData = Array.isArray(data2) ? data2 : [];
+              scanData = extractScans(data2);
               setScans(
-                scanData.filter(arr => arr && arr[0]).map(arr => ({
+                scanData.filter((arr: any[]) => arr && arr[0]).map((arr: any[]) => ({
                   scan_id: arr[0],
                   name: arr[1],
                   target: arr[2],
@@ -54,7 +61,7 @@ const ScanListPage = () => {
             });
         } else {
           setScans(
-            scanData.filter(arr => arr && arr[0]).map(arr => ({
+            scanData.filter((arr: any[]) => arr && arr[0]).map((arr: any[]) => ({
               scan_id: arr[0],
               name: arr[1],
               target: arr[2],

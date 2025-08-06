@@ -22,31 +22,29 @@ const OsintScans = () => {
     fetchScans();
   }, []);
 
-  // Fetch scans from SpiderFoot scanlist (array of arrays)
+  // Fetch scans from SpiderFoot scanlist (array or object)
   const fetchScans = () => {
     setLoading(true);
     fetch(`${API_BASE}/scanlist`)
       .then(res => res.json())
       .then(data => {
-        // SpiderFoot scanlist is an array of arrays, each scan:
-        // [scan_id, name, target, started, finished, status, elements, correlations, modules, scan_type]
+        // Support both array and object with scans property
+        let scanArray = Array.isArray(data)
+          ? data
+          : (data && Array.isArray(data.scans) ? data.scans : []);
         setScans(
-          Array.isArray(data)
-            ? data
-                .filter(arr => arr && arr[0]) // filter out scans with undefined/null scan_id
-                .map(arr => ({
-                  scan_id: arr[0],
-                  name: arr[1],
-                  target: arr[2],
-                  started: arr[3],
-                  finished: arr[4],
-                  status: arr[5],
-                  elements: arr[6],
-                  correlations: arr[7],
-                  modules: arr[8],
-                  scan_type: arr[9],
-                }))
-            : []
+          scanArray.filter((arr: any[]) => arr && arr[0]).map((arr: any[]) => ({
+            scan_id: arr[0],
+            name: arr[1],
+            target: arr[2],
+            started: arr[3],
+            finished: arr[4],
+            status: arr[5],
+            elements: arr[6],
+            correlations: arr[7],
+            modules: arr[8],
+            scan_type: arr[9],
+          }))
         );
         setLoading(false);
       })
