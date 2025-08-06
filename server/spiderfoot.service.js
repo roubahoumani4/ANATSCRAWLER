@@ -1,3 +1,9 @@
+  // Delete scan stub
+  deleteScan: async (scanId) => {
+    // TODO: Implement actual scan deletion logic (remove scan from DB, files, etc.)
+    // For now, just return success for frontend integration
+    return { scanId, deleted: true };
+  },
 const { spawn } = require('child_process');
 const path = require('path');
 

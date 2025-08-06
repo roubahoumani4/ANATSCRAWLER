@@ -112,6 +112,16 @@ router.get("/scan/:scanId/logs", async (req, res) => {
   }
 });
 
+// Delete scan
+router.post("/scan/:scanId/delete", async (req, res) => {
+  try {
+    const result = await spiderfoot.deleteScan(req.params.scanId);
+    res.json({ success: true, result });
+  } catch (e) {
+    res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
+  }
+});
+
 // Start new scan
 router.post("/scan/start", async (req, res) => {
   const { target, name } = req.body;
