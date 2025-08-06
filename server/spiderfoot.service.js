@@ -1,3 +1,9 @@
+// Abort scan stub
+  abortScan: async (scanId) => {
+    scanCache = null; // Invalidate cache
+    // TODO: Implement actual scan abort logic (signal running scan, update status, etc.)
+    return { scanId, aborted: true };
+  },
 const { spawn } = require('child_process');
 const path = require('path');
 
@@ -49,28 +55,39 @@ function runPythonCommand(args, waitForOutput = true) {
   });
 }
 
+// In-memory cache for scan list
+let scanCache = null;
+let lastCacheTime = 0;
+const CACHE_TTL_MS = 30000; // 30 seconds
+
 module.exports = {
   // Delete scan stub
   deleteScan: async (scanId) => {
+    scanCache = null; // Invalidate cache
     // TODO: Implement actual scan deletion logic (remove scan from DB, files, etc.)
     // For now, just return success for frontend integration
     return { scanId, deleted: true };
   },
+  // Abort scan stub
+  abortScan: async (scanId) => {
+    scanCache = null; // Invalidate cache
+    // TODO: Implement actual scan abort logic (signal running scan, update status, etc.)
+    return { scanId, aborted: true };
+  },
   listScans: async () => {
+    const now = Date.now();
+    if (scanCache && (now - lastCacheTime < CACHE_TTL_MS)) {
+      return scanCache;
+    }
     try {
-      // Get the basic scan list (array of arrays)
       const result = await runPythonCommand(['list_scans']);
       let scans = result.scans || [];
-      // For each scan, fetch correlation summary and append as 9th element
-      // If correlation summary fails, use default empty object
       const withCorrelations = await Promise.all(scans.map(async (scan) => {
         let corr = { HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
         try {
           const corrResult = await runPythonCommand(['scan_correlation_summary', scan[0]]);
           if (corrResult && typeof corrResult === 'object') {
-            // Accept both array and object
             if (Array.isArray(corrResult)) {
-              // Not expected, but fallback
               corr = { HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
             } else {
               corr = {
@@ -83,11 +100,12 @@ module.exports = {
           }
         } catch (e) {
           console.warn(`Failed to get correlation summary for scan ${scan[0]}:`, e.message);
-          // ignore, use default
         }
         return [...scan, corr];
       }));
-      return { scans: withCorrelations };
+      scanCache = { scans: withCorrelations };
+      lastCacheTime = now;
+      return scanCache;
     } catch (error) {
       console.error('Error in listScans:', error);
       throw error;
@@ -105,6 +123,7 @@ module.exports = {
 
   // 🔵 Detached version of scan start (non-blocking)
   startScan: (target, name) => {
+    scanCache = null; // Invalidate cache
     return new Promise((resolve, reject) => {
       // Use relative paths that work in both development and production
       const wrapperPath = path.resolve(__dirname, 'spiderfoot_wrapper.py');
