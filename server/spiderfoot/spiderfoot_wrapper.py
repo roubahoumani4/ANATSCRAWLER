@@ -119,6 +119,14 @@ def start_scan(target, name):
             return
 
         modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR)
+        # Verbose error logging for module loading
+        if not modules_dict or 'sfp_dnsresolve' not in modules_dict:
+            print(f"[ERROR] Failed to load module: sfp_dnsresolve", file=sys.stderr)
+            print(f"[DEBUG] Loaded modules: {list(modules_dict.keys()) if modules_dict else 'None'}", file=sys.stderr)
+            import traceback
+            print(traceback.format_exc(), file=sys.stderr)
+            print(json.dumps({"success": False, "error": "Failed to load module: sfp_dnsresolve", "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
+            return
         enabled_modules = ["sfp_dnsresolve"]  # Use minimal module to debug failures
 
         config = {
