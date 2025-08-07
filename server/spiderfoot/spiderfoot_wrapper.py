@@ -204,6 +204,11 @@ def start_scan(target, name):
                     last_event_count = event_count
                 if status_str in ["FINISHED", "ERROR-FAILED", "ABORTED"]:
                     print(f"[Scan] Scan {scan_id} completed with status: {status_str}. Total events: {event_count}", file=sys.stderr, flush=True)
+                    if event_count == 0:
+                        print(f"[ERROR] Scan completed but no events were generated. Possible causes: invalid target, missing module options, or modules not notifying events.", file=sys.stderr, flush=True)
+                        print(f"[ERROR] Target: {target}", file=sys.stderr, flush=True)
+                        print(f"[ERROR] Enabled modules: {enabled_modules}", file=sys.stderr, flush=True)
+                        print(f"[ERROR] Scan config: {json.dumps(config)}", file=sys.stderr, flush=True)
                     print(json.dumps({"success": status_str=="FINISHED", "scanId": scanner.scanId, "eventCount": event_count, "status": status_str}))
                     break
                 time.sleep(poll_interval)
