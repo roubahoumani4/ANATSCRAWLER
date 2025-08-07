@@ -45,11 +45,18 @@ const OsintNewScan = () => {
         body: JSON.stringify({ target, name: scanName })
       });
       const data = await res.json();
-      if (!data.success) setError("Failed to start scan");
+      if (!data.success) {
+        setError("Failed to start scan");
+        setLoading(false);
+      } else {
+        // Keep spinner until scan is actually finished (simulate with timeout or poll)
+        // You can replace this with polling scan status if available
+        setTimeout(() => setLoading(false), 4000); // Spinner stays for 4 seconds
+      }
     } catch {
       setError("Failed to start scan");
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
