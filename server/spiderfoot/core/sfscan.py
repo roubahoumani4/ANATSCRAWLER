@@ -386,8 +386,10 @@ class SpiderFootScanner():
                     continue
 
                 # Register the target with the module
+                # Only call setTarget if the method exists
                 try:
-                    mod.setTarget(self.__target)
+                    if hasattr(mod, "setTarget"):
+                        mod.setTarget(self.__target)
                 except Exception as e:
                     if self.__sf is not None:
                         self.__sf.error(f"Module {modName} failed to set target '{self.__target}': {e}")
