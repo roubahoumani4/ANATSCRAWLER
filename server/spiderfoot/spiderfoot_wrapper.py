@@ -140,6 +140,7 @@ def start_scan(target, name):
             '_moduleTimeout': 30,
             '_internettlds_cache': True,
             '_internettlds': 'generic, country, sponsored, infrastructure',
+            '_socks1type': '',  # Added to prevent KeyError in modules
             '__modules__': {mod: {'opts': {}} for mod in enabled_modules}
         }
 

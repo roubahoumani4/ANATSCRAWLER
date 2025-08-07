@@ -322,7 +322,8 @@ class SpiderFootScanner():
                             print(f"[SFSCAN] sfp_dnsresolve options: {self.__modconfig[modName]}", file=sys.stderr)
 
                     # clear any listener relationships from the past
-                    mod.clearListeners()
+                    if hasattr(mod, "clearListeners"):
+                        mod.clearListeners()
                     mod.setScanId(self.__scanId if self.__scanId is not None else "")
                     mod.setSharedThreadPool(self.__sharedThreadPool)
                     mod.setDbh(self.__dbh)
