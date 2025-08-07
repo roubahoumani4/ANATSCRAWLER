@@ -142,7 +142,12 @@ def start_scan(target, name):
             '_uiShowOnlyNew': False,
             '_moduleTimeout': 30,
             '_internettlds_cache': True,
-            '_internettlds': 'generic, country, sponsored, infrastructure'
+            '_internettlds': 'generic, country, sponsored, infrastructure',
+            '__modules__': {
+                'sfp_dnsresolve': {
+                    'opts': {}
+                }
+            }
         }
 
         print(f"[DEBUG] Scan config: {json.dumps(config)}", file=sys.stderr)
