@@ -338,14 +338,21 @@ class SpiderFootScanner():
                             pass
                     # Defensive: only set tempStorage as dict if not present and not defined as a method in the class
                     # Only set tempStorage as dict if neither instance nor class defines it
-                    has_instance = hasattr(mod, "tempStorage")
-                    has_class = hasattr(type(mod), "tempStorage")
-                    is_class_method = callable(getattr(type(mod), "tempStorage", None))
-                    if not has_instance and not has_class:
-                        try:
-                            setattr(mod, "tempStorage", {})
-                        except Exception:
-                            pass
+                    # List of modules that expect tempStorage to be a method
+                    tempstorage_method_modules = [
+                        "sfp_abusix", "sfp_tool_cmseek", "sfp_flickr", "sfp_cleanbrowsing", "sfp_abusech",
+                        "sfp_grep_app", "sfp_commoncrawl", "sfp_archiveorg", "sfp_hackertarget", "sfp_fsecure_riddler",
+                        "sfp_googlesafebrowsing"
+                    ]
+                    if modName not in tempstorage_method_modules:
+                        has_instance = hasattr(mod, "tempStorage")
+                        has_class = hasattr(type(mod), "tempStorage")
+                        is_class_method = callable(getattr(type(mod), "tempStorage", None))
+                        if not has_instance and not has_class:
+                            try:
+                                setattr(mod, "tempStorage", {})
+                            except Exception:
+                                pass
                     mod.setup(self.__sf, self.__modconfig[modName])
                     print(f"[SFSCAN] Module {modName} setup complete.", file=sys.stderr)
                 except Exception as e:
