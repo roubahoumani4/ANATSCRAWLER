@@ -37,7 +37,7 @@ def list_modules():
         module_names = sorted(list(modules_dict.keys()))
         print(json.dumps({"modules": module_names}))
     except Exception as e:
-        print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}))
+        print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 
 def list_scans():
     try:
@@ -45,7 +45,7 @@ def list_scans():
         scans = db.scanInstanceList()
         print(json.dumps({"scans": scans}))
     except Exception as e:
-        print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}))
+        print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 
 def scan_info(scan_id):
     try:
@@ -53,7 +53,7 @@ def scan_info(scan_id):
         scan = db.scanInstanceGet(scan_id)
         print(json.dumps(scan))
     except Exception as e:
-        print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}))
+        print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 
 def scan_graph(scan_id):
     try:
@@ -61,7 +61,7 @@ def scan_graph(scan_id):
         results = db.scanResultEvent(scan_id)
         print(json.dumps(results))
     except Exception as e:
-        print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}))
+        print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 
 def scan_browse(scan_id):
     try:
@@ -69,7 +69,7 @@ def scan_browse(scan_id):
         unique = db.scanResultEventUnique(scan_id)
         print(json.dumps(unique))
     except Exception as e:
-        print(json.dumps({"error": str(e)}))
+        print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 
 def scan_result_summary(scan_id):
     try:
@@ -77,26 +77,7 @@ def scan_result_summary(scan_id):
         summary = db.scanResultSummary(scan_id)
         print(json.dumps(summary))
     except Exception as e:
-        print(json.dumps({"error": str(e)}))
-
-def delete_scan(scan_id):
-    try:
-        db = SpiderFootDb({'__database': DB_PATH})
-        deleted = db.scanInstanceDelete(scan_id)
-        print(json.dumps({"scanId": scan_id, "deleted": bool(deleted)}))
-    except Exception as e:
-        print(json.dumps({"scanId": scan_id, "deleted": False, "error": str(e)}))
-
-def stop_scan(scan_id):
-    import time
-    try:
-        db = SpiderFootDb({'__database': DB_PATH})
-        # Mark scan as aborted and set end time
-        now = str(int(time.time() * 1000))
-        db.scanInstanceSet(scan_id, ended=now, status="ABORTED")
-        print(json.dumps({"scanId": scan_id, "stopped": True, "ended": now, "status": "ABORTED"}))
-    except Exception as e:
-        print(json.dumps({"scanId": scan_id, "stopped": False, "error": str(e)}))
+        print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 
 def scan_correlation_summary(scan_id):
     try:
@@ -104,7 +85,7 @@ def scan_correlation_summary(scan_id):
         summary = db.scanCorrelationSummary(scan_id)
         print(json.dumps(summary))
     except Exception as e:
-        print(json.dumps({"error": str(e)}))
+        print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 
 def scan_correlation_list(scan_id):
     try:
@@ -112,7 +93,7 @@ def scan_correlation_list(scan_id):
         clist = db.scanCorrelationList(scan_id)
         print(json.dumps(clist))
     except Exception as e:
-        print(json.dumps({"error": str(e)}))
+        print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 
 def scan_result_event(scan_id):
     try:
@@ -120,7 +101,7 @@ def scan_result_event(scan_id):
         events = db.scanResultEvent(scan_id)
         print(json.dumps(events))
     except Exception as e:
-        print(json.dumps({"error": str(e)}))
+        print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 
 def scan_logs(scan_id):
     try:
@@ -128,7 +109,7 @@ def scan_logs(scan_id):
         logs = db.scanLogs(scan_id)
         print(json.dumps(logs))
     except Exception as e:
-        print(json.dumps({"error": str(e)}))
+        print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 
 def start_scan(target, name):
     try:
@@ -186,7 +167,7 @@ def start_scan(target, name):
 
         print(json.dumps({"success": True, "scanId": scanner.scanId}))
     except Exception as e:
-        print(json.dumps({"success": False, "error": str(e), "traceback": traceback.format_exc()}))
+        print(json.dumps({"success": False, "error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 
 # --- Command Handler ---
 if __name__ == "__main__":
@@ -210,8 +191,6 @@ if __name__ == "__main__":
             case "scan_result_event": scan_result_event(*args)
             case "scan_logs": scan_logs(*args)
             case "start_scan": start_scan(*args)
-            case "delete_scan": delete_scan(*args)
-            case "stop_scan": stop_scan(*args)
             case _: print(json.dumps({"error": "Unknown command"})); sys.exit(1)
 
     except Exception as e:
