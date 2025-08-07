@@ -95,5 +95,6 @@ class sfp_hashes(SpiderFootPlugin):
 
             evt = SpiderFootEvent("HASH", f"[{hashalgo}] {hashval}", self.__name__, event)
             self.notifyListeners(evt)
+            self.debug(f"Event notified: {evt.eventType} - {str(evt)}")
 
 # End of sfp_hashes class
