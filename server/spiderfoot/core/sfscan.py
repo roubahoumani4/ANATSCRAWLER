@@ -330,8 +330,14 @@ class SpiderFootScanner():
                         mod.setSharedThreadPool(self.__sharedThreadPool)
                     if hasattr(mod, "setDbh"):
                         mod.setDbh(self.__dbh)
-                    # Only set tempStorage as dict if not present at all
-                    if not hasattr(mod, "tempStorage"):
+                    # Defensive: set opts to {} if None
+                    if hasattr(mod, "opts") and getattr(mod, "opts") is None:
+                        try:
+                            setattr(mod, "opts", {})
+                        except Exception:
+                            pass
+                    # Defensive: only set tempStorage as dict if not present and not defined as a method in the class
+                    if not hasattr(mod, "tempStorage") and not callable(getattr(type(mod), "tempStorage", None)):
                         try:
                             setattr(mod, "tempStorage", {})
                         except Exception:
