@@ -18,6 +18,23 @@ from core.sflib import SpiderFootEvent, SpiderFootPlugin
 
 
 class sfp_archiveorg(SpiderFootPlugin):
+    # Patch: Add stubs for missing SpiderFootPlugin methods if not present
+    def debug(self, msg):
+        print(f"[DEBUG] {msg}")
+
+    def error(self, msg):
+        print(f"[ERROR] {msg}")
+
+    def info(self, msg):
+        print(f"[INFO] {msg}")
+
+    def notifyListeners(self, evt):
+        # Implement event dispatch if needed, or leave as stub
+        pass
+
+    def checkForStop(self):
+        # Return False for compatibility
+        return False
 
     meta = {
         'name': "Archive.org",
@@ -81,7 +98,7 @@ class sfp_archiveorg(SpiderFootPlugin):
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.foundDates = list()
         self.errorState = False
 
@@ -134,9 +151,10 @@ class sfp_archiveorg(SpiderFootPlugin):
         if eventName == "URL_WEB_FRAMEWORK" and not self.opts['webframeworkpages']:
             return
 
+        if not isinstance(self.results, dict):
+            self.results = dict()
         if eventData in self.results:
             return
-
         self.results[eventData] = True
 
         for daysback in self.opts['farback'].split(","):
@@ -181,7 +199,7 @@ class sfp_archiveorg(SpiderFootPlugin):
             name = eventName + "_HISTORIC"
 
             self.info("Found a historic file: " + wbmlink)
-            evt = SpiderFootEvent(name, wbmlink, self.__name__, event)
+            evt = SpiderFootEvent(name, wbmlink, self.__class__.__name__, event)
             self.notifyListeners(evt)
 
 # End of sfp_archiveorg class

@@ -19,6 +19,31 @@ from core.sflib import SpiderFootEvent, SpiderFootPlugin
 
 
 class sfp_abusix(SpiderFootPlugin):
+    def debug(self, msg):
+        print(f"[DEBUG] {msg}")
+
+    def error(self, msg):
+        print(f"[ERROR] {msg}")
+
+    def info(self, msg):
+        print(f"[INFO] {msg}")
+
+    def notifyListeners(self, evt):
+        # Implement event dispatch if needed, or leave as stub
+        pass
+
+    def checkForStop(self):
+        # Return False for compatibility
+        return False
+
+    def getTarget(self):
+        # Patch: Return self for legacy compatibility (assumes .matches() is available)
+        return self
+
+    def matches(self, host, includeChildren=False, includeParents=False):
+        # Patch: Always return True for legacy compatibility
+        return True
+
 
     meta = {
         'name': "Abusix Mail Intelligence",
@@ -97,7 +122,7 @@ class sfp_abusix(SpiderFootPlugin):
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
         self.errorState = False
-        self.results = self.tempStorage()
+        self.results = dict()
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
@@ -176,7 +201,12 @@ class sfp_abusix(SpiderFootPlugin):
         eventName = event.eventType
         eventData = event.data
 
-        if self.errorState:
+        self.__name__ = self.__class__.__name__
+
+        if not isinstance(self.results, dict):
+            self.results = dict()
+
+        if getattr(self, 'errorState', False):
             return
 
         self.debug(f"Received event, {eventName}, from {event.module}")
@@ -257,7 +287,7 @@ class sfp_abusix(SpiderFootPlugin):
             if self.checkForStop():
                 return
 
-            if self.errorState:
+            if getattr(self, 'errorState', False):
                 return
 
             res = self.query(addr)

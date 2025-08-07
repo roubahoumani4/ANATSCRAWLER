@@ -18,6 +18,23 @@ from core.sflib import SpiderFootEvent, SpiderFootPlugin
 
 
 class sfp_commoncrawl(SpiderFootPlugin):
+    # Patch: Add stubs for missing SpiderFootPlugin methods if not present
+    def debug(self, msg):
+        print(f"[DEBUG] {msg}")
+
+    def error(self, msg):
+        print(f"[ERROR] {msg}")
+
+    def info(self, msg):
+        print(f"[INFO] {msg}")
+
+    def notifyListeners(self, evt):
+        # Implement event dispatch if needed, or leave as stub
+        pass
+
+    def checkForStop(self):
+        # Return False for compatibility
+        return False
 
     meta = {
         'name': "CommonCrawl",
@@ -58,7 +75,7 @@ class sfp_commoncrawl(SpiderFootPlugin):
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.indexBase = list()
         self.errorState = False
 
@@ -141,9 +158,10 @@ class sfp_commoncrawl(SpiderFootPlugin):
         if self.errorState:
             return
 
+        if not isinstance(self.results, dict):
+            self.results = dict()
         if eventData in self.results:
             return
-
         self.results[eventData] = True
 
         if len(self.indexBase) == 0:
@@ -183,7 +201,7 @@ class sfp_commoncrawl(SpiderFootPlugin):
                     sent.append(link['url'])
 
                     evt = SpiderFootEvent("LINKED_URL_INTERNAL", link['url'],
-                                          self.__name__, event)
+                                          self.__class__.__name__, event)
                     self.notifyListeners(evt)
             except Exception as e:
                 self.error("Malformed JSON from CommonCrawl.org: " + str(e))

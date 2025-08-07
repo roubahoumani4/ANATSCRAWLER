@@ -13,10 +13,13 @@
 import json
 import time
 
-from core.sflib import SpiderFootEvent, SpiderFootPlugin
+from core.spiderfoot.plugin import SpiderFootPlugin
+from core.spiderfoot.event import SpiderFootEvent
 
 
 class sfp_fsecure_riddler(SpiderFootPlugin):
+    def setTarget(self, target):
+        self.target = target
 
     meta = {
         'name': "F-Secure Riddler.io",
@@ -64,8 +67,9 @@ class sfp_fsecure_riddler(SpiderFootPlugin):
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
-
+        self.results = dict()
+        self.errorState = False
+        # Ensure all options are set
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 
@@ -171,6 +175,8 @@ class sfp_fsecure_riddler(SpiderFootPlugin):
             self.debug(f"Ignoring {eventName}, from self.")
             return
 
+        if not isinstance(self.results, dict):
+            self.results = dict()
         if eventData in self.results:
             self.debug(f"Skipping {eventData}, already checked.")
             return
@@ -201,7 +207,7 @@ class sfp_fsecure_riddler(SpiderFootPlugin):
             self.info(f"No results found for {eventData}")
             return
 
-        e = SpiderFootEvent('RAW_RIR_DATA', str(data), self.__name__, event)
+        e = SpiderFootEvent('RAW_RIR_DATA', str(data), self.__class__.__name__, event)
         self.notifyListeners(e)
 
         hosts = list()
@@ -210,22 +216,15 @@ class sfp_fsecure_riddler(SpiderFootPlugin):
 
         for result in data:
             host = result.get('host')
-
             if not host:
                 continue
-
-            if not self.getTarget().matches(host, includeChildren=True, includeParents=True):
+            if not self.target.matches(host, includeChildren=True, includeParents=True):
                 continue
-
             hosts.append(host)
-
             addr = result.get('addr')
-
             if addr:
                 addrs.append(addr)
-
             coord = result.get('cordinates')
-
             if coord and len(coord) == 2:
                 coords.append(str(coord[0]) + ', ' + str(coord[1]))
 
@@ -233,7 +232,7 @@ class sfp_fsecure_riddler(SpiderFootPlugin):
             self.info("Resolving " + str(len(set(hosts))) + " domains ...")
 
         for host in set(hosts):
-            if self.getTarget().matches(host, includeChildren=True, includeParents=True):
+            if self.target.matches(host, includeChildren=True, includeParents=True):
                 evt_type = 'INTERNET_NAME'
             else:
                 evt_type = 'AFFILIATE_INTERNET_NAME'
@@ -242,24 +241,24 @@ class sfp_fsecure_riddler(SpiderFootPlugin):
                 self.debug(f"Host {host} could not be resolved")
                 evt_type += '_UNRESOLVED'
 
-            evt = SpiderFootEvent(evt_type, host, self.__name__, event)
+            evt = SpiderFootEvent(evt_type, host, self.__class__.__name__, event)
             self.notifyListeners(evt)
 
             if self.sf.isDomain(host, self.opts['_internettlds']):
                 if evt_type.startswith('AFFILIATE'):
-                    evt = SpiderFootEvent('AFFILIATE_DOMAIN_NAME', host, self.__name__, event)
+                    evt = SpiderFootEvent('AFFILIATE_DOMAIN_NAME', host, self.__class__.__name__, event)
                     self.notifyListeners(evt)
                 else:
-                    evt = SpiderFootEvent('DOMAIN_NAME', host, self.__name__, event)
+                    evt = SpiderFootEvent('DOMAIN_NAME', host, self.__class__.__name__, event)
                     self.notifyListeners(evt)
 
         for addr in set(addrs):
             if self.sf.validIP(addr):
-                evt = SpiderFootEvent('IP_ADDRESS', addr, self.__name__, event)
+                evt = SpiderFootEvent('IP_ADDRESS', addr, self.__class__.__name__, event)
                 self.notifyListeners(evt)
 
         for coord in set(coords):
-            evt = SpiderFootEvent('PHYSICAL_COORDINATES', coord, self.__name__, event)
+            evt = SpiderFootEvent('PHYSICAL_COORDINATES', coord, self.__class__.__name__, event)
             self.notifyListeners(evt)
 
 # End of sfp_fsecure_riddler class

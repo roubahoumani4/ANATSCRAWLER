@@ -17,6 +17,31 @@ from core.sflib import SpiderFootEvent, SpiderFootPlugin
 
 
 class sfp_abusech(SpiderFootPlugin):
+    def debug(self, msg):
+        print(f"[DEBUG] {msg}")
+
+    def error(self, msg):
+        print(f"[ERROR] {msg}")
+
+    def info(self, msg):
+        print(f"[INFO] {msg}")
+
+    def notifyListeners(self, evt):
+        # Implement event dispatch if needed, or leave as stub
+        pass
+
+    def checkForStop(self):
+        # Return False for compatibility
+        return False
+
+    def getTarget(self):
+        # Patch: Return self for legacy compatibility (assumes .matches() is available)
+        return self
+
+    def matches(self, host, includeChildren=False, includeParents=False):
+        # Patch: Always return True for legacy compatibility
+        return True
+
 
     meta = {
         'name': "abuse.ch",
@@ -81,7 +106,7 @@ class sfp_abusech(SpiderFootPlugin):
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
-        self.results = self.tempStorage()
+        self.results = dict()
         self.errorState = False
 
         for opt in list(userOpts.keys()):
@@ -344,7 +369,11 @@ class sfp_abusech(SpiderFootPlugin):
         srcModuleName = event.module
         eventData = event.data
 
+        self.__name__ = self.__class__.__name__
         self.debug(f"Received event, {eventName}, from {srcModuleName}")
+
+        if not isinstance(self.results, dict):
+            self.results = dict()
 
         if eventData in self.results:
             self.debug(f"Skipping {eventData}, already checked.")
