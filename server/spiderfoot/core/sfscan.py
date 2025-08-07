@@ -330,9 +330,11 @@ class SpiderFootScanner():
                         mod.setSharedThreadPool(self.__sharedThreadPool)
                     if hasattr(mod, "setDbh"):
                         mod.setDbh(self.__dbh)
-                    # Set tempStorage if available
-                    if hasattr(mod, "tempStorage"):
-                        mod.tempStorage = {}
+                    # Set tempStorage if possible (avoid AttributeError for modules that do not allow dynamic attributes)
+                    try:
+                        setattr(mod, "tempStorage", {})
+                    except Exception:
+                        pass
                     mod.setup(self.__sf, self.__modconfig[modName])
                     print(f"[SFSCAN] Module {modName} setup complete.", file=sys.stderr)
                 except Exception as e:
