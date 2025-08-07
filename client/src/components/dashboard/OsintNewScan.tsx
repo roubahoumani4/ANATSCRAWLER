@@ -20,6 +20,7 @@ const OsintNewScan = () => {
   const [scanType, setScanType] = useState<keyof typeof moduleSets>("all");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scanStarted, setScanStarted] = useState(false);
 
   useEffect(() => {
     fetch(`${API_BASE}/modules`)
@@ -36,6 +37,7 @@ const OsintNewScan = () => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setScanStarted(false);
     try {
       const res = await fetch(`${API_BASE}/scan/start`, {
         method: "POST",
@@ -44,6 +46,7 @@ const OsintNewScan = () => {
       });
       const data = await res.json();
       if (!data.success) setError("Failed to start scan");
+      else setScanStarted(true);
     } catch {
       setError("Failed to start scan");
     }
@@ -177,12 +180,57 @@ const OsintNewScan = () => {
       </div>
       <button
         type="submit"
-        className="mt-8 bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded font-bold flex items-center w-fit"
+        className="mt-8 bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded font-bold flex items-center w-fit relative"
         disabled={loading}
       >
         <Search className="w-4 h-4 mr-2" /> Run Scan
+        {loading && (
+          <span className="ml-4">
+            <span className="cube-spinner inline-block align-middle">
+              <span className="cube" />
+            </span>
+          </span>
+        )}
       </button>
+      {/* Cube spinner styles */}
+      <style>{`
+        .cube-spinner {
+          width: 24px;
+          height: 24px;
+          perspective: 40px;
+        }
+        .cube {
+          width: 18px;
+          height: 18px;
+          background: linear-gradient(135deg, #3b82f6 60%, #0a0f1c 100%);
+          border-radius: 4px;
+          animation: cube-spin 1s infinite linear;
+        }
+        @keyframes cube-spin {
+          0% { transform: rotateY(0deg) rotateX(0deg); }
+          50% { transform: rotateY(180deg) rotateX(180deg); }
+          100% { transform: rotateY(360deg) rotateX(360deg); }
+        }
+      `}</style>
       {error && <div className="text-red-400 mt-2">{error}</div>}
+      {scanStarted && !error && (
+        <div className="mt-4 text-blue-300 text-sm flex flex-col items-start">
+          <span>
+            Scan started! You can view the progress and all details at the <b>View All Scans</b> page.
+          </span>
+          <span className="mt-2 flex items-center gap-2">
+            <span>Click here:</span>
+            <a
+              href="https://horus.anatsecurity.fr/osint-engine/scans"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1 rounded bg-blue-700 hover:bg-blue-800 text-white font-semibold text-xs shadow transition"
+            >
+              View All Scans
+            </a>
+          </span>
+        </div>
+      )}
         </motion.form>
       </div>
     </div>

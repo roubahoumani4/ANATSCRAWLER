@@ -79,6 +79,25 @@ def scan_result_summary(scan_id):
     except Exception as e:
         print(json.dumps({"error": str(e)}))
 
+def delete_scan(scan_id):
+    try:
+        db = SpiderFootDb({'__database': DB_PATH})
+        deleted = db.scanInstanceDelete(scan_id)
+        print(json.dumps({"scanId": scan_id, "deleted": bool(deleted)}))
+    except Exception as e:
+        print(json.dumps({"scanId": scan_id, "deleted": False, "error": str(e)}))
+
+def stop_scan(scan_id):
+    import time
+    try:
+        db = SpiderFootDb({'__database': DB_PATH})
+        # Mark scan as aborted and set end time
+        now = str(int(time.time() * 1000))
+        db.scanInstanceSet(scan_id, ended=now, status="ABORTED")
+        print(json.dumps({"scanId": scan_id, "stopped": True, "ended": now, "status": "ABORTED"}))
+    except Exception as e:
+        print(json.dumps({"scanId": scan_id, "stopped": False, "error": str(e)}))
+
 def scan_correlation_summary(scan_id):
     try:
         db = SpiderFootDb({'__database': DB_PATH})
@@ -191,6 +210,8 @@ if __name__ == "__main__":
             case "scan_result_event": scan_result_event(*args)
             case "scan_logs": scan_logs(*args)
             case "start_scan": start_scan(*args)
+            case "delete_scan": delete_scan(*args)
+            case "stop_scan": stop_scan(*args)
             case _: print(json.dumps({"error": "Unknown command"})); sys.exit(1)
 
     except Exception as e:
