@@ -216,6 +216,9 @@ class sfp_dnsresolve(SpiderFootPlugin):
         eventDataHash = self.sf.hashstring(eventData)
         addrs = None
         parentEvent = event
+        if eventName == "IP_ADDRESS":
+            import sys
+            print(f"[SFP_DNSRESOLVE][DEBUG] Received IP_ADDRESS event: value={eventData}", file=sys.stderr, flush=True)
 
         # Don't be recursive for names
         if srcModuleName in ["sfp_dnsresolve"] and "_NAME" in eventName:
