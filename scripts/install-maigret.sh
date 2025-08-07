@@ -1,4 +1,4 @@
-#!/bin/bash
+ #!/bin/bash
 set -e
 # Check for Python 3.10
 if ! command -v python3.10 >/dev/null; then

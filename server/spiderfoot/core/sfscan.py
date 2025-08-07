@@ -12,6 +12,7 @@
 import socket
 import time
 import queue
+import sys
 from time import sleep
 from copy import deepcopy
 from contextlib import suppress
@@ -110,6 +111,7 @@ class SpiderFootScanner():
         self.__moduleList = moduleList
         self.__sf = SpiderFoot(self.__config)
         self.__sf.dbh = self.__dbh
+        print(f"[SFSCAN] Initializing modules: {self.__moduleList}", file=sys.stderr)
 
         # Create a unique ID for this scan in the back-end DB.
         if scanId:
@@ -290,23 +292,23 @@ class SpiderFootScanner():
                 if not modName:
                     continue
 
+                print(f"[SFSCAN] Activating module: {modName}", file=sys.stderr)
                 # Module may have been renamed or removed
                 if not self.__config or '__modules__' not in self.__config or modName not in self.__config['__modules__']:
-                    if self.__sf is not None:
-                        self.__sf.error(f"Failed to load module: {modName}")
+                    print(f"[SFSCAN] Failed to load module (missing config): {modName}", file=sys.stderr)
                     continue
 
                 try:
                     module = __import__('modules.' + modName, globals(), locals(), [modName])
-                except ImportError:
-                    if self.__sf is not None:
-                        self.__sf.error(f"Failed to load module: {modName}")
+                except ImportError as ie:
+                    print(f"[SFSCAN] ImportError loading module {modName}: {ie}", file=sys.stderr)
                     continue
 
                 try:
                     mod = getattr(module, modName)()
                     mod.__name__ = modName
-                except Exception:
+                except Exception as e:
+                    print(f"[SFSCAN] Exception instantiating module {modName}: {e}", file=sys.stderr)
                     continue
 
                 # Set up the module options, scan ID, database handle and listeners
@@ -316,6 +318,8 @@ class SpiderFootScanner():
                         self.__modconfig[modName] = deepcopy(self.__config['__modules__'][modName]['opts'])
                         for opt in list(self.__config.keys()):
                             self.__modconfig[modName][opt] = deepcopy(self.__config[opt])
+                        if modName == "sfp_dnsresolve":
+                            print(f"[SFSCAN] sfp_dnsresolve options: {self.__modconfig[modName]}", file=sys.stderr)
 
                     # clear any listener relationships from the past
                     mod.clearListeners()
@@ -323,9 +327,11 @@ class SpiderFootScanner():
                     mod.setSharedThreadPool(self.__sharedThreadPool)
                     mod.setDbh(self.__dbh)
                     mod.setup(self.__sf, self.__modconfig[modName])
-                except Exception:
-                    if self.__sf is not None:
-                        self.__sf.error(f"Module {modName} initialization failed")
+                    print(f"[SFSCAN] Module {modName} setup complete.", file=sys.stderr)
+                except Exception as e:
+                    print(f"[SFSCAN] Module {modName} initialization failed: {e}", file=sys.stderr)
+                    import traceback
+                    print(traceback.format_exc(), file=sys.stderr)
                     mod.errorState = True
                     continue
 
@@ -369,17 +375,15 @@ class SpiderFootScanner():
                 try:
                     mod.outgoingEventQueue = self.eventQueue
                     mod.incomingEventQueue = queue.Queue()
+                    print(f"[SFSCAN] Event queues set for module {modName}", file=sys.stderr)
                 except Exception as e:
-                    if self.__sf is not None:
-                        self.__sf.error(f"Module {modName} event queue setup failed: {e}")
+                    print(f"[SFSCAN] Module {modName} event queue setup failed: {e}", file=sys.stderr)
                     continue
 
                 self.__moduleInstances[modName] = mod
-                if self.__sf is not None:
-                    self.__sf.status(f"{modName} module loaded.")
+                print(f"[SFSCAN] {modName} module loaded.", file=sys.stderr)
 
-            if self.__sf is not None:
-                self.__sf.debug(f"Scan [{self.__scanId}] loaded {len(self.__moduleInstances)} modules.")
+            print(f"[SFSCAN] Scan [{self.__scanId}] loaded {len(self.__moduleInstances)} modules.", file=sys.stderr)
 
             if not self.__moduleInstances:
                 self.__setStatus("ERROR-FAILED", 0.0, time.time() * 1000)
@@ -435,7 +439,6 @@ class SpiderFootScanner():
             self.__setStatus("ABORTED", 0.0, time.time() * 1000)
 
         except BaseException as e:
-            import sys
             import traceback
             if self.__sf is not None:
                 self.__sf.error(
