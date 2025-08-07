@@ -121,14 +121,11 @@ def start_scan(target, name):
         print(f"[DEBUG] Attempting to load modules from: {MODULES_DIR}", file=sys.stderr)
         modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR)
         print(f"[DEBUG] Modules loaded: {list(modules_dict.keys()) if modules_dict else 'None'}", file=sys.stderr)
-        # Verbose error logging for module loading
-        if not modules_dict or 'sfp_dnsresolve' not in modules_dict:
-            print(f"[ERROR] Failed to load module: sfp_dnsresolve", file=sys.stderr)
-            print(f"[DEBUG] Loaded modules: {list(modules_dict.keys()) if modules_dict else 'None'}", file=sys.stderr)
-            print(traceback.format_exc(), file=sys.stderr)
-            print(json.dumps({"success": False, "error": "Failed to load module: sfp_dnsresolve", "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
+        if not modules_dict:
+            print(f"[ERROR] Failed to load any modules.", file=sys.stderr)
+            print(json.dumps({"success": False, "error": "Failed to load any modules."}), file=sys.stderr, flush=True)
             return
-        enabled_modules = ["sfp_dnsresolve"]  # Use minimal module to debug failures
+        enabled_modules = list(modules_dict.keys())
 
         config = {
             '__database': DB_PATH,
@@ -143,11 +140,7 @@ def start_scan(target, name):
             '_moduleTimeout': 30,
             '_internettlds_cache': True,
             '_internettlds': 'generic, country, sponsored, infrastructure',
-            '__modules__': {
-                'sfp_dnsresolve': {
-                    'opts': {}
-                }
-            }
+            '__modules__': {mod: {'opts': {}} for mod in enabled_modules}
         }
 
         print(f"[DEBUG] Scan config: {json.dumps(config)}", file=sys.stderr)
