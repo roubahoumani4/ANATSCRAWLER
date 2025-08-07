@@ -345,12 +345,8 @@ class SpiderFootScanner():
                         "sfp_googlesafebrowsing"
                     ]
                     if modName in tempstorage_method_modules:
-                        # If not present, set to None so module can handle it
-                        if not hasattr(mod, "tempStorage"):
-                            try:
-                                setattr(mod, "tempStorage", None)
-                            except Exception:
-                                pass
+                        # Do not set tempStorage at all; let module handle its own method/attribute
+                        pass
                     else:
                         has_instance = hasattr(mod, "tempStorage")
                         has_class = hasattr(type(mod), "tempStorage")
