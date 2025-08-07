@@ -118,7 +118,9 @@ def start_scan(target, name):
             print(json.dumps({"success": False, "error": f"Could not determine target type for: {target}"}))
             return
 
+        print(f"[DEBUG] Attempting to load modules from: {MODULES_DIR}", file=sys.stderr)
         modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR)
+        print(f"[DEBUG] Modules loaded: {list(modules_dict.keys()) if modules_dict else 'None'}", file=sys.stderr)
         # Verbose error logging for module loading
         if not modules_dict or 'sfp_dnsresolve' not in modules_dict:
             print(f"[ERROR] Failed to load module: sfp_dnsresolve", file=sys.stderr)
@@ -143,19 +145,30 @@ def start_scan(target, name):
             '_internettlds': 'generic, country, sponsored, infrastructure'
         }
 
+        print(f"[DEBUG] Scan config: {json.dumps(config)}", file=sys.stderr)
+        print(f"[DEBUG] Enabled modules: {enabled_modules}", file=sys.stderr)
+
         sfdb = SpiderFootDb({'__database': DB_PATH})
         sfdb.create()
 
+        print(f"[DEBUG] Database initialized at: {DB_PATH}", file=sys.stderr)
+
         scan_id = SpiderFootHelpers.genScanInstanceId()
+
+        print(f"[DEBUG] Generated scan ID: {scan_id}", file=sys.stderr)
 
         # ✅ Register the scan in the DB manually
         sfdb.scanInstanceCreate(scan_id, name, target)
+
+        print(f"[DEBUG] Scan registered in DB: name={name}, target={target}", file=sys.stderr)
 
         print(f"▶️ Starting scan...", file=sys.stderr)
         print(f"Target: {target}", file=sys.stderr)
         print(f"Target Type: {target_type}", file=sys.stderr)
         print(f"Scan ID: {scan_id}", file=sys.stderr)
         print(f"Enabled Modules: {enabled_modules}", file=sys.stderr)
+
+        print(f"[DEBUG] Initializing SpiderFootScanner...", file=sys.stderr)
 
         try:
             scanner = SpiderFootScanner(
@@ -167,6 +180,7 @@ def start_scan(target, name):
                 globalOpts=config,
                 start=True
             )
+            print(f"[DEBUG] SpiderFootScanner initialized successfully.", file=sys.stderr)
         except Exception as inner:
             print("🚨 Failed to initialize SpiderFootScanner", file=sys.stderr)
             print(traceback.format_exc(), file=sys.stderr)
