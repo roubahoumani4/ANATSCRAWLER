@@ -149,6 +149,7 @@ class SpiderFootHelpers():
                             "Public Registries", "Real World", "Reputation Systems",
                             "Search Engines", "Secondary Networks", "Social Media"]
 
+        import sys, traceback
         for filename in os.listdir(path):
             if not filename.startswith("sfp_"):
                 continue
@@ -159,9 +160,9 @@ class SpiderFootHelpers():
 
             modName = filename.split('.')[0]
             sfModules[modName] = dict()
-            mod = __import__('modules.' + modName, globals(), locals(), [modName])
-            sfModules[modName]['object'] = getattr(mod, modName)()
             try:
+                mod = __import__('modules.' + modName, globals(), locals(), [modName])
+                sfModules[modName]['object'] = getattr(mod, modName)()
                 mod_obj = sfModules[modName]['object']
                 mod_dict = {
                     "name": modName,
@@ -170,9 +171,12 @@ class SpiderFootHelpers():
                     "producedEvents": mod_obj.producedEvents()
                 }
             except Exception as e:
+                print(f"[MODULE LOAD ERROR] {modName}: {e}", file=sys.stderr)
+                print(traceback.format_exc(), file=sys.stderr)
                 mod_dict = {
                     "name": modName,
-                    "error": str(e)
+                    "error": str(e),
+                    "traceback": traceback.format_exc()
                 }
             sfModules[modName].update(mod_dict)
 
