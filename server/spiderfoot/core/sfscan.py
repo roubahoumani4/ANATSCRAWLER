@@ -324,7 +324,8 @@ class SpiderFootScanner():
                     # clear any listener relationships from the past
                     if hasattr(mod, "clearListeners"):
                         mod.clearListeners()
-                    mod.setScanId(self.__scanId if self.__scanId is not None else "")
+                    if hasattr(mod, "setScanId"):
+                        mod.setScanId(self.__scanId if self.__scanId is not None else "")
                     mod.setSharedThreadPool(self.__sharedThreadPool)
                     mod.setDbh(self.__dbh)
                     mod.setup(self.__sf, self.__modconfig[modName])
