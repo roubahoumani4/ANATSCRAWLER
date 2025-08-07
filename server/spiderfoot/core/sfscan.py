@@ -408,7 +408,7 @@ class SpiderFootScanner():
             # Create the "ROOT" event which un-triggered modules will link events to
             # Create a minimal valid event for self-reference
             dummy_event = object.__new__(SpiderFootEvent)
-            SpiderFootEvent.__init__(dummy_event, "DUMMY", "", "", dummy_event)
+            SpiderFootEvent.__init__(dummy_event, "DUMMY", "dummy", "", dummy_event)
             rootEvent = SpiderFootEvent("ROOT", self.__targetValue or "", "", dummy_event)
             psMod.notifyListeners(rootEvent)
             firstEvent = SpiderFootEvent(self.__targetType or "", self.__targetValue or "", "SpiderFoot UI", rootEvent)
