@@ -185,17 +185,35 @@ def start_scan(target, name):
             return
 
         print(f"[Scan] Scan {scan_id} started.", file=sys.stderr, flush=True)
-        # Wait for scan to finish and print event count
-        try:
-            db = SpiderFootDb({'__database': DB_PATH})
-            events = db.scanResultEvent(scan_id)
-            event_count = len(events) if events else 0
-            print(f"[Scan] Scan {scan_id} completed. Total events: {event_count}", file=sys.stderr, flush=True)
-            print(json.dumps({"success": True, "scanId": scanner.scanId, "eventCount": event_count}))
-        except Exception as scanerr:
-            print(f"[Scan] Fatal scan error: {scanerr}", file=sys.stderr, flush=True)
-            print(traceback.format_exc(), file=sys.stderr, flush=True)
-            print(json.dumps({"success": False, "error": str(scanerr), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
+        # Poll for scan status and event count
+        import time
+        db = SpiderFootDb({'__database': DB_PATH})
+        max_wait = 120  # seconds
+        poll_interval = 2  # seconds
+        waited = 0
+        last_event_count = -1
+        while waited < max_wait:
+            try:
+                scan_status = db.scanInstanceGet(scan_id)
+                status_str = scan_status[5] if scan_status and len(scan_status) > 5 else "UNKNOWN"
+                events = db.scanResultEvent(scan_id)
+                event_count = len(events) if events else 0
+                if event_count != last_event_count:
+                    print(f"[Scan] Progress: status={status_str}, events={event_count}", file=sys.stderr, flush=True)
+                    last_event_count = event_count
+                if status_str in ["FINISHED", "ERROR-FAILED", "ABORTED"]:
+                    print(f"[Scan] Scan {scan_id} completed with status: {status_str}. Total events: {event_count}", file=sys.stderr, flush=True)
+                    print(json.dumps({"success": status_str=="FINISHED", "scanId": scanner.scanId, "eventCount": event_count, "status": status_str}))
+                    break
+                time.sleep(poll_interval)
+                waited += poll_interval
+            except Exception as scanerr:
+                print(f"[Scan] Polling error: {scanerr}", file=sys.stderr, flush=True)
+                print(traceback.format_exc(), file=sys.stderr, flush=True)
+                break
+        else:
+            print(f"[Scan] Scan {scan_id} timed out after {max_wait} seconds.", file=sys.stderr, flush=True)
+            print(json.dumps({"success": False, "scanId": scanner.scanId, "eventCount": last_event_count, "status": "TIMEOUT"}))
     except Exception as e:
         print(json.dumps({"success": False, "error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 
