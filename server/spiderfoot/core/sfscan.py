@@ -344,7 +344,14 @@ class SpiderFootScanner():
                         "sfp_grep_app", "sfp_commoncrawl", "sfp_archiveorg", "sfp_hackertarget", "sfp_fsecure_riddler",
                         "sfp_googlesafebrowsing"
                     ]
-                    if modName not in tempstorage_method_modules:
+                    if modName in tempstorage_method_modules:
+                        # If not present, set to None so module can handle it
+                        if not hasattr(mod, "tempStorage"):
+                            try:
+                                setattr(mod, "tempStorage", None)
+                            except Exception:
+                                pass
+                    else:
                         has_instance = hasattr(mod, "tempStorage")
                         has_class = hasattr(type(mod), "tempStorage")
                         is_class_method = callable(getattr(type(mod), "tempStorage", None))
