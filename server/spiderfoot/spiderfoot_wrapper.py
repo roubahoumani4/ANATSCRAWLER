@@ -165,7 +165,18 @@ def start_scan(target, name):
             print(traceback.format_exc(), file=sys.stderr)
             return
 
-        print(json.dumps({"success": True, "scanId": scanner.scanId}))
+        print(f"[Scan] Scan {scan_id} started.", file=sys.stderr, flush=True)
+        # Wait for scan to finish and print event count
+        try:
+            db = SpiderFootDb({'__database': DB_PATH})
+            events = db.scanResultEvent(scan_id)
+            event_count = len(events) if events else 0
+            print(f"[Scan] Scan {scan_id} completed. Total events: {event_count}", file=sys.stderr, flush=True)
+            print(json.dumps({"success": True, "scanId": scanner.scanId, "eventCount": event_count}))
+        except Exception as scanerr:
+            print(f"[Scan] Fatal scan error: {scanerr}", file=sys.stderr, flush=True)
+            print(traceback.format_exc(), file=sys.stderr, flush=True)
+            print(json.dumps({"success": False, "error": str(scanerr), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
     except Exception as e:
         print(json.dumps({"success": False, "error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 
