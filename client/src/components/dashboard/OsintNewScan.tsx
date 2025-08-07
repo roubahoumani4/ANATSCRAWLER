@@ -19,6 +19,7 @@ const OsintNewScan = () => {
   const [selectedModules, setSelectedModules] = useState<string[]>([]);
   const [scanType, setScanType] = useState<keyof typeof moduleSets>("all");
   const [loading, setLoading] = useState(false);
+  const [buttonClicked, setButtonClicked] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,6 +36,7 @@ const OsintNewScan = () => {
   const startScan = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setButtonClicked(true);
     setError(null);
     try {
       const res = await fetch(`${API_BASE}/scan/start`, {
@@ -177,38 +179,40 @@ const OsintNewScan = () => {
       </div>
       <button
         type="submit"
-        className="mt-8 bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded font-bold flex items-center w-fit relative"
+        className={`mt-8 bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded font-bold flex items-center w-fit relative transition-transform duration-150 ${buttonClicked ? 'scale-95 ring-2 ring-blue-400' : ''}`}
         disabled={loading}
+        onAnimationEnd={() => setButtonClicked(false)}
       >
         <Search className="w-4 h-4 mr-2" /> Run Scan
-        {loading && (
-          <span className="ml-4">
-            <span
-              className="inline-block align-middle"
-              style={{ width: 24, height: 24, perspective: 40 }}
-            >
-              <span
-                style={{
-                  display: 'inline-block',
-                  width: 18,
-                  height: 18,
-                  borderRadius: 4,
-                  background: 'linear-gradient(135deg, #3b82f6 60%, #0a0f1c 100%)',
-                  animation: 'cube-spin 1s infinite linear'
-                }}
-                className=""
-              />
-            </span>
-            <style>{`
-              @keyframes cube-spin {
-                0% { transform: rotateY(0deg) rotateX(0deg); }
-                50% { transform: rotateY(180deg) rotateX(180deg); }
-                100% { transform: rotateY(360deg) rotateX(360deg); }
-              }
-            `}</style>
-          </span>
-        )}
       </button>
+      {/* Spinner outside button */}
+      {loading && (
+        <div className="mt-4 flex items-center gap-2">
+          <span
+            className="inline-block align-middle"
+            style={{ width: 24, height: 24, perspective: 40 }}
+          >
+            <span
+              style={{
+                display: 'inline-block',
+                width: 18,
+                height: 18,
+                borderRadius: 4,
+                background: 'linear-gradient(135deg, #3b82f6 60%, #0a0f1c 100%)',
+                animation: 'cube-spin 1s infinite linear'
+              }}
+            />
+          </span>
+          <style>{`
+            @keyframes cube-spin {
+              0% { transform: rotateY(0deg) rotateX(0deg); }
+              50% { transform: rotateY(180deg) rotateX(180deg); }
+              100% { transform: rotateY(360deg) rotateX(360deg); }
+            }
+          `}</style>
+          <span className="text-blue-300 text-sm">Scan in progress...</span>
+        </div>
+      )}
       {error && <div className="text-red-400 mt-2">{error}</div>}
         </motion.form>
       </div>
