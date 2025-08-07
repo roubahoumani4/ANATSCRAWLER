@@ -337,7 +337,11 @@ class SpiderFootScanner():
                         except Exception:
                             pass
                     # Defensive: only set tempStorage as dict if not present and not defined as a method in the class
-                    if not hasattr(mod, "tempStorage") and not callable(getattr(type(mod), "tempStorage", None)):
+                    # Only set tempStorage as dict if neither instance nor class defines it
+                    has_instance = hasattr(mod, "tempStorage")
+                    has_class = hasattr(type(mod), "tempStorage")
+                    is_class_method = callable(getattr(type(mod), "tempStorage", None))
+                    if not has_instance and not has_class:
                         try:
                             setattr(mod, "tempStorage", {})
                         except Exception:
@@ -370,10 +374,12 @@ class SpiderFootScanner():
                         continue
 
                 # Give modules a chance to 'enrich' the original target with aliases of that target.
+                # Only call enrichTarget if the method exists
                 try:
-                    newTarget = mod.enrichTarget(self.__target)
-                    if newTarget is not None:
-                        self.__target = newTarget
+                    if hasattr(mod, "enrichTarget"):
+                        newTarget = mod.enrichTarget(self.__target)
+                        if newTarget is not None:
+                            self.__target = newTarget
                 except Exception as e:
                     if self.__sf is not None:
                         self.__sf.error(f"Module {modName} target enrichment failed: {e}")
