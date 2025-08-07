@@ -326,7 +326,8 @@ class SpiderFootScanner():
                         mod.clearListeners()
                     if hasattr(mod, "setScanId"):
                         mod.setScanId(self.__scanId if self.__scanId is not None else "")
-                    mod.setSharedThreadPool(self.__sharedThreadPool)
+                    if hasattr(mod, "setSharedThreadPool"):
+                        mod.setSharedThreadPool(self.__sharedThreadPool)
                     mod.setDbh(self.__dbh)
                     mod.setup(self.__sf, self.__modconfig[modName])
                     print(f"[SFSCAN] Module {modName} setup complete.", file=sys.stderr)
