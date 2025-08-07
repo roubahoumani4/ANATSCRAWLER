@@ -183,32 +183,32 @@ const OsintNewScan = () => {
         <Search className="w-4 h-4 mr-2" /> Run Scan
         {loading && (
           <span className="ml-4">
-            <span className="cube-spinner inline-block align-middle">
-              <span className="cube" />
+            <span
+              className="inline-block align-middle"
+              style={{ width: 24, height: 24, perspective: 40 }}
+            >
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: 18,
+                  height: 18,
+                  borderRadius: 4,
+                  background: 'linear-gradient(135deg, #3b82f6 60%, #0a0f1c 100%)',
+                  animation: 'cube-spin 1s infinite linear'
+                }}
+                className=""
+              />
             </span>
+            <style>{`
+              @keyframes cube-spin {
+                0% { transform: rotateY(0deg) rotateX(0deg); }
+                50% { transform: rotateY(180deg) rotateX(180deg); }
+                100% { transform: rotateY(360deg) rotateX(360deg); }
+              }
+            `}</style>
           </span>
         )}
       </button>
-      {/* Cube spinner styles */}
-      <style>{`
-        .cube-spinner {
-          width: 24px;
-          height: 24px;
-          perspective: 40px;
-        }
-        .cube {
-          width: 18px;
-          height: 18px;
-          background: linear-gradient(135deg, #3b82f6 60%, #0a0f1c 100%);
-          border-radius: 4px;
-          animation: cube-spin 1s infinite linear;
-        }
-        @keyframes cube-spin {
-          0% { transform: rotateY(0deg) rotateX(0deg); }
-          50% { transform: rotateY(180deg) rotateX(180deg); }
-          100% { transform: rotateY(360deg) rotateX(360deg); }
-        }
-      `}</style>
       {error && <div className="text-red-400 mt-2">{error}</div>}
         </motion.form>
       </div>
