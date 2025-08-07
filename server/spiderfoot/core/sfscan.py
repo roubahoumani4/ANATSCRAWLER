@@ -447,6 +447,7 @@ class SpiderFootScanner():
             psMod.notifyListeners(rootEvent)
             firstEvent = SpiderFootEvent(self.__targetType or "", self.__targetValue or "", "SpiderFoot UI", rootEvent)
             psMod.notifyListeners(firstEvent)
+            print(f"[SFSCAN][DEBUG] Initial event dispatched: type={firstEvent.eventType}, value={firstEvent.data}", file=sys.stderr, flush=True)
 
             # Special case.. check if an INTERNET_NAME is also a domain
             if self.__targetType == 'INTERNET_NAME' and self.__sf is not None and hasattr(self.__sf, 'isDomain') and self.__targetValue is not None and self.__config and '_internettlds' in self.__config and self.__sf.isDomain(self.__targetValue, self.__config['_internettlds']):
@@ -536,6 +537,7 @@ class SpiderFootScanner():
 
                 try:
                     sfEvent = self.eventQueue.get_nowait()
+                    print(f"[SFSCAN][DEBUG] Event loop: got event type={getattr(sfEvent, 'eventType', None)}, value={getattr(sfEvent, 'data', None)}", file=sys.stderr, flush=True)
                     if self.__sf is not None:
                         self.__sf.debug(f"waitForThreads() got event, {sfEvent.eventType}, from eventQueue.")
                 except queue.Empty:
@@ -576,6 +578,7 @@ class SpiderFootScanner():
                     if not mod.errorState and mod.incomingEventQueue is not None:
                         watchedEvents = mod.watchedEvents()
                         if sfEvent.eventType in watchedEvents or "*" in watchedEvents:
+                            print(f"[SFSCAN][DEBUG] Passing event type={sfEvent.eventType} to module={mod.__name__}", file=sys.stderr, flush=True)
                             mod.incomingEventQueue.put(deepcopy(sfEvent))
 
         finally:

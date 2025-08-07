@@ -90,8 +90,6 @@ class sfp_hashes(SpiderFootPlugin):
             self.results = dict()
 
         hashes = SpiderFootHelpers.extractHashesFromText(eventData)
-        if not hashes:
-            self.debug(f"No hashes found in event data: {eventData[:100]}... (event type: {eventName})")
         for hashtup in hashes:
             hashalgo, hashval = hashtup
 
