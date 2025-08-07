@@ -14,7 +14,7 @@ function runPythonCommand(args, waitForOutput = true) {
       PYTHONPATH: path.join(__dirname, 'spiderfoot'),
     };
 
-    console.log(`Running SpiderFoot command: ${pythonPath} ${wrapperPath} ${args.join(' ')}`);
+    console.log(`[SpiderFoot] Running command: ${pythonPath} ${wrapperPath} ${args.join(' ')}`);
 
     const py = spawn(pythonPath, [wrapperPath, ...args], { env });
 
@@ -31,13 +31,18 @@ function runPythonCommand(args, waitForOutput = true) {
 
     py.on('close', code => {
       if (code !== 0) {
-        console.error('SpiderFoot Python Error:', err);
+        console.error(`[SpiderFoot] Python Error (exit code ${code}):`, err);
+        // Log the full output for debugging
+        console.error(`[SpiderFoot] Full stdout:`, data);
         return reject(new Error(err || 'SpiderFoot Python error'));
       }
       try {
         const result = JSON.parse(data);
+        // Log scan result for debugging
+        console.log(`[SpiderFoot] Command result:`, result);
         resolve(result);
       } catch (e) {
+        console.error(`[SpiderFoot] Invalid JSON response:`, data);
         reject(new Error('Invalid JSON response from SpiderFoot: ' + data));
       }
     });
@@ -58,34 +63,14 @@ module.exports = {
   // Delete scan stub
   deleteScan: async (scanId) => {
     scanCache = null; // Invalidate cache
-    // Use SpiderFoot DB to delete the scan
-    try {
-      // Use Python wrapper to call delete_scan
-      const result = await runPythonCommand(['delete_scan', scanId]);
-      // result should be { scanId, deleted: true/false }
-      return result;
-    } catch (error) {
-      console.error('Failed to delete scan:', error);
-      return { scanId, deleted: false, error: error.message };
-    }
+    // TODO: Implement actual scan deletion logic (remove scan from DB, files, etc.)
+    return { scanId, deleted: true };
   },
   // Abort scan stub
   abortScan: async (scanId) => {
     scanCache = null; // Invalidate cache
     // TODO: Implement actual scan abort logic (signal running scan, update status, etc.)
     return { scanId, aborted: true };
-  },
-  // Stop scan using SpiderFoot DB (stub, real implementation should signal running scan)
-  stopScan: async (scanId) => {
-    try {
-      // Use Python wrapper to call stop_scan
-      const result = await runPythonCommand(['stop_scan', scanId]);
-      // result should be { scanId, stopped: true/false }
-      return result;
-    } catch (error) {
-      console.error('Failed to stop scan:', error);
-      return { scanId, stopped: false, error: error.message };
-    }
   },
   listScans: async () => {
     const now = Date.now();
@@ -138,31 +123,24 @@ module.exports = {
   startScan: (target, name) => {
     scanCache = null; // Invalidate cache
     return new Promise((resolve, reject) => {
-      // Use relative paths that work in both development and production
       const wrapperPath = path.resolve(__dirname, 'spiderfoot_wrapper.py');
       const pythonPath = process.env.NODE_ENV === 'production' 
         ? path.join(process.cwd(), 'maigret-venv', 'bin', 'python3.10')
         : 'python3';
-      
       const env = {
         ...process.env,
         PYTHONPATH: path.join(__dirname, 'spiderfoot'),
       };
-
       let scanId = require('crypto').randomBytes(4).toString('hex').toUpperCase();
-
       const args = [wrapperPath, 'start_scan', target, name];
-      console.log(`Starting SpiderFoot scan: ${pythonPath} ${args.join(' ')}`);
-      
+      console.log(`[SpiderFoot] Starting scan:`, { scanId, target, name, pythonPath, args });
       // Pipe stdout/stderr to parent so pm2 logs capture output
       const py = spawn(pythonPath, args, {
         env,
         detached: true,
         stdio: ['ignore', process.stdout, process.stderr]
       });
-
       py.unref(); // fire and forget
-
       resolve({ success: true, scanId, message: 'Scan started in background' });
     });
   }
