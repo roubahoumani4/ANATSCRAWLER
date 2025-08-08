@@ -833,14 +833,38 @@ def start_scan(target, name):
 # Abort a running scan by setting its status to ABORT-REQUESTED
 def abort_scan(scan_id: str):
     try:
+        import time as _time
         db = SpiderFootDb({'__database': DB_PATH})
         info = db.scanInstanceGet(scan_id)
         if not info:
             print(json.dumps({"success": False, "error": f"Scan {scan_id} not found"}))
             return
-        # Mark scan as abort requested; SpiderFoot workers should respect this and halt
+
+        current_status = info[5] if len(info) > 5 else "UNKNOWN"
+        # If not running, force mark as ABORTED immediately
+        if current_status not in ["RUNNING", "STARTING", "STARTED"]:
+            db.scanInstanceSet(scan_id, "", "", "ABORTED")
+            print(json.dumps({"success": True, "scanId": scan_id, "status": "ABORTED"}))
+            return
+
+        # Mark scan as abort requested; workers should stop shortly
         db.scanInstanceSet(scan_id, "", "", "ABORT-REQUESTED")
-        print(json.dumps({"success": True, "scanId": scan_id, "status": "ABORT-REQUESTED"}))
+
+        # Wait briefly for workers to acknowledge and transition
+        deadline = _time.time() + 8.0
+        final_status = "ABORT-REQUESTED"
+        while _time.time() < deadline:
+            _time.sleep(0.5)
+            cur = db.scanInstanceGet(scan_id)
+            if cur and len(cur) > 5 and cur[5] in ["ABORTED", "FINISHED", "ERROR-FAILED"]:
+                final_status = cur[5]
+                break
+        else:
+            # Force abort if no transition happened
+            db.scanInstanceSet(scan_id, "", "", "ABORTED")
+            final_status = "ABORTED"
+
+        print(json.dumps({"success": True, "scanId": scan_id, "status": final_status}))
     except Exception as e:
         print(json.dumps({"success": False, "error": str(e), "traceback": traceback.format_exc()}))
 
