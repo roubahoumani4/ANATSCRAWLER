@@ -372,10 +372,23 @@ def scan_browse(scan_id):
 def scan_logs(scan_id):
     try:
         db = SpiderFootDb({'__database': DB_PATH})
-        logs = db.scanLogs(scan_id)
-        if not logs:
-            logs = []
-        print(json.dumps(logs))
+        logs = db.scanLogs(scan_id) or []
+        # Convert raw tuples [ts_ms, component, type, message, rowId] into objects the UI expects
+        formatted = []
+        for row in logs:
+            try:
+                ts_ms = int(row[0]) if len(row) > 0 else 0
+                generated = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts_ms / 1000)) if ts_ms else ""
+            except Exception:
+                generated = ""
+            formatted.append({
+                "generated": generated,
+                "component": row[1] if len(row) > 1 else None,
+                "type": row[2] if len(row) > 2 else None,
+                "message": row[3] if len(row) > 3 else None,
+                "rowId": row[4] if len(row) > 4 else None
+            })
+        print(json.dumps(formatted))
     except Exception as e:
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
         print(json.dumps([]))
@@ -817,6 +830,20 @@ def start_scan(target, name):
     except Exception as e:
         print(json.dumps({"success": False, "error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 
+# Abort a running scan by setting its status to ABORT-REQUESTED
+def abort_scan(scan_id: str):
+    try:
+        db = SpiderFootDb({'__database': DB_PATH})
+        info = db.scanInstanceGet(scan_id)
+        if not info:
+            print(json.dumps({"success": False, "error": f"Scan {scan_id} not found"}))
+            return
+        # Mark scan as abort requested; SpiderFoot workers should respect this and halt
+        db.scanInstanceSet(scan_id, "", "", "ABORT-REQUESTED")
+        print(json.dumps({"success": True, "scanId": scan_id, "status": "ABORT-REQUESTED"}))
+    except Exception as e:
+        print(json.dumps({"success": False, "error": str(e), "traceback": traceback.format_exc()}))
+
 # --- Command Handler ---
 if __name__ == "__main__":
     try:
@@ -839,6 +866,7 @@ if __name__ == "__main__":
             case "scan_result_event": scan_result_event(*args)
             case "scan_logs": scan_logs(*args)
             case "delete_scan": delete_scan(*args)
+            case "abort_scan": abort_scan(*args)
             case "start_scan": start_scan(*args)
             case _: print(json.dumps({"error": "Unknown command"})); sys.exit(1)
 

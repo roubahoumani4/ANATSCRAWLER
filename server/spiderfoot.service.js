@@ -3,15 +3,59 @@ const path = require('path');
 
 function runPythonCommand(args, waitForOutput = true) {
   return new Promise((resolve, reject) => {
-    const actualPath = '/var/www/anatscrawler/app/server/spiderfoot/spiderfoot_wrapper.py';
-    const pythonPath = path.join(process.cwd(), 'maigret-venv/bin/python3.10');
+    // Use relative paths that work in both development and production
+    // Try multiple possible wrapper paths (including symbolic links)
+    const possibleWrapperPaths = [
+      path.resolve(__dirname, 'spiderfoot_wrapper.py'),  // Direct path
+      path.resolve(process.cwd(), 'spiderfoot_wrapper.py'),  // Root level (symbolic link)
+      path.resolve(__dirname, 'spiderfoot', 'spiderfoot_wrapper.py'),  // Subdirectory
+    ];
+    
+    let wrapperPath = null;
+    for (const wp of possibleWrapperPaths) {
+      if (require('fs').existsSync(wp)) {
+        wrapperPath = wp;
+        console.log(`[SpiderFoot] Found wrapper path: ${wrapperPath}`);
+        break;
+      }
+    }
+    
+    if (!wrapperPath) {
+      wrapperPath = path.resolve(__dirname, 'spiderfoot_wrapper.py');  // Default fallback
+      console.log(`[SpiderFoot] Using default wrapper path: ${wrapperPath}`);
+    }
+
+    // Check if we're in production and use the correct Python path
+    let pythonPath;
+    if (process.env.NODE_ENV === 'production') {
+      // Try multiple possible Python paths in production
+      const possiblePaths = [
+        path.join(process.cwd(), 'maigret-venv', 'bin', 'python3.10'),  // Based on actual structure
+        path.join(process.cwd(), 'maigret-venv', 'bin', 'python3'),     // Alternative Python version
+        path.join(process.cwd(), 'venv', 'bin', 'python3'),            // Alternative venv
+        'python3.10',
+        'python3',
+        'python'
+      ];
+      
+      // Use the first available Python path
+      pythonPath = possiblePaths[0]; // We'll check availability below
+    } else {
+      pythonPath = 'python3';
+    }
 
     const env = {
       ...process.env,
-      PYTHONPATH: '/var/www/anatscrawler/app/server/spiderfoot',
+      PYTHONPATH: path.join(__dirname, 'spiderfoot'),
     };
 
-    const py = spawn(pythonPath, [actualPath, ...args], { env });
+    console.log(`[SpiderFoot] Running command: ${pythonPath} ${wrapperPath} ${args.join(' ')}`);
+    console.log(`[SpiderFoot] Environment: NODE_ENV=${process.env.NODE_ENV}, cwd=${process.cwd()}`);
+
+    const py = spawn(pythonPath, [wrapperPath, ...args], { 
+      env,
+      cwd: process.cwd() // Ensure we're in the right directory
+    });
 
     if (!waitForOutput) {
       py.unref();
@@ -34,13 +78,17 @@ function runPythonCommand(args, waitForOutput = true) {
     py.on('close', code => {
       console.log(`[SpiderFoot] Process exited with code ${code}`);
       if (code !== 0) {
-        console.error('PYTHON ERROR:', err);
-        return reject(err || 'Python error');
+        console.error(`[SpiderFoot] Python Error (exit code ${code}):`, err);
+        console.error(`[SpiderFoot] Full stdout:`, data);
+        return reject(new Error(err || `SpiderFoot Python error (exit code ${code})`));
       }
       try {
-        resolve(JSON.parse(data));
+        const result = JSON.parse(data);
+        console.log(`[SpiderFoot] Command result:`, result);
+        resolve(result);
       } catch (e) {
-        reject('Invalid JSON: ' + data);
+        console.error(`[SpiderFoot] Invalid JSON response:`, data);
+        reject(new Error('Invalid JSON response from SpiderFoot: ' + data));
       }
     });
 
@@ -135,39 +183,76 @@ module.exports = {
   // Abort scan stub
   abortScan: async (scanId) => {
     scanCache = null; // Invalidate cache
-    // TODO: Implement actual scan abort logic (signal running scan, update status, etc.)
-    return { scanId, aborted: true };
+    try {
+      console.log(`[SpiderFoot] Aborting scan: ${scanId}`);
+      const result = await runPythonCommand(['abort_scan', scanId]);
+      console.log(`[SpiderFoot] Abort scan result:`, result);
+      return result;
+    } catch (error) {
+      console.error(`[SpiderFoot] Error aborting scan ${scanId}:`, error);
+      throw error;
+    }
   },
   listScans: async () => {
-    // Get the basic scan list (array of arrays)
-    const result = await runPythonCommand(['list_scans']);
-    let scans = result.scans || [];
-    // For each scan, fetch correlation summary and append as 9th element
-    // If correlation summary fails, use default empty object
-    const withCorrelations = await Promise.all(scans.map(async (scan) => {
-      let corr = { HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
-      try {
-        const corrResult = await runPythonCommand(['scan_correlation_summary', scan[0]]);
-        if (corrResult && typeof corrResult === 'object') {
-          // Accept both array and object
-          if (Array.isArray(corrResult)) {
-            // Not expected, but fallback
-            corr = { HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
-          } else {
-            corr = {
-              HIGH: corrResult.HIGH || 0,
-              MEDIUM: corrResult.MEDIUM || 0,
-              LOW: corrResult.LOW || 0,
-              INFO: corrResult.INFO || 0
-            };
-          }
-        }
-      } catch (e) {
-        // ignore, use default
+    const now = Date.now();
+    if (scanCache && (now - lastCacheTime < CACHE_TTL_MS)) {
+      return scanCache;
+    }
+    try {
+      console.log('[SpiderFoot] Fetching scan list...');
+      const result = await runPythonCommand(['list_scans']);
+      console.log('[SpiderFoot] Raw scan list result:', result);
+      
+      let scans = [];
+      if (result && result.scans) {
+        scans = Array.isArray(result.scans) ? result.scans : [];
+      } else if (Array.isArray(result)) {
+        scans = result;
       }
-      return [...scan, corr];
-    }));
-    return { scans: withCorrelations };
+      
+      console.log('[SpiderFoot] Found scans:', scans.length);
+      
+      // If no scans, return empty array immediately
+      if (!scans || scans.length === 0) {
+        scanCache = { scans: [] };
+        lastCacheTime = now;
+        console.log('[SpiderFoot] Returning empty scan list');
+        return scanCache;
+      }
+      
+      const withCorrelations = await Promise.all(scans.map(async (scan) => {
+        let corr = { HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
+        try {
+          if (scan && scan[0]) {
+            const corrResult = await runPythonCommand(['scan_correlation_summary', scan[0]]);
+            if (corrResult && typeof corrResult === 'object') {
+              if (Array.isArray(corrResult)) {
+                corr = { HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
+              } else {
+                corr = {
+                  HIGH: corrResult.HIGH || 0,
+                  MEDIUM: corrResult.MEDIUM || 0,
+                  LOW: corrResult.LOW || 0,
+                  INFO: corrResult.INFO || 0
+                };
+              }
+            }
+          }
+        } catch (e) {
+          console.warn(`Failed to get correlation summary for scan ${scan[0]}:`, e.message);
+        }
+        return [...scan, corr];
+      }));
+      
+      scanCache = { scans: withCorrelations };
+      lastCacheTime = now;
+      console.log('[SpiderFoot] Returning scan list with correlations:', scanCache);
+      return scanCache;
+    } catch (error) {
+      console.error('Error in listScans:', error);
+      // Return empty scans array instead of throwing
+      return { scans: [] };
+    }
   },
   scanInfo: (scanId) => runPythonCommand(['scan_info', scanId]),
   scanGraph: (scanId) => runPythonCommand(['scan_graph', scanId]),
@@ -180,26 +265,22 @@ module.exports = {
   listModules: () => runPythonCommand(['list_modules']),
 
   // 🔵 Detached version of scan start (non-blocking)
-  startScan: (target, name) => {
-    scanCache = null; // Invalidate cache
-    return new Promise((resolve, reject) => {
-      const actualPath = '/var/www/anatscrawler/app/server/spiderfoot/spiderfoot_wrapper.py';
-      const pythonPath = path.join(process.cwd(), 'maigret-venv/bin/python3.10');
-      const env = {
-        ...process.env,
-        PYTHONPATH: path.join(__dirname, 'spiderfoot'),
-      };
-      let scanId = require('crypto').randomBytes(4).toString('hex').toUpperCase();
-
-      const args = [actualPath, 'start_scan', target, name];
-      // Pipe stdout/stderr to parent so pm2 logs capture output
-      const py = spawn(pythonPath, args, {
-        env,
-        detached: true,
-        stdio: ['ignore', process.stdout, process.stderr]
-      });
-      py.unref(); // fire and forget
-      resolve({ success: true, scanId, message: 'Scan started in background' });
-    });
+  startScan: async (target, name) => {
+    // Invalidate cache and start scan via wrapper, returning the REAL scanId
+    scanCache = null;
+    try {
+      console.log(`[SpiderFoot] Starting scan via wrapper for target='${target}' name='${name}'`);
+      const result = await runPythonCommand(['start_scan', target, name], true);
+      // Expecting { success: true, scanId, status, message }
+      if (result && result.success && result.scanId) {
+        console.log(`[SpiderFoot] Scan started with scanId=${result.scanId}`);
+        return { success: true, scanId: result.scanId, message: result.message || 'Scan started' };
+      }
+      console.error('[SpiderFoot] Unexpected start_scan response:', result);
+      throw new Error('Unexpected start_scan response');
+    } catch (error) {
+      console.error('[SpiderFoot] Failed to start scan:', error);
+      throw error;
+    }
   }
 };
