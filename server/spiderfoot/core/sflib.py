@@ -386,7 +386,7 @@ class SpiderFoot:
             return None
 
         for mod in opts['__modules__']:
-            if 'opts' not in opts['__modules__'][mod]:
+            if 'opts' not in opts['__modules__'][mod] or not isinstance(opts['__modules__'][mod]['opts'], dict):
                 continue
             for opt in opts['__modules__'][mod]['opts']:
                 if opt.startswith('_') and filterSystem:

@@ -1860,3 +1860,67 @@ class SpiderFootDb:
                     raise IOError("Unable to create correlation result in database") from e
 
         return uniqueId
+
+    def scanGraph(self, instanceId: str) -> list:
+        """Get graph data for a scan.
+
+        Args:
+            instanceId (str): scan instance ID
+
+        Returns:
+            list: graph data
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(f"instanceId is {type(instanceId)}; expected str()") from None
+
+        if not instanceId:
+            raise ValueError("instanceId is empty") from None
+
+        qry = """
+            SELECT DISTINCT 
+                c.hash as 'id',
+                c.data as 'label',
+                c.type as 'type',
+                c.module as 'module',
+                c.confidence as 'confidence',
+                c.visibility as 'visibility',
+                c.risk as 'risk',
+                c.source_event_hash as 'source',
+                s.data as 'source_data',
+                s.type as 'source_type'
+            FROM tbl_scan_results c
+            LEFT JOIN tbl_scan_results s ON c.source_event_hash = s.hash
+            WHERE c.scan_instance_id = ? AND c.type <> 'ROOT'
+            ORDER BY c.generated
+        """
+
+        with self.dbhLock:
+            if self.dbh is None:
+                raise IOError("Database handle is not initialized.")
+            try:
+                self.dbh.execute(qry, [instanceId])
+                results = self.dbh.fetchall()
+                
+                # Convert to graph format
+                graph_data = []
+                for row in results:
+                    graph_data.append({
+                        'id': row[0],
+                        'label': row[1],
+                        'type': row[2],
+                        'module': row[3],
+                        'confidence': row[4],
+                        'visibility': row[5],
+                        'risk': row[6],
+                        'source': row[7],
+                        'source_data': row[8],
+                        'source_type': row[9]
+                    })
+                
+                return graph_data
+            except sqlite3.Error as e:
+                raise IOError("SQL error encountered when fetching graph data") from e
