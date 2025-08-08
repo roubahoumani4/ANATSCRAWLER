@@ -23,12 +23,27 @@ def test_environment():
             "modules_dir": os.path.join(os.path.dirname(os.path.abspath(__file__)), "modules")
         },
         "path_exists": {},
-        "imports": {}
+        "imports": {},
+        "symbolic_links": {}
     }
     
     # Check if paths exist
     for name, path in results["paths"].items():
         results["path_exists"][name] = os.path.exists(path)
+    
+    # Check for symbolic links (based on actual structure)
+    symbolic_links = [
+        ("/var/www/anatscrawler/modules", "modules symlink"),
+        ("/var/www/anatscrawler/spiderfoot_wrapper.py", "wrapper symlink"),
+        ("/var/www/anatscrawler/spiderfoot.db", "database file")
+    ]
+    
+    for link_path, description in symbolic_links:
+        results["symbolic_links"][description] = {
+            "exists": os.path.exists(link_path),
+            "is_link": os.path.islink(link_path) if os.path.exists(link_path) else False,
+            "real_path": os.path.realpath(link_path) if os.path.exists(link_path) else None
+        }
     
     # Test imports
     try:

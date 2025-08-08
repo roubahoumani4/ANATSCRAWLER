@@ -6,24 +6,43 @@ import traceback
 # --- Path Setup ---
 WRAPPER_DIR = os.path.abspath(os.path.dirname(__file__))
 SPIDERFOOT_CORE = os.path.join(WRAPPER_DIR, "core")
-MODULES_DIR = os.path.join(WRAPPER_DIR, "modules")
+
+# Try multiple possible module paths (including symbolic links)
+possible_module_paths = [
+    os.path.join(WRAPPER_DIR, "modules"),  # Direct modules directory
+    "/var/www/anatscrawler/modules",       # Symbolic link location (as shown in image)
+    os.path.join(os.getcwd(), "modules"),  # Current working directory modules
+    "modules"                              # Relative path
+]
+
+MODULES_DIR = None
+for path in possible_module_paths:
+    if os.path.exists(path):
+        MODULES_DIR = path
+        print(f"[DEBUG] Found modules directory: {path}", file=sys.stderr)
+        break
+
+if not MODULES_DIR:
+    MODULES_DIR = os.path.join(WRAPPER_DIR, "modules")  # Default fallback
 
 # Try multiple possible database paths
 possible_db_paths = [
-    "/var/www/anatscrawler/app/spiderfoot.db",
-    os.path.join(WRAPPER_DIR, "spiderfoot.db"),
-    os.path.join(os.getcwd(), "spiderfoot.db"),
-    "spiderfoot.db"
+    "/var/www/anatscrawler/spiderfoot.db",  # Root level (as shown in the image)
+    "/var/www/anatscrawler/app/spiderfoot.db",  # App subdirectory
+    os.path.join(WRAPPER_DIR, "spiderfoot.db"),  # Wrapper directory
+    os.path.join(os.getcwd(), "spiderfoot.db"),  # Current working directory
+    "spiderfoot.db"  # Relative path
 ]
 
 DB_PATH = None
 for path in possible_db_paths:
     if os.path.exists(path) or os.path.exists(os.path.dirname(path)):
         DB_PATH = path
+        print(f"[DEBUG] Found database path: {path}", file=sys.stderr)
         break
 
 if not DB_PATH:
-    DB_PATH = "/var/www/anatscrawler/app/spiderfoot.db"  # Default fallback
+    DB_PATH = "/var/www/anatscrawler/spiderfoot.db"  # Default fallback based on actual structure
 
 # Show paths (debugging)
 print("PYTHONPATH:", sys.path, file=sys.stderr)
@@ -66,18 +85,41 @@ def list_modules():
 def list_scans():
     try:
         print(f"[DEBUG] Using database path: {DB_PATH}", file=sys.stderr)
+        
+        # Check if database directory exists
+        db_dir = os.path.dirname(DB_PATH)
+        if not os.path.exists(db_dir):
+            print(f"[DEBUG] Creating database directory: {db_dir}", file=sys.stderr)
+            try:
+                os.makedirs(db_dir, exist_ok=True)
+            except Exception as dir_error:
+                print(f"[DEBUG] Failed to create database directory: {dir_error}", file=sys.stderr)
+        
         db = SpiderFootDb({'__database': DB_PATH})
         
         # Try to create the database if it doesn't exist
         try:
             db.create()
+            print(f"[DEBUG] Database created/initialized successfully", file=sys.stderr)
         except Exception as create_error:
             print(f"[DEBUG] Database creation error (non-critical): {create_error}", file=sys.stderr)
         
-        scans = db.scanInstanceList()
-        print(f"[DEBUG] Found {len(scans) if scans else 0} scans", file=sys.stderr)
-        print(json.dumps({"scans": scans}))
+        try:
+            scans = db.scanInstanceList()
+            print(f"[DEBUG] Found {len(scans) if scans else 0} scans", file=sys.stderr)
+            
+            # If no scans, return empty array
+            if not scans:
+                print(json.dumps({"scans": []}))
+            else:
+                print(json.dumps({"scans": scans}))
+                
+        except Exception as scan_error:
+            print(f"[DEBUG] Error getting scan list: {scan_error}", file=sys.stderr)
+            print(json.dumps({"scans": []}))
+            
     except Exception as e:
+        print(f"[DEBUG] Critical error in list_scans: {e}", file=sys.stderr)
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 
 def scan_info(scan_id):

@@ -4,16 +4,35 @@ const path = require('path');
 function runPythonCommand(args, waitForOutput = true) {
   return new Promise((resolve, reject) => {
     // Use relative paths that work in both development and production
-    const wrapperPath = path.resolve(__dirname, 'spiderfoot_wrapper.py');
+    // Try multiple possible wrapper paths (including symbolic links)
+    const possibleWrapperPaths = [
+      path.resolve(__dirname, 'spiderfoot_wrapper.py'),  // Direct path
+      path.resolve(process.cwd(), 'spiderfoot_wrapper.py'),  // Root level (symbolic link)
+      path.resolve(__dirname, 'spiderfoot', 'spiderfoot_wrapper.py'),  // Subdirectory
+    ];
     
+    let wrapperPath = null;
+    for (const wp of possibleWrapperPaths) {
+      if (require('fs').existsSync(wp)) {
+        wrapperPath = wp;
+        console.log(`[SpiderFoot] Found wrapper path: ${wrapperPath}`);
+        break;
+      }
+    }
+    
+    if (!wrapperPath) {
+      wrapperPath = path.resolve(__dirname, 'spiderfoot_wrapper.py');  // Default fallback
+      console.log(`[SpiderFoot] Using default wrapper path: ${wrapperPath}`);
+    }
+
     // Check if we're in production and use the correct Python path
     let pythonPath;
     if (process.env.NODE_ENV === 'production') {
       // Try multiple possible Python paths in production
       const possiblePaths = [
-        path.join(process.cwd(), 'maigret-venv', 'bin', 'python3.10'),
-        path.join(process.cwd(), 'maigret-venv', 'bin', 'python3'),
-        path.join(process.cwd(), 'venv', 'bin', 'python3'),
+        path.join(process.cwd(), 'maigret-venv', 'bin', 'python3.10'),  // Based on actual structure
+        path.join(process.cwd(), 'maigret-venv', 'bin', 'python3'),     // Alternative Python version
+        path.join(process.cwd(), 'venv', 'bin', 'python3'),            // Alternative venv
         'python3.10',
         'python3',
         'python'
@@ -170,23 +189,39 @@ module.exports = {
       const result = await runPythonCommand(['list_scans']);
       console.log('[SpiderFoot] Raw scan list result:', result);
       
-      let scans = result.scans || [];
+      let scans = [];
+      if (result && result.scans) {
+        scans = Array.isArray(result.scans) ? result.scans : [];
+      } else if (Array.isArray(result)) {
+        scans = result;
+      }
+      
       console.log('[SpiderFoot] Found scans:', scans.length);
+      
+      // If no scans, return empty array immediately
+      if (!scans || scans.length === 0) {
+        scanCache = { scans: [] };
+        lastCacheTime = now;
+        console.log('[SpiderFoot] Returning empty scan list');
+        return scanCache;
+      }
       
       const withCorrelations = await Promise.all(scans.map(async (scan) => {
         let corr = { HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
         try {
-          const corrResult = await runPythonCommand(['scan_correlation_summary', scan[0]]);
-          if (corrResult && typeof corrResult === 'object') {
-            if (Array.isArray(corrResult)) {
-              corr = { HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
-            } else {
-              corr = {
-                HIGH: corrResult.HIGH || 0,
-                MEDIUM: corrResult.MEDIUM || 0,
-                LOW: corrResult.LOW || 0,
-                INFO: corrResult.INFO || 0
-              };
+          if (scan && scan[0]) {
+            const corrResult = await runPythonCommand(['scan_correlation_summary', scan[0]]);
+            if (corrResult && typeof corrResult === 'object') {
+              if (Array.isArray(corrResult)) {
+                corr = { HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
+              } else {
+                corr = {
+                  HIGH: corrResult.HIGH || 0,
+                  MEDIUM: corrResult.MEDIUM || 0,
+                  LOW: corrResult.LOW || 0,
+                  INFO: corrResult.INFO || 0
+                };
+              }
             }
           }
         } catch (e) {

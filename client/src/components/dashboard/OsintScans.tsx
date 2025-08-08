@@ -27,7 +27,21 @@ const OsintScans = () => {
     setLoading(true);
     console.log('[OsintScans] Fetching scans from:', `${API_BASE}/scanlist`);
     
-    fetch(`${API_BASE}/scanlist`)
+    // First, test if the API is working
+    fetch(`${API_BASE}/health`)
+      .then(res => {
+        console.log('[OsintScans] Health check status:', res.status);
+        if (!res.ok) {
+          throw new Error(`Health check failed: HTTP ${res.status}`);
+        }
+        return res.json();
+      })
+      .then(healthData => {
+        console.log('[OsintScans] Health check result:', healthData);
+        
+        // Now fetch the actual scan list
+        return fetch(`${API_BASE}/scanlist`);
+      })
       .then(res => {
         console.log('[OsintScans] Response status:', res.status);
         if (!res.ok) {

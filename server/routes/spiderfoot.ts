@@ -1,6 +1,21 @@
 import express from "express";
 const router = express.Router();
 const spiderfoot = require("../spiderfoot.service");
+const path = require('path');
+
+// Health check endpoint for SpiderFoot
+router.get("/health", async (req, res) => {
+  try {
+    res.json({
+      status: "SpiderFoot API is running",
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      wrapperPath: path.resolve(__dirname, '../spiderfoot/spiderfoot_wrapper.py')
+    });
+  } catch (e) {
+    res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
+  }
+});
 
 // Test endpoint to debug SpiderFoot integration
 router.get("/test", async (req, res) => {
@@ -9,7 +24,6 @@ router.get("/test", async (req, res) => {
     
     // Test 1: Check if Python wrapper is accessible
     const { spawn } = require('child_process');
-    const path = require('path');
     const wrapperPath = path.resolve(__dirname, '../spiderfoot/spiderfoot_wrapper.py');
     
     console.log("[SpiderFoot] Wrapper path:", wrapperPath);
