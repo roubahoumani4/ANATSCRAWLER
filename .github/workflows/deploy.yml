@@ -110,7 +110,9 @@ jobs:
             fi
             source maigret-venv/bin/activate
             pip install --upgrade pip
+            # Ensure required Python deps for SpiderFoot integration
             pip install networkx
+            pip install --upgrade beautifulsoup4
             deactivate
             # Restart PM2 cleanly for new deployment
             pm2 delete anatscrawler || true

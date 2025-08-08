@@ -44,9 +44,29 @@ function runPythonCommand(args, waitForOutput = true) {
       pythonPath = 'python3';
     }
 
+    // Build PYTHONPATH to include SpiderFoot directory and venv site-packages (if present)
+    const spiderfootDir = path.join(__dirname, 'spiderfoot');
+    let sitePackagesPath = '';
+    try {
+      const venvLibDir = path.join(process.cwd(), 'maigret-venv', 'lib');
+      const fs = require('fs');
+      if (fs.existsSync(venvLibDir)) {
+        const entries = fs.readdirSync(venvLibDir, { withFileTypes: true });
+        const pyDir = entries.find((e) => e.isDirectory() && e.name.startsWith('python'));
+        if (pyDir) {
+          const candidate = path.join(venvLibDir, pyDir.name, 'site-packages');
+          if (fs.existsSync(candidate)) sitePackagesPath = candidate;
+        }
+      }
+    } catch (_) {
+      // ignore, fallback to spiderfootDir only
+    }
+
     const env = {
       ...process.env,
-      PYTHONPATH: path.join(__dirname, 'spiderfoot'),
+      PYTHONPATH: [spiderfootDir, sitePackagesPath, process.env.PYTHONPATH]
+        .filter(Boolean)
+        .join(path.delimiter),
     };
 
     console.log(`[SpiderFoot] Running command: ${pythonPath} ${wrapperPath} ${args.join(' ')}`);
@@ -119,9 +139,27 @@ module.exports = {
         ? path.join(process.cwd(), 'maigret-venv', 'bin', 'python3.10')
         : 'python3';
       
+      // Build PYTHONPATH similar to runtime
+      const spiderfootDir = path.join(__dirname, 'spiderfoot');
+      let sitePackagesPath = '';
+      try {
+        const venvLibDir = path.join(process.cwd(), 'maigret-venv', 'lib');
+        const fs = require('fs');
+        if (fs.existsSync(venvLibDir)) {
+          const entries = fs.readdirSync(venvLibDir, { withFileTypes: true });
+          const pyDir = entries.find((e) => e.isDirectory() && e.name.startsWith('python'));
+          if (pyDir) {
+            const candidate = path.join(venvLibDir, pyDir.name, 'site-packages');
+            if (fs.existsSync(candidate)) sitePackagesPath = candidate;
+          }
+        }
+      } catch (_) {}
+
       const env = {
         ...process.env,
-        PYTHONPATH: path.join(__dirname, 'spiderfoot'),
+        PYTHONPATH: [spiderfootDir, sitePackagesPath, process.env.PYTHONPATH]
+          .filter(Boolean)
+          .join(path.delimiter),
       };
       
       return new Promise((resolve, reject) => {
