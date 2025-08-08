@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useRoute, useLocation } from "wouter";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LabelList
@@ -25,52 +25,60 @@ const ScanDetailsPage = () => {
   const [scanLog, setScanLog] = useState<string>("");
   const [graphData, setGraphData] = useState<any>(null);
   const [correlations, setCorrelations] = useState<any>(null);
+  const [refreshIntervalMs, setRefreshIntervalMs] = useState<number>(5000);
+
+  const fetchScanData = useCallback(async () => {
+    try {
+      const [status, summary, correlations, browse, graph, logs] = await Promise.all([
+        fetch(`/api/spiderfoot/scan/${scanId}/status`).then(res => res.json()).catch(() => null),
+        fetch(`/api/spiderfoot/scan/${scanId}/summary`).then(res => res.json()).catch(() => []),
+        fetch(`/api/spiderfoot/scan/${scanId}/correlationsummary`).then(res => res.json()).catch(() => []),
+        fetch(`/api/spiderfoot/scan/${scanId}/browse`).then(res => res.json()).catch(() => []),
+        fetch(`/api/spiderfoot/scan/${scanId}/graph`).then(res => res.json()).catch(() => []),
+        fetch(`/api/spiderfoot/scan/${scanId}/logs`).then(res => res.json()).catch(() => [])
+      ]);
+
+      setScanStatus(status);
+      setScanResults({ summary, correlations, browse, graph });
+      setCorrelations(correlations);
+      setGraphData(graph);
+      
+      // Format logs properly
+      let formattedLogs = "";
+      if (Array.isArray(logs)) {
+        formattedLogs = logs.map(l => {
+          if (typeof l === 'string') return l;
+          if (typeof l === 'object' && l.generated) {
+            return `${l.generated} [${l.component || 'SYSTEM'}] ${l.type || 'INFO'}: ${l.message || ''}`;
+          }
+          return JSON.stringify(l);
+        }).join('\n');
+      } else if (typeof logs === 'string') {
+        formattedLogs = logs;
+      }
+      setScanLog(formattedLogs);
+      
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching scan data:', error);
+      setError("Failed to load scan details");
+      setLoading(false);
+    }
+  }, [scanId]);
 
   useEffect(() => {
     setLoading(true);
     setError(null);
-    
-    const fetchScanData = async () => {
-      try {
-        const [status, summary, correlations, browse, graph, logs] = await Promise.all([
-          fetch(`/api/spiderfoot/scan/${scanId}/status`).then(res => res.json()).catch(() => null),
-          fetch(`/api/spiderfoot/scan/${scanId}/summary`).then(res => res.json()).catch(() => []),
-          fetch(`/api/spiderfoot/scan/${scanId}/correlationsummary`).then(res => res.json()).catch(() => []),
-          fetch(`/api/spiderfoot/scan/${scanId}/browse`).then(res => res.json()).catch(() => []),
-          fetch(`/api/spiderfoot/scan/${scanId}/graph`).then(res => res.json()).catch(() => []),
-          fetch(`/api/spiderfoot/scan/${scanId}/logs`).then(res => res.json()).catch(() => [])
-        ]);
-
-        setScanStatus(status);
-        setScanResults({ summary, correlations, browse, graph });
-        setCorrelations(correlations);
-        setGraphData(graph);
-        
-        // Format logs properly
-        let formattedLogs = "";
-        if (Array.isArray(logs)) {
-          formattedLogs = logs.map(l => {
-            if (typeof l === 'string') return l;
-            if (typeof l === 'object' && l.generated) {
-              return `${l.generated} [${l.component || 'SYSTEM'}] ${l.type || 'INFO'}: ${l.message || ''}`;
-            }
-            return JSON.stringify(l);
-          }).join('\n');
-        } else if (typeof logs === 'string') {
-          formattedLogs = logs;
-        }
-        setScanLog(formattedLogs);
-        
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching scan data:', error);
-        setError("Failed to load scan details");
-        setLoading(false);
-      }
-    };
-
     fetchScanData();
-  }, [scanId]);
+  }, [scanId, fetchScanData]);
+
+  useEffect(() => {
+    if (!refreshIntervalMs) return;
+    const id = setInterval(() => {
+      fetchScanData();
+    }, refreshIntervalMs);
+    return () => clearInterval(id);
+  }, [refreshIntervalMs, fetchScanData]);
 
   if (loading) return <div className="p-8">Loading scan details...</div>;
   if (error) return <div className="p-8 text-red-400">{error}</div>;
@@ -114,16 +122,30 @@ const ScanDetailsPage = () => {
         <button className="text-blue-400 underline" onClick={() => navigate("/osint-engine/scans") }>&larr; Back</button>
         <h1 className="text-2xl font-bold">{scanStatus.name || scanStatus.target} <span className="ml-2 text-xs font-semibold text-yellow-400">{scanStatus.status}</span></h1>
       </div>
-      <div className="flex gap-2 mb-6">
-        {TABS.map(t => (
-          <button
-            key={t}
-            className={`px-4 py-2 rounded ${tab === t ? 'bg-blue-600 text-white' : 'bg-gray-700 text-coolWhite'}`}
-            onClick={() => setTab(t)}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex gap-2">
+          {TABS.map(t => (
+            <button
+              key={t}
+              className={`px-4 py-2 rounded ${tab === t ? 'bg-blue-600 text-white' : 'bg-gray-700 text-coolWhite'}`}
+              onClick={() => setTab(t)}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+        <div className="ml-4 flex items-center gap-2">
+          <span className="text-xs text-gray-400">Auto-refresh:</span>
+          <select
+            className="bg-gray-700 text-coolWhite text-xs px-2 py-1 rounded"
+            value={refreshIntervalMs}
+            onChange={(e) => setRefreshIntervalMs(Number(e.target.value))}
           >
-            {t}
-          </button>
-        ))}
+            <option value={0}>Off</option>
+            <option value={5000}>5s</option>
+            <option value={10000}>10s</option>
+          </select>
+        </div>
       </div>
       {tab === "Summary" && (
         <div>
