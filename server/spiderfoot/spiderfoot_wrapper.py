@@ -7,11 +7,29 @@ import traceback
 WRAPPER_DIR = os.path.abspath(os.path.dirname(__file__))
 SPIDERFOOT_CORE = os.path.join(WRAPPER_DIR, "core")
 MODULES_DIR = os.path.join(WRAPPER_DIR, "modules")
-DB_PATH = "/var/www/anatscrawler/app/spiderfoot.db"
+
+# Try multiple possible database paths
+possible_db_paths = [
+    "/var/www/anatscrawler/app/spiderfoot.db",
+    os.path.join(WRAPPER_DIR, "spiderfoot.db"),
+    os.path.join(os.getcwd(), "spiderfoot.db"),
+    "spiderfoot.db"
+]
+
+DB_PATH = None
+for path in possible_db_paths:
+    if os.path.exists(path) or os.path.exists(os.path.dirname(path)):
+        DB_PATH = path
+        break
+
+if not DB_PATH:
+    DB_PATH = "/var/www/anatscrawler/app/spiderfoot.db"  # Default fallback
 
 # Show paths (debugging)
 print("PYTHONPATH:", sys.path, file=sys.stderr)
 print("MODULES_DIR:", MODULES_DIR, file=sys.stderr)
+print("DB_PATH:", DB_PATH, file=sys.stderr)
+print("CWD:", os.getcwd(), file=sys.stderr)
 
 # Ensure importable paths
 for path in [WRAPPER_DIR, SPIDERFOOT_CORE, MODULES_DIR]:
@@ -26,7 +44,13 @@ try:
 except ImportError as e:
     print(json.dumps({
         "error": "Failed to import SpiderFoot modules",
-        "details": str(e)
+        "details": str(e),
+        "paths": {
+            "wrapper_dir": WRAPPER_DIR,
+            "core_dir": SPIDERFOOT_CORE,
+            "modules_dir": MODULES_DIR,
+            "sys_path": sys.path
+        }
     }), file=sys.stderr, flush=True)
     sys.exit(1)
 
@@ -41,8 +65,17 @@ def list_modules():
 
 def list_scans():
     try:
+        print(f"[DEBUG] Using database path: {DB_PATH}", file=sys.stderr)
         db = SpiderFootDb({'__database': DB_PATH})
+        
+        # Try to create the database if it doesn't exist
+        try:
+            db.create()
+        except Exception as create_error:
+            print(f"[DEBUG] Database creation error (non-critical): {create_error}", file=sys.stderr)
+        
         scans = db.scanInstanceList()
+        print(f"[DEBUG] Found {len(scans) if scans else 0} scans", file=sys.stderr)
         print(json.dumps({"scans": scans}))
     except Exception as e:
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)

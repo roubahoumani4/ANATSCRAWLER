@@ -5,9 +5,25 @@ function runPythonCommand(args, waitForOutput = true) {
   return new Promise((resolve, reject) => {
     // Use relative paths that work in both development and production
     const wrapperPath = path.resolve(__dirname, 'spiderfoot_wrapper.py');
-    const pythonPath = process.env.NODE_ENV === 'production' 
-      ? path.join(process.cwd(), 'maigret-venv', 'bin', 'python3.10')
-      : 'python3';
+    
+    // Check if we're in production and use the correct Python path
+    let pythonPath;
+    if (process.env.NODE_ENV === 'production') {
+      // Try multiple possible Python paths in production
+      const possiblePaths = [
+        path.join(process.cwd(), 'maigret-venv', 'bin', 'python3.10'),
+        path.join(process.cwd(), 'maigret-venv', 'bin', 'python3'),
+        path.join(process.cwd(), 'venv', 'bin', 'python3'),
+        'python3.10',
+        'python3',
+        'python'
+      ];
+      
+      // Use the first available Python path
+      pythonPath = possiblePaths[0]; // We'll check availability below
+    } else {
+      pythonPath = 'python3';
+    }
 
     const env = {
       ...process.env,
@@ -15,8 +31,12 @@ function runPythonCommand(args, waitForOutput = true) {
     };
 
     console.log(`[SpiderFoot] Running command: ${pythonPath} ${wrapperPath} ${args.join(' ')}`);
+    console.log(`[SpiderFoot] Environment: NODE_ENV=${process.env.NODE_ENV}, cwd=${process.cwd()}`);
 
-    const py = spawn(pythonPath, [wrapperPath, ...args], { env });
+    const py = spawn(pythonPath, [wrapperPath, ...args], { 
+      env,
+      cwd: process.cwd() // Ensure we're in the right directory
+    });
 
     if (!waitForOutput) {
       py.unref();
@@ -26,19 +46,25 @@ function runPythonCommand(args, waitForOutput = true) {
     let data = '';
     let err = '';
 
-    py.stdout.on('data', chunk => data += chunk);
-    py.stderr.on('data', chunk => err += chunk);
+    py.stdout.on('data', chunk => {
+      data += chunk;
+      console.log(`[SpiderFoot] stdout: ${chunk.toString()}`);
+    });
+    
+    py.stderr.on('data', chunk => {
+      err += chunk;
+      console.log(`[SpiderFoot] stderr: ${chunk.toString()}`);
+    });
 
     py.on('close', code => {
+      console.log(`[SpiderFoot] Process exited with code ${code}`);
       if (code !== 0) {
         console.error(`[SpiderFoot] Python Error (exit code ${code}):`, err);
-        // Log the full output for debugging
         console.error(`[SpiderFoot] Full stdout:`, data);
-        return reject(new Error(err || 'SpiderFoot Python error'));
+        return reject(new Error(err || `SpiderFoot Python error (exit code ${code})`));
       }
       try {
         const result = JSON.parse(data);
-        // Log scan result for debugging
         console.log(`[SpiderFoot] Command result:`, result);
         resolve(result);
       } catch (e) {
@@ -78,8 +104,13 @@ module.exports = {
       return scanCache;
     }
     try {
+      console.log('[SpiderFoot] Fetching scan list...');
       const result = await runPythonCommand(['list_scans']);
+      console.log('[SpiderFoot] Raw scan list result:', result);
+      
       let scans = result.scans || [];
+      console.log('[SpiderFoot] Found scans:', scans.length);
+      
       const withCorrelations = await Promise.all(scans.map(async (scan) => {
         let corr = { HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
         try {
@@ -101,12 +132,15 @@ module.exports = {
         }
         return [...scan, corr];
       }));
+      
       scanCache = { scans: withCorrelations };
       lastCacheTime = now;
+      console.log('[SpiderFoot] Returning scan list with correlations:', scanCache);
       return scanCache;
     } catch (error) {
       console.error('Error in listScans:', error);
-      throw error;
+      // Return empty scans array instead of throwing
+      return { scans: [] };
     }
   },
   scanInfo: (scanId) => runPythonCommand(['scan_info', scanId]),

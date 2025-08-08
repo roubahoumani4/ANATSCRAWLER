@@ -3,6 +3,40 @@
 ## Overview
 This project is a full-stack web application for ANAT Security, focusing on credential search and user management. It uses a React frontend with a Node.js/Express backend, connected to MongoDB. The application follows a modern architecture with component-based UI design using Shadcn UI components and implements features like authentication, dark/light theme switching, and multilingual support.
 
+## 🚨 CRITICAL DEPLOYMENT CONSIDERATIONS
+
+**IMPORTANT**: This project deploys to a remote VM environment. Every change must consider deployment implications.
+
+### Quick Reference
+- **Application Server**: 192.168.1.105 (Internal) / 46.165.254.175:50103 (External SSH)
+- **Database Server**: 192.168.1.110 (MongoDB, Redis, Elasticsearch)
+- **Deployment User**: `ituu`
+- **Deployment Directory**: `/var/www/anatscrawler/app`
+- **CI/CD**: GitHub Actions on push to `main` branch
+
+### Before Making Changes
+1. **Check Deployment Checklist**: See `docs/DEPLOYMENT_CONSIDERATIONS.md`
+2. **Test Locally**: Always test changes locally before pushing
+3. **Consider Environment**: Changes affect remote VM, not local machine
+4. **Update Documentation**: Document any new deployment requirements
+
+### Key Deployment Files
+- **CI/CD Pipeline**: `.github/workflows/deploy.yml`
+- **Deployment Scripts**: `scripts/prod.sh`, `scripts/validate-deployment.sh`
+- **Configuration**: `ecosystem.config.cjs`, `docs/nginx-anatscrawler.conf`
+
+### Validation Commands
+```bash
+# After deployment, validate:
+pm2 ls
+curl http://192.168.1.105:5000/api/health
+./scripts/validate-deployment.sh
+```
+
+**For detailed deployment considerations, see: [`docs/DEPLOYMENT_CONSIDERATIONS.md`](DEPLOYMENT_CONSIDERATIONS.md)**
+
+---
+
 ## Deployment History
 
 ### Recent Deployments
