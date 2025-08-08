@@ -167,11 +167,18 @@ module.exports = {
     }
   },
 
-  // Delete scan stub
+  // Delete scan
   deleteScan: async (scanId) => {
     scanCache = null; // Invalidate cache
-    // TODO: Implement actual scan deletion logic (remove scan from DB, files, etc.)
-    return { scanId, deleted: true };
+    try {
+      console.log(`[SpiderFoot] Deleting scan: ${scanId}`);
+      const result = await runPythonCommand(['delete_scan', scanId]);
+      console.log(`[SpiderFoot] Delete scan result:`, result);
+      return result;
+    } catch (error) {
+      console.error(`[SpiderFoot] Error deleting scan ${scanId}:`, error);
+      throw error;
+    }
   },
   // Abort scan stub
   abortScan: async (scanId) => {

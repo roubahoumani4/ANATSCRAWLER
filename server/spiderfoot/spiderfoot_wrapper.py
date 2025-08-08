@@ -2,6 +2,7 @@ import sys
 import json
 import os
 import traceback
+import time
 
 # --- Path Setup ---
 WRAPPER_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -111,10 +112,62 @@ def list_scans():
             print(f"[DEBUG] Database creation warning: {create_error}", file=sys.stderr)
         
         scans = db.scanInstanceList()
+        processed_scans = []
+        
         if scans:
-            print(json.dumps({"scans": scans}))
-        else:
-            print(json.dumps({"scans": []}))
+            for scan in scans:
+                # scan structure: [guid, name, seed_target, created, started, ended, status, count]
+                scan_id = scan[0]
+                name = scan[1]
+                target = scan[2]
+                created = scan[3]
+                started = scan[4] if scan[4] and scan[4] != 0 else None
+                ended = scan[5] if scan[5] and scan[5] != 0 else None
+                status = scan[6]
+                elements = scan[7] if isinstance(scan[7], int) else 0
+                
+                # Get correlation summary for this scan
+                correlations = {"HIGH": 0, "MEDIUM": 0, "LOW": 0, "INFO": 0}
+                try:
+                    correlation_summary = db.scanCorrelationSummary(scan_id, by="risk")
+                    if correlation_summary:
+                        for corr in correlation_summary:
+                            if len(corr) >= 2:
+                                risk_level = corr[0].upper()
+                                count = corr[1] if isinstance(corr[1], int) else 0
+                                if risk_level in correlations:
+                                    correlations[risk_level] = count
+                except Exception as corr_error:
+                    print(f"[DEBUG] Error getting correlations for scan {scan_id}: {corr_error}", file=sys.stderr)
+                
+                # Convert timestamps to proper format
+                started_str = None
+                if started:
+                    try:
+                        started_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(started))
+                    except:
+                        started_str = str(started)
+                
+                ended_str = None
+                if ended:
+                    try:
+                        ended_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ended))
+                    except:
+                        ended_str = str(ended)
+                
+                processed_scan = [
+                    scan_id,           # scan_id
+                    name,              # name
+                    target,            # target
+                    started_str,       # started
+                    ended_str,         # finished
+                    status,            # status
+                    elements,          # elements
+                    correlations       # correlations
+                ]
+                processed_scans.append(processed_scan)
+        
+        print(json.dumps({"scans": processed_scans}))
     except Exception as e:
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 
@@ -182,14 +235,50 @@ def scan_logs(scan_id):
     except Exception as e:
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 
+def delete_scan(scan_id):
+    try:
+        db = SpiderFootDb({'__database': DB_PATH})
+        
+        # Check if scan exists
+        scan_info = db.scanInstanceGet(scan_id)
+        if not scan_info:
+            print(json.dumps({"success": False, "error": f"Scan {scan_id} does not exist"}))
+            return
+        
+        # Check if scan is running
+        if scan_info[5] in ["RUNNING", "STARTING", "STARTED"]:
+            print(json.dumps({"success": False, "error": f"Scan {scan_id} is {scan_info[5]}. You cannot delete running scans."}))
+            return
+        
+        # Delete the scan
+        db.scanInstanceDelete(scan_id)
+        print(json.dumps({"success": True, "message": f"Scan {scan_id} deleted successfully"}))
+        
+    except Exception as e:
+        print(json.dumps({"success": False, "error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
+
 def run_scan_in_process(logging_queue, scan_name, scan_id, target, target_type, module_list, config):
     """Run a scan in a separate process - this is the target function for multiprocessing"""
     try:
         import time
         print(f"[PROCESS] Starting scan {scan_id} in separate process", file=sys.stderr)
+        print(f"[PROCESS] Target: {target}, Type: {target_type}", file=sys.stderr)
+        print(f"[PROCESS] Modules: {module_list}", file=sys.stderr)
+        
+        # Ensure the modules directory is in the Python path for this process
+        if MODULES_DIR not in sys.path:
+            sys.path.insert(0, MODULES_DIR)
+        if WRAPPER_DIR not in sys.path:
+            sys.path.insert(0, WRAPPER_DIR)
+        if SPIDERFOOT_CORE not in sys.path:
+            sys.path.insert(0, SPIDERFOOT_CORE)
+        
+        print(f"[PROCESS] Python path: {sys.path[:3]}", file=sys.stderr)
         
         # Use the startSpiderFootScanner function which is designed for multiprocessing
         scanner = startSpiderFootScanner(logging_queue, scan_name, scan_id, target, target_type, module_list, config)
+        
+        print(f"[PROCESS] Scanner created successfully", file=sys.stderr)
         
         # Wait for the scan to complete by polling the status
         db = SpiderFootDb({'__database': DB_PATH})
@@ -254,7 +343,35 @@ def start_scan(target, name):
             print(f"[ERROR] Failed to load any modules.", file=sys.stderr)
             print(json.dumps({"success": False, "error": "Failed to load any modules."}), file=sys.stderr, flush=True)
             return
-        enabled_modules = list(modules_dict.keys())
+        
+        # Select default modules if none specified
+        enabled_modules = []
+        
+        # Add some basic modules for different target types
+        if target_type == "IP_ADDRESS":
+            enabled_modules = ["sfp_dnsresolve", "sfp_whois", "sfp_ipinfo", "sfp_abuseipdb", "sfp_shodan"]
+        elif target_type == "DOMAIN_NAME":
+            enabled_modules = ["sfp_dnsresolve", "sfp_whois", "sfp_subdomain_takeover", "sfp_webserver", "sfp_ssl"]
+        elif target_type == "EMAILADDR":
+            enabled_modules = ["sfp_haveibeenpwned", "sfp_hunter", "sfp_emailrep", "sfp_breachdirectory"]
+        else:
+            # Default modules for any target type
+            enabled_modules = ["sfp_dnsresolve", "sfp_whois", "sfp_ipinfo", "sfp_shodan"]
+        
+        # Filter to only include modules that actually exist
+        available_modules = list(modules_dict.keys())
+        enabled_modules = [mod for mod in enabled_modules if mod in available_modules]
+        
+        # If no modules were selected, use a few basic ones
+        if not enabled_modules:
+            basic_modules = ["sfp_dnsresolve", "sfp_whois", "sfp_ipinfo"]
+            enabled_modules = [mod for mod in basic_modules if mod in available_modules]
+        
+        # If still no modules, use the first few available
+        if not enabled_modules and available_modules:
+            enabled_modules = available_modules[:5]  # Use first 5 modules
+        
+        print(f"[DEBUG] Selected modules: {enabled_modules}", file=sys.stderr)
 
         config = {
             '__database': DB_PATH,
@@ -270,10 +387,10 @@ def start_scan(target, name):
             '_internettlds_cache': True,
             '_internettlds': 'generic, country, sponsored, infrastructure',
             '_socks1type': '',  # Added to prevent KeyError in modules
-            '__modules__': {mod: {'opts': {}} for mod in enabled_modules}
+            '__modules__': modules_dict
         }
 
-        print(f"[DEBUG] Scan config: {json.dumps(config)}", file=sys.stderr)
+        print(f"[DEBUG] Scan config prepared", file=sys.stderr)
         print(f"[DEBUG] Enabled modules: {enabled_modules}", file=sys.stderr)
 
         sfdb = SpiderFootDb({'__database': DB_PATH})
@@ -356,6 +473,7 @@ if __name__ == "__main__":
             case "scan_correlation_list": scan_correlation_list(*args)
             case "scan_result_event": scan_result_event(*args)
             case "scan_logs": scan_logs(*args)
+            case "delete_scan": delete_scan(*args)
             case "start_scan": start_scan(*args)
             case _: print(json.dumps({"error": "Unknown command"})); sys.exit(1)
 
