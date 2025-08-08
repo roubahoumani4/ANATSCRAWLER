@@ -12,6 +12,8 @@ SPIDERFOOT_CORE = os.path.join(WRAPPER_DIR, "core")
 possible_module_paths = [
     os.path.join(WRAPPER_DIR, "modules"),  # Direct modules directory
     "/var/www/anatscrawler/modules",       # Symbolic link location (as shown in image)
+    "/var/www/anatscrawler/app/modules",   # App modules directory
+    "/var/www/anatscrawler/app/server/spiderfoot/modules",  # Server spiderfoot modules
     os.path.join(os.getcwd(), "modules"),  # Current working directory modules
     "modules"                              # Relative path
 ]
@@ -261,6 +263,8 @@ def run_scan_in_process(logging_queue, scan_name, scan_id, target, target_type, 
     """Run a scan in a separate process - this is the target function for multiprocessing"""
     try:
         import time
+        import multiprocessing as mp
+        
         print(f"[PROCESS] Starting scan {scan_id} in separate process", file=sys.stderr)
         print(f"[PROCESS] Target: {target}, Type: {target_type}", file=sys.stderr)
         print(f"[PROCESS] Modules: {module_list}", file=sys.stderr)
@@ -274,6 +278,10 @@ def run_scan_in_process(logging_queue, scan_name, scan_id, target, target_type, 
             sys.path.insert(0, SPIDERFOOT_CORE)
         
         print(f"[PROCESS] Python path: {sys.path[:3]}", file=sys.stderr)
+        
+        # Create a proper logging queue if none provided
+        if logging_queue is None:
+            logging_queue = mp.Queue()
         
         # Use the startSpiderFootScanner function which is designed for multiprocessing
         scanner = startSpiderFootScanner(logging_queue, scan_name, scan_id, target, target_type, module_list, config)

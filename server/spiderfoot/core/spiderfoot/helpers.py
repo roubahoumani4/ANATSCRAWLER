@@ -168,7 +168,15 @@ class SpiderFootHelpers():
                     "name": modName,
                     "object": mod_obj.__class__.__name__,
                     "watchedEvents": mod_obj.watchedEvents(),
-                    "producedEvents": mod_obj.producedEvents()
+                    "producedEvents": mod_obj.producedEvents(),
+                    "opts": getattr(mod_obj, 'opts', {}),
+                    "optdescs": getattr(mod_obj, 'optdescs', {}),
+                    "meta": getattr(mod_obj, 'meta', {}),
+                    "cats": getattr(mod_obj, 'cats', []),
+                    "flags": getattr(mod_obj, 'flags', []),
+                    "useCases": getattr(mod_obj, 'useCases', []),
+                    "descr": getattr(mod_obj, 'meta', {}).get('summary', ''),
+                    "group": getattr(mod_obj, 'useCases', [])
                 }
             except Exception as e:
                 print(f"[MODULE LOAD ERROR] {modName}: {e}", file=sys.stderr)
@@ -176,7 +184,15 @@ class SpiderFootHelpers():
                 mod_dict = {
                     "name": modName,
                     "error": str(e),
-                    "traceback": traceback.format_exc()
+                    "traceback": traceback.format_exc(),
+                    "opts": {},
+                    "optdescs": {},
+                    "meta": {},
+                    "cats": [],
+                    "flags": [],
+                    "useCases": [],
+                    "descr": "",
+                    "group": []
                 }
             sfModules[modName].update(mod_dict)
 
