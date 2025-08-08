@@ -25,7 +25,12 @@ from .spiderfoot import SpiderFootDb, SpiderFootEvent, SpiderFootPlugin, SpiderF
 
 
 def startSpiderFootScanner(loggingQueue, *args, **kwargs):
-    logger.logWorkerSetup(loggingQueue)
+    try:
+        logger.logWorkerSetup(loggingQueue)
+    except Exception as e:
+        print(f"[SFSCAN] Warning: Failed to setup logging queue: {e}, continuing with console logging", file=sys.stderr)
+        # Continue with console logging if queue setup fails
+        logger.logWorkerSetup(None)
     return SpiderFootScanner(*args, **kwargs)
 
 

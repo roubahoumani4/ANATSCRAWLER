@@ -144,7 +144,7 @@ def logWorkerSetup(loggingQueue) -> 'logging.Logger':
     """Root SpiderFoot logger.
 
     Args:
-        loggingQueue (Queue): TBD
+        loggingQueue (Queue): Queue for logging, can be None
 
     Returns:
         logging.Logger: Logger
@@ -153,8 +153,26 @@ def logWorkerSetup(loggingQueue) -> 'logging.Logger':
     # Don't do this more than once
     if len(log.handlers) == 0:
         log.setLevel(logging.DEBUG)
-        queue_handler = QueueHandler(loggingQueue)
-        log.addHandler(queue_handler)
+        # Only add queue handler if loggingQueue is not None and is a valid queue
+        if loggingQueue is not None:
+            try:
+                # Test if the queue is actually usable
+                if hasattr(loggingQueue, 'put'):
+                    queue_handler = QueueHandler(loggingQueue)
+                    log.addHandler(queue_handler)
+                else:
+                    raise ValueError("Queue object does not have required 'put' method")
+            except Exception as e:
+                # If queue handler fails, fall back to console logging
+                print(f"[LOGGER] Queue handler failed: {e}, falling back to console logging", file=sys.stderr)
+                console_handler = logging.StreamHandler(sys.stderr)
+                console_handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+                log.addHandler(console_handler)
+        else:
+            # If no queue provided, use console logging
+            console_handler = logging.StreamHandler(sys.stderr)
+            console_handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+            log.addHandler(console_handler)
     return log
 
 

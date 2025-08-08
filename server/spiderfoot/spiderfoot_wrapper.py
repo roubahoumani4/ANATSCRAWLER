@@ -65,9 +65,11 @@ try:
     if hasattr(mp, 'set_start_method'):
         try:
             mp.set_start_method("fork", force=True)
+            print(f"[DEBUG] Set multiprocessing start method to 'fork'", file=sys.stderr)
         except RuntimeError:
             # If fork is not available, use spawn
             mp.set_start_method("spawn", force=True)
+            print(f"[DEBUG] Set multiprocessing start method to 'spawn'", file=sys.stderr)
 except Exception as e:
     print(f"[DEBUG] Multiprocessing setup warning: {e}", file=sys.stderr)
 
@@ -421,6 +423,22 @@ def run_scan_in_process(logging_queue, scan_name, scan_id, target, target_type, 
         print(f"[PROCESS] Target: {target}, Type: {target_type}", file=sys.stderr)
         print(f"[PROCESS] Modules: {module_list}", file=sys.stderr)
         
+        # Check if logging_queue is valid
+        if logging_queue is None:
+            print(f"[PROCESS] Warning: logging_queue is None, will use console logging", file=sys.stderr)
+        elif not hasattr(logging_queue, 'put'):
+            print(f"[PROCESS] Warning: logging_queue is not a valid queue object, will use console logging", file=sys.stderr)
+            logging_queue = None
+        else:
+            print(f"[PROCESS] Logging queue is valid and ready to use", file=sys.stderr)
+            # Test the queue in the child process
+            try:
+                logging_queue.put("child_process_test")
+                print(f"[PROCESS] Queue test in child process successful", file=sys.stderr)
+            except Exception as child_queue_error:
+                print(f"[PROCESS] Queue test in child process failed: {child_queue_error}, will use console logging", file=sys.stderr)
+                logging_queue = None
+        
         # Ensure the modules directory is in the Python path for this process
         if MODULES_DIR not in sys.path:
             sys.path.insert(0, MODULES_DIR)
@@ -432,14 +450,31 @@ def run_scan_in_process(logging_queue, scan_name, scan_id, target, target_type, 
         print(f"[PROCESS] Python path: {sys.path[:3]}", file=sys.stderr)
         
         # Re-import modules in this process context
-        from core.sfscan import SpiderFootScanner, startSpiderFootScanner
-        from core.spiderfoot.db import SpiderFootDb
-        from core.spiderfoot.helpers import SpiderFootHelpers
+        try:
+            from core.sfscan import SpiderFootScanner, startSpiderFootScanner
+            from core.spiderfoot.db import SpiderFootDb
+            from core.spiderfoot.helpers import SpiderFootHelpers
+        except ImportError as import_error:
+            print(f"[PROCESS] Failed to import SpiderFoot modules: {import_error}", file=sys.stderr)
+            raise
         
         # Load modules in this process context
         print(f"[PROCESS] Loading modules from: {MODULES_DIR}", file=sys.stderr)
         modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR)
         print(f"[PROCESS] Loaded {len(modules_dict)} modules", file=sys.stderr)
+        
+        # Debug: Check if specific modules are loaded
+        if modules_dict:
+            print(f"[PROCESS] Sample modules loaded: {list(modules_dict.keys())[:5]}", file=sys.stderr)
+            # Check if key modules are present
+            key_modules = ["sfp_dnsresolve", "sfp_whois", "sfp__stor_db"]
+            for key_mod in key_modules:
+                if key_mod in modules_dict:
+                    print(f"[PROCESS] ✓ {key_mod} module found", file=sys.stderr)
+                else:
+                    print(f"[PROCESS] ✗ {key_mod} module NOT found", file=sys.stderr)
+        else:
+            print(f"[PROCESS] ERROR: No modules loaded!", file=sys.stderr)
         
         # Update config with loaded modules
         config['__modules__'] = modules_dict
@@ -475,8 +510,24 @@ def run_scan_in_process(logging_queue, scan_name, scan_id, target, target_type, 
         
         # Use the startSpiderFootScanner function which is designed for multiprocessing
         try:
-            scanner = startSpiderFootScanner(logging_queue, scan_name, scan_id, target, target_type, module_list, config)
-            print(f"[PROCESS] Scanner created successfully", file=sys.stderr)
+            print(f"[PROCESS] About to call startSpiderFootScanner with args:", file=sys.stderr)
+            print(f"[PROCESS] - scan_name: {scan_name}", file=sys.stderr)
+            print(f"[PROCESS] - scan_id: {scan_id}", file=sys.stderr)
+            print(f"[PROCESS] - target: {target}", file=sys.stderr)
+            print(f"[PROCESS] - target_type: {target_type}", file=sys.stderr)
+            print(f"[PROCESS] - module_list: {module_list}", file=sys.stderr)
+            print(f"[PROCESS] - config keys: {list(config.keys())}", file=sys.stderr)
+            print(f"[PROCESS] - logging_queue type: {type(logging_queue)}", file=sys.stderr)
+            
+            try:
+                scanner = startSpiderFootScanner(logging_queue, scan_name, scan_id, target, target_type, module_list, config)
+                print(f"[PROCESS] Scanner created successfully", file=sys.stderr)
+            except Exception as scanner_error:
+                print(f"[PROCESS] Failed to create scanner with queue: {scanner_error}", file=sys.stderr)
+                print(f"[PROCESS] Retrying without queue...", file=sys.stderr)
+                # Retry without the queue
+                scanner = startSpiderFootScanner(None, scan_name, scan_id, target, target_type, module_list, config)
+                print(f"[PROCESS] Scanner created successfully (without queue)", file=sys.stderr)
             
             # Check if scanner was created properly
             if not scanner:
@@ -494,6 +545,35 @@ def run_scan_in_process(logging_queue, scan_name, scan_id, target, target_type, 
                     print(f"[PROCESS] Module {mod_name}: errorState={getattr(mod_instance, 'errorState', 'N/A')}, _stopScanning={getattr(mod_instance, '_stopScanning', 'N/A')}", file=sys.stderr)
             else:
                 print(f"[PROCESS] Scanner doesn't have module instances attribute", file=sys.stderr)
+            
+            # Check scanner status
+            if hasattr(scanner, 'status'):
+                print(f"[PROCESS] Scanner status: {scanner.status}", file=sys.stderr)
+            
+            # Check if scan is actually running
+            if hasattr(scanner, '_SpiderFootScanner__status'):
+                print(f"[PROCESS] Scanner internal status: {scanner._SpiderFootScanner__status}", file=sys.stderr)
+            
+            # Check if modules were loaded in the scanner
+            if hasattr(scanner, '_SpiderFootScanner__moduleInstances'):
+                module_instances = scanner._SpiderFootScanner__moduleInstances
+                print(f"[PROCESS] Scanner loaded {len(module_instances)} module instances: {list(module_instances.keys())}", file=sys.stderr)
+                
+                # Check each module's status
+                for mod_name, mod_instance in module_instances.items():
+                    print(f"[PROCESS] Module {mod_name}: errorState={getattr(mod_instance, 'errorState', 'N/A')}, _stopScanning={getattr(mod_instance, '_stopScanning', 'N/A')}", file=sys.stderr)
+            else:
+                print(f"[PROCESS] Scanner doesn't have module instances attribute", file=sys.stderr)
+            
+            # Check if scan is actually running by checking the database status
+            try:
+                current_status = db.scanInstanceGet(scan_id)
+                if current_status and len(current_status) > 5:
+                    print(f"[PROCESS] Current scan status in DB: {current_status[5]}", file=sys.stderr)
+                else:
+                    print(f"[PROCESS] No scan status found in DB", file=sys.stderr)
+            except Exception as db_error:
+                print(f"[PROCESS] Error checking scan status in DB: {db_error}", file=sys.stderr)
             
             # Wait for the scan to complete by polling the status
             max_wait = 600  # 10 minutes timeout
@@ -684,10 +764,27 @@ def start_scan(target, name):
         print(f"[DEBUG] Starting SpiderFootScanner in separate process...", file=sys.stderr)
 
         try:
-            # Create a dummy logging queue (not used in our case)
+            # Create a proper multiprocessing queue for logging
             logging_queue = None
+            try:
+                # Try to create the queue with error handling
+                logging_queue = mp.Queue()
+                print(f"[DEBUG] Created multiprocessing queue successfully", file=sys.stderr)
+                
+                # Test if the queue is working
+                try:
+                    logging_queue.put("test_message")
+                    print(f"[DEBUG] Queue test successful", file=sys.stderr)
+                except Exception as test_error:
+                    print(f"[DEBUG] Queue test failed: {test_error}, will use None", file=sys.stderr)
+                    logging_queue = None
+                    
+            except Exception as queue_error:
+                print(f"[DEBUG] Failed to create multiprocessing queue: {queue_error}, will use None", file=sys.stderr)
+                logging_queue = None
             
             # Start the scan in a separate process using our custom function
+            print(f"[DEBUG] About to start process with logging_queue: {type(logging_queue)}", file=sys.stderr)
             p = mp.Process(target=run_scan_in_process, args=(logging_queue, name, scan_id, target, target_type, enabled_modules, config))
             p.daemon = True
             p.start()
