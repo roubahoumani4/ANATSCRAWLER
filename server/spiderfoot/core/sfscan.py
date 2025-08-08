@@ -76,6 +76,14 @@ class SpiderFootScanner():
 
         self.__config = deepcopy(globalOpts)
         self.__dbh = SpiderFootDb(self.__config)
+        
+        # ✅ CRITICAL: Ensure database schema is created
+        try:
+            self.__dbh.create()
+            print(f"[SFSCAN] Database schema created successfully", file=sys.stderr)
+        except Exception as e:
+            print(f"[SFSCAN] Database schema creation failed: {e}", file=sys.stderr)
+            # Continue anyway as the schema might already exist
 
         if not isinstance(scanName, str):
             raise TypeError(f"scanName is {type(scanName)}; expected str()")
@@ -438,6 +446,12 @@ class SpiderFootScanner():
             psMod.setDbh(self.__dbh)
             psMod.clearListeners()
             # Do not assign queues to psMod; SpiderFootPlugin does not define these as queue attributes
+
+            # ✅ CRITICAL: Register all modules as listeners to the pseudo module
+            print(f"[SFSCAN] Registering {len(self.__moduleInstances)} modules as listeners to pseudo module", file=sys.stderr)
+            for mod in self.__moduleInstances.values():
+                psMod.registerListener(mod)
+                print(f"[SFSCAN] Registered {mod.__name__} as listener to pseudo module", file=sys.stderr)
 
             # Create the "ROOT" event which un-triggered modules will link events to
             # Create a minimal valid event for self-reference

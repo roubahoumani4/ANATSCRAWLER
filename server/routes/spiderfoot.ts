@@ -204,6 +204,105 @@ router.get("/scan/:scanId/logs", async (req, res) => {
   }
 });
 
+// Scan results (comprehensive endpoint for frontend real-time updates)
+router.get("/scan/:scanId/results", async (req, res) => {
+  try {
+    const scanId = req.params.scanId;
+    console.log(`[SpiderFoot] Fetching comprehensive results for scan ${scanId}`);
+    
+    // Fetch all scan data in parallel
+    const [status, summary, correlations, browse, events, logs] = await Promise.all([
+      spiderfoot.scanInfo(scanId).catch(() => null),
+      spiderfoot.scanResultSummary(scanId).catch(() => []),
+      spiderfoot.scanCorrelationSummary(scanId).catch(() => []),
+      spiderfoot.scanBrowse(scanId).catch(() => []),
+      spiderfoot.scanResultEvent(scanId).catch(() => []),
+      spiderfoot.scanLogs(scanId).catch(() => [])
+    ]);
+
+    // Format the response for frontend consumption
+    const results: {
+      scan_id: string;
+      status: string;
+      name?: string;
+      target?: string;
+      created?: number;
+      started?: number;
+      ended?: number;
+      summary: any;
+      correlations: any;
+      browse: any;
+      events: any;
+      logs: any;
+      elements: any;
+      correlation_counts: {
+        HIGH: number;
+        MEDIUM: number;
+        LOW: number;
+        INFO: number;
+      };
+    } = {
+      scan_id: scanId,
+      status: 'UNKNOWN',
+      summary: summary || [],
+      correlations: correlations || [],
+      browse: browse || [],
+      events: events || [],
+      logs: logs || [],
+      elements: events?.length || 0,
+      // Add correlation counts for easy access
+      correlation_counts: {
+        HIGH: 0,
+        MEDIUM: 0,
+        LOW: 0,
+        INFO: 0
+      }
+    };
+
+    // Parse scan status from the scan info
+    if (status && Array.isArray(status) && status.length >= 6) {
+      results.status = status[5] || 'UNKNOWN'; // status is at index 5
+      results.name = status[0] || scanId; // name is at index 0
+      results.target = status[1] || ''; // target is at index 1
+      results.created = status[2] || 0; // created timestamp is at index 2
+      results.started = status[3] || 0; // started timestamp is at index 3
+      results.ended = status[4] || 0; // ended timestamp is at index 4
+    } else if (status && typeof status === 'object') {
+      // Handle case where status might be an object
+      results.status = status.status || status[5] || 'UNKNOWN';
+      results.name = status.name || status[0] || scanId;
+      results.target = status.target || status[1] || '';
+      results.created = status.created || status[2] || 0;
+      results.started = status.started || status[3] || 0;
+      results.ended = status.ended || status[4] || 0;
+    }
+
+    // Calculate correlation counts
+    if (Array.isArray(correlations)) {
+      correlations.forEach(corr => {
+        if (Array.isArray(corr) && corr.length >= 2) {
+          const risk = corr[0]?.toUpperCase();
+          const count = parseInt(corr[1]) || 0;
+          if (risk && risk in results.correlation_counts) {
+            results.correlation_counts[risk as keyof typeof results.correlation_counts] = count;
+          }
+        }
+      });
+    }
+
+    console.log(`[SpiderFoot] Returning comprehensive results for scan ${scanId}:`, {
+      status: results.status,
+      elements: results.elements,
+      correlations: results.correlation_counts
+    });
+
+    res.json(results);
+  } catch (e) {
+    console.error(`[SpiderFoot] Error fetching results for scan ${req.params.scanId}:`, e);
+    res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
+  }
+});
+
 // Delete scan
 router.post("/scan/:scanId/delete", async (req, res) => {
   try {

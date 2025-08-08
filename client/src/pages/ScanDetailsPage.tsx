@@ -83,10 +83,21 @@ const ScanDetailsPage = () => {
     value: typeof row[3] === 'number' ? row[3] : (typeof row.total === 'number' ? row.total : 0)
   }));
 
-  // Prepare correlations data
+  // Prepare correlations data - handle both array and object formats
   const correlationsData = Array.isArray(correlations) ? correlations : [];
   const correlationStats = correlationsData.reduce((acc: any, corr: any) => {
-    const risk = (corr[2] || corr.risk || '').toLowerCase();
+    // Handle different data structures
+    let risk = '';
+    if (Array.isArray(corr)) {
+      // Array format: [risk_level, count, risk_level_again, additional_info]
+      risk = (corr[0] || '').toLowerCase();
+    } else if (typeof corr === 'object' && corr !== null) {
+      // Object format: { risk: 'HIGH', count: 5 }
+      risk = (corr.risk || corr.rule_risk || '').toLowerCase();
+    } else {
+      risk = String(corr || '').toLowerCase();
+    }
+    
     if (risk === 'high') acc.high++;
     else if (risk === 'medium') acc.medium++;
     else if (risk === 'low') acc.low++;
@@ -155,11 +166,37 @@ const ScanDetailsPage = () => {
       {tab === "Correlations" && (
         <div className="bg-gray-900 p-4 rounded">
           <div className="font-semibold mb-2">Correlations</div>
-          {correlations && Object.keys(correlations).length > 0 ? (
-            <div className="flex gap-4">
-              {Object.entries(correlations).map(([key, val]) => (
-                <span key={key} className={`px-3 py-1 rounded-full text-xs font-bold ${key === 'high' ? 'bg-red-700/80 text-red-200' : key === 'medium' ? 'bg-yellow-700/80 text-yellow-200' : key === 'low' ? 'bg-blue-700/80 text-blue-200' : 'bg-green-700/80 text-green-200'}`}>{key}: {typeof val === 'number' || typeof val === 'string' ? val : JSON.stringify(val)}</span>
-              ))}
+          {correlationsData && correlationsData.length > 0 ? (
+            <div className="space-y-2">
+              {correlationsData.map((corr: any, idx: number) => {
+                let risk = '';
+                let count = 0;
+                let description = '';
+                
+                if (Array.isArray(corr)) {
+                  risk = corr[0] || '';
+                  count = corr[1] || 0;
+                  description = corr[2] || '';
+                } else if (typeof corr === 'object' && corr !== null) {
+                  risk = corr.risk || corr.rule_risk || '';
+                  count = corr.count || corr.total || 0;
+                  description = corr.description || corr.rule_descr || '';
+                }
+                
+                return (
+                  <div key={idx} className="flex justify-between items-center p-2 bg-gray-800 rounded">
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                      risk.toLowerCase() === 'high' ? 'bg-red-700/80 text-red-200' : 
+                      risk.toLowerCase() === 'medium' ? 'bg-yellow-700/80 text-yellow-200' : 
+                      risk.toLowerCase() === 'low' ? 'bg-blue-700/80 text-blue-200' : 
+                      'bg-green-700/80 text-green-200'
+                    }`}>
+                      {risk.toUpperCase()}: {count}
+                    </span>
+                    {description && <span className="text-gray-300 text-sm">{description}</span>}
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="text-gray-400">No correlations found.</div>
@@ -176,13 +213,19 @@ const ScanDetailsPage = () => {
                   <tr>
                     <th className="p-2">Type</th>
                     <th className="p-2">Value</th>
+                    <th className="p-2">Last Seen</th>
+                    <th className="p-2">Module</th>
+                    <th className="p-2">Count</th>
                   </tr>
                 </thead>
                 <tbody>
                   {browseData.map((el: any, idx: number) => (
                     <tr key={idx} className="border-b border-gray-800">
-                      <td className="p-2">{el[1] || el.type}</td>
-                      <td className="p-2">{el[0] || el.value}</td>
+                      <td className="p-2">{el[1] || el.type || 'Unknown'}</td>
+                      <td className="p-2">{el[0] || el.value || 'N/A'}</td>
+                      <td className="p-2">{el[2] || el.last_seen || 'N/A'}</td>
+                      <td className="p-2">{el[3] || el.module || 'N/A'}</td>
+                      <td className="p-2">{el[4] || el.count || 1}</td>
                     </tr>
                   ))}
                 </tbody>

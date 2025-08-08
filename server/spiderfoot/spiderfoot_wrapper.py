@@ -227,7 +227,8 @@ def scan_result_summary(scan_id):
 def scan_correlation_summary(scan_id):
     try:
         db = SpiderFootDb({'__database': DB_PATH})
-        summary = db.scanCorrelationSummary(scan_id)
+        # Use "risk" as the default parameter to get the expected format for frontend
+        summary = db.scanCorrelationSummary(scan_id, by="risk")
         if not summary:
             summary = []
         
@@ -237,10 +238,10 @@ def scan_correlation_summary(scan_id):
             for row in summary:
                 if isinstance(row, (list, tuple)) and len(row) >= 2:
                     formatted_summary.append([
-                        row[0],  # risk/rule
+                        row[0],  # risk level (HIGH, MEDIUM, LOW, INFO)
                         row[1] if len(row) > 1 else 0,   # count
-                        row[2] if len(row) > 2 else "",  # description
-                        row[3] if len(row) > 3 else ""   # additional info
+                        row[0] if len(row) > 0 else "",  # risk level again for consistency
+                        ""  # additional info
                     ])
                 else:
                     formatted_summary.append(row)
@@ -453,76 +454,112 @@ def run_scan_in_process(logging_queue, scan_name, scan_id, target, target_type, 
         # Initialize database connection
         db = SpiderFootDb({'__database': DB_PATH})
         
+        # ✅ CRITICAL: Ensure database schema is created
+        try:
+            db.create()
+            print(f"[PROCESS] Database schema created successfully", file=sys.stderr)
+        except Exception as e:
+            print(f"[PROCESS] Database schema creation failed: {e}", file=sys.stderr)
+            # Continue anyway as the schema might already exist
+        
         # Update scan status to STARTING
         try:
             db.scanInstanceSet(scan_id, "", "", "STARTING")
         except Exception as e:
             print(f"[PROCESS] Failed to update scan status to STARTING: {e}", file=sys.stderr)
         
+        # ✅ CRITICAL: Add more debugging for module execution
+        print(f"[PROCESS] About to create scanner with target={target}, target_type={target_type}", file=sys.stderr)
+        print(f"[PROCESS] Module list: {module_list}", file=sys.stderr)
+        print(f"[PROCESS] Config keys: {list(config.keys())}", file=sys.stderr)
+        
         # Use the startSpiderFootScanner function which is designed for multiprocessing
         try:
             scanner = startSpiderFootScanner(logging_queue, scan_name, scan_id, target, target_type, module_list, config)
             print(f"[PROCESS] Scanner created successfully", file=sys.stderr)
+            
+            # Check if scanner was created properly
+            if not scanner:
+                print(f"[PROCESS] Scanner creation failed - scanner is None", file=sys.stderr)
+                db.scanInstanceSet(scan_id, "", "", "ERROR-FAILED")
+                return
+            
+            # ✅ CRITICAL: Check if modules were actually loaded in the scanner
+            if hasattr(scanner, '_SpiderFootScanner__moduleInstances'):
+                module_instances = scanner._SpiderFootScanner__moduleInstances
+                print(f"[PROCESS] Scanner loaded {len(module_instances)} module instances: {list(module_instances.keys())}", file=sys.stderr)
+                
+                # Check each module's status
+                for mod_name, mod_instance in module_instances.items():
+                    print(f"[PROCESS] Module {mod_name}: errorState={getattr(mod_instance, 'errorState', 'N/A')}, _stopScanning={getattr(mod_instance, '_stopScanning', 'N/A')}", file=sys.stderr)
+            else:
+                print(f"[PROCESS] Scanner doesn't have module instances attribute", file=sys.stderr)
+            
+            # Wait for the scan to complete by polling the status
+            max_wait = 600  # 10 minutes timeout
+            poll_interval = 5  # seconds
+            waited = 0
+            
+            print(f"[PROCESS] Waiting for scan {scan_id} to complete...", file=sys.stderr)
+            
+            while waited < max_wait:
+                try:
+                    scan_status = db.scanInstanceGet(scan_id)
+                    if scan_status and len(scan_status) > 5:
+                        status_str = scan_status[5]
+                        print(f"[PROCESS] Scan {scan_id} status: {status_str}", file=sys.stderr)
+                        
+                        if status_str in ["FINISHED", "ERROR-FAILED", "ABORTED"]:
+                            print(f"[PROCESS] Scan {scan_id} completed with status: {status_str}", file=sys.stderr)
+                            break
+                        elif status_str in ["RUNNING", "STARTING", "STARTED"]:
+                            # Check if any results have been generated
+                            try:
+                                results = db.scanResultEvent(scan_id)
+                                if results and len(results) > 0:
+                                    print(f"[PROCESS] Scan {scan_id} has generated {len(results)} results", file=sys.stderr)
+                            except Exception as result_error:
+                                print(f"[PROCESS] Error checking results: {result_error}", file=sys.stderr)
+                    
+                    time.sleep(poll_interval)
+                    waited += poll_interval
+                    
+                except Exception as poll_error:
+                    print(f"[PROCESS] Error polling scan status: {poll_error}", file=sys.stderr)
+                    time.sleep(poll_interval)
+                    waited += poll_interval
+            
+            if waited >= max_wait:
+                print(f"[PROCESS] Scan {scan_id} timed out after {max_wait} seconds", file=sys.stderr)
+                # Update scan status to ERROR-FAILED
+                try:
+                    db.scanInstanceSet(scan_id, "", "", "ERROR-FAILED")
+                except:
+                    pass
+            
+            # Final status check and result verification
+            try:
+                final_status = db.scanInstanceGet(scan_id)
+                if final_status and len(final_status) > 5:
+                    final_status_str = final_status[5]
+                    print(f"[PROCESS] Scan {scan_id} final status: {final_status_str}", file=sys.stderr)
+                    
+                    # Check if results were generated
+                    if final_status_str == "FINISHED":
+                        results = db.scanResultEvent(scan_id)
+                        print(f"[PROCESS] Scan {scan_id} completed with {len(results) if results else 0} results", file=sys.stderr)
+                    elif final_status_str == "RUNNING":
+                        # Force the scan to finish if it's still running
+                        print(f"[PROCESS] Scan {scan_id} is still running, forcing completion", file=sys.stderr)
+                        db.scanInstanceSet(scan_id, "", "", "FINISHED")
+            except Exception as final_check_error:
+                print(f"[PROCESS] Error in final status check: {final_check_error}", file=sys.stderr)
+            
         except Exception as scanner_error:
             print(f"[PROCESS] Failed to create scanner: {scanner_error}", file=sys.stderr)
+            print(f"[PROCESS] Traceback: {traceback.format_exc()}", file=sys.stderr)
             db.scanInstanceSet(scan_id, "", "", "ERROR-FAILED")
             return
-        
-        # Wait for the scan to complete by polling the status
-        max_wait = 600  # 10 minutes timeout
-        poll_interval = 5  # seconds
-        waited = 0
-        
-        print(f"[PROCESS] Waiting for scan {scan_id} to complete...", file=sys.stderr)
-        
-        while waited < max_wait:
-            try:
-                scan_status = db.scanInstanceGet(scan_id)
-                if scan_status and len(scan_status) > 5:
-                    status_str = scan_status[5]
-                    print(f"[PROCESS] Scan {scan_id} status: {status_str}", file=sys.stderr)
-                    
-                    if status_str in ["FINISHED", "ERROR-FAILED", "ABORTED"]:
-                        print(f"[PROCESS] Scan {scan_id} completed with status: {status_str}", file=sys.stderr)
-                        break
-                    elif status_str in ["RUNNING", "STARTING", "STARTED"]:
-                        # Check if any results have been generated
-                        try:
-                            results = db.scanResultEvent(scan_id)
-                            if results and len(results) > 0:
-                                print(f"[PROCESS] Scan {scan_id} has generated {len(results)} results", file=sys.stderr)
-                        except Exception as result_error:
-                            print(f"[PROCESS] Error checking results: {result_error}", file=sys.stderr)
-                
-                time.sleep(poll_interval)
-                waited += poll_interval
-                
-            except Exception as poll_error:
-                print(f"[PROCESS] Error polling scan status: {poll_error}", file=sys.stderr)
-                time.sleep(poll_interval)
-                waited += poll_interval
-        
-        if waited >= max_wait:
-            print(f"[PROCESS] Scan {scan_id} timed out after {max_wait} seconds", file=sys.stderr)
-            # Update scan status to ERROR-FAILED
-            try:
-                db.scanInstanceSet(scan_id, "", "", "ERROR-FAILED")
-            except:
-                pass
-        
-        # Final status check and result verification
-        try:
-            final_status = db.scanInstanceGet(scan_id)
-            if final_status and len(final_status) > 5:
-                final_status_str = final_status[5]
-                print(f"[PROCESS] Scan {scan_id} final status: {final_status_str}", file=sys.stderr)
-                
-                # Check if results were generated
-                if final_status_str == "FINISHED":
-                    results = db.scanResultEvent(scan_id)
-                    print(f"[PROCESS] Scan {scan_id} completed with {len(results) if results else 0} results", file=sys.stderr)
-        except Exception as final_check_error:
-            print(f"[PROCESS] Error in final status check: {final_check_error}", file=sys.stderr)
         
         print(f"[PROCESS] Scan {scan_id} process completed", file=sys.stderr)
         
@@ -554,34 +591,39 @@ def start_scan(target, name):
             print(json.dumps({"success": False, "error": "Failed to load any modules."}), file=sys.stderr, flush=True)
             return
         
-        # Select default modules if none specified
+        # ✅ NEW: Select ALL available modules except those requiring API keys
         enabled_modules = []
-        
-        # Add some basic modules for different target types
-        if target_type == "IP_ADDRESS":
-            enabled_modules = ["sfp_dnsresolve", "sfp_whois", "sfp_ipinfo", "sfp_abuseipdb", "sfp_shodan"]
-        elif target_type == "DOMAIN_NAME":
-            enabled_modules = ["sfp_dnsresolve", "sfp_whois", "sfp_subdomain_takeover", "sfp_webserver", "sfp_ssl"]
-        elif target_type == "EMAILADDR":
-            enabled_modules = ["sfp_haveibeenpwned", "sfp_hunter", "sfp_emailrep", "sfp_breachdirectory"]
-        else:
-            # Default modules for any target type
-            enabled_modules = ["sfp_dnsresolve", "sfp_whois", "sfp_ipinfo", "sfp_shodan"]
-        
-        # Filter to only include modules that actually exist
         available_modules = list(modules_dict.keys())
-        enabled_modules = [mod for mod in enabled_modules if mod in available_modules]
         
-        # If no modules were selected, use a few basic ones
+        # Filter out modules that require API keys
+        for module_name in available_modules:
+            module_info = modules_dict.get(module_name, {})
+            # Check both flags and meta.flags fields
+            module_flags = module_info.get('flags', [])
+            meta_flags = module_info.get('meta', {}).get('flags', [])
+            all_flags = module_flags + meta_flags
+            
+            # Skip modules that require API keys
+            if 'apikey' in all_flags:
+                print(f"[DEBUG] Skipping module {module_name} - requires API key", file=sys.stderr)
+                continue
+            
+            # Include all other modules
+            enabled_modules.append(module_name)
+            print(f"[DEBUG] Added module: {module_name}", file=sys.stderr)
+        
+        # ✅ CRITICAL: Always add the database storage module if not already included
+        if "sfp__stor_db" in available_modules and "sfp__stor_db" not in enabled_modules:
+            enabled_modules.append("sfp__stor_db")
+            print(f"[DEBUG] Added database storage module: sfp__stor_db", file=sys.stderr)
+        
+        # If no modules were selected (all require API keys), use a few basic ones
         if not enabled_modules:
-            basic_modules = ["sfp_dnsresolve", "sfp_whois", "sfp_ipinfo"]
+            basic_modules = ["sfp_dnsresolve", "sfp_whois", "sfp__stor_db"]
             enabled_modules = [mod for mod in basic_modules if mod in available_modules]
+            print(f"[DEBUG] No non-API modules found, using basic modules: {enabled_modules}", file=sys.stderr)
         
-        # If still no modules, use the first few available
-        if not enabled_modules and available_modules:
-            enabled_modules = available_modules[:5]  # Use first 5 modules
-        
-        print(f"[DEBUG] Selected modules: {enabled_modules}", file=sys.stderr)
+        print(f"[DEBUG] Selected modules ({len(enabled_modules)} total): {enabled_modules}", file=sys.stderr)
 
         config = {
             '__database': DB_PATH,
@@ -597,8 +639,24 @@ def start_scan(target, name):
             '_internettlds_cache': True,
             '_internettlds': 'generic, country, sponsored, infrastructure',
             '_socks1type': '',  # Added to prevent KeyError in modules
-            '__modules__': modules_dict
+            '__modules__': modules_dict,
+            # ✅ CRITICAL: Ensure storage module is properly configured
+            'sfp__stor_db': {
+                '_store': True,
+                'maxstorage': 0  # Unlimited storage
+            }
         }
+        
+        # ✅ CRITICAL: Ensure storage module is properly configured
+        if "sfp__stor_db" in enabled_modules:
+            # Add storage module configuration to ensure it works properly
+            if "sfp__stor_db" not in config:
+                config["sfp__stor_db"] = {}
+            config["sfp__stor_db"]["_store"] = True
+            config["sfp__stor_db"]["maxstorage"] = 0  # Unlimited storage
+            # Ensure the database connection is properly configured
+            config["sfp__stor_db"]["__database"] = DB_PATH
+            print(f"[DEBUG] Configured storage module settings", file=sys.stderr)
 
         print(f"[DEBUG] Scan config prepared", file=sys.stderr)
         print(f"[DEBUG] Enabled modules: {enabled_modules}", file=sys.stderr)
@@ -621,7 +679,7 @@ def start_scan(target, name):
         print(f"Target: {target}", file=sys.stderr)
         print(f"Target Type: {target_type}", file=sys.stderr)
         print(f"Scan ID: {scan_id}", file=sys.stderr)
-        print(f"Enabled Modules: {enabled_modules}", file=sys.stderr)
+        print(f"Enabled Modules ({len(enabled_modules)}): {enabled_modules}", file=sys.stderr)
 
         print(f"[DEBUG] Starting SpiderFootScanner in separate process...", file=sys.stderr)
 
