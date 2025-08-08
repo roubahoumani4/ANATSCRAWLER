@@ -86,6 +86,68 @@ let lastCacheTime = 0;
 const CACHE_TTL_MS = 30000; // 30 seconds
 
 module.exports = {
+  // Test function to verify Python environment
+  testEnvironment: async () => {
+    try {
+      console.log('[SpiderFoot] Testing environment...');
+      const { spawn } = require('child_process');
+      const path = require('path');
+      const testScriptPath = path.resolve(__dirname, 'spiderfoot/test_python.py');
+      
+      console.log('[SpiderFoot] Test script path:', testScriptPath);
+      
+      const pythonPath = process.env.NODE_ENV === 'production' 
+        ? path.join(process.cwd(), 'maigret-venv', 'bin', 'python3.10')
+        : 'python3';
+      
+      const env = {
+        ...process.env,
+        PYTHONPATH: path.join(__dirname, 'spiderfoot'),
+      };
+      
+      return new Promise((resolve, reject) => {
+        const py = spawn(pythonPath, [testScriptPath], { env });
+        
+        let data = '';
+        let err = '';
+        
+        py.stdout.on('data', chunk => {
+          data += chunk;
+          console.log(`[SpiderFoot] Test stdout: ${chunk.toString()}`);
+        });
+        
+        py.stderr.on('data', chunk => {
+          err += chunk;
+          console.log(`[SpiderFoot] Test stderr: ${chunk.toString()}`);
+        });
+        
+        py.on('close', code => {
+          if (code !== 0) {
+            console.error(`[SpiderFoot] Test failed with code ${code}:`, err);
+            reject(new Error(err || `Test failed with code ${code}`));
+          } else {
+            try {
+              const result = JSON.parse(data);
+              console.log('[SpiderFoot] Test result:', result);
+              resolve(result);
+            } catch (e) {
+              console.error('[SpiderFoot] Invalid JSON from test:', data);
+              reject(new Error('Invalid JSON response from test: ' + data));
+            }
+          }
+        });
+        
+        py.on('error', (error) => {
+          console.error('[SpiderFoot] Test spawn error:', error);
+          reject(new Error(`Failed to start test process: ${error.message}`));
+        });
+      });
+    } catch (error) {
+      console.error('[SpiderFoot] Test environment error:', error);
+      throw error;
+    }
+  },
+
   // Delete scan stub
   deleteScan: async (scanId) => {
     scanCache = null; // Invalidate cache

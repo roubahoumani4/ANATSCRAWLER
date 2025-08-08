@@ -25,30 +25,45 @@ const OsintScans = () => {
   // Fetch scans from SpiderFoot scanlist (array or object)
   const fetchScans = () => {
     setLoading(true);
+    console.log('[OsintScans] Fetching scans from:', `${API_BASE}/scanlist`);
+    
     fetch(`${API_BASE}/scanlist`)
-      .then(res => res.json())
+      .then(res => {
+        console.log('[OsintScans] Response status:', res.status);
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+        return res.json();
+      })
       .then(data => {
+        console.log('[OsintScans] Raw data received:', data);
+        
         // Support both array and object with scans property
         let scanArray = Array.isArray(data)
           ? data
           : (data && Array.isArray(data.scans) ? data.scans : []);
-        setScans(
-          scanArray.filter((arr: any[]) => arr && arr[0]).map((arr: any[]) => ({
-            scan_id: arr[0],
-            name: arr[1],
-            target: arr[2],
-            started: arr[3],
-            finished: arr[4],
-            status: arr[5],
-            elements: arr[6],
-            correlations: arr[7],
-            modules: arr[8],
-            scan_type: arr[9],
-          }))
-        );
+        
+        console.log('[OsintScans] Processed scan array:', scanArray);
+        
+        const processedScans = scanArray.filter((arr: any[]) => arr && arr[0]).map((arr: any[]) => ({
+          scan_id: arr[0],
+          name: arr[1],
+          target: arr[2],
+          started: arr[3],
+          finished: arr[4],
+          status: arr[5],
+          elements: arr[6],
+          correlations: arr[7],
+          modules: arr[8],
+          scan_type: arr[9],
+        }));
+        
+        console.log('[OsintScans] Processed scans:', processedScans);
+        setScans(processedScans);
         setLoading(false);
       })
-      .catch(() => {
+      .catch((error) => {
+        console.error('[OsintScans] Error fetching scans:', error);
         setScans([]);
         setLoading(false);
       });
