@@ -61,7 +61,13 @@ for path in [WRAPPER_DIR, SPIDERFOOT_CORE, MODULES_DIR]:
 # --- Multiprocessing Setup ---
 try:
     import multiprocessing as mp
-    mp.set_start_method("spawn", force=True)
+    # Use 'fork' on Linux for better compatibility with logging
+    if hasattr(mp, 'set_start_method'):
+        try:
+            mp.set_start_method("fork", force=True)
+        except RuntimeError:
+            # If fork is not available, use spawn
+            mp.set_start_method("spawn", force=True)
 except Exception as e:
     print(f"[DEBUG] Multiprocessing setup warning: {e}", file=sys.stderr)
 
@@ -195,7 +201,25 @@ def scan_result_summary(scan_id):
         summary = db.scanResultSummary(scan_id)
         if not summary:
             summary = []
-        print(json.dumps(summary))
+        
+        # Ensure we return a proper array structure
+        if isinstance(summary, list):
+            # Convert to the expected format for frontend
+            formatted_summary = []
+            for row in summary:
+                if isinstance(row, (list, tuple)) and len(row) >= 4:
+                    formatted_summary.append([
+                        row[0],  # type/name
+                        row[1] if len(row) > 1 else "",  # description
+                        row[2] if len(row) > 2 else "",  # last seen
+                        row[3] if len(row) > 3 else 0,   # total
+                        row[4] if len(row) > 4 else 0    # unique total
+                    ])
+                else:
+                    formatted_summary.append(row)
+            print(json.dumps(formatted_summary))
+        else:
+            print(json.dumps([]))
     except Exception as e:
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
         print(json.dumps([]))
@@ -206,7 +230,23 @@ def scan_correlation_summary(scan_id):
         summary = db.scanCorrelationSummary(scan_id)
         if not summary:
             summary = []
-        print(json.dumps(summary))
+        
+        # Convert to the expected format for frontend
+        if isinstance(summary, list):
+            formatted_summary = []
+            for row in summary:
+                if isinstance(row, (list, tuple)) and len(row) >= 2:
+                    formatted_summary.append([
+                        row[0],  # risk/rule
+                        row[1] if len(row) > 1 else 0,   # count
+                        row[2] if len(row) > 2 else "",  # description
+                        row[3] if len(row) > 3 else ""   # additional info
+                    ])
+                else:
+                    formatted_summary.append(row)
+            print(json.dumps(formatted_summary))
+        else:
+            print(json.dumps([]))
     except Exception as e:
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
         print(json.dumps([]))
@@ -217,7 +257,27 @@ def scan_correlation_list(scan_id):
         correlations = db.scanCorrelationList(scan_id)
         if not correlations:
             correlations = []
-        print(json.dumps(correlations))
+        
+        # Convert to the expected format for frontend
+        if isinstance(correlations, list):
+            formatted_correlations = []
+            for row in correlations:
+                if isinstance(row, (list, tuple)) and len(row) >= 4:
+                    formatted_correlations.append([
+                        row[0],  # correlation id
+                        row[1] if len(row) > 1 else "",  # title
+                        row[2] if len(row) > 2 else "",  # risk
+                        row[3] if len(row) > 3 else "",  # description
+                        row[4] if len(row) > 4 else "",  # rule name
+                        row[5] if len(row) > 5 else "",  # rule description
+                        row[6] if len(row) > 6 else "",  # rule logic
+                        row[7] if len(row) > 7 else 0    # count
+                    ])
+                else:
+                    formatted_correlations.append(row)
+            print(json.dumps(formatted_correlations))
+        else:
+            print(json.dumps([]))
     except Exception as e:
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
         print(json.dumps([]))
@@ -228,7 +288,34 @@ def scan_result_event(scan_id):
         events = db.scanResultEvent(scan_id)
         if not events:
             events = []
-        print(json.dumps(events))
+        
+        # Convert to the expected format for frontend
+        if isinstance(events, list):
+            formatted_events = []
+            for row in events:
+                if isinstance(row, (list, tuple)) and len(row) >= 4:
+                    formatted_events.append([
+                        row[0],  # generated timestamp
+                        row[1] if len(row) > 1 else "",  # data
+                        row[2] if len(row) > 2 else "",  # source data
+                        row[3] if len(row) > 3 else "",  # module
+                        row[4] if len(row) > 4 else "",  # type
+                        row[5] if len(row) > 5 else 100, # confidence
+                        row[6] if len(row) > 6 else 100, # visibility
+                        row[7] if len(row) > 7 else 0,   # risk
+                        row[8] if len(row) > 8 else "",  # hash
+                        row[9] if len(row) > 9 else "",  # source event hash
+                        row[10] if len(row) > 10 else "", # event description
+                        row[11] if len(row) > 11 else "", # event type
+                        row[12] if len(row) > 12 else "", # scan instance id
+                        row[13] if len(row) > 13 else 0,  # false positive
+                        row[14] if len(row) > 14 else 0   # parent false positive
+                    ])
+                else:
+                    formatted_events.append(row)
+            print(json.dumps(formatted_events))
+        else:
+            print(json.dumps([]))
     except Exception as e:
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
         print(json.dumps([]))
@@ -239,7 +326,42 @@ def scan_browse(scan_id):
         browse = db.scanResultEvent(scan_id)
         if not browse:
             browse = []
-        print(json.dumps(browse))
+        
+        # Convert to the expected format for frontend (unique entities)
+        if isinstance(browse, list):
+            # Get unique entities for browse view
+            unique_entities = {}
+            for row in browse:
+                if isinstance(row, (list, tuple)) and len(row) >= 2:
+                    data = row[1] if len(row) > 1 else ""
+                    event_type = row[4] if len(row) > 4 else ""
+                    if data and event_type:
+                        key = f"{event_type}:{data}"
+                        if key not in unique_entities:
+                            unique_entities[key] = {
+                                "type": event_type,
+                                "value": data,
+                                "count": 1,
+                                "last_seen": row[0] if len(row) > 0 else "",
+                                "module": row[3] if len(row) > 3 else ""
+                            }
+                        else:
+                            unique_entities[key]["count"] += 1
+            
+            # Convert to list format
+            formatted_browse = []
+            for entity in unique_entities.values():
+                formatted_browse.append([
+                    entity["value"],
+                    entity["type"],
+                    entity["last_seen"],
+                    entity["module"],
+                    entity["count"]
+                ])
+            
+            print(json.dumps(formatted_browse))
+        else:
+            print(json.dumps([]))
     except Exception as e:
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
         print(json.dumps([]))
@@ -282,6 +404,17 @@ def run_scan_in_process(logging_queue, scan_name, scan_id, target, target_type, 
     try:
         import time
         import multiprocessing as mp
+        import logging
+        
+        # Configure logging for this process to avoid queue issues
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.StreamHandler(sys.stderr),
+                logging.FileHandler(f'/tmp/spiderfoot_scan_{scan_id}.log')
+            ]
+        )
         
         print(f"[PROCESS] Starting scan {scan_id} in separate process", file=sys.stderr)
         print(f"[PROCESS] Target: {target}, Type: {target_type}", file=sys.stderr)
@@ -317,13 +450,25 @@ def run_scan_in_process(logging_queue, scan_name, scan_id, target, target_type, 
         
         print(f"[PROCESS] Modules prepared with opts", file=sys.stderr)
         
-        # Use the startSpiderFootScanner function which is designed for multiprocessing
-        scanner = startSpiderFootScanner(logging_queue, scan_name, scan_id, target, target_type, module_list, config)
+        # Initialize database connection
+        db = SpiderFootDb({'__database': DB_PATH})
         
-        print(f"[PROCESS] Scanner created successfully", file=sys.stderr)
+        # Update scan status to STARTING
+        try:
+            db.scanInstanceSet(scan_id, "", "", "STARTING")
+        except Exception as e:
+            print(f"[PROCESS] Failed to update scan status to STARTING: {e}", file=sys.stderr)
+        
+        # Use the startSpiderFootScanner function which is designed for multiprocessing
+        try:
+            scanner = startSpiderFootScanner(logging_queue, scan_name, scan_id, target, target_type, module_list, config)
+            print(f"[PROCESS] Scanner created successfully", file=sys.stderr)
+        except Exception as scanner_error:
+            print(f"[PROCESS] Failed to create scanner: {scanner_error}", file=sys.stderr)
+            db.scanInstanceSet(scan_id, "", "", "ERROR-FAILED")
+            return
         
         # Wait for the scan to complete by polling the status
-        db = SpiderFootDb({'__database': DB_PATH})
         max_wait = 600  # 10 minutes timeout
         poll_interval = 5  # seconds
         waited = 0
@@ -364,6 +509,20 @@ def run_scan_in_process(logging_queue, scan_name, scan_id, target, target_type, 
                 db.scanInstanceSet(scan_id, "", "", "ERROR-FAILED")
             except:
                 pass
+        
+        # Final status check and result verification
+        try:
+            final_status = db.scanInstanceGet(scan_id)
+            if final_status and len(final_status) > 5:
+                final_status_str = final_status[5]
+                print(f"[PROCESS] Scan {scan_id} final status: {final_status_str}", file=sys.stderr)
+                
+                # Check if results were generated
+                if final_status_str == "FINISHED":
+                    results = db.scanResultEvent(scan_id)
+                    print(f"[PROCESS] Scan {scan_id} completed with {len(results) if results else 0} results", file=sys.stderr)
+        except Exception as final_check_error:
+            print(f"[PROCESS] Error in final status check: {final_check_error}", file=sys.stderr)
         
         print(f"[PROCESS] Scan {scan_id} process completed", file=sys.stderr)
         

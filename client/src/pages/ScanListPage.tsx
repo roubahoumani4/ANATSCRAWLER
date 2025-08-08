@@ -29,58 +29,54 @@ const ScanListPage = () => {
       return [];
     };
 
-    fetch("/api/spiderfoot/scanlist")
-      .then(res => res.json())
-      .then(data => {
-        let scanData = extractScans(data);
-        if (!scanData || scanData.length === 0) {
-          // fallback to legacy route
-          fetch("/osint-engine/scans")
-            .then(res2 => res2.json())
-            .then(data2 => {
-              scanData = extractScans(data2);
-              setScans(
-                scanData.filter((arr: any[]) => arr && arr[0]).map((arr: any[]) => ({
-                  scan_id: arr[0],
-                  name: arr[1],
-                  target: arr[2],
-                  started: arr[3],
-                  finished: arr[4],
-                  status: arr[5],
-                  elements: arr[6],
-                  correlations: arr[7],
-                  modules: arr[8],
-                  scan_type: arr[9],
-                }))
-              );
-              setLoading(false);
-            })
-            .catch(() => {
-              setError("Failed to load scans");
-              setLoading(false);
-            });
-        } else {
-          setScans(
-            scanData.filter((arr: any[]) => arr && arr[0]).map((arr: any[]) => ({
-              scan_id: arr[0],
-              name: arr[1],
-              target: arr[2],
-              started: arr[3],
-              finished: arr[4],
-              status: arr[5],
-              elements: arr[6],
-              correlations: arr[7],
-              modules: arr[8],
-              scan_type: arr[9],
-            }))
-          );
-          setLoading(false);
+    const fetchScans = async () => {
+      try {
+        setLoading(true);
+        
+        // First try the main API endpoint
+        const response = await fetch("/api/spiderfoot/scanlist");
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-      })
-      .catch(() => {
+        
+        const data = await response.json();
+        let scanData = extractScans(data);
+        
+        // If no scans found, try the legacy endpoint
+        if (!scanData || scanData.length === 0) {
+          console.log("No scans found in main endpoint, trying legacy endpoint...");
+          const legacyResponse = await fetch("/osint-engine/scans");
+          if (legacyResponse.ok) {
+            const legacyData = await legacyResponse.json();
+            scanData = extractScans(legacyData);
+          }
+        }
+        
+        const processedScans = scanData
+          .filter((arr: any[]) => arr && arr[0])
+          .map((arr: any[]) => ({
+            scan_id: arr[0],
+            name: arr[1] || arr[0],
+            target: arr[2] || '',
+            started: arr[3] || null,
+            finished: arr[4] || null,
+            status: arr[5] || 'UNKNOWN',
+            elements: arr[6] || 0,
+            correlations: arr[7] || { HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 },
+            modules: arr[8] || [],
+            scan_type: arr[9] || 'unknown',
+          }));
+        
+        setScans(processedScans);
+        setLoading(false);
+      } catch (error) {
+        console.error("Failed to load scans:", error);
         setError("Failed to load scans");
         setLoading(false);
-      });
+      }
+    };
+
+    fetchScans();
   }, []);
 
   if (loading) return <div className="p-8">Loading scans...</div>;

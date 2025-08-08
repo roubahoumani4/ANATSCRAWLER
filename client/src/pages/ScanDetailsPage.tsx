@@ -29,26 +29,47 @@ const ScanDetailsPage = () => {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    Promise.all([
-      fetch(`/api/spiderfoot/scan/${scanId}/status`).then(res => res.json()),
-      fetch(`/api/spiderfoot/scan/${scanId}/summary`).then(res => res.json()),
-      fetch(`/api/spiderfoot/scan/${scanId}/correlationsummary`).then(res => res.json()),
-      fetch(`/api/spiderfoot/scan/${scanId}/browse`).then(res => res.json()),
-      fetch(`/api/spiderfoot/scan/${scanId}/graph`).then(res => res.json()),
-      fetch(`/api/spiderfoot/scan/${scanId}/logs`).then(res => res.json())
-    ])
-      .then(([status, summary, correlations, browse, graph, logs]) => {
+    
+    const fetchScanData = async () => {
+      try {
+        const [status, summary, correlations, browse, graph, logs] = await Promise.all([
+          fetch(`/api/spiderfoot/scan/${scanId}/status`).then(res => res.json()).catch(() => null),
+          fetch(`/api/spiderfoot/scan/${scanId}/summary`).then(res => res.json()).catch(() => []),
+          fetch(`/api/spiderfoot/scan/${scanId}/correlationsummary`).then(res => res.json()).catch(() => []),
+          fetch(`/api/spiderfoot/scan/${scanId}/browse`).then(res => res.json()).catch(() => []),
+          fetch(`/api/spiderfoot/scan/${scanId}/graph`).then(res => res.json()).catch(() => []),
+          fetch(`/api/spiderfoot/scan/${scanId}/logs`).then(res => res.json()).catch(() => [])
+        ]);
+
         setScanStatus(status);
         setScanResults({ summary, correlations, browse, graph });
         setCorrelations(correlations);
         setGraphData(graph);
-        setScanLog(Array.isArray(logs) ? logs.map(l => `${l.generated} [${l.component}] ${l.type}: ${l.message}`).join('\n') : (logs || ""));
+        
+        // Format logs properly
+        let formattedLogs = "";
+        if (Array.isArray(logs)) {
+          formattedLogs = logs.map(l => {
+            if (typeof l === 'string') return l;
+            if (typeof l === 'object' && l.generated) {
+              return `${l.generated} [${l.component || 'SYSTEM'}] ${l.type || 'INFO'}: ${l.message || ''}`;
+            }
+            return JSON.stringify(l);
+          }).join('\n');
+        } else if (typeof logs === 'string') {
+          formattedLogs = logs;
+        }
+        setScanLog(formattedLogs);
+        
         setLoading(false);
-      })
-      .catch(() => {
+      } catch (error) {
+        console.error('Error fetching scan data:', error);
         setError("Failed to load scan details");
         setLoading(false);
-      });
+      }
+    };
+
+    fetchScanData();
   }, [scanId]);
 
   if (loading) return <div className="p-8">Loading scan details...</div>;
@@ -58,9 +79,23 @@ const ScanDetailsPage = () => {
   // Prepare data types for bar chart (from summary)
   const summaryArr = Array.isArray(scanResults?.summary) ? scanResults.summary : [];
   const barData = summaryArr.map((row: any) => ({
-    name: row[0] || row.type || row.name,
-    value: row[3] || row.total || 0
+    name: row[0] || row.type || row.name || 'Unknown',
+    value: typeof row[3] === 'number' ? row[3] : (typeof row.total === 'number' ? row.total : 0)
   }));
+
+  // Prepare correlations data
+  const correlationsData = Array.isArray(correlations) ? correlations : [];
+  const correlationStats = correlationsData.reduce((acc: any, corr: any) => {
+    const risk = (corr[2] || corr.risk || '').toLowerCase();
+    if (risk === 'high') acc.high++;
+    else if (risk === 'medium') acc.medium++;
+    else if (risk === 'low') acc.low++;
+    else acc.info++;
+    return acc;
+  }, { high: 0, medium: 0, low: 0, info: 0 });
+
+  // Prepare browse data
+  const browseData = Array.isArray(scanResults?.browse) ? scanResults.browse : [];
 
   return (
     <div className="p-8 w-full">
@@ -90,10 +125,10 @@ const ScanDetailsPage = () => {
             <div className="bg-gray-800 p-4 rounded">
               <div className="mb-2 font-semibold">Correlations</div>
               <div className="flex gap-2">
-                <span className="bg-red-400 px-2 rounded">High {correlations?.high || 0}</span>
-                <span className="bg-yellow-400 px-2 rounded">Medium {correlations?.medium || 0}</span>
-                <span className="bg-blue-400 px-2 rounded">Low {correlations?.low || 0}</span>
-                <span className="bg-green-400 px-2 rounded">Info {correlations?.info || 0}</span>
+                <span className="bg-red-400 px-2 rounded">High {correlationStats.high || 0}</span>
+                <span className="bg-yellow-400 px-2 rounded">Medium {correlationStats.medium || 0}</span>
+                <span className="bg-blue-400 px-2 rounded">Low {correlationStats.low || 0}</span>
+                <span className="bg-green-400 px-2 rounded">Info {correlationStats.info || 0}</span>
               </div>
             </div>
           </div>
@@ -134,7 +169,7 @@ const ScanDetailsPage = () => {
       {tab === "Browse" && (
         <div>
           <div className="font-semibold mb-2">Browse Data</div>
-          {Array.isArray(scanResults?.browse) && scanResults.browse.length > 0 ? (
+          {browseData.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="min-w-full text-xs bg-gray-900 rounded">
                 <thead>
@@ -144,7 +179,7 @@ const ScanDetailsPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {scanResults.browse.map((el: any, idx: number) => (
+                  {browseData.map((el: any, idx: number) => (
                     <tr key={idx} className="border-b border-gray-800">
                       <td className="p-2">{el[1] || el.type}</td>
                       <td className="p-2">{el[0] || el.value}</td>

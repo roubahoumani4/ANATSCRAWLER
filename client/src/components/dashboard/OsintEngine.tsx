@@ -621,7 +621,7 @@ function ScanResultsTabs({ results }: { results: any }) {
     if (!results || !results.correlations) return { high: 0, medium: 0, low: 0, info: 0 };
     if (Array.isArray(results.correlations)) {
       return results.correlations.reduce((acc: any, c: any) => {
-        const risk = (c.risk || '').toLowerCase();
+        const risk = (c[2] || c.risk || '').toLowerCase();
         if (risk === 'high') acc.high++;
         else if (risk === 'medium') acc.medium++;
         else if (risk === 'low') acc.low++;
@@ -641,7 +641,7 @@ function ScanResultsTabs({ results }: { results: any }) {
 
   function getSummaryStats() {
     return {
-      total: results?.elements || results?.summary?.total || 0,
+      total: results?.elements || results?.summary?.total || (Array.isArray(results?.summary) ? results.summary.reduce((sum: number, row: any) => sum + (row[3] || 0), 0) : 0),
       unique: results?.summary?.unique || 0,
       status: results?.status || results?.summary?.status || '',
       errors: results?.summary?.errors || 0
