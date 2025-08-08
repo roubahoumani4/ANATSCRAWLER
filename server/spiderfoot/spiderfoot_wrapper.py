@@ -55,9 +55,16 @@ for path in [WRAPPER_DIR, SPIDERFOOT_CORE, MODULES_DIR]:
     if path not in sys.path:
         sys.path.insert(0, path)
 
+# --- Multiprocessing Setup ---
+try:
+    import multiprocessing as mp
+    mp.set_start_method("spawn", force=True)
+except Exception as e:
+    print(f"[DEBUG] Multiprocessing setup warning: {e}", file=sys.stderr)
+
 # --- Imports ---
 try:
-    from core.sfscan import SpiderFootScanner
+    from core.sfscan import SpiderFootScanner, startSpiderFootScanner
     from core.spiderfoot.db import SpiderFootDb
     from core.spiderfoot.helpers import SpiderFootHelpers
 except ImportError as e:
@@ -100,49 +107,38 @@ def list_scans():
         # Try to create the database if it doesn't exist
         try:
             db.create()
-            print(f"[DEBUG] Database created/initialized successfully", file=sys.stderr)
         except Exception as create_error:
-            print(f"[DEBUG] Database creation error (non-critical): {create_error}", file=sys.stderr)
+            print(f"[DEBUG] Database creation warning: {create_error}", file=sys.stderr)
         
-        try:
-            scans = db.scanInstanceList()
-            print(f"[DEBUG] Found {len(scans) if scans else 0} scans", file=sys.stderr)
-            
-            # If no scans, return empty array
-            if not scans:
-                print(json.dumps({"scans": []}))
-            else:
-                print(json.dumps({"scans": scans}))
-                
-        except Exception as scan_error:
-            print(f"[DEBUG] Error getting scan list: {scan_error}", file=sys.stderr)
+        scans = db.scanInstanceList()
+        if scans:
+            print(json.dumps({"scans": scans}))
+        else:
             print(json.dumps({"scans": []}))
-            
     except Exception as e:
-        print(f"[DEBUG] Critical error in list_scans: {e}", file=sys.stderr)
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 
 def scan_info(scan_id):
     try:
         db = SpiderFootDb({'__database': DB_PATH})
-        scan = db.scanInstanceGet(scan_id)
-        print(json.dumps(scan))
+        info = db.scanInstanceGet(scan_id)
+        print(json.dumps(info))
     except Exception as e:
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 
 def scan_graph(scan_id):
     try:
         db = SpiderFootDb({'__database': DB_PATH})
-        results = db.scanResultEvent(scan_id)
-        print(json.dumps(results))
+        graph = db.scanGraph(scan_id)
+        print(json.dumps(graph))
     except Exception as e:
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 
 def scan_browse(scan_id):
     try:
         db = SpiderFootDb({'__database': DB_PATH})
-        unique = db.scanResultEventUnique(scan_id)
-        print(json.dumps(unique))
+        browse = db.scanResultEvent(scan_id)
+        print(json.dumps(browse))
     except Exception as e:
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 
@@ -165,8 +161,8 @@ def scan_correlation_summary(scan_id):
 def scan_correlation_list(scan_id):
     try:
         db = SpiderFootDb({'__database': DB_PATH})
-        clist = db.scanCorrelationList(scan_id)
-        print(json.dumps(clist))
+        correlations = db.scanCorrelationList(scan_id)
+        print(json.dumps(correlations))
     except Exception as e:
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 
@@ -186,8 +182,66 @@ def scan_logs(scan_id):
     except Exception as e:
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 
+def run_scan_in_process(logging_queue, scan_name, scan_id, target, target_type, module_list, config):
+    """Run a scan in a separate process - this is the target function for multiprocessing"""
+    try:
+        import time
+        print(f"[PROCESS] Starting scan {scan_id} in separate process", file=sys.stderr)
+        
+        # Use the startSpiderFootScanner function which is designed for multiprocessing
+        scanner = startSpiderFootScanner(logging_queue, scan_name, scan_id, target, target_type, module_list, config)
+        
+        # Wait for the scan to complete by polling the status
+        db = SpiderFootDb({'__database': DB_PATH})
+        max_wait = 300  # 5 minutes timeout
+        poll_interval = 2  # seconds
+        waited = 0
+        
+        print(f"[PROCESS] Waiting for scan {scan_id} to complete...", file=sys.stderr)
+        
+        while waited < max_wait:
+            try:
+                scan_status = db.scanInstanceGet(scan_id)
+                if scan_status and len(scan_status) > 5:
+                    status_str = scan_status[5]
+                    print(f"[PROCESS] Scan {scan_id} status: {status_str}", file=sys.stderr)
+                    
+                    if status_str in ["FINISHED", "ERROR-FAILED", "ABORTED"]:
+                        print(f"[PROCESS] Scan {scan_id} completed with status: {status_str}", file=sys.stderr)
+                        break
+                
+                time.sleep(poll_interval)
+                waited += poll_interval
+                
+            except Exception as poll_error:
+                print(f"[PROCESS] Error polling scan status: {poll_error}", file=sys.stderr)
+                time.sleep(poll_interval)
+                waited += poll_interval
+        
+        if waited >= max_wait:
+            print(f"[PROCESS] Scan {scan_id} timed out after {max_wait} seconds", file=sys.stderr)
+            # Update scan status to ERROR-FAILED
+            try:
+                db.scanInstanceSet(scan_id, "", "", "ERROR-FAILED")
+            except:
+                pass
+        
+        print(f"[PROCESS] Scan {scan_id} process completed", file=sys.stderr)
+        
+    except Exception as e:
+        print(f"[PROCESS] Error in scan {scan_id}: {e}", file=sys.stderr)
+        print(traceback.format_exc(), file=sys.stderr)
+        # Update scan status to ERROR-FAILED
+        try:
+            db = SpiderFootDb({'__database': DB_PATH})
+            db.scanInstanceSet(scan_id, "", "", "ERROR-FAILED")
+        except:
+            pass
+
 def start_scan(target, name):
     try:
+        import time
+        
         target_type = SpiderFootHelpers.targetTypeFromString(target)
         if not target_type:
             print(json.dumps({"success": False, "error": f"Could not determine target type for: {target}"}))
@@ -242,59 +296,42 @@ def start_scan(target, name):
         print(f"Scan ID: {scan_id}", file=sys.stderr)
         print(f"Enabled Modules: {enabled_modules}", file=sys.stderr)
 
-        print(f"[DEBUG] Initializing SpiderFootScanner...", file=sys.stderr)
+        print(f"[DEBUG] Starting SpiderFootScanner in separate process...", file=sys.stderr)
 
         try:
-            scanner = SpiderFootScanner(
-                scanName=name,
-                scanId=scan_id,
-                targetValue=target,
-                targetType=target_type,
-                moduleList=enabled_modules,
-                globalOpts=config,
-                start=True
-            )
-            print(f"[DEBUG] SpiderFootScanner initialized successfully.", file=sys.stderr)
+            # Create a dummy logging queue (not used in our case)
+            logging_queue = None
+            
+            # Start the scan in a separate process using our custom function
+            p = mp.Process(target=run_scan_in_process, args=(logging_queue, name, scan_id, target, target_type, enabled_modules, config))
+            p.daemon = True
+            p.start()
+            
+            print(f"[DEBUG] SpiderFootScanner process started with PID: {p.pid}", file=sys.stderr)
+            
         except Exception as inner:
-            print("🚨 Failed to initialize SpiderFootScanner", file=sys.stderr)
+            print("🚨 Failed to start SpiderFootScanner process", file=sys.stderr)
             print(traceback.format_exc(), file=sys.stderr)
+            print(json.dumps({"success": False, "error": f"Failed to start scan process: {str(inner)}"}), file=sys.stderr, flush=True)
             return
 
-        print(f"[Scan] Scan {scan_id} started.", file=sys.stderr, flush=True)
-        # Poll for scan status and event count
-        import time
+        print(f"[Scan] Scan {scan_id} started in background process.", file=sys.stderr, flush=True)
+        
+        # Wait a moment for the scan to initialize
+        time.sleep(2)
+        
+        # Check if the scan was created successfully
         db = SpiderFootDb({'__database': DB_PATH})
-        max_wait = 120  # seconds
-        poll_interval = 2  # seconds
-        waited = 0
-        last_event_count = -1
-        while waited < max_wait:
-            try:
-                scan_status = db.scanInstanceGet(scan_id)
-                status_str = scan_status[5] if scan_status and len(scan_status) > 5 else "UNKNOWN"
-                events = db.scanResultEvent(scan_id)
-                event_count = len(events) if events else 0
-                if event_count != last_event_count:
-                    print(f"[Scan] Progress: status={status_str}, events={event_count}", file=sys.stderr, flush=True)
-                    last_event_count = event_count
-                if status_str in ["FINISHED", "ERROR-FAILED", "ABORTED"]:
-                    print(f"[Scan] Scan {scan_id} completed with status: {status_str}. Total events: {event_count}", file=sys.stderr, flush=True)
-                    if event_count == 0:
-                        print(f"[ERROR] Scan completed but no events were generated. Possible causes: invalid target, missing module options, or modules not notifying events.", file=sys.stderr, flush=True)
-                        print(f"[ERROR] Target: {target}", file=sys.stderr, flush=True)
-                        print(f"[ERROR] Enabled modules: {enabled_modules}", file=sys.stderr, flush=True)
-                        print(f"[ERROR] Scan config: {json.dumps(config)}", file=sys.stderr, flush=True)
-                    print(json.dumps({"success": status_str=="FINISHED", "scanId": scanner.scanId, "eventCount": event_count, "status": status_str}))
-                    break
-                time.sleep(poll_interval)
-                waited += poll_interval
-            except Exception as scanerr:
-                print(f"[Scan] Polling error: {scanerr}", file=sys.stderr, flush=True)
-                print(traceback.format_exc(), file=sys.stderr, flush=True)
-                break
+        scan_status = db.scanInstanceGet(scan_id)
+        
+        if scan_status:
+            status_str = scan_status[5] if scan_status and len(scan_status) > 5 else "UNKNOWN"
+            print(f"[Scan] Scan {scan_id} initialized with status: {status_str}", file=sys.stderr, flush=True)
+            print(json.dumps({"success": True, "scanId": scan_id, "status": status_str, "message": "Scan started successfully"}))
         else:
-            print(f"[Scan] Scan {scan_id} timed out after {max_wait} seconds.", file=sys.stderr, flush=True)
-            print(json.dumps({"success": False, "scanId": scanner.scanId, "eventCount": last_event_count, "status": "TIMEOUT"}))
+            print(f"[ERROR] Scan {scan_id} failed to initialize", file=sys.stderr, flush=True)
+            print(json.dumps({"success": False, "scanId": scan_id, "error": "Scan failed to initialize"}))
+            
     except Exception as e:
         print(json.dumps({"success": False, "error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 

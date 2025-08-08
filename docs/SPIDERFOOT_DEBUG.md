@@ -3,7 +3,7 @@
 ## Issue
 The SpiderFoot integration is not showing any scans or results on the page at https://horus.anatsecurity.fr/osint-engine/scans
 
-## Latest Changes (2025-01-27)
+## Latest Changes (2025-01-27) - Based on Actual Directory Structure
 
 ### 1. Enhanced Error Handling
 - ✅ Added comprehensive logging to `server/spiderfoot.service.js`
@@ -12,22 +12,54 @@ The SpiderFoot integration is not showing any scans or results on the page at ht
 - ✅ Added health check endpoint (`/api/spiderfoot/health`)
 
 ### 2. Fixed Database Path Issues
-- ✅ Updated `server/spiderfoot/spiderfoot_wrapper.py` to try multiple database paths
+- ✅ Updated `server/spiderfoot/spiderfoot_wrapper.py` to use correct database path: `/var/www/anatscrawler/spiderfoot.db`
 - ✅ Added fallback database path handling
 - ✅ Added automatic database creation if it doesn't exist
 - ✅ Added directory creation for database path
 
-### 3. Added Test Endpoints
+### 3. Fixed Module Path Issues
+- ✅ Updated module path to handle symbolic link: `/var/www/anatscrawler/modules -> server/spiderfoot/modules/`
+- ✅ Added multiple path detection for modules directory
+- ✅ Added symbolic link support
+
+### 4. Fixed Wrapper Path Issues
+- ✅ Updated wrapper path to handle symbolic link: `/var/www/anatscrawler/spiderfoot_wrapper.py -> server/spiderfoot/spiderfoot_wrapper.py`
+- ✅ Added multiple path detection for wrapper
+- ✅ Added symbolic link support
+
+### 5. Added Test Endpoints
 - ✅ Added `/api/spiderfoot/test` endpoint for debugging
 - ✅ Added `/api/spiderfoot/health` endpoint for health checks
 - ✅ Created `server/spiderfoot/test_python.py` for environment testing
 - ✅ Added environment test function to service
 
-### 4. Improved Frontend Debugging
+### 6. Improved Frontend Debugging
 - ✅ Added console logging to `client/src/components/dashboard/OsintScans.tsx`
 - ✅ Enhanced error handling in fetch requests
 - ✅ Added health check before fetching scans
 - ✅ Better error reporting to users
+
+## Actual Directory Structure (from server)
+
+```
+/var/www/anatscrawler/
+├── app/                           # Application directory
+├── client/                        # Frontend client
+├── deploy/                        # Deployment files
+├── dist/                          # Build distribution
+├── ecosystem.config.cjs           # PM2 configuration
+├── index.js                       # Main server file
+├── maigret-venv/                  # Python virtual environment
+├── modules -> server/spiderfoot/modules/  # Symbolic link to modules
+├── node_modules/                  # Node.js dependencies
+├── out/                           # Output directory
+├── package-lock.json              # Package lock file
+├── package.json                   # Package configuration
+├── scripts/                       # Scripts directory
+├── server/                        # Server directory
+├── spiderfoot.db                  # SpiderFoot database (ROOT LEVEL)
+└── spiderfoot_wrapper.py -> server/spiderfoot/spiderfoot_wrapper.py  # Symbolic link
+```
 
 ## Debugging Steps
 
@@ -43,7 +75,7 @@ Expected response:
   "status": "SpiderFoot API is running",
   "timestamp": "2025-01-27T...",
   "environment": "production",
-  "wrapperPath": "/var/www/anatscrawler/app/server/spiderfoot/spiderfoot_wrapper.py"
+  "wrapperPath": "/var/www/anatscrawler/spiderfoot_wrapper.py"
 }
 ```
 
@@ -58,6 +90,7 @@ This will show:
 - Current directory and paths
 - Module import status
 - Database path and status
+- Symbolic link status
 - Scan list results
 
 ### 3. Check Server Logs
@@ -69,14 +102,14 @@ pm2 logs anatscrawler | grep -i spiderfoot
 ### 4. Test Python Wrapper Directly
 SSH into the production VM and test the Python wrapper:
 ```bash
-cd /var/www/anatscrawler/app
+cd /var/www/anatscrawler
 python3 server/spiderfoot/spiderfoot_wrapper.py list_scans
 ```
 
 ### 5. Check Database
 Verify the SpiderFoot database exists and is accessible:
 ```bash
-ls -la /var/www/anatscrawler/app/spiderfoot.db
+ls -la /var/www/anatscrawler/spiderfoot.db
 ```
 
 ### 6. Test API Endpoints
@@ -95,12 +128,12 @@ curl https://horus.anatsecurity.fr/api/spiderfoot/modules
 
 ### 2. Database Path Issues
 - **Problem**: Database file not found
-- **Solution**: Check if `/var/www/anatscrawler/app/spiderfoot.db` exists
+- **Solution**: Check if `/var/www/anatscrawler/spiderfoot.db` exists (ROOT LEVEL)
 - **Alternative**: Create database in current directory
 
 ### 3. Module Import Issues
 - **Problem**: SpiderFoot modules not found
-- **Solution**: Check if `server/spiderfoot/core` and `server/spiderfoot/modules` exist
+- **Solution**: Check if `/var/www/anatscrawler/modules` symbolic link exists
 - **Alternative**: Verify PYTHONPATH is set correctly
 
 ### 4. Permission Issues
@@ -130,16 +163,16 @@ curl https://horus.anatsecurity.fr/api/spiderfoot/modules
 2. **Test Health Check**: Visit `/api/spiderfoot/health` endpoint
 3. **Test Environment**: Visit `/api/spiderfoot/test` endpoint
 4. **Check Logs**: Monitor PM2 logs for errors
-5. **Verify Database**: Ensure SpiderFoot database exists
+5. **Verify Database**: Ensure SpiderFoot database exists at root level
 6. **Test Scans**: Try creating a new scan to verify functionality
 
 ## Files Modified
 
 - `server/spiderfoot.service.js` - Enhanced error handling and logging
-- `server/spiderfoot/spiderfoot_wrapper.py` - Fixed database path and added debugging
+- `server/spiderfoot/spiderfoot_wrapper.py` - Fixed database and module paths
 - `server/routes/spiderfoot.ts` - Added test and health endpoints
 - `client/src/components/dashboard/OsintScans.tsx` - Added debugging and error handling
-- `server/spiderfoot/test_python.py` - New test script for environment verification
+- `server/spiderfoot/test_python.py` - Updated test script for actual structure
 
 ## Quick Test Commands
 
