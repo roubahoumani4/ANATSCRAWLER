@@ -59,13 +59,24 @@ const OsintScans = () => {
         
         console.log('[OsintScans] Processed scan array:', scanArray);
         
+        const normalizeStatus = (raw: any): string => {
+          if (!raw && raw !== 0) return 'unknown';
+          const s = String(raw).toUpperCase();
+          if (s === 'ABORT-REQUESTED' || s === 'ABORT_REQUESTED') return 'abort-requested';
+          if (s === 'ABORTED') return 'aborted';
+          if (s === 'FINISHED' || s === 'DONE' || s === 'COMPLETED') return 'finished';
+          if (s === 'ERROR-FAILED' || s === 'ERROR' || s === 'FAILED') return 'error';
+          if (s === 'RUNNING' || s === 'STARTED' || s === 'STARTING' || s === 'INITIALIZING' || s === 'CREATED') return 'running';
+          return s.toLowerCase();
+        };
+
         const processedScans = scanArray.filter((arr: any[]) => arr && arr[0]).map((arr: any[]) => ({
           scan_id: arr[0],
           name: arr[1],
           target: arr[2],
           started: arr[3],
           finished: arr[4],
-          status: arr[5],
+          status: normalizeStatus(arr[5]),
           elements: arr[6],
           correlations: arr[7],
           modules: arr[8],
