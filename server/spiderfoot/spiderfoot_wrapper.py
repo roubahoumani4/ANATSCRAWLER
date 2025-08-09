@@ -909,6 +909,16 @@ def start_scan(target, name):
                 'maxstorage': 0,
                 '__database': DB_PATH,
             },
+            'sfp__stor_stdout': {
+                '_format': 'tab',
+                '_requested': [],
+                '_showonlyrequested': False,
+                '_stripnewline': False,
+                '_showsource': False,
+                '_csvdelim': ',',
+                '_maxlength': 0,
+                '_eventtypes': {}
+            },
         }
 
         # Initialize DB and register scan
