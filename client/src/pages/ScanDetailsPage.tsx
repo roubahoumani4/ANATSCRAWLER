@@ -145,6 +145,7 @@ const ScanDetailsPage = () => {
             <option value={5000}>5s</option>
             <option value={10000}>10s</option>
           </select>
+          <button className="ml-2 bg-gray-700 hover:bg-gray-600 text-white text-xs px-2 py-1 rounded" onClick={fetchScanData}>Refresh now</button>
         </div>
       </div>
       {tab === "Summary" && (

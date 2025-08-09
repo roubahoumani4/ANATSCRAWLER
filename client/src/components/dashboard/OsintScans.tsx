@@ -14,6 +14,7 @@ const OsintScans = () => {
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [autoRefreshMs, setAutoRefreshMs] = useState<number>(5000);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,6 +22,15 @@ const OsintScans = () => {
   useEffect(() => {
     fetchScans();
   }, []);
+
+  // Auto-refresh while any scan is running
+  useEffect(() => {
+    if (!autoRefreshMs) return;
+    const anyRunning = scans.some(s => s.status === 'running' || s.status === 'abort-requested');
+    if (!anyRunning) return;
+    const id = setInterval(fetchScans, autoRefreshMs);
+    return () => clearInterval(id);
+  }, [scans, autoRefreshMs]);
 
   // Fetch scans from SpiderFoot scanlist (array or object)
   const fetchScans = () => {
@@ -199,6 +209,18 @@ const OsintScans = () => {
             <option value="aborted">Aborted</option>
             <option value="running">Running</option>
             <option value="error">Error</option>
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-coolWhite text-sm">Auto-refresh:</span>
+          <select
+            className="bg-darkGray border border-gray-700 text-coolWhite rounded px-2 py-1 text-xs focus:outline-none"
+            value={autoRefreshMs}
+            onChange={e => setAutoRefreshMs(Number(e.target.value))}
+          >
+            <option value={0}>Off</option>
+            <option value={5000}>5s</option>
+            <option value={10000}>10s</option>
           </select>
         </div>
         <div className="flex gap-2">

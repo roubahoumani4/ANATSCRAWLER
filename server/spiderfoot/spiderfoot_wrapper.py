@@ -688,20 +688,20 @@ def start_scan(target, name):
         enabled_modules = []
         available_modules = list(modules_dict.keys())
         
-        # Filter out modules that require API keys
+        # Filter out modules that require API keys, but explicitly include a sensible default baseline
+        baseline_allowlist = {
+            "sfp_dnsresolve", "sfp_whois", "sfp_ipaddr", "sfp_dns", "sfp_subdomain", "sfp_spider",
+            "sfp_email", "sfp_httpheaders", "sfp_sslcert", "sfp_robtex", "sfp_certdb", "sfp__stor_db"
+        }
         for module_name in available_modules:
             module_info = modules_dict.get(module_name, {})
-            # Check both flags and meta.flags fields
             module_flags = module_info.get('flags', [])
             meta_flags = module_info.get('meta', {}).get('flags', [])
             all_flags = module_flags + meta_flags
-            
-            # Skip modules that require API keys
-            if 'apikey' in all_flags:
+            # Skip modules that require API keys unless in explicit baseline allowlist
+            if 'apikey' in all_flags and module_name not in baseline_allowlist:
                 print(f"[DEBUG] Skipping module {module_name} - requires API key", file=sys.stderr)
                 continue
-            
-            # Include all other modules
             enabled_modules.append(module_name)
             print(f"[DEBUG] Added module: {module_name}", file=sys.stderr)
         
@@ -710,9 +710,12 @@ def start_scan(target, name):
             enabled_modules.append("sfp__stor_db")
             print(f"[DEBUG] Added database storage module: sfp__stor_db", file=sys.stderr)
         
-        # If no modules were selected (all require API keys), use a few basic ones
+        # If no modules were selected (all require API keys), use a broader basic set
         if not enabled_modules:
-            basic_modules = ["sfp_dnsresolve", "sfp_whois", "sfp__stor_db"]
+            basic_modules = [
+                "sfp_dnsresolve", "sfp_whois", "sfp_subdomain", "sfp_ipaddr", "sfp_httpheaders",
+                "sfp_sslcert", "sfp_spider", "sfp__stor_db"
+            ]
             enabled_modules = [mod for mod in basic_modules if mod in available_modules]
             print(f"[DEBUG] No non-API modules found, using basic modules: {enabled_modules}", file=sys.stderr)
         
