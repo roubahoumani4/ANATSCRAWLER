@@ -35,24 +35,6 @@ const ScanDetailsPage = () => {
   const [mispLoading, setMispLoading] = useState<boolean>(false);
   const [refreshIntervalMs, setRefreshIntervalMs] = useState<number>(5000);
 
-  const abortScan = useCallback(async () => {
-    try {
-      await fetch(`/api/spiderfoot/scan/${scanId}/abort`, { method: 'POST' });
-      await fetchScanData();
-    } catch (e) {
-      console.error('Failed to abort scan', e);
-    }
-  }, [scanId, fetchScanData]);
-
-  const deleteScan = useCallback(async () => {
-    try {
-      await fetch(`/api/spiderfoot/scan/${scanId}/delete`, { method: 'POST' });
-      navigate('/osint-engine/scans');
-    } catch (e) {
-      console.error('Failed to delete scan', e);
-    }
-  }, [scanId, navigate]);
-
   const fetchScanData = useCallback(async () => {
     try {
       const [status, summary, correlations, browse, graph, logs] = await Promise.all([
@@ -129,6 +111,24 @@ const ScanDetailsPage = () => {
       setLoading(false);
     }
   }, [scanId]);
+
+  const abortScan = useCallback(async () => {
+    try {
+      await fetch(`/api/spiderfoot/scan/${scanId}/abort`, { method: 'POST' });
+      await fetchScanData();
+    } catch (e) {
+      console.error('Failed to abort scan', e);
+    }
+  }, [scanId, fetchScanData]);
+
+  const deleteScan = useCallback(async () => {
+    try {
+      await fetch(`/api/spiderfoot/scan/${scanId}/delete`, { method: 'POST' });
+      navigate('/osint-engine/scans');
+    } catch (e) {
+      console.error('Failed to delete scan', e);
+    }
+  }, [scanId, navigate]);
 
   useEffect(() => {
     setLoading(true);

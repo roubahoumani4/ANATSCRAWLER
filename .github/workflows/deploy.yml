@@ -46,16 +46,10 @@ jobs:
           name: production-build
           path: out
 
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: production-build
-          path: out
-
-      - name: Flatten out directory for deploy
+      - name: Prepare deploy directory
         run: |
           mkdir -p deploy
-          rsync -a out/ deploy/
+          rsync -a --delete out/ deploy/
 
       - name: Sync build artifacts to VM
         uses: appleboy/scp-action@v0.1.7
@@ -105,8 +99,10 @@ jobs:
             # Install Maigret and dependencies for Threat Intelligence feature
             chmod +x scripts/install-maigret.sh
             bash scripts/install-maigret.sh
-            # Install Recharts for frontend charting (ensure available for SSR/build)
-            npm install recharts
+            # Ensure PM2 is available before using it
+            if ! command -v pm2 >/dev/null 2>&1; then
+              npm install -g pm2
+            fi
             # Install Python dependencies for Spiderfoot
             # Always use maigret-venv for Python dependencies
             if [ ! -d "maigret-venv" ]; then
@@ -118,10 +114,7 @@ jobs:
             pip install networkx
             pip install --upgrade beautifulsoup4
             deactivate
-            # Restart PM2 cleanly for new deployment
-            pm2 delete anatscrawler || true
-            pm2 start index.js --name anatscrawler
-            # Recreate .env
+            # Recreate .env before starting pm2
             cat > .env <<EOF
             NODE_ENV=production
             PORT=${APP_PORT}
@@ -138,20 +131,8 @@ jobs:
             MISP_TIMEOUT_MS=${MISP_TIMEOUT_MS}
             EOF
             chmod 600 .env
-            # Ensure pm2 is available
-            if ! command -v pm2 >/dev/null; then
-              npm install -g pm2
-            fi
-            # Reload or start
-            pm2 reload ecosystem.config.cjs --env production || pm2 start ecosystem.config.cjs --env production
-            # Install extra security dependencies
-            npm install csurf
-            npm i --save-dev @types/csurf
-            npm install cookie-parser
-            npm i --save-dev @types/cookie-parser
-      - name: Remove deprecated and add secure dependencies
-        run: |
-          npm uninstall xss-clean
-          npm install sanitize-html
-          npm i --save-dev @types/sanitize-html
-          npm uninstall csurf
+            # Start or reload with ecosystem only
+            pm2 delete anatscrawler || true
+            pm2 start ecosystem.config.cjs --env production
+            pm2 save
+      # All dependencies should be pinned in package.json; avoid modifying deps post-deploy
