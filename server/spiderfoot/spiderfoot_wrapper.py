@@ -12,22 +12,36 @@ SPIDERFOOT_CORE = os.path.join(WRAPPER_DIR, "core")
 # Try multiple possible module paths (including symbolic links)
 possible_module_paths = [
     os.path.join(WRAPPER_DIR, "modules"),  # Direct modules directory
-    "/var/www/anatscrawler/modules",       # Symbolic link location (as shown in image)
+    "/var/www/anatscrawler/app/server/spiderfoot/modules",  # Server spiderfoot modules (preferred)
+    "/var/www/anatscrawler/modules",       # Symbolic link location
     "/var/www/anatscrawler/app/modules",   # App modules directory
-    "/var/www/anatscrawler/app/server/spiderfoot/modules",  # Server spiderfoot modules
     os.path.join(os.getcwd(), "modules"),  # Current working directory modules
     "modules"                              # Relative path
 ]
 
+def _looks_like_spiderfoot_modules_dir(directory: str) -> bool:
+    try:
+        if not os.path.isdir(directory):
+            return False
+        # Heuristic: must contain at least one SpiderFoot plugin file like sfp_*.py
+        for entry in os.listdir(directory):
+            if entry.startswith("sfp_") and entry.endswith('.py'):
+                return True
+        return False
+    except Exception:
+        return False
+
 MODULES_DIR = None
 for path in possible_module_paths:
-    if os.path.exists(path):
+    if _looks_like_spiderfoot_modules_dir(path):
         MODULES_DIR = path
         print(f"[DEBUG] Found modules directory: {path}", file=sys.stderr)
         break
 
 if not MODULES_DIR:
+    # Final fallback: use WRAPPER_DIR/modules even if empty; better than None
     MODULES_DIR = os.path.join(WRAPPER_DIR, "modules")  # Default fallback
+    print(f"[DEBUG] Falling back to modules directory (may be empty): {MODULES_DIR}", file=sys.stderr)
 
 # Try multiple possible database paths
 possible_db_paths = [
