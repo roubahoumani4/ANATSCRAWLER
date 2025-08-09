@@ -27,12 +27,16 @@ function runPythonCommand(args, waitForOutput = true) {
 
     // Check if we're in production and use the correct Python path
     let pythonPath;
-    if (process.env.NODE_ENV === 'production') {
+    const envPython = process.env.PYTHON_BIN || process.env.SPIDERFOOT_PYTHON || '';
+    if (envPython) {
+      pythonPath = envPython; // Highest priority: explicit env var
+    } else if (process.env.NODE_ENV === 'production') {
       // Try multiple possible Python paths in production
       const possiblePaths = [
+        '/var/www/anatscrawler/app/maigret-venv/bin/python3.10',       // Fixed deploy path requested
         path.join(process.cwd(), 'maigret-venv', 'bin', 'python3.10'),  // Based on actual structure
         path.join(process.cwd(), 'maigret-venv', 'bin', 'python3'),     // Alternative Python version
-        path.join(process.cwd(), 'venv', 'bin', 'python3'),            // Alternative venv
+        path.join(process.cwd(), 'venv', 'bin', 'python3'),             // Alternative venv
         'python3.10',
         'python3',
         'python'

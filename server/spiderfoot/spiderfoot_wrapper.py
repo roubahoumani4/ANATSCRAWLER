@@ -898,6 +898,7 @@ def start_scan(target, name):
             '_useragent': 'Mozilla/5.0',
             '_maxthreads': 10,
             '_uiShowOnlyNew': False,
+            '_showonlyrequested': False,
             '_moduleTimeout': 30,
             '_internettlds_cache': True,
             '_internettlds': 'generic, country, sponsored, infrastructure',

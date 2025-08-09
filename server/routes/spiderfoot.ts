@@ -34,6 +34,99 @@ router.get("/health", async (req, res) => {
   }
 });
 
+// Module progress derived from logs
+router.get("/scan/:scanId/progress", async (req, res) => {
+  try {
+    const scanId = req.params.scanId;
+    const [info, logs] = await Promise.all([
+      spiderfoot.scanInfo(scanId).catch(() => ({})),
+      spiderfoot.scanLogs(scanId).catch(() => ([]))
+    ]);
+
+    // Collect candidate module names from info metadata if present
+    const modulesFromInfo: string[] = Array.isArray((info as any)?.modules)
+      ? (info as any).modules
+      : [];
+
+    // Prepare maps
+    const finished = new Set<string>();
+    const errored = new Set<string>();
+    const seen = new Set<string>(modulesFromInfo);
+
+    const addFromLine = (line: string) => {
+      if (!line) return;
+      // threadWorker FINISHED
+      let m = line.match(/(sfp_[a-z0-9_]+)\.threadWorker\(\) got \"FINISHED\"/i);
+      if (m) {
+        const mod = m[1];
+        seen.add(mod);
+        finished.add(mod);
+        return;
+      }
+      // Clearing and unsetting incomingEventQueue for errored module <name>
+      m = line.match(/errored module\s+(sfp_[a-z0-9_\.]+)/i);
+      if (m) {
+        const mod = m[1].replace(/^modules\./, "");
+        seen.add(mod);
+        errored.add(mod);
+        return;
+      }
+      // Module (modules.sfp_foo) encountered an error
+      m = line.match(/Module \(modules\.(sfp_[a-z0-9_]+)\) encountered an error/i);
+      if (m) {
+        const mod = m[1];
+        seen.add(mod);
+        errored.add(mod);
+        return;
+      }
+      // Setting up sfp_xxx (treat as seen)
+      m = line.match(/Setting up\s+(sfp_[a-z0-9_]+)/i);
+      if (m) {
+        seen.add(m[1]);
+      }
+    };
+
+    // Parse structured logs
+    if (Array.isArray(logs)) {
+      for (const entry of logs as any[]) {
+        const msg: string = (entry && (entry.message || entry[3])) || '';
+        addFromLine(String(msg));
+      }
+    }
+
+    // Parse process file log for near real-time signals
+    try {
+      const fs = require('fs');
+      const p = `/tmp/spiderfoot_scan_${scanId}.log`;
+      if (fs.existsSync(p)) {
+        const txt = fs.readFileSync(p, 'utf8');
+        txt.split(/\r?\n/).forEach(addFromLine);
+      }
+    } catch {}
+
+    // Build statuses map
+    const statuses: Record<string, 'finished' | 'error' | 'seen'> = {};
+    Array.from(seen).forEach((mod) => { statuses[mod] = 'seen'; });
+    Array.from(finished).forEach((mod) => { statuses[mod] = 'finished'; });
+    Array.from(errored).forEach((mod) => { statuses[mod] = 'error'; });
+
+    // Determine totals
+    const totalModules = seen.size || modulesFromInfo.length || null;
+    const finishedCount = finished.size;
+    const errorCount = errored.size;
+
+    res.json({
+      scanId,
+      totalModules,
+      finished: finishedCount,
+      errors: errorCount,
+      statuses
+    });
+  } catch (e) {
+    res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
+  }
+});
+
 // Event count (debug/heartbeat)
 router.get("/scan/:scanId/eventcount", async (req, res) => {
   try {

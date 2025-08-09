@@ -8,6 +8,7 @@
     "build:client": "VITE_API_URL=/api vite build",
     "build:server": "NODE_ENV=production node scripts/build-server.js",
     "start": "NODE_ENV=production node dist/index.js",
+    "start:prod:py": "PYTHON_BIN=/var/www/anatscrawler/app/maigret-venv/bin/python3.10 NODE_ENV=production node dist/index.js",
     "check": "tsc",
     "prod:clean": "rm -rf dist node_modules package-lock.json",
     "prod:install": "npm ci --omit=dev",
@@ -126,6 +127,7 @@
     "vite": "^6.3.5"
   },
   "optionalDependencies": {
-    "bufferutil": "^4.0.8"
+    "bufferutil": "^4.0.8",
+    "utf-8-validate": "^6.0.5"
   }
 }
