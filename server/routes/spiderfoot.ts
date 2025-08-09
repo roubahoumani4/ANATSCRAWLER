@@ -17,6 +17,25 @@ router.get("/health", async (req, res) => {
   }
 });
 
+// Event count (debug/heartbeat)
+router.get("/scan/:scanId/eventcount", async (req, res) => {
+  try {
+    const result = await spiderfoot.runPythonCommand
+    res.json(await spiderfoot.scanEventCount(req.params.scanId));
+  } catch (e) {
+    res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
+  }
+});
+
+// Last log timestamp (debug/heartbeat)
+router.get("/scan/:scanId/lastlog", async (req, res) => {
+  try {
+    res.json(await spiderfoot.scanLastLogTime(req.params.scanId));
+  } catch (e) {
+    res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
+  }
+});
+
 // Test endpoint to debug SpiderFoot integration
 router.get("/test", async (req, res) => {
   try {

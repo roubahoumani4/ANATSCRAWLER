@@ -301,6 +301,9 @@ module.exports = {
   scanResultEvent: (scanId) => runPythonCommand(['scan_result_event', scanId]),
   scanLogs: (scanId) => runPythonCommand(['scan_logs', scanId]),
   listModules: () => runPythonCommand(['list_modules']),
+  // Debug helpers
+  scanEventCount: (scanId) => runPythonCommand(['scan_event_count', scanId]),
+  scanLastLogTime: (scanId) => runPythonCommand(['scan_last_log_time', scanId]),
 
   // 🔵 Detached version of scan start (non-blocking)
   startScan: async (target, name) => {

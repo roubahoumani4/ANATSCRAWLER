@@ -38,14 +38,25 @@ const ScanDetailsPage = () => {
         fetch(`/api/spiderfoot/scan/${scanId}/logs`).then(res => res.json()).catch(() => [])
       ]);
 
-      setScanStatus(status);
+      // Normalize scan status: server should return an object, but tolerate array shape
+      const normalizedStatus = Array.isArray(status)
+        ? {
+            name: status[0] ?? scanId,
+            target: status[1] ?? '',
+            created: status[2] ?? 0,
+            started: status[3] ?? 0,
+            finished: status[4] ?? 0,
+            status: status[5] ?? 'UNKNOWN'
+          }
+        : (status || {});
+      setScanStatus(normalizedStatus);
       setScanResults({ summary, correlations, browse, graph });
       setCorrelations(correlations);
       setGraphData(graph);
       
       // Format logs properly
       let formattedLogs = "";
-      if (Array.isArray(logs)) {
+        if (Array.isArray(logs)) {
         formattedLogs = logs.map(l => {
           if (typeof l === 'string') return l;
           if (typeof l === 'object' && l.generated) {
@@ -120,7 +131,13 @@ const ScanDetailsPage = () => {
     <div className="p-8 w-full">
       <div className="flex items-center gap-4 mb-4">
         <button className="text-blue-400 underline" onClick={() => navigate("/osint-engine/scans") }>&larr; Back</button>
-        <h1 className="text-2xl font-bold">{scanStatus.name || scanStatus.target} <span className="ml-2 text-xs font-semibold text-yellow-400">{scanStatus.status}</span></h1>
+        <h1 className="text-2xl font-bold">
+          {scanStatus.name || scanStatus.target}
+          <span className="ml-2 text-xs font-semibold text-yellow-400">{scanStatus.status}</span>
+          {Array.isArray((scanStatus as any)?.modules) && (scanStatus as any).modules.length > 0 && (
+            <span className="ml-3 text-xs text-gray-400">Modules: {(scanStatus as any).modules.slice(0, 6).join(', ')}{(scanStatus as any).modules.length > 6 ? '…' : ''}</span>
+          )}
+        </h1>
       </div>
       <div className="flex items-center justify-between mb-6">
         <div className="flex gap-2">

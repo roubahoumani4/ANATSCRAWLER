@@ -47,6 +47,9 @@ for path in possible_db_paths:
 if not DB_PATH:
     DB_PATH = "/var/www/anatscrawler/spiderfoot.db"  # Default fallback based on actual structure
 
+# Metadata file (to persist auxiliary info like enabled modules)
+META_PATH = os.path.join(os.path.dirname(DB_PATH), 'spiderfoot_scanmeta.json')
+
 # Show paths (debugging)
 print("PYTHONPATH:", sys.path, file=sys.stderr)
 print("MODULES_DIR:", MODULES_DIR, file=sys.stderr)
@@ -185,7 +188,30 @@ def scan_info(scan_id):
     try:
         db = SpiderFootDb({'__database': DB_PATH})
         info = db.scanInstanceGet(scan_id)
-        print(json.dumps(info))
+        # Convert to object and enrich with metadata
+        result = info
+        try:
+            if isinstance(info, (list, tuple)) and len(info) >= 6:
+                result = {
+                    "name": info[0],
+                    "target": info[1],
+                    "created": info[2],
+                    "started": info[3],
+                    "ended": info[4],
+                    "status": info[5]
+                }
+            # Attach modules from metadata if available
+            if os.path.exists(META_PATH):
+                with open(META_PATH, 'r') as f:
+                    meta = json.load(f)
+                if isinstance(meta, dict) and scan_id in meta:
+                    result_modules = meta[scan_id].get('modules')
+                    if result_modules:
+                        if isinstance(result, dict):
+                            result['modules'] = result_modules
+        except Exception:
+            pass
+        print(json.dumps(result))
     except Exception as e:
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 
@@ -225,6 +251,38 @@ def scan_result_summary(scan_id):
     except Exception as e:
         print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
         print(json.dumps([]))
+
+def scan_event_count(scan_id):
+    try:
+        db = SpiderFootDb({'__database': DB_PATH})
+        summary = db.scanResultSummary(scan_id) or []
+        total = 0
+        if isinstance(summary, list):
+            for row in summary:
+                try:
+                    if isinstance(row, (list, tuple)) and len(row) > 3:
+                        total += int(row[3] or 0)
+                except Exception:
+                    pass
+        print(json.dumps({"scan_id": scan_id, "count": total}))
+    except Exception as e:
+        print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
+        print(json.dumps({"scan_id": scan_id, "count": 0}))
+
+def scan_last_log_time(scan_id):
+    try:
+        db = SpiderFootDb({'__database': DB_PATH})
+        logs = db.scanLogs(scan_id) or []
+        latest = 0
+        if isinstance(logs, list) and logs:
+            try:
+                latest = max(int(row[0]) for row in logs if isinstance(row, (list, tuple)) and len(row) > 0 and isinstance(row[0], (int, float)))
+            except Exception:
+                pass
+        print(json.dumps({"scan_id": scan_id, "latest_log_ts": latest}))
+    except Exception as e:
+        print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
+        print(json.dumps({"scan_id": scan_id, "latest_log_ts": 0}))
 
 def scan_correlation_summary(scan_id):
     try:
@@ -779,6 +837,24 @@ def start_scan(target, name):
 
         print(f"[DEBUG] Starting SpiderFootScanner in separate process...", file=sys.stderr)
 
+        # Persist metadata (enabled modules) for UI visibility
+        try:
+            meta = {}
+            if os.path.exists(META_PATH):
+                with open(META_PATH, 'r') as f:
+                    meta = json.load(f) or {}
+            meta[scan_id] = {
+                'modules': enabled_modules,
+                'name': name,
+                'target': target,
+                'created': time.time()
+            }
+            with open(META_PATH, 'w') as f:
+                json.dump(meta, f)
+            print(f"[DEBUG] Wrote scan metadata to {META_PATH}", file=sys.stderr)
+        except Exception as meta_err:
+            print(f"[DEBUG] Failed to write scan metadata: {meta_err}", file=sys.stderr)
+
         try:
             # Create a proper multiprocessing queue for logging
             logging_queue = None
@@ -825,10 +901,10 @@ def start_scan(target, name):
         if scan_status:
             status_str = scan_status[5] if scan_status and len(scan_status) > 5 else "UNKNOWN"
             print(f"[Scan] Scan {scan_id} initialized with status: {status_str}", file=sys.stderr, flush=True)
-            print(json.dumps({"success": True, "scanId": scan_id, "status": status_str, "message": "Scan started successfully"}))
+            print(json.dumps({"success": True, "scanId": scan_id, "status": status_str, "message": "Scan started successfully", "modules": enabled_modules}))
         else:
             print(f"[ERROR] Scan {scan_id} failed to initialize", file=sys.stderr, flush=True)
-            print(json.dumps({"success": False, "scanId": scan_id, "error": "Scan failed to initialize"}))
+            print(json.dumps({"success": False, "scanId": scan_id, "error": "Scan failed to initialize", "modules": enabled_modules}))
             
     except Exception as e:
         print(json.dumps({"success": False, "error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
@@ -892,6 +968,8 @@ if __name__ == "__main__":
             case "scan_correlation_list": scan_correlation_list(*args)
             case "scan_result_event": scan_result_event(*args)
             case "scan_logs": scan_logs(*args)
+            case "scan_event_count": scan_event_count(*args)
+            case "scan_last_log_time": scan_last_log_time(*args)
             case "delete_scan": delete_scan(*args)
             case "abort_scan": abort_scan(*args)
             case "start_scan": start_scan(*args)
