@@ -877,7 +877,17 @@ def start_scan(target, name):
             print(json.dumps({"success": False, "error": f"Could not determine target type for: {target}"}))
             return
 
-        # Minimal config; the child process will load modules and choose defaults
+        # Load ALL available modules for a full scan
+        try:
+            modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR or "modules")
+            enabled_modules = list(modules_dict.keys())
+        except Exception as load_err:
+            # If loading fails, fall back to minimal set; child process will also try again
+            modules_dict = create_minimal_modules_dict()
+            enabled_modules = list(modules_dict.keys())
+            print(f"[DEBUG] Failed to load modules for full scan, using minimal: {load_err}", file=sys.stderr)
+
+        # Base config; the child process will also merge modules into config
         config = {
             '__database': DB_PATH,
             '_debug': True,
@@ -891,7 +901,13 @@ def start_scan(target, name):
             '_moduleTimeout': 30,
             '_internettlds_cache': True,
             '_internettlds': 'generic, country, sponsored, infrastructure',
-            '_socks1type': ''
+            '_socks1type': '',
+            '__modules__': modules_dict,
+            'sfp__stor_db': {
+                '_store': True,
+                'maxstorage': 0,
+                '__database': DB_PATH,
+            },
         }
 
         # Initialize DB and register scan
@@ -903,14 +919,14 @@ def start_scan(target, name):
         sfdb.scanInstanceCreate(scan_id, name, target)
         print(f"[DEBUG] Registered scan {scan_id}", file=sys.stderr)
 
-        # Persist minimal metadata for UI
+        # Persist metadata for UI (record enabled modules)
         try:
             meta = {}
             if os.path.exists(META_PATH):
                 with open(META_PATH, 'r') as f:
                     meta = json.load(f) or {}
             meta[scan_id] = {
-                'modules': 'pending',
+                'modules': enabled_modules,
                 'name': name,
                 'target': target,
                 'created': time.time()
@@ -928,7 +944,8 @@ def start_scan(target, name):
             except Exception:
                 logging_queue = None
 
-            p = mp.Process(target=run_scan_in_process, args=(logging_queue, name, scan_id, target, target_type, [], config))
+            # Pass the full module list to the scan process
+            p = mp.Process(target=run_scan_in_process, args=(logging_queue, name, scan_id, target, target_type, enabled_modules, config))
             p.daemon = False
             p.start()
 
