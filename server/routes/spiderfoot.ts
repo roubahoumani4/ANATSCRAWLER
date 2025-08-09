@@ -126,7 +126,20 @@ router.get("/osint-engine/scans", async (req, res) => {
 // Get scan info (details)
 router.get("/scan/:scanId/status", async (req, res) => {
   try {
-    const info = await spiderfoot.scanInfo(req.params.scanId);
+    const raw = await spiderfoot.scanInfo(req.params.scanId);
+    // Normalize scan info into an object for the UI
+    // Expected raw array: [name, target, created, started, ended, status]
+    let info: any = raw;
+    if (Array.isArray(raw)) {
+      info = {
+        name: raw[0] ?? req.params.scanId,
+        target: raw[1] ?? '',
+        created: raw[2] ?? 0,
+        started: raw[3] ?? 0,
+        ended: raw[4] ?? 0,
+        status: raw[5] ?? 'UNKNOWN'
+      };
+    }
     res.json(info);
   } catch (e) {
     res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
