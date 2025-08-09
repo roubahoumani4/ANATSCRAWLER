@@ -935,6 +935,93 @@ def start_scan(target, name):
     except Exception as e:
         print(json.dumps({"success": False, "error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 
+# Start a scan with a minimal, fast baseline of modules
+def start_scan_minimal(target, name):
+    try:
+        import time
+
+        # Load modules
+        modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR)
+        available_modules = list(modules_dict.keys())
+
+        # Minimal baseline set
+        requested = [
+            "sfp_dnsresolve",
+            "sfp_whois",
+            "sfp_spider",
+            "sfp__stor_db",
+        ]
+        enabled_modules = [m for m in requested if m in available_modules]
+        print(f"[DEBUG] Minimal enabled modules: {enabled_modules}", file=sys.stderr)
+
+        # Build config
+        config = {
+            '__database': DB_PATH,
+            '_debug': True,
+            '_loglevel': 'DEBUG',
+            '__logging': True,
+            '_scanlogtodisk': True,
+            '_dnsserver': '8.8.8.8',
+            '_useragent': 'Mozilla/5.0',
+            '_maxthreads': 10,
+            '_uiShowOnlyNew': False,
+            '_moduleTimeout': 30,
+            '__modules__': modules_dict,
+            'sfp__stor_db': {
+                '_store': True,
+                'maxstorage': 0,
+                '__database': DB_PATH,
+            },
+        }
+
+        sfdb = SpiderFootDb({'__database': DB_PATH})
+        sfdb.create()
+        print(f"[DEBUG] Database initialized at: {DB_PATH}", file=sys.stderr)
+
+        scan_id = SpiderFootHelpers.genScanInstanceId()
+        sfdb.scanInstanceCreate(scan_id, name, target)
+        print(f"[DEBUG] Registered minimal scan {scan_id}", file=sys.stderr)
+
+        # Persist metadata for UI
+        try:
+            meta = {}
+            if os.path.exists(META_PATH):
+                with open(META_PATH, 'r') as f:
+                    meta = json.load(f) or {}
+            meta[scan_id] = {
+                'modules': enabled_modules,
+                'name': name,
+                'target': target,
+                'created': time.time(),
+                'baseline': True
+            }
+            with open(META_PATH, 'w') as f:
+                json.dump(meta, f)
+        except Exception as meta_err:
+            print(f"[DEBUG] Failed to write metadata: {meta_err}", file=sys.stderr)
+
+        # Start the process using existing helper
+        try:
+            logging_queue = None
+            p = mp.Process(target=run_scan_in_process, args=(logging_queue, name, scan_id, target, SpiderFootHelpers.targetTypeFromString(target), enabled_modules, config))
+            p.daemon = True
+            p.start()
+            print(f"[DEBUG] Minimal scan process started PID={p.pid}", file=sys.stderr)
+        except Exception as e:
+            print(json.dumps({"success": False, "error": f"Failed to start scan process: {str(e)}"}), file=sys.stderr, flush=True)
+            return
+
+        time.sleep(2)
+        db = SpiderFootDb({'__database': DB_PATH})
+        scan_status = db.scanInstanceGet(scan_id)
+        if scan_status:
+            status_str = scan_status[5] if len(scan_status) > 5 else "UNKNOWN"
+            print(json.dumps({"success": True, "scanId": scan_id, "status": status_str, "message": "Minimal scan started", "modules": enabled_modules}))
+        else:
+            print(json.dumps({"success": False, "scanId": scan_id, "error": "Minimal scan failed to initialize", "modules": enabled_modules}))
+    except Exception as e:
+        print(json.dumps({"success": False, "error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
+
 # Abort a running scan by setting its status to ABORT-REQUESTED
 def abort_scan(scan_id: str):
     try:

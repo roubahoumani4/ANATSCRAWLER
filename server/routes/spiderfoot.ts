@@ -434,5 +434,23 @@ router.post("/scan/start", async (req, res) => {
   }
 });
 
+// Start minimal (fast baseline) scan
+router.post("/scan/start-minimal", async (req, res) => {
+  const { target, name } = req.body;
+  if (!target || !name) {
+    return res.status(400).json({ error: "Missing target or name" });
+  }
+  try {
+    const result = await spiderfoot.startScanMinimal(target, name);
+    if (result && result.scanId) {
+      res.json({ scanId: result.scanId, success: true });
+    } else {
+      res.status(500).json({ error: "Failed to start minimal scan", details: result });
+    }
+  } catch (e) {
+    res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
+  }
+});
+
 // --- Exports ---
 export default router;

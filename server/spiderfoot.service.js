@@ -321,6 +321,21 @@ module.exports = {
   // Debug helpers
   scanEventCount: (scanId) => runPythonCommand(['scan_event_count', scanId]),
   scanLastLogTime: (scanId) => runPythonCommand(['scan_last_log_time', scanId]),
+  // Minimal baseline scan
+  startScanMinimal: async (target, name) => {
+    scanCache = null;
+    try {
+      console.log(`[SpiderFoot] Starting minimal scan for target='${target}' name='${name}'`);
+      const result = await runPythonCommand(['start_scan_minimal', target, name], true);
+      if (result && result.success && result.scanId) {
+        return { success: true, scanId: result.scanId, message: result.message || 'Minimal scan started' };
+      }
+      throw new Error('Unexpected start_scan_minimal response');
+    } catch (error) {
+      console.error('[SpiderFoot] Failed to start minimal scan:', error);
+      throw error;
+    }
+  },
 
   // 🔵 Detached version of scan start (non-blocking)
   startScan: async (target, name) => {
