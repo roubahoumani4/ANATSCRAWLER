@@ -78,6 +78,10 @@ jobs:
           REDIS_URL: ${{ secrets.REDIS_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           COOKIE_SECRET: ${{ secrets.COOKIE_SECRET }}
+          MISP_URL: ${{ secrets.MISP_URL }}
+          MISP_API_KEY: ${{ secrets.MISP_API_KEY }}
+          MISP_VERIFY_TLS: ${{ secrets.MISP_VERIFY_TLS }}
+          MISP_TIMEOUT_MS: ${{ secrets.MISP_TIMEOUT_MS }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           port: ${{ secrets.DEPLOY_PORT }}
@@ -128,6 +132,10 @@ jobs:
             VITE_API_URL=/api
             JWT_SECRET=${JWT_SECRET}
             COOKIE_SECRET=${COOKIE_SECRET}
+            MISP_URL=${MISP_URL}
+            MISP_API_KEY=${MISP_API_KEY}
+            MISP_VERIFY_TLS=${MISP_VERIFY_TLS}
+            MISP_TIMEOUT_MS=${MISP_TIMEOUT_MS}
             EOF
             chmod 600 .env
             # Ensure pm2 is available
