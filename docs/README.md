@@ -24,12 +24,18 @@ This project is a full-stack web application for ANAT Security, focusing on cred
 - **CI/CD Pipeline**: `.github/workflows/deploy.yml`
 - **Deployment Scripts**: `scripts/prod.sh`, `scripts/validate-deployment.sh`
 - **Configuration**: `ecosystem.config.cjs`, `docs/nginx-anatscrawler.conf`
+ - **SpiderFoot Integration**: `docs/SPIDERFOOT_INTEGRATION.md`
+ - **MISP & cross-enrichment plan**: see `docs/SPIDERFOOT_INTEGRATION.md` → Staged improvements plan
+  - **Architecture, gaps, and plan**: `docs/ARCHITECTURE_GAPS_AND_PLAN.md`
 
 ### Validation Commands
+
 ```bash
 # After deployment, validate:
 pm2 ls
 curl http://192.168.1.105:5000/api/health
+curl http://192.168.1.105:5000/api/spiderfoot/health
+curl http://192.168.1.105:5000/api/spiderfoot/scanlist
 ./scripts/validate-deployment.sh
 ```
 
@@ -114,6 +120,14 @@ The application follows a client-server architecture with the following core com
    - Optimized production builds
    - TypeScript support with ESM modules
 
+## Identified gaps and near-term fixes
+
+- Graph tab visualization is a placeholder in `client/src/pages/ScanDetailsPage.tsx`.
+- Minor bug in `server/routes/spiderfoot.ts` for `/scan/:scanId/eventcount` (stray/incomplete call) — adjust to directly return `scanEventCount`.
+- Response shape normalization is partial; prefer consistent objects from the router for status/correlations.
+- Some bundled modules include stubs; restrict enabled modules to the baseline until hardened.
+
+See `docs/SPIDERFOOT_INTEGRATION.md` for the full staged plan including MISP integration.
 ## Key Components
 
 ### Frontend Components

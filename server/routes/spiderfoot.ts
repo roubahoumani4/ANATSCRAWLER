@@ -20,8 +20,8 @@ router.get("/health", async (req, res) => {
 // Event count (debug/heartbeat)
 router.get("/scan/:scanId/eventcount", async (req, res) => {
   try {
-    const result = await spiderfoot.runPythonCommand
-    res.json(await spiderfoot.scanEventCount(req.params.scanId));
+    const result = await spiderfoot.scanEventCount(req.params.scanId);
+    res.json(result);
   } catch (e) {
     res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
   }
