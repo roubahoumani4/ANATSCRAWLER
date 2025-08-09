@@ -137,12 +137,16 @@ jobs:
             pm2 save
 
             # Ensure SpiderFoot runtime preconditions
-            echo "--- Ensuring /var/www/anatscrawler ownership ---"
-            chown -R $(whoami):$(whoami) /var/www/anatscrawler || true
+            echo "--- Ensuring /var/www/anatscrawler ownership (best-effort) ---"
+            if [ "$(id -u)" -eq 0 ]; then
+              chown -R $(whoami):$(whoami) /var/www/anatscrawler >/dev/null 2>&1 || true
+            else
+              echo "Not root; skipping chown to avoid noisy 'Operation not permitted' errors"
+            fi
 
             echo "--- Ensuring modules symlink ---"
             if [ ! -L "/var/www/anatscrawler/modules" ]; then
-              ln -s /var/www/anatscrawler/app/server/spiderfoot/modules /var/www/anatscrawler/modules || true
+              ln -s /var/www/anatscrawler/app/server/spiderfoot/modules /var/www/anatscrawler/modules >/dev/null 2>&1 || true
             fi
 
             echo "--- Connectivity sanity checks ---"
