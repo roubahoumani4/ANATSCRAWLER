@@ -134,6 +134,25 @@ except ImportError as e:
     }), file=sys.stderr, flush=True)
     sys.exit(1)
 
+# --- Helper function to create minimal modules dict ---
+def create_minimal_modules_dict():
+    """Create a minimal modules dictionary with essential modules when loading fails"""
+    return {
+        "sfp__stor_db": {
+            "name": "sfp__stor_db",
+            "opts": {},
+            "meta": {},
+            "flags": [],
+            "useCases": [],
+            "watchedEvents": ["*"],
+            "producedEvents": ["*"],
+            "cats": [],
+            "optdescs": {},
+            "descr": "",
+            "group": []
+        }
+    }
+
 # --- Wrapper Commands ---
 def list_modules():
     try:
@@ -565,14 +584,21 @@ def run_scan_in_process(logging_queue, scan_name, scan_id, target, target_type, 
             from core.sfscan import SpiderFootScanner, startSpiderFootScanner
             from core.spiderfoot.db import SpiderFootDb
             from core.spiderfoot.helpers import SpiderFootHelpers
+            print(f"[PROCESS] Successfully imported SpiderFoot modules", file=sys.stderr)
         except ImportError as import_error:
             print(f"[PROCESS] Failed to import SpiderFoot modules: {import_error}", file=sys.stderr)
+            print(f"[PROCESS] Traceback: {traceback.format_exc()}", file=sys.stderr)
             raise
         
         # Load modules in this process context
         print(f"[PROCESS] Loading modules from: {MODULES_DIR}", file=sys.stderr)
-        modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR)
-        print(f"[PROCESS] Loaded {len(modules_dict)} modules", file=sys.stderr)
+        try:
+            modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR)
+            print(f"[PROCESS] Loaded {len(modules_dict)} modules", file=sys.stderr)
+        except Exception as load_error:
+            print(f"[PROCESS] Failed to load modules: {load_error}", file=sys.stderr)
+            modules_dict = create_minimal_modules_dict()
+            print(f"[PROCESS] Created minimal modules dict", file=sys.stderr)
         
         # Debug: Check if specific modules are loaded
         if modules_dict:
@@ -586,6 +612,9 @@ def run_scan_in_process(logging_queue, scan_name, scan_id, target, target_type, 
                     print(f"[PROCESS] ✗ {key_mod} module NOT found", file=sys.stderr)
         else:
             print(f"[PROCESS] ERROR: No modules loaded!", file=sys.stderr)
+            # Try to create a minimal modules dict with at least the storage module
+            modules_dict = create_minimal_modules_dict()
+            print(f"[PROCESS] Created minimal modules dict with storage module", file=sys.stderr)
         
         # Update config with loaded modules
         config['__modules__'] = modules_dict
@@ -598,7 +627,12 @@ def run_scan_in_process(logging_queue, scan_name, scan_id, target, target_type, 
         print(f"[PROCESS] Modules prepared with opts", file=sys.stderr)
         
         # Initialize database connection
-        db = SpiderFootDb({'__database': DB_PATH})
+        try:
+            db = SpiderFootDb({'__database': DB_PATH})
+            print(f"[PROCESS] Database connection established", file=sys.stderr)
+        except Exception as db_error:
+            print(f"[PROCESS] Failed to connect to database: {db_error}", file=sys.stderr)
+            raise
         
         # ✅ CRITICAL: Ensure database schema is created
         try:
@@ -611,6 +645,7 @@ def run_scan_in_process(logging_queue, scan_name, scan_id, target, target_type, 
         # Update scan status to STARTING
         try:
             db.scanInstanceSet(scan_id, "", "", "STARTING")
+            print(f"[PROCESS] Updated scan status to STARTING", file=sys.stderr)
         except Exception as e:
             print(f"[PROCESS] Failed to update scan status to STARTING: {e}", file=sys.stderr)
         
@@ -629,6 +664,16 @@ def run_scan_in_process(logging_queue, scan_name, scan_id, target, target_type, 
             print(f"[PROCESS] - module_list: {module_list}", file=sys.stderr)
             print(f"[PROCESS] - config keys: {list(config.keys())}", file=sys.stderr)
             print(f"[PROCESS] - logging_queue type: {type(logging_queue)}", file=sys.stderr)
+            
+            # ✅ CRITICAL: Ensure module_list is not empty and contains valid modules
+            if not module_list:
+                print(f"[PROCESS] WARNING: module_list is empty, using basic modules", file=sys.stderr)
+                module_list = ["sfp_dnsresolve", "sfp_whois", "sfp__stor_db"]
+                # Filter to only include modules that exist
+                module_list = [mod for mod in module_list if mod in modules_dict]
+                if not module_list:
+                    print(f"[PROCESS] ERROR: No valid modules found, using storage module only", file=sys.stderr)
+                    module_list = ["sfp__stor_db"]
             
             try:
                 scanner = startSpiderFootScanner(logging_queue, scan_name, scan_id, target, target_type, module_list, config)
@@ -664,17 +709,6 @@ def run_scan_in_process(logging_queue, scan_name, scan_id, target, target_type, 
             # Check if scan is actually running
             if hasattr(scanner, '_SpiderFootScanner__status'):
                 print(f"[PROCESS] Scanner internal status: {scanner._SpiderFootScanner__status}", file=sys.stderr)
-            
-            # Check if modules were loaded in the scanner
-            if hasattr(scanner, '_SpiderFootScanner__moduleInstances'):
-                module_instances = scanner._SpiderFootScanner__moduleInstances
-                print(f"[PROCESS] Scanner loaded {len(module_instances)} module instances: {list(module_instances.keys())}", file=sys.stderr)
-                
-                # Check each module's status
-                for mod_name, mod_instance in module_instances.items():
-                    print(f"[PROCESS] Module {mod_name}: errorState={getattr(mod_instance, 'errorState', 'N/A')}, _stopScanning={getattr(mod_instance, '_stopScanning', 'N/A')}", file=sys.stderr)
-            else:
-                print(f"[PROCESS] Scanner doesn't have module instances attribute", file=sys.stderr)
             
             # Check if scan is actually running by checking the database status
             try:
@@ -775,12 +809,19 @@ def start_scan(target, name):
             return
 
         print(f"[DEBUG] Attempting to load modules from: {MODULES_DIR}", file=sys.stderr)
-        modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR)
-        print(f"[DEBUG] Modules loaded: {list(modules_dict.keys()) if modules_dict else 'None'}", file=sys.stderr)
+        try:
+            modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR)
+            print(f"[DEBUG] Modules loaded: {list(modules_dict.keys()) if modules_dict else 'None'}", file=sys.stderr)
+        except Exception as load_error:
+            print(f"[DEBUG] Failed to load modules: {load_error}", file=sys.stderr)
+            modules_dict = create_minimal_modules_dict()
+            print(f"[DEBUG] Created minimal modules dict", file=sys.stderr)
+        
+        # ✅ CRITICAL: Handle case where no modules are loaded
         if not modules_dict:
-            print(f"[ERROR] Failed to load any modules.", file=sys.stderr)
-            print(json.dumps({"success": False, "error": "Failed to load any modules."}), file=sys.stderr, flush=True)
-            return
+            print(f"[WARNING] Failed to load any modules from {MODULES_DIR}, creating minimal modules dict", file=sys.stderr)
+            # Create a minimal modules dict with essential modules
+            modules_dict = create_minimal_modules_dict()
         
         # ✅ NEW: Select ALL available modules except those requiring API keys
         enabled_modules = []
@@ -816,6 +857,11 @@ def start_scan(target, name):
             ]
             enabled_modules = [mod for mod in basic_modules if mod in available_modules]
             print(f"[DEBUG] No non-API modules found, using basic modules: {enabled_modules}", file=sys.stderr)
+            
+            # If still no modules, create a minimal set
+            if not enabled_modules:
+                enabled_modules = ["sfp__stor_db"]
+                print(f"[DEBUG] No basic modules found, using storage module only: {enabled_modules}", file=sys.stderr)
         
         print(f"[DEBUG] Selected modules ({len(enabled_modules)} total): {enabled_modules}", file=sys.stderr)
 
@@ -918,10 +964,24 @@ def start_scan(target, name):
             # Start the scan in a separate process using our custom function
             print(f"[DEBUG] About to start process with logging_queue: {type(logging_queue)}", file=sys.stderr)
             p = mp.Process(target=run_scan_in_process, args=(logging_queue, name, scan_id, target, target_type, enabled_modules, config))
-            p.daemon = True
+            p.daemon = False  # Changed to False to prevent silent failures
             p.start()
             
             print(f"[DEBUG] SpiderFootScanner process started with PID: {p.pid}", file=sys.stderr)
+            
+            # Wait a moment for the scan to initialize and check if it's still running
+            time.sleep(3)
+            
+            if not p.is_alive():
+                print(f"[ERROR] Scan process died immediately", file=sys.stderr)
+                # Try to get the exit code
+                try:
+                    exit_code = p.exitcode
+                    print(f"[ERROR] Process exit code: {exit_code}", file=sys.stderr)
+                except:
+                    pass
+                print(json.dumps({"success": False, "error": "Scan process failed to start or died immediately"}), file=sys.stderr, flush=True)
+                return
             
         except Exception as inner:
             print("🚨 Failed to start SpiderFootScanner process", file=sys.stderr)

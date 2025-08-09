@@ -427,6 +427,14 @@ class SpiderFootScanner():
                     print(f"[SFSCAN] Module {modName} event queue setup failed: {e}", file=sys.stderr)
                     continue
 
+                # ✅ CRITICAL: Ensure module has _priority attribute
+                if not hasattr(mod, '_priority'):
+                    try:
+                        setattr(mod, '_priority', 1)
+                        print(f"[SFSCAN] Added _priority=1 to module {modName}", file=sys.stderr)
+                    except Exception as e:
+                        print(f"[SFSCAN] Failed to add _priority to module {modName}: {e}", file=sys.stderr)
+
                 self.__moduleInstances[modName] = mod
                 print(f"[SFSCAN] {modName} module loaded.", file=sys.stderr)
 

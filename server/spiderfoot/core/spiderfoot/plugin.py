@@ -383,7 +383,7 @@ class SpiderFootPlugin():
             self.outgoingEventQueue.put(sfEvent)
         # otherwise, call other modules directly
         else:
-            self._listenerModules.sort(key=lambda m: m._priority)
+            self._listenerModules.sort(key=lambda m: getattr(m, '_priority', 1))
 
             for listener in self._listenerModules:
                 if eventName not in listener.watchedEvents() and '*' not in listener.watchedEvents():
