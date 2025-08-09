@@ -3,6 +3,7 @@ import json
 import os
 import traceback
 import time
+import types
 
 # --- Path Setup ---
 WRAPPER_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -47,6 +48,19 @@ for path in possible_db_paths:
 if not DB_PATH:
     DB_PATH = "/var/www/anatscrawler/spiderfoot.db"  # Default fallback based on actual structure
 
+# --- Prefer venv site-packages (if present) before importing SpiderFoot ---
+try:
+    venv_lib = "/var/www/anatscrawler/app/maigret-venv/lib"
+    if os.path.isdir(venv_lib):
+        for entry in sorted(os.listdir(venv_lib)):
+            if entry.startswith("python"):
+                sp = os.path.join(venv_lib, entry, "site-packages")
+                if os.path.isdir(sp) and sp not in sys.path:
+                    sys.path.insert(0, sp)
+                    print(f"[DEBUG] Prepending venv site-packages: {sp}", file=sys.stderr)
+except Exception as _e:
+    print(f"[DEBUG] Failed to prepend venv site-packages: {_e}", file=sys.stderr)
+
 # Metadata file (to persist auxiliary info like enabled modules)
 META_PATH = os.path.join(os.path.dirname(DB_PATH), 'spiderfoot_scanmeta.json')
 
@@ -81,6 +95,18 @@ try:
     from core.sfscan import SpiderFootScanner, startSpiderFootScanner
     from core.spiderfoot.db import SpiderFootDb
     from core.spiderfoot.helpers import SpiderFootHelpers
+    # bs4 compatibility shim: ensure bs4.filter.SoupStrainer is available
+    try:
+        import bs4.filter  # type: ignore
+    except Exception:
+        try:
+            from bs4.element import SoupStrainer  # type: ignore
+            shim = types.ModuleType("bs4.filter")
+            shim.SoupStrainer = SoupStrainer  # type: ignore[attr-defined]
+            sys.modules["bs4.filter"] = shim
+            print("[DEBUG] Installed bs4.filter compatibility shim", file=sys.stderr)
+        except Exception as e:
+            print(json.dumps({"error": "BeautifulSoup4 import failed", "details": str(e)}), file=sys.stderr, flush=True)
 except ImportError as e:
     print(json.dumps({
         "error": "Failed to import SpiderFoot modules",
