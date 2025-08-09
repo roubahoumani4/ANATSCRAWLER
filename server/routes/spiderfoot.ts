@@ -2,15 +2,32 @@ import express from "express";
 const router = express.Router();
 const spiderfoot = require("../spiderfoot.service");
 const path = require('path');
+import mispService from '../misp.service';
 
 // Health check endpoint for SpiderFoot
 router.get("/health", async (req, res) => {
   try {
+    let wrapperOk = false;
+    let modulesCount = 0;
+    let modulesError: string | undefined;
+    try {
+      const mods = await spiderfoot.listModules();
+      if (mods && Array.isArray(mods.modules)) {
+        wrapperOk = true;
+        modulesCount = mods.modules.length;
+      }
+    } catch (e: any) {
+      modulesError = e?.message || String(e);
+    }
+
     res.json({
       status: "SpiderFoot API is running",
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || 'development',
-      wrapperPath: path.resolve(__dirname, '../spiderfoot/spiderfoot_wrapper.py')
+      wrapperPath: path.resolve(__dirname, '../spiderfoot/spiderfoot_wrapper.py'),
+      wrapperReachable: wrapperOk,
+      modulesCount,
+      modulesError
     });
   } catch (e) {
     res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
@@ -159,6 +176,11 @@ router.get("/scan/:scanId/status", async (req, res) => {
         status: raw[5] ?? 'UNKNOWN'
       };
     }
+    // Ensure compatibility with UI which expects `finished`
+    if (info && typeof info === 'object') {
+      const endedVal = (info.ended ?? info.finished ?? 0);
+      info.finished = endedVal;
+    }
     res.json(info);
   } catch (e) {
     res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
@@ -223,6 +245,50 @@ router.get("/scan/:scanId/events", async (req, res) => {
     res.json(events);
   } catch (e) {
     res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
+  }
+});
+
+// MISP enrichment for a scan (read-only)
+router.get("/scan/:scanId/enrich/misp", async (req, res) => {
+  try {
+    const scanId = req.params.scanId;
+    // Use browse for unique entities
+    const browse = await spiderfoot.scanBrowse(scanId).catch(() => []);
+    const events = await spiderfoot.scanResultEvent(scanId).catch(() => []);
+    // Derive IOC candidates: domain, hostname, ip, email, hash, url
+    const iocs = new Set<string>();
+    const pushIf = (v: any) => { if (typeof v === 'string' && v.length > 2) iocs.add(v); };
+    (Array.isArray(browse) ? browse : []).forEach((row: any[]) => {
+      const value = row?.[0];
+      const type = String(row?.[1] || '').toLowerCase();
+      if (['domain', 'internet_name', 'hostname', 'ip_address', 'emailaddr', 'hash', 'url', 'website'].includes(type)) pushIf(value);
+    });
+    (Array.isArray(events) ? events : []).forEach((row: any[]) => {
+      const value = row?.[1];
+      const type = String(row?.[4] || '').toLowerCase();
+      if (['domain', 'internet_name', 'hostname', 'ip_address', 'emailaddr', 'hash', 'url', 'website'].includes(type)) pushIf(value);
+    });
+
+    const results: Record<string, any> = {};
+    await Promise.all(Array.from(iocs).slice(0, 200).map(async (ioc) => {
+      try {
+        // naive type inference
+        let t: string | undefined = undefined;
+        if (/^\d+\.\d+\.\d+\.\d+$/.test(ioc)) t = 'ip-src';
+        else if (/^[0-9a-f]{32}|[0-9a-f]{40}|[0-9a-f]{64}$/i.test(ioc)) t = undefined; // let MISP infer
+        else if (/^https?:\/\//i.test(ioc)) t = 'url';
+        else if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(ioc)) t = 'email-src';
+        else if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(ioc)) t = 'domain';
+        const r = await mispService.searchAttributes(ioc, t);
+        results[ioc] = r;
+      } catch (e: any) {
+        results[ioc] = { success: false, error: e?.message || String(e) };
+      }
+    }));
+
+    res.json({ success: true, scanId, matches: results });
+  } catch (e) {
+    res.status(500).json({ success: false, error: (e instanceof Error ? e.message : String(e)) });
   }
 });
 
@@ -308,6 +374,9 @@ router.get("/scan/:scanId/results", async (req, res) => {
       results.started = status.started || status[3] || 0;
       results.ended = status.ended || status[4] || 0;
     }
+
+    // Ensure compatibility with UI: expose `finished` mirror of `ended`
+    (results as any).finished = results.ended || 0;
 
     // Calculate correlation counts
     if (Array.isArray(correlations)) {

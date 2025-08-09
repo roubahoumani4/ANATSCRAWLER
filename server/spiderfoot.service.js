@@ -259,14 +259,30 @@ module.exports = {
       }
       
       const withCorrelations = await Promise.all(scans.map(async (scan) => {
-        let corr = { HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
-        try {
-          if (scan && scan[0]) {
-            const corrResult = await runPythonCommand(['scan_correlation_summary', scan[0]]);
-            if (corrResult && typeof corrResult === 'object') {
+        // Prefer wrapper-provided correlations at index 7 when available
+        let corr = (scan && scan[7] && typeof scan[7] === 'object' && !Array.isArray(scan[7]))
+          ? {
+              HIGH: scan[7].HIGH || 0,
+              MEDIUM: scan[7].MEDIUM || 0,
+              LOW: scan[7].LOW || 0,
+              INFO: scan[7].INFO || 0
+            }
+          : { HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
+
+        // If wrapper didn’t provide counts, fall back to on-demand summary
+        if (!scan[7]) {
+          try {
+            if (scan && scan[0]) {
+              const corrResult = await runPythonCommand(['scan_correlation_summary', scan[0]]);
               if (Array.isArray(corrResult)) {
-                corr = { HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
-              } else {
+                for (const row of corrResult) {
+                  if (Array.isArray(row) && row.length >= 2) {
+                    const risk = String(row[0] || '').toUpperCase();
+                    const count = Number(row[1] || 0) || 0;
+                    if (risk in corr) corr[risk] = count;
+                  }
+                }
+              } else if (corrResult && typeof corrResult === 'object') {
                 corr = {
                   HIGH: corrResult.HIGH || 0,
                   MEDIUM: corrResult.MEDIUM || 0,
@@ -275,10 +291,11 @@ module.exports = {
                 };
               }
             }
+          } catch (e) {
+            console.warn(`Failed to get correlation summary for scan ${scan[0]}:`, e.message);
           }
-        } catch (e) {
-          console.warn(`Failed to get correlation summary for scan ${scan[0]}:`, e.message);
         }
+
         return [...scan, corr];
       }));
       

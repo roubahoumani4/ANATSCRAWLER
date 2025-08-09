@@ -56,6 +56,7 @@ import cookieParser from "cookie-parser";
 import sanitizeHtml from "sanitize-html";
 import crypto from "crypto";
 import spiderfootRouter from './routes/spiderfoot';
+import mispRouter from './routes/misp';
 
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || "ANAT_SECURITY_JWT_SECRET_KEY";
@@ -65,6 +66,8 @@ export async function registerRoutes(app: Express): Promise<void> {
   await registerThreatIntelRoute(app);
   // Mount SpiderFoot API proxy at /api/spiderfoot
   app.use('/api/spiderfoot', spiderfootRouter);
+  // Mount MISP API proxy at /api/misp
+  app.use('/api/misp', mispRouter);
   // Create a new secure router
   const secureRouter = express.Router();
   
