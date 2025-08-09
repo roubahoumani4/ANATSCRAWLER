@@ -871,68 +871,13 @@ def start_scan(target, name):
     try:
         import time
         
+        # Determine target type early
         target_type = SpiderFootHelpers.targetTypeFromString(target)
         if not target_type:
             print(json.dumps({"success": False, "error": f"Could not determine target type for: {target}"}))
             return
 
-        print(f"[DEBUG] Attempting to load modules from: {MODULES_DIR}", file=sys.stderr)
-        try:
-            modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR or "modules")
-            print(f"[DEBUG] Modules loaded: {list(modules_dict.keys()) if modules_dict else 'None'}", file=sys.stderr)
-        except Exception as load_error:
-            print(f"[DEBUG] Failed to load modules: {load_error}", file=sys.stderr)
-            modules_dict = create_minimal_modules_dict()
-            print(f"[DEBUG] Created minimal modules dict", file=sys.stderr)
-        
-        # ✅ CRITICAL: Handle case where no modules are loaded
-        if not modules_dict:
-            print(f"[WARNING] Failed to load any modules from {MODULES_DIR}, creating minimal modules dict", file=sys.stderr)
-            # Create a minimal modules dict with essential modules
-            modules_dict = create_minimal_modules_dict()
-        
-        # ✅ NEW: Select ALL available modules except those requiring API keys
-        enabled_modules = []
-        available_modules = list(modules_dict.keys())
-        
-        # Filter out modules that require API keys, but explicitly include a sensible default baseline
-        baseline_allowlist = {
-            "sfp_dnsresolve", "sfp_whois", "sfp_ipaddr", "sfp_dns", "sfp_subdomain", "sfp_spider",
-            "sfp_email", "sfp_httpheaders", "sfp_sslcert", "sfp_robtex", "sfp_certdb", "sfp__stor_db"
-        }
-        for module_name in available_modules:
-            module_info = modules_dict.get(module_name, {})
-            module_flags = module_info.get('flags', [])
-            meta_flags = module_info.get('meta', {}).get('flags', [])
-            all_flags = module_flags + meta_flags
-            # Skip modules that require API keys unless in explicit baseline allowlist
-            if 'apikey' in all_flags and module_name not in baseline_allowlist:
-                print(f"[DEBUG] Skipping module {module_name} - requires API key", file=sys.stderr)
-                continue
-            enabled_modules.append(module_name)
-            print(f"[DEBUG] Added module: {module_name}", file=sys.stderr)
-        
-        # ✅ CRITICAL: Always add the database storage module if not already included
-        if "sfp__stor_db" in available_modules and "sfp__stor_db" not in enabled_modules:
-            enabled_modules.append("sfp__stor_db")
-            print(f"[DEBUG] Added database storage module: sfp__stor_db", file=sys.stderr)
-        
-        # If no modules were selected (all require API keys), use a broader basic set
-        if not enabled_modules:
-            basic_modules = [
-                "sfp_dnsresolve", "sfp_whois", "sfp_subdomain", "sfp_ipaddr", "sfp_httpheaders",
-                "sfp_sslcert", "sfp_spider", "sfp__stor_db"
-            ]
-            enabled_modules = [mod for mod in basic_modules if mod in available_modules]
-            print(f"[DEBUG] No non-API modules found, using basic modules: {enabled_modules}", file=sys.stderr)
-            
-            # If still no modules, create a minimal set
-            if not enabled_modules:
-                enabled_modules = ["sfp__stor_db"]
-                print(f"[DEBUG] No basic modules found, using storage module only: {enabled_modules}", file=sys.stderr)
-        
-        print(f"[DEBUG] Selected modules ({len(enabled_modules)} total): {enabled_modules}", file=sys.stderr)
-
+        # Minimal config; the child process will load modules and choose defaults
         config = {
             '__database': DB_PATH,
             '_debug': True,
@@ -946,134 +891,61 @@ def start_scan(target, name):
             '_moduleTimeout': 30,
             '_internettlds_cache': True,
             '_internettlds': 'generic, country, sponsored, infrastructure',
-            '_socks1type': '',  # Added to prevent KeyError in modules
-            '__modules__': modules_dict,
-            # ✅ CRITICAL: Ensure storage module is properly configured
-            'sfp__stor_db': {
-                '_store': True,
-                'maxstorage': 0  # Unlimited storage
-            }
+            '_socks1type': ''
         }
-        
-        # ✅ CRITICAL: Ensure storage module is properly configured
-        if "sfp__stor_db" in enabled_modules:
-            # Add storage module configuration to ensure it works properly
-            if "sfp__stor_db" not in config:
-                config["sfp__stor_db"] = {}
-            config["sfp__stor_db"]["_store"] = True
-            config["sfp__stor_db"]["maxstorage"] = 0  # Unlimited storage
-            # Ensure the database connection is properly configured
-            config["sfp__stor_db"]["__database"] = DB_PATH
-            print(f"[DEBUG] Configured storage module settings", file=sys.stderr)
 
-        print(f"[DEBUG] Scan config prepared", file=sys.stderr)
-        print(f"[DEBUG] Enabled modules: {enabled_modules}", file=sys.stderr)
-
+        # Initialize DB and register scan
         sfdb = SpiderFootDb({'__database': DB_PATH})
         sfdb.create()
-
         print(f"[DEBUG] Database initialized at: {DB_PATH}", file=sys.stderr)
 
         scan_id = SpiderFootHelpers.genScanInstanceId()
-
-        print(f"[DEBUG] Generated scan ID: {scan_id}", file=sys.stderr)
-
-        # ✅ Register the scan in the DB manually
         sfdb.scanInstanceCreate(scan_id, name, target)
+        print(f"[DEBUG] Registered scan {scan_id}", file=sys.stderr)
 
-        print(f"[DEBUG] Scan registered in DB: name={name}, target={target}", file=sys.stderr)
-
-        print(f"▶️ Starting scan...", file=sys.stderr)
-        print(f"Target: {target}", file=sys.stderr)
-        print(f"Target Type: {target_type}", file=sys.stderr)
-        print(f"Scan ID: {scan_id}", file=sys.stderr)
-        print(f"Enabled Modules ({len(enabled_modules)}): {enabled_modules}", file=sys.stderr)
-
-        print(f"[DEBUG] Starting SpiderFootScanner in separate process...", file=sys.stderr)
-
-        # Persist metadata (enabled modules) for UI visibility
+        # Persist minimal metadata for UI
         try:
             meta = {}
             if os.path.exists(META_PATH):
                 with open(META_PATH, 'r') as f:
                     meta = json.load(f) or {}
             meta[scan_id] = {
-                'modules': enabled_modules,
+                'modules': 'pending',
                 'name': name,
                 'target': target,
                 'created': time.time()
             }
             with open(META_PATH, 'w') as f:
                 json.dump(meta, f)
-            print(f"[DEBUG] Wrote scan metadata to {META_PATH}", file=sys.stderr)
-        except Exception as meta_err:
-            print(f"[DEBUG] Failed to write scan metadata: {meta_err}", file=sys.stderr)
+        except Exception:
+            pass
 
+        # Start child process quickly; child will load modules
         try:
-            # Create a proper multiprocessing queue for logging
             logging_queue = None
             try:
-                # Try to create the queue with error handling
                 logging_queue = mp.Queue()
-                print(f"[DEBUG] Created multiprocessing queue successfully", file=sys.stderr)
-                
-                # Test if the queue is working
-                try:
-                    logging_queue.put("test_message")
-                    print(f"[DEBUG] Queue test successful", file=sys.stderr)
-                except Exception as test_error:
-                    print(f"[DEBUG] Queue test failed: {test_error}, will use None", file=sys.stderr)
-                    logging_queue = None
-                    
-            except Exception as queue_error:
-                print(f"[DEBUG] Failed to create multiprocessing queue: {queue_error}, will use None", file=sys.stderr)
+            except Exception:
                 logging_queue = None
-            
-            # Start the scan in a separate process using our custom function
-            print(f"[DEBUG] About to start process with logging_queue: {type(logging_queue)}", file=sys.stderr)
-            p = mp.Process(target=run_scan_in_process, args=(logging_queue, name, scan_id, target, target_type, enabled_modules, config))
-            p.daemon = False  # Changed to False to prevent silent failures
+
+            p = mp.Process(target=run_scan_in_process, args=(logging_queue, name, scan_id, target, target_type, [], config))
+            p.daemon = False
             p.start()
-            
-            print(f"[DEBUG] SpiderFootScanner process started with PID: {p.pid}", file=sys.stderr)
-            
-            # Wait a moment for the scan to initialize and check if it's still running
-            time.sleep(3)
-            
+
+            # Short readiness window to detect immediate failure only
+            time.sleep(1.5)
             if not p.is_alive():
-                print(f"[ERROR] Scan process died immediately", file=sys.stderr)
-                # Try to get the exit code
-                try:
-                    exit_code = p.exitcode
-                    print(f"[ERROR] Process exit code: {exit_code}", file=sys.stderr)
-                except:
-                    pass
-                print(json.dumps({"success": False, "error": "Scan process failed to start or died immediately"}), file=sys.stderr, flush=True)
+                print(json.dumps({"success": False, "error": "Scan process failed to start"}), file=sys.stderr, flush=True)
                 return
-            
         except Exception as inner:
-            print("🚨 Failed to start SpiderFootScanner process", file=sys.stderr)
-            print(traceback.format_exc(), file=sys.stderr)
             print(json.dumps({"success": False, "error": f"Failed to start scan process: {str(inner)}"}), file=sys.stderr, flush=True)
             return
 
-        print(f"[Scan] Scan {scan_id} started in background process.", file=sys.stderr, flush=True)
-        
-        # Wait a moment for the scan to initialize
-        time.sleep(2)
-        
-        # Check if the scan was created successfully
+        # Return as soon as the scan row exists (avoid 504s on slow module load)
         db = SpiderFootDb({'__database': DB_PATH})
         scan_status = db.scanInstanceGet(scan_id)
-        
-        if scan_status:
-            status_str = scan_status[5] if scan_status and len(scan_status) > 5 else "UNKNOWN"
-            print(f"[Scan] Scan {scan_id} initialized with status: {status_str}", file=sys.stderr, flush=True)
-            print(json.dumps({"success": True, "scanId": scan_id, "status": status_str, "message": "Scan started successfully", "modules": enabled_modules}))
-        else:
-            print(f"[ERROR] Scan {scan_id} failed to initialize", file=sys.stderr, flush=True)
-            print(json.dumps({"success": False, "scanId": scan_id, "error": "Scan failed to initialize", "modules": enabled_modules}))
-            
+        status_str = scan_status[5] if (scan_status and len(scan_status) > 5) else "CREATED"
+        print(json.dumps({"success": True, "scanId": scan_id, "status": status_str, "message": "Scan started"}))
     except Exception as e:
         print(json.dumps({"success": False, "error": str(e), "traceback": traceback.format_exc()}), file=sys.stderr, flush=True)
 

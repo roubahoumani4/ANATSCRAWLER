@@ -295,9 +295,60 @@ router.get("/scan/:scanId/enrich/misp", async (req, res) => {
 // Scan logs
 router.get("/scan/:scanId/logs", async (req, res) => {
   try {
-    const logs = await spiderfoot.scanLogs(req.params.scanId);
-    res.json(logs);
+    const scanId = req.params.scanId;
+    const logs = await spiderfoot.scanLogs(scanId);
+
+    // If logs are already a string or non-empty array, return them.
+    const isArrayWithItems = Array.isArray(logs) && logs.length > 0;
+    const isString = typeof logs === "string" && logs.length > 0;
+
+    // Always try to enrich with the process log file for near-real-time output
+    const fs = require("fs");
+    const path = `/tmp/spiderfoot_scan_${scanId}.log`;
+    let fileContent = "";
+    try {
+      if (fs.existsSync(path)) {
+        // Read synchronously; the file is small and this endpoint is polled infrequently
+        fileContent = fs.readFileSync(path, "utf8");
+      }
+    } catch {
+      // ignore file read errors; fallback to DB logs only
+    }
+
+    // If DB logs are present, format them to string similar to frontend and merge with file content
+    if (isArrayWithItems) {
+      const formatted = (logs as any[]).map((l: any) => {
+        const generated = l.generated || "";
+        const component = l.component || "SYSTEM";
+        const type = l.type || "INFO";
+        const message = l.message || "";
+        return `${generated} [${component}] ${type}: ${message}`;
+      }).join("\n");
+
+      const combined = [formatted, fileContent].filter(Boolean).join("\n");
+      return res.json(combined || formatted);
+    }
+
+    // If logs were already string, append the file content
+    if (isString) {
+      const combined = [logs as string, fileContent].filter(Boolean).join("\n");
+      return res.json(combined || logs);
+    }
+
+    // Otherwise, return file content if available; else the original logs
+    if (fileContent) return res.json(fileContent);
+    return res.json(logs);
   } catch (e) {
+    try {
+      // As a last resort, attempt to return just the file content if it exists
+      const scanId = req.params.scanId;
+      const fs = require("fs");
+      const path = `/tmp/spiderfoot_scan_${scanId}.log`;
+      if (fs.existsSync(path)) {
+        const content = fs.readFileSync(path, "utf8");
+        return res.json(content);
+      }
+    } catch {}
     res.status(500).json({ error: (e instanceof Error ? e.message : String(e)) });
   }
 });
