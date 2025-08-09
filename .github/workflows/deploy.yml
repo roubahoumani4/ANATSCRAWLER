@@ -135,4 +135,26 @@ jobs:
             pm2 delete anatscrawler || true
             pm2 start ecosystem.config.cjs --env production
             pm2 save
+
+            # Ensure SpiderFoot runtime preconditions
+            echo "--- Ensuring /var/www/anatscrawler ownership ---"
+            chown -R $(whoami):$(whoami) /var/www/anatscrawler || true
+
+            echo "--- Ensuring modules symlink ---"
+            if [ ! -L "/var/www/anatscrawler/modules" ]; then
+              ln -s /var/www/anatscrawler/app/server/spiderfoot/modules /var/www/anatscrawler/modules || true
+            fi
+
+            echo "--- Connectivity sanity checks ---"
+            curl -s https://example.com >/dev/null || true
+
+            echo "--- SpiderFoot health check ---"
+            sleep 2
+            curl -s http://127.0.0.1:${APP_PORT}/api/spiderfoot/health || true
+            echo
+            echo "--- SpiderFoot modules ---"
+            curl -s http://127.0.0.1:${APP_PORT}/api/spiderfoot/modules || true
+            echo
+            echo "--- SpiderFoot scanlist ---"
+            curl -s http://127.0.0.1:${APP_PORT}/api/spiderfoot/scanlist || true
       # All dependencies should be pinned in package.json; avoid modifying deps post-deploy
