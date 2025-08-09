@@ -51,9 +51,36 @@ const OsintEngine = () => {
 
   // Fetch all scans
   const fetchScans = () => {
-    fetch(`${API_BASE}/scans`)
+    fetch(`${API_BASE}/scanlist`)
       .then(res => res.json())
-      .then(data => setScans(data.scans || []));
+      .then(data => {
+        // Support array or { scans }
+        const scanArray = Array.isArray(data) ? data : (Array.isArray(data?.scans) ? data.scans : []);
+        const normalizeStatus = (raw: any): string => {
+          if (!raw && raw !== 0) return 'unknown';
+          const s = String(raw).toUpperCase();
+          if (s === 'ABORT-REQUESTED' || s === 'ABORT_REQUESTED') return 'abort-requested';
+          if (s === 'ABORTED') return 'aborted';
+          if (s === 'FINISHED' || s === 'DONE' || s === 'COMPLETED') return 'finished';
+          if (s === 'ERROR-FAILED' || s === 'ERROR' || s === 'FAILED') return 'error';
+          if (s === 'RUNNING' || s === 'STARTED' || s === 'STARTING' || s === 'INITIALIZING' || s === 'CREATED') return 'running';
+          return s.toLowerCase();
+        };
+        const processed = scanArray.filter((arr: any[]) => arr && arr[0]).map((arr: any[]) => ({
+          scan_id: arr[0],
+          name: arr[1],
+          target: arr[2],
+          started: arr[3],
+          finished: arr[4],
+          status: normalizeStatus(arr[5]),
+          elements: arr[6],
+          correlations: arr[7],
+          modules: arr[8],
+          scan_type: arr[9],
+        }));
+        setScans(processed);
+      })
+      .catch(() => setScans([]));
   };
 
   // Start a new scan
@@ -63,14 +90,14 @@ const OsintEngine = () => {
     setError(null);
     setResults(null);
     try {
-      const res = await fetch(`${API_BASE}/scan`, {
+      const res = await fetch(`${API_BASE}/scan/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target, modules: selectedModules, name: scanName, scan_type: scanType })
+        body: JSON.stringify({ target, name: scanName })
       });
       const data = await res.json();
-      if (data.scan_id) {
-        setActiveScanId(data.scan_id);
+      if (data.scanId) {
+        setActiveScanId(data.scanId);
         fetchScans();
       } else {
         setError("Failed to start scan");
