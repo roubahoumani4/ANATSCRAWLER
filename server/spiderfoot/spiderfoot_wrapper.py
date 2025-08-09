@@ -31,7 +31,7 @@ def _looks_like_spiderfoot_modules_dir(directory: str) -> bool:
     except Exception:
         return False
 
-MODULES_DIR = None
+MODULES_DIR: str | None = None
 for path in possible_module_paths:
     if _looks_like_spiderfoot_modules_dir(path):
         MODULES_DIR = path
@@ -52,12 +52,15 @@ possible_db_paths = [
     "spiderfoot.db"  # Relative path
 ]
 
-DB_PATH = None
+DB_PATH: str | None = None
 for path in possible_db_paths:
-    if os.path.exists(path) or os.path.exists(os.path.dirname(path)):
-        DB_PATH = path
-        print(f"[DEBUG] Found database path: {path}", file=sys.stderr)
-        break
+    try:
+        if os.path.exists(path) or os.path.exists(os.path.dirname(path)):
+            DB_PATH = path
+            print(f"[DEBUG] Found database path: {path}", file=sys.stderr)
+            break
+    except Exception:
+        continue
 
 if not DB_PATH:
     DB_PATH = "/var/www/anatscrawler/spiderfoot.db"  # Default fallback based on actual structure
@@ -85,8 +88,8 @@ print("DB_PATH:", DB_PATH, file=sys.stderr)
 print("CWD:", os.getcwd(), file=sys.stderr)
 
 # Ensure importable paths
-for path in [WRAPPER_DIR, SPIDERFOOT_CORE, MODULES_DIR]:
-    if path not in sys.path:
+for path in [WRAPPER_DIR, SPIDERFOOT_CORE, MODULES_DIR or ""]:
+    if path and path not in sys.path:
         sys.path.insert(0, path)
 
 # --- Multiprocessing Setup ---
@@ -105,6 +108,68 @@ except Exception as e:
     print(f"[DEBUG] Multiprocessing setup warning: {e}", file=sys.stderr)
 
 # --- Imports ---
+
+# Provide runtime shims for networkx 3.x -> 2.x API breaks used by SpiderFoot
+def _install_networkx_compat_shims() -> None:
+    try:
+        import importlib
+        import networkx as nx  # type: ignore
+
+        # nodes_equal moved/removed in newer networkx; provide a conservative fallback
+        try:
+            from networkx import utils as nx_utils  # type: ignore
+            if not hasattr(nx_utils, 'nodes_equal'):
+                def nodes_equal(a, b):
+                    try:
+                        return a == b
+                    except Exception:
+                        return False
+                setattr(nx_utils, 'nodes_equal', nodes_equal)
+                print('[DEBUG] Installed shim: networkx.utils.nodes_equal', file=sys.stderr)
+        except Exception as _e:
+            # Create minimal utils module if import fails
+            nx_utils_mod = types.ModuleType('networkx.utils')
+            def nodes_equal(a, b):
+                try:
+                    return a == b
+                except Exception:
+                    return False
+            setattr(nx_utils_mod, 'nodes_equal', nodes_equal)
+            sys.modules['networkx.utils'] = nx_utils_mod
+            print('[DEBUG] Created shim module: networkx.utils with nodes_equal', file=sys.stderr)
+
+        # argmap decorator removed in 3.x; provide a no-op compatible decorator
+        try:
+            decorators_mod = importlib.import_module('networkx.utils.decorators')  # type: ignore
+            if not hasattr(decorators_mod, 'argmap'):
+                def argmap(func=None, *dargs, **dkwargs):
+                    if func is None:
+                        def _deco(f):
+                            return f
+                        return _deco
+                    return func
+                setattr(decorators_mod, 'argmap', argmap)
+                print('[DEBUG] Installed shim: networkx.utils.decorators.argmap', file=sys.stderr)
+        except Exception:
+            # Create the decorators submodule and parent if needed
+            if 'networkx.utils' not in sys.modules:
+                sys.modules['networkx.utils'] = types.ModuleType('networkx.utils')
+            decorators_mod = types.ModuleType('networkx.utils.decorators')
+            def argmap(func=None, *dargs, **dkwargs):
+                if func is None:
+                    def _deco(f):
+                        return f
+                    return _deco
+                return func
+            setattr(decorators_mod, 'argmap', argmap)
+            sys.modules['networkx.utils.decorators'] = decorators_mod
+            print('[DEBUG] Created shim module: networkx.utils.decorators with argmap', file=sys.stderr)
+    except Exception as e:
+        print(f"[DEBUG] NetworkX compat shim not applied: {e}", file=sys.stderr)
+
+# Install shims before importing SpiderFoot
+_install_networkx_compat_shims()
+
 try:
     from core.sfscan import SpiderFootScanner, startSpiderFootScanner
     from core.spiderfoot.db import SpiderFootDb
@@ -156,7 +221,7 @@ def create_minimal_modules_dict():
 # --- Wrapper Commands ---
 def list_modules():
     try:
-        modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR)
+        modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR or "modules")
         module_names = sorted(list(modules_dict.keys()))
         print(json.dumps({"modules": module_names}))
     except Exception as e:
@@ -167,7 +232,7 @@ def list_scans():
         print(f"[DEBUG] Using database path: {DB_PATH}", file=sys.stderr)
         
         # Check if database directory exists
-        db_dir = os.path.dirname(DB_PATH)
+        db_dir = os.path.dirname(DB_PATH or "spiderfoot.db")
         if not os.path.exists(db_dir):
             print(f"[DEBUG] Creating database directory: {db_dir}", file=sys.stderr)
             try:
@@ -570,7 +635,7 @@ def run_scan_in_process(logging_queue, scan_name, scan_id, target, target_type, 
                 logging_queue = None
         
         # Ensure the modules directory is in the Python path for this process
-        if MODULES_DIR not in sys.path:
+        if MODULES_DIR and MODULES_DIR not in sys.path:
             sys.path.insert(0, MODULES_DIR)
         if WRAPPER_DIR not in sys.path:
             sys.path.insert(0, WRAPPER_DIR)
@@ -593,7 +658,7 @@ def run_scan_in_process(logging_queue, scan_name, scan_id, target, target_type, 
         # Load modules in this process context
         print(f"[PROCESS] Loading modules from: {MODULES_DIR}", file=sys.stderr)
         try:
-            modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR)
+            modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR or "modules")
             print(f"[PROCESS] Loaded {len(modules_dict)} modules", file=sys.stderr)
         except Exception as load_error:
             print(f"[PROCESS] Failed to load modules: {load_error}", file=sys.stderr)
@@ -692,8 +757,9 @@ def run_scan_in_process(logging_queue, scan_name, scan_id, target, target_type, 
                 return
             
             # ✅ CRITICAL: Check if modules were actually loaded in the scanner
-            if hasattr(scanner, '_SpiderFootScanner__moduleInstances'):
-                module_instances = scanner._SpiderFootScanner__moduleInstances
+            # Access with getattr to satisfy type checker
+            module_instances = getattr(scanner, '_SpiderFootScanner__moduleInstances', None)
+            if module_instances is not None:
                 print(f"[PROCESS] Scanner loaded {len(module_instances)} module instances: {list(module_instances.keys())}", file=sys.stderr)
                 
                 # Check each module's status
@@ -703,12 +769,14 @@ def run_scan_in_process(logging_queue, scan_name, scan_id, target, target_type, 
                 print(f"[PROCESS] Scanner doesn't have module instances attribute", file=sys.stderr)
             
             # Check scanner status
-            if hasattr(scanner, 'status'):
-                print(f"[PROCESS] Scanner status: {scanner.status}", file=sys.stderr)
+            status_attr = getattr(scanner, 'status', None)
+            if status_attr is not None:
+                print(f"[PROCESS] Scanner status: {status_attr}", file=sys.stderr)
             
             # Check if scan is actually running
-            if hasattr(scanner, '_SpiderFootScanner__status'):
-                print(f"[PROCESS] Scanner internal status: {scanner._SpiderFootScanner__status}", file=sys.stderr)
+            internal_status = getattr(scanner, '_SpiderFootScanner__status', None)
+            if internal_status is not None:
+                print(f"[PROCESS] Scanner internal status: {internal_status}", file=sys.stderr)
             
             # Check if scan is actually running by checking the database status
             try:
@@ -810,7 +878,7 @@ def start_scan(target, name):
 
         print(f"[DEBUG] Attempting to load modules from: {MODULES_DIR}", file=sys.stderr)
         try:
-            modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR)
+            modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR or "modules")
             print(f"[DEBUG] Modules loaded: {list(modules_dict.keys()) if modules_dict else 'None'}", file=sys.stderr)
         except Exception as load_error:
             print(f"[DEBUG] Failed to load modules: {load_error}", file=sys.stderr)
@@ -1015,7 +1083,7 @@ def start_scan_minimal(target, name):
         import time
 
         # Load modules
-        modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR)
+        modules_dict = SpiderFootHelpers.loadModulesAsDict(MODULES_DIR or "modules")
         available_modules = list(modules_dict.keys())
 
         # Minimal baseline set

@@ -68,6 +68,18 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.use('/api/spiderfoot', spiderfootRouter);
   // Mount MISP API proxy at /api/misp
   app.use('/api/misp', mispRouter);
+
+  // Legacy scans endpoint to support frontend fallback at /osint-engine/scans
+  // Mirrors /api/spiderfoot/scanlist but at the top-level path
+  app.get('/osint-engine/scans', async (req: Request, res: Response) => {
+    try {
+      const spiderfootService = require('./spiderfoot.service');
+      const scans = await spiderfootService.listScans();
+      res.json(scans);
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message || String(e) });
+    }
+  });
   // Create a new secure router
   const secureRouter = express.Router();
   
