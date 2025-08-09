@@ -271,21 +271,20 @@ class SpiderFootPlugin():
             raise TypeError("Module called getScanId() but no scanId is set.")
 
         return self.__scanId__
-    def getTarget(self) -> str:
-        """Gets the current target this module is acting against.
+    def getTarget(self):
+        """Gets the current SpiderFootTarget this module is acting against.
 
         Returns:
-            str: current target value
+            SpiderFootTarget: current target object
 
         Raises:
             TypeError: Module called getTarget() but no target is set or is invalid.
         """
         if not self._currentTarget:
             raise TypeError("Module called getTarget() but no target is set.")
-        # Defensive: ensure _currentTarget has targetValue attribute
-        if not hasattr(self._currentTarget, 'targetValue'):
-            raise TypeError("Current target does not have a targetValue attribute.")
-        return self._currentTarget.targetValue
+        # Return the full SpiderFootTarget object so modules can call .matches(),
+        # access .targetValue, .targetType, etc.
+        return self._currentTarget
 
     def registerListener(self, listener) -> None:
         """Listener modules which will get notified once we have data for them to

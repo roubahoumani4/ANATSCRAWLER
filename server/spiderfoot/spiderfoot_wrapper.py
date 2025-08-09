@@ -1040,6 +1040,9 @@ def start_scan_minimal(target, name):
             '_maxthreads': 10,
             '_uiShowOnlyNew': False,
             '_moduleTimeout': 30,
+            '_internettlds_cache': True,
+            '_internettlds': 'generic, country, sponsored, infrastructure',
+            '_socks1type': '',
             '__modules__': modules_dict,
             'sfp__stor_db': {
                 '_store': True,
@@ -1160,6 +1163,7 @@ if __name__ == "__main__":
             case "delete_scan": delete_scan(*args)
             case "abort_scan": abort_scan(*args)
             case "start_scan": start_scan(*args)
+            case "start_scan_minimal": start_scan_minimal(*args)
             case _: print(json.dumps({"error": "Unknown command"})); sys.exit(1)
 
     except Exception as e:
