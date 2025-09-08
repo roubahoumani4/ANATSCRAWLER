@@ -70,8 +70,8 @@ jobs:
           command_timeout: 5m
           script: |
             set -e
-            sudo mkdir -p /var/www/anatscrawler/current /var/www/anatscrawler/logs /var/www/anatscrawler/data
-            sudo chown -R $USER:$USER /var/www/anatscrawler
+            mkdir -p /var/www/anatscrawler/current /var/www/anatscrawler/logs /var/www/anatscrawler/data
+            # Ownership not required if deploy user already owns /var/www/anatscrawler
 
       - name: Download artifact
         uses: actions/download-artifact@v4
@@ -125,22 +125,15 @@ jobs:
             chmod -R 755 "${BASE_DIR}/data" "${BASE_DIR}/logs" || true
             mkdir -p /var/www/anatscrawler/logs || true
             chmod 755 /var/www/anatscrawler/logs || true
-            echo "Installing Node.js if missing..."
+            echo "Checking Node.js..."
             if ! command -v node >/dev/null 2>&1; then
-              if command -v apt-get >/dev/null 2>&1; then
-                curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-                sudo apt-get install -y nodejs
-              elif command -v dnf >/dev/null 2>&1; then
-                curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
-                sudo dnf install -y nodejs
-              elif command -v yum >/dev/null 2>&1; then
-                curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
-                sudo yum install -y nodejs
-              fi
+              echo "Node.js not found. Skipping privileged installation (no sudo required). Please preinstall Node.js >= 20."
             fi
 
-            # Ensure PM2 is available
-            command -v pm2 >/dev/null 2>&1 || sudo npm i -g pm2
+            # Ensure PM2 is available (try user-level first)
+            if ! command -v pm2 >/dev/null 2>&1; then
+              npm i -g pm2 || { echo "PM2 global install failed without sudo; attempting with sudo if available"; command -v sudo >/dev/null 2>&1 && sudo npm i -g pm2 || true; }
+            fi
 
             echo "Stopping PM2 app (if running)..."
             pm2 stop anatscrawler || true
@@ -152,15 +145,7 @@ jobs:
 
             cd "${CURRENT_DIR}"
 
-            echo "Installing base OS dependencies if missing (zero-touch)..."
-            if command -v apt-get >/dev/null 2>&1; then
-              sudo apt-get update -y || true
-              sudo apt-get install -y python3 python3-venv python3-pip curl tar gzip || true
-            elif command -v dnf >/dev/null 2>&1; then
-              sudo dnf install -y python3 python3-venv python3-pip curl tar gzip || true
-            elif command -v yum >/dev/null 2>&1; then
-              sudo yum install -y python3 python3-venv python3-pip curl tar gzip || true
-            fi
+            echo "Skipping OS-level package installation (no sudo). Assuming runtime deps present."
 
             echo "Installing runtime dependencies (prod only)..."
             if [ -f package-lock.json ]; then
