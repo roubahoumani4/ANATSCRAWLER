@@ -118,11 +118,12 @@ jobs:
             BASE_DIR=/var/www/anatscrawler
             RELEASE_TGZ=${BASE_DIR}/anatscrawler-release.tar.gz
             CURRENT_DIR=${BASE_DIR}/current
+            SHARED_DATA=${BASE_DIR}/data
 
             echo "Preparing directories..."
             umask 022
-            mkdir -p "${CURRENT_DIR}" "${BASE_DIR}/data" "${BASE_DIR}/data/backups" "${BASE_DIR}/logs"
-            chmod -R 755 "${BASE_DIR}/data" "${BASE_DIR}/logs" || true
+            mkdir -p "${CURRENT_DIR}" "${SHARED_DATA}" "${SHARED_DATA}/backups" "${BASE_DIR}/logs"
+            chmod -R 755 "${SHARED_DATA}" "${BASE_DIR}/logs" || true
             mkdir -p /var/www/anatscrawler/logs || true
             chmod 755 /var/www/anatscrawler/logs || true
             echo "Checking Node.js..."
@@ -167,6 +168,8 @@ jobs:
                   "$SF_DIR/.venv/bin/pip" install -r "$SF_DIR/requirements.txt" || true
                 fi
               fi
+              # Ensure persistent SpiderFoot data directories
+              mkdir -p "${SHARED_DATA}/spiderfoot" "${SHARED_DATA}/spiderfoot/cache" "${SHARED_DATA}/spiderfoot/logs"
             fi
 
             echo "Ensuring stable server path via symlink..."
@@ -214,9 +217,12 @@ jobs:
             # SpiderFoot integration
             SPIDERFOOT_HOST=127.0.0.1
             SPIDERFOOT_PORT=5001
-            SPIDERFOOT_DOCROOT=/osint
             SPIDERFOOT_DIR=./server/spiderfoot-4.0
             SPIDERFOOT_NO_VENV=0
+            # Persist SpiderFoot data on shared disk
+            SPIDERFOOT_DATA=${SHARED_DATA}/spiderfoot
+            SPIDERFOOT_CACHE=${SHARED_DATA}/spiderfoot/cache
+            SPIDERFOOT_LOGS=${SHARED_DATA}/spiderfoot/logs
             # Web
             CORS_ORIGIN=https://horus.anatsecurity.fr
             MAX_CONCURRENT_SCANS=10

@@ -30,7 +30,16 @@ router.use(
     target: SPIDERFOOT_TARGET,
     changeOrigin: true,
     ws: true,
-  secure: false
+    secure: false,
+    pathRewrite: (incomingPath) => {
+      // We expose SpiderFoot under /osint but upstream expects to be at '/'
+      const p = incomingPath || '/';
+      if (p.startsWith(DOCROOT)) {
+        const stripped = p.slice(DOCROOT.length);
+        return stripped.startsWith('/') ? stripped : `/${stripped}`;
+      }
+      return p;
+    },
   })
 );
 

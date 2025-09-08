@@ -83,11 +83,19 @@ class SpiderFootService {
 
   private async waitReady(timeoutMs = 60000): Promise<boolean> {
     const start = Date.now();
-    const url = `http://${this.defaultHost}:${this.defaultPort}${this.docroot}/ping`;
+    // Try a few likely readiness endpoints; treat any 2xx as ready
+    const candidates = [
+      `${this.docroot}`,
+      `${this.docroot}/`,
+      '/',
+    ];
     while (Date.now() - start < timeoutMs) {
       try {
-        const resp = await fetch(url, { method: 'GET' });
-        if (resp.ok) return true;
+        for (const p of candidates) {
+          const url = `http://${this.defaultHost}:${this.defaultPort}${p}`;
+          const resp = await fetch(url, { method: 'GET' });
+          if (resp.ok) return true;
+        }
       } catch { /* not ready yet */ }
       await new Promise(r => setTimeout(r, 1000));
     }
@@ -117,7 +125,7 @@ class SpiderFootService {
         return { ok: false, reason: 'SpiderFoot directory not found. Place spiderfoot-4.0 in project root or server/.' };
       }
 
-      await this.patchDocrootIfNeeded(dir);
+  // No vendor patching; we proxy /osint to SpiderFoot root via Express proxy
 
       // Best-effort venv setup; skip if disabled
       if (process.env.SPIDERFOOT_NO_VENV !== '1') {
@@ -128,10 +136,14 @@ class SpiderFootService {
 
       const env = {
         ...process.env,
-        SPIDERFOOT_DOCROOT: this.docroot,
+        // SpiderFoot reads these for data persistence if provided
+        SPIDERFOOT_DATA: process.env.SPIDERFOOT_DATA,
+        SPIDERFOOT_CACHE: process.env.SPIDERFOOT_CACHE,
+        SPIDERFOOT_LOGS: process.env.SPIDERFOOT_LOGS,
+        // Host/port for web UI
         SPIDERFOOT_HOST: this.defaultHost,
         SPIDERFOOT_PORT: String(this.defaultPort),
-      };
+      } as NodeJS.ProcessEnv;
 
       const args = ['sf.py', '-l', `${this.defaultHost}:${this.defaultPort}`];
       const child = spawn(py, args, { cwd: dir, env } as SpawnOptionsWithoutStdio);
