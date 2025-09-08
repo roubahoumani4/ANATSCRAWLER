@@ -9,6 +9,7 @@ import GeneralSettingsPage from '@/pages/GeneralSettingsPage';
 import LandingPage from '@/pages/LandingPage';
 import NotFoundPage from '@/pages/NotFoundPage';
 import SignupPage from '@/pages/SignupPage';
+import SpiderFootPage from '@/pages/SpiderFootPage';
 
 // Layout Component
 import Layout from '@/components/layout/Layout';
@@ -44,6 +45,7 @@ export default function AppContent() {
         
         {/* Protected Routes */}
         <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+  <Route path="/dashboard/search" element={<ProtectedRoute><SpiderFootPage /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><GeneralSettingsPage /></ProtectedRoute>} />
         
         {/* Fallback Route */}

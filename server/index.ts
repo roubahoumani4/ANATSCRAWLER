@@ -154,10 +154,10 @@ async function startServer() {
     // Handle static files and client routing
     const isDev = process.env.NODE_ENV !== 'production';
 
-    if (isDev) {
+  if (isDev) {
       // In development, just serve a simple message - Vite dev server runs separately
       app.get('*', (req, res, next) => {
-        if (req.path.startsWith('/api')) {
+        if (req.path.startsWith('/api') || req.path.startsWith('/osint')) {
           return next(); // Let API routes be handled by the API router
         }
 
@@ -292,10 +292,11 @@ async function startServer() {
       }));
 
       // Handle SPA routing - serve index.html for all non-API routes
-      app.get('*', (req, res, next) => {
+    app.get('*', (req, res, next) => {
         if (
-          req.path.startsWith('/api') ||
-          req.path.startsWith('/scan')
+      req.path.startsWith('/api') ||
+      req.path.startsWith('/scan') ||
+      req.path.startsWith('/osint')
         ) {
           return next(); // Let API routes be handled by the API router
         }

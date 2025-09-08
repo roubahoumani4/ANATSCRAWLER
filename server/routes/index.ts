@@ -8,6 +8,7 @@ import authRoutes from './auth/auth.routes';
 import userRoutes from './auth/user.routes';
 import healthRoutes from './health/health.routes';
 import searchRoutes from './search';
+import spiderfootProxy from './spiderfoot';
 
 /**
  * Register all application routes with proper organization and authentication
@@ -35,6 +36,9 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   // Search routes - authenticated users only
   app.use(`${apiV1}/search`, authenticate, searchRoutes);
+
+  // SpiderFoot UI/API proxy - authenticated users only under /osint
+  app.use('/osint', authenticate, spiderfootProxy);
 
   // Public search endpoint for landing page - no authentication required
   app.use('/api/public-search', searchRoutes);

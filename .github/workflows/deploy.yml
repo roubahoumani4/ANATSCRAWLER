@@ -40,6 +40,9 @@ jobs:
           mkdir -p .release/server
           # Copy only necessary server directories
           cp -r server/config server/lib server/middleware server/models server/routes server/services server/types server/utils .release/server/
+          # Include SpiderFoot integration code
+          mkdir -p .release/server/spiderfoot-4.0
+          cp -r server/spiderfoot-4.0 .release/server/
           cp package.json .release/
           if [ -f package-lock.json ]; then cp package-lock.json .release/; fi
           cp ecosystem.config.cjs .release/
@@ -114,6 +117,21 @@ jobs:
               npm install --omit=dev --no-audit --no-fund
             fi
 
+            echo "Preparing SpiderFoot runtime (venv + requirements)..."
+            SF_DIR="${CURRENT_DIR}/server/spiderfoot-4.0"
+            if [ -d "$SF_DIR" ]; then
+              # Create venv if not present
+              if [ ! -d "$SF_DIR/.venv" ]; then
+                python3 -m venv "$SF_DIR/.venv" || true
+              fi
+              if [ -x "$SF_DIR/.venv/bin/pip" ]; then
+                "$SF_DIR/.venv/bin/pip" install --upgrade pip || true
+                if [ -f "$SF_DIR/requirements.txt" ]; then
+                  "$SF_DIR/.venv/bin/pip" install -r "$SF_DIR/requirements.txt" || true
+                fi
+              fi
+            fi
+
             echo "Ensuring stable server path via symlink..."
             mkdir -p ${BASE_DIR}/server
             # Symlink /var/www/anatscrawler/server -> /var/www/anatscrawler/current/server
@@ -138,7 +156,16 @@ jobs:
             HOST=0.0.0.0
             JWT_SECRET=${JWT_SECRET}
             COOKIE_SECRET=${COOKIE_SECRET}
-            MONGODB_URL=${MONGODB_URL}
+            # Backing services (internal LAN)
+            MONGODB_URL=${MONGODB_URL:-mongodb://192.168.1.110:27017/anat_security}
+            ELASTICSEARCH_URL=http://192.168.1.110:9200
+            REDIS_URL=redis://192.168.1.110:6379
+            # SpiderFoot integration
+            SPIDERFOOT_HOST=127.0.0.1
+            SPIDERFOOT_PORT=5001
+            SPIDERFOOT_DOCROOT=/osint
+            SPIDERFOOT_DIR=./server/spiderfoot-4.0
+            SPIDERFOOT_NO_VENV=0
             CORS_ORIGIN=https://horus.anatsecurity.fr
             MAX_CONCURRENT_SCANS=10
             EOF
@@ -167,6 +194,19 @@ jobs:
               echo "API health check failed; showing logs"
               pm2 logs anatscrawler --lines 120 --nostream || true
               exit 1
+            fi
+
+            echo "Check SpiderFoot proxy health (requires app to auto-start it)..."
+            OSINT_OK=0
+            for i in {1..60}; do
+              # Health behind auth is not public; just hit unauthenticated to trigger start
+              if curl -fsS -m 5 http://127.0.0.1:5000/osint/health > /dev/null; then
+                OSINT_OK=1; echo "SpiderFoot proxy responded"; break
+              fi
+              sleep 1
+            done
+            if [ "$OSINT_OK" -ne 1 ]; then
+              echo "SpiderFoot proxy did not respond yet (may require first authenticated request). Continuing..."
             fi
 
       - name: Final status
