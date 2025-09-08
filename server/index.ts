@@ -56,12 +56,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // Environment-aware static file serving
-if (ENVIRONMENT_CONFIG.IS_PRODUCTION) {
-  // In production, serve built client files
-  const clientBuildPath = ENVIRONMENT_CONFIG.PATHS.CLIENT_BUILD;
-  console.log(`📁 Serving static files from: ${clientBuildPath}`);
-  app.use(express.static(clientBuildPath));
-} else {
+if (!ENVIRONMENT_CONFIG.IS_PRODUCTION) {
   // In development, no static file serving (handled by Vite dev server)
   console.log(`🔧 Development mode: Static files handled by Vite dev server`);
 }
@@ -265,6 +260,10 @@ async function startServer() {
           // Set proper MIME types for JavaScript modules
           if (filePath.endsWith('.js')) {
             res.setHeader('Content-Type', 'application/javascript');
+          }
+          // Ensure CSS is served with correct content-type to satisfy X-Content-Type-Options: nosniff
+          if (filePath.endsWith('.css')) {
+            res.setHeader('Content-Type', 'text/css');
           }
 
           // Add cache headers for static assets
