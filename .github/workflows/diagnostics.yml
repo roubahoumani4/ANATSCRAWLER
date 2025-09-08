@@ -55,10 +55,10 @@ jobs:
             fi
 
             # Check client build
-            if [ -d "dist/client" ]; then
+            if [ -d "client/dist" ]; then
               echo "✅ Client build exists"
               echo "Client files:"
-              find dist/client -name "*.js" | head -5
+              find client/dist -name "*.js" | head -5
             else
               echo "❌ Client build missing"
             fi
@@ -85,8 +85,8 @@ jobs:
             echo "🌐 Testing API endpoints:"
             echo "========================"
 
-            # Test health endpoint
-            curl -s localhost:3000/health | head -5 || echo "Health endpoint failed"
+            # Test health endpoint (production default port 5000)
+            curl -s localhost:5000/health | head -5 || echo "Health endpoint failed"
 
             echo ""
             echo "📊 PM2 detailed status:"

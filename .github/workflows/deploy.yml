@@ -60,6 +60,19 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - name: Prepare remote base directory
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          command_timeout: 5m
+          script: |
+            set -e
+            sudo mkdir -p /var/www/anatscrawler/current /var/www/anatscrawler/logs /var/www/anatscrawler/data
+            sudo chown -R $USER:$USER /var/www/anatscrawler
+
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
@@ -78,13 +91,28 @@ jobs:
 
       - name: Activate release and restart PM2
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          # Core app secrets and backing services
+          APP_PORT: ${{ secrets.APP_PORT }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          COOKIE_SECRET: ${{ secrets.COOKIE_SECRET }}
+          MONGODB_URL: ${{ secrets.MONGODB_URL }}
+          ELASTICSEARCH_URL: ${{ secrets.ELASTICSEARCH_URL }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          # Optional MISP integration
+          MISP_URL: ${{ secrets.MISP_URL }}
+          MISP_API_KEY: ${{ secrets.MISP_API_KEY }}
+          MISP_VERIFY_TLS: ${{ secrets.MISP_VERIFY_TLS }}
+          MISP_TIMEOUT_MS: ${{ secrets.MISP_TIMEOUT_MS }}
+          # Frontend runtime hint (not strictly required)
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.DEPLOY_PORT }}
           command_timeout: 10m
-          envs: JWT_SECRET,COOKIE_SECRET,MONGODB_URL
+          envs: APP_PORT,JWT_SECRET,COOKIE_SECRET,MONGODB_URL,ELASTICSEARCH_URL,REDIS_URL,MISP_URL,MISP_API_KEY,MISP_VERIFY_TLS,MISP_TIMEOUT_MS,VITE_API_URL
           script: |
             set -e
             BASE_DIR=/var/www/anatscrawler
@@ -97,6 +125,20 @@ jobs:
             chmod -R 755 "${BASE_DIR}/data" "${BASE_DIR}/logs" || true
             mkdir -p /var/www/anatscrawler/logs || true
             chmod 755 /var/www/anatscrawler/logs || true
+            echo "Installing Node.js if missing..."
+            if ! command -v node >/dev/null 2>&1; then
+              if command -v apt-get >/dev/null 2>&1; then
+                curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+                sudo apt-get install -y nodejs
+              elif command -v dnf >/dev/null 2>&1; then
+                curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+                sudo dnf install -y nodejs
+              elif command -v yum >/dev/null 2>&1; then
+                curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+                sudo yum install -y nodejs
+              fi
+            fi
+
             # Ensure PM2 is available
             command -v pm2 >/dev/null 2>&1 || sudo npm i -g pm2
 
@@ -110,6 +152,16 @@ jobs:
 
             cd "${CURRENT_DIR}"
 
+            echo "Installing base OS dependencies if missing (zero-touch)..."
+            if command -v apt-get >/dev/null 2>&1; then
+              sudo apt-get update -y || true
+              sudo apt-get install -y python3 python3-venv python3-pip curl tar gzip || true
+            elif command -v dnf >/dev/null 2>&1; then
+              sudo dnf install -y python3 python3-venv python3-pip curl tar gzip || true
+            elif command -v yum >/dev/null 2>&1; then
+              sudo yum install -y python3 python3-venv python3-pip curl tar gzip || true
+            fi
+
             echo "Installing runtime dependencies (prod only)..."
             if [ -f package-lock.json ]; then
               npm ci --omit=dev --no-audit --no-fund
@@ -122,7 +174,7 @@ jobs:
             if [ -d "$SF_DIR" ]; then
               # Create venv if not present
               if [ ! -d "$SF_DIR/.venv" ]; then
-                python3 -m venv "$SF_DIR/.venv" || true
+                python3 -m venv "$SF_DIR/.venv" || python -m venv "$SF_DIR/.venv" || true
               fi
               if [ -x "$SF_DIR/.venv/bin/pip" ]; then
                 "$SF_DIR/.venv/bin/pip" install --upgrade pip || true
@@ -140,6 +192,12 @@ jobs:
             fi
             ln -sfn "${CURRENT_DIR}/server" "${BASE_DIR}/server"
 
+            # Symlink /var/www/anatscrawler/client -> /var/www/anatscrawler/current/client
+            if [ -L "${BASE_DIR}/client" ]; then
+              rm -f "${BASE_DIR}/client"
+            fi
+            ln -sfn "${CURRENT_DIR}/client" "${BASE_DIR}/client"
+
             echo "Listing deployment contents for diagnostics..."
             if [ -f "${BASE_DIR}/anatscrawler-release.tar.gz" ]; then
               tar -tzf "${BASE_DIR}/anatscrawler-release.tar.gz" | head -n 200 || true
@@ -152,20 +210,29 @@ jobs:
             echo "Writing .env with production secrets..."
             cat > .env <<EOF
             NODE_ENV=production
-            PORT=5000
+            PORT=${APP_PORT:-5000}
             HOST=0.0.0.0
+            # Search/DB/Cache services (set via GitHub Secrets)
+            ELASTICSEARCH_URL=${ELASTICSEARCH_URL:-http://192.168.1.110:9200}
+            MONGODB_URL=${MONGODB_URL:-mongodb://192.168.1.110:27017/anat_security}
+            REDIS_URL=${REDIS_URL:-redis://192.168.1.110:6379}
+            # API base for frontend (client may ignore at runtime)
+            VITE_API_URL=${VITE_API_URL:-/api}
+            # Auth secrets
             JWT_SECRET=${JWT_SECRET}
             COOKIE_SECRET=${COOKIE_SECRET}
-            # Backing services (internal LAN)
-            MONGODB_URL=${MONGODB_URL:-mongodb://192.168.1.110:27017/anat_security}
-            ELASTICSEARCH_URL=http://192.168.1.110:9200
-            REDIS_URL=redis://192.168.1.110:6379
+            # Optional MISP integration
+            MISP_URL=${MISP_URL}
+            MISP_API_KEY=${MISP_API_KEY}
+            MISP_VERIFY_TLS=${MISP_VERIFY_TLS}
+            MISP_TIMEOUT_MS=${MISP_TIMEOUT_MS}
             # SpiderFoot integration
             SPIDERFOOT_HOST=127.0.0.1
             SPIDERFOOT_PORT=5001
             SPIDERFOOT_DOCROOT=/osint
             SPIDERFOOT_DIR=./server/spiderfoot-4.0
             SPIDERFOOT_NO_VENV=0
+            # Web
             CORS_ORIGIN=https://horus.anatsecurity.fr
             MAX_CONCURRENT_SCANS=10
             EOF

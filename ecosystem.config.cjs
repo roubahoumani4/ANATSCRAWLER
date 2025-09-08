@@ -8,7 +8,6 @@ module.exports = {
     exec_mode: 'fork',
     env: {
       NODE_ENV: 'production',
-      PORT: 5000,
       MAX_CONCURRENT_SCANS: 10
     },
   error_file: '/var/www/anatscrawler/logs/error.log',
