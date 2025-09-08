@@ -1,0 +1,301 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Build outputs
+dist/
+client/dist/
+server/dist/
+build/
+*.tsbuildinfo
+
+# Environment files (but allow specific ones)
+.env
+.env.*
+!.env.example
+!server/config/spiderfoot.production.env
+!server/config/spiderfoot.env.example
+
+# Python virtual environments and cache
+.venv/
+venv/
+env/
+spiderfoot-venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/python*
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+PYTHONPATH
+
+# Allow TypeScript/JavaScript lib directories
+!client/src/lib/
+!server/lib/
+
+# Development environment files
+.replit
+.cursor/
+.fleet/
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Temporary directories and files
+tmp/
+temp/
+deploy-temp/
+deploy-*/
+build-*/
+temp-*/
+*.tmp
+*.temp
+*.cache
+.temp/
+.cache/
+
+# Logs
+*.log
+logs/
+log/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
+.grunt
+
+# Bower dependency directory (https://bower.io/)
+bower_components
+
+# node-waf configuration
+.lock-wscript
+
+# Compiled binary addons (https://nodejs.org/api/addons.html)
+build/Release
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# parcel-bundler cache (https://parceljs.org/)
+.parcel-cache
+
+# Next.js build output
+.next
+out
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+
+# Gatsby files
+.cache/
+public
+
+# Storybook build outputs
+.out
+.storybook-out
+
+# Rollup.js default build output
+dist/
+
+# OS/Editor files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.swp
+*.swo
+*~
+.directory
+
+# Test outputs
+coverage/
+test-results/
+.nyc_output/
+junit.xml
+
+# Misc
+*.local
+*.zip
+*.tar.gz
+*.tgz
+*.bak
+*.backup
+*.old
+*.orig
+*.rej
+*.patch
+
+# Data files (keep structure but ignore content)
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/*.log
+data/*.sqlite
+data/*.sqlite3
+!data/
+spiderfoot.db
+spiderfoot_scanmeta.json
+
+# SpiderFoot specific (but allow important files)
+server/spiderfoot/spiderfoot.db*
+server/spiderfoot/cookies.txt
+server/spiderfoot/tmp/
+server/spiderfoot/test/
+server/spiderfoot/data/*.db
+server/spiderfoot/data/*.db-shm
+server/spiderfoot/data/*.db-wal
+server/spiderfoot/data/*.sqlite
+server/spiderfoot/data/*.sqlite3
+!server/spiderfoot/data/
+!server/spiderfoot/
+!server/spiderfoot/spiderfoot/
+!server/spiderfoot/modules/
+!server/spiderfoot/sf.py
+!server/spiderfoot/sflib.py
+!server/spiderfoot/sf_wrapper.py
+!server/spiderfoot/spiderfoot.conf
+
+# Scan logs
+tmp/spiderfoot_scan_*.log
+
+# Backups
+data/backups/
+*.backup
+
+# Generated files
+.github/.DS_Store
+server/spiderfoot/docs/
+
+# Local configuration overrides
+server/config.local.*
+server/config.env.local
+
+# PM2 logs and configs
+pids/
+logs/
+*.log
+ecosystem.config.js.local
+
+# Scripts cleanup and organization
+# Temporary script files during development
+scripts/*.tmp
+scripts/*.temp
+scripts/*.bak
+scripts/*.backup
+
+# Deployment temporary files
+deploy-*/
+deploy-temp/
+deploy-out/
+deploy-cache/
+
+# Build temporary files
+build-*/
+build-temp/
+build-cache/
+
+# Test temporary files
+test-*/
+test-temp/
+test-cache/
+
+# Temporary configuration files
+*.config.tmp
+*.config.temp
+*.config.local
+*.env.tmp
+*.env.temp
+
+# Backup files from scripts cleanup
+docs/testing/scripts-backup/*.tmp
+docs/testing/scripts-backup/*.temp
+docs/testing/scripts-backup/*.bak
+
+# Temporary Python files
+*.pyc
+*.pyo
+*.pyd
+.Python
+__pycache__/
+*.so
+
+# Temporary shell script files
+*.sh.tmp
+*.sh.temp
+*.sh.bak
+
+# Temporary JavaScript files
+*.js.tmp
+*.js.temp
+*.js.bak
+
+# Local overrides for scripts
+scripts/.env
+scripts/.env.local
+scripts/config.local.*

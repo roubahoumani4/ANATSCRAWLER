@@ -1,0 +1,101 @@
+name: Production Diagnostics
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_scan_test:
+        description: 'Run a test scan'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  diagnostics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Production Diagnostics
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          command_timeout: 10m
+          script: |
+            set -e
+            cd /var/www/anatscrawler
+
+            echo "🔄 Updating diagnostics script..."
+
+            # Download the latest diagnostics script
+            curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github.v3.raw" \
+              "https://api.github.com/repos/${{ github.repository }}/contents/scripts/production-diagnostics.sh" \
+              > scripts/production-diagnostics.sh
+
+            chmod +x scripts/production-diagnostics.sh
+
+            echo "🚀 Running diagnostics..."
+            ./scripts/production-diagnostics.sh
+
+            echo ""
+            echo "🧪 Additional application checks:"
+            echo "================================="
+
+            # Check if config files exist
+            if [ -f "server/config.ts" ]; then
+              echo "✅ Server config exists"
+            else
+              echo "❌ Server config missing"
+            fi
+
+            # Check client build
+            if [ -d "dist/client" ]; then
+              echo "✅ Client build exists"
+              echo "Client files:"
+              find dist/client -name "*.js" | head -5
+            else
+              echo "❌ Client build missing"
+            fi
+
+            # Check server build
+            if [ -f "dist/index.js" ]; then
+              echo "✅ Server build exists"
+            else
+              echo "❌ Server build missing"
+            fi
+
+      - name: Test API Endpoints (if requested)
+        if: ${{ github.event.inputs.run_scan_test == 'true' }}
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          command_timeout: 5m
+          script: |
+            cd /var/www/anatscrawler
+
+            echo "🌐 Testing API endpoints:"
+            echo "========================"
+
+            # Test health endpoint
+            curl -s localhost:3000/health | head -5 || echo "Health endpoint failed"
+
+            echo ""
+            echo "📊 PM2 detailed status:"
+            pm2 describe anatscrawler 2>/dev/null || echo "PM2 process not found"
+
+            echo ""
+            echo "🔍 Live process monitoring:"
+            ps aux | grep -E "(node|python)" | grep -v grep
+
+            echo ""
+            echo "📝 Live log tail:"
+            tail -n 20 logs/*.log 2>/dev/null || echo "No log files found"

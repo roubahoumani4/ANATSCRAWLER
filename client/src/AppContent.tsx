@@ -1,0 +1,54 @@
+import { AnimatePresence } from 'framer-motion';
+import { Route, Routes, Navigate, useLocation } from 'react-router-dom';
+import { useAuth } from './context/AuthContext';
+
+// Pages
+import DashboardPage from '@/pages/DashboardPage';
+import EnhancedLoginPage from '@/pages/EnhancedLoginPage';
+import GeneralSettingsPage from '@/pages/GeneralSettingsPage';
+import LandingPage from '@/pages/LandingPage';
+import NotFoundPage from '@/pages/NotFoundPage';
+import SignupPage from '@/pages/SignupPage';
+
+// Layout Component
+import Layout from '@/components/layout/Layout';
+
+// Protected Route Component
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated, loading } = useAuth();
+  
+  if (loading) return (
+    <div className="h-screen w-full flex items-center justify-center bg-jetBlack text-coolWhite">
+      <div className="w-12 h-12 border-4 border-coolWhite/10 border-t-white rounded-full animate-spin"></div>
+    </div>
+  );
+  
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  
+  return <Layout>{children}</Layout>;
+};
+
+export default function AppContent() {
+  const { isAuthenticated } = useAuth();
+  const location = useLocation();
+
+  return (
+    <AnimatePresence mode="wait">
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/login" element={!isAuthenticated ? <EnhancedLoginPage /> : <Navigate to="/" />} />
+        <Route path="/signup" element={!isAuthenticated ? <SignupPage /> : <Navigate to="/" />} />
+        
+        {/* Landing Page - Public but redirects if authenticated */}
+        <Route path="/" element={!isAuthenticated ? <LandingPage /> : <Navigate to="/dashboard" />} />
+        
+        {/* Protected Routes */}
+        <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute><GeneralSettingsPage /></ProtectedRoute>} />
+        
+        {/* Fallback Route */}
+        <Route path="*" element={<ProtectedRoute><NotFoundPage /></ProtectedRoute>} />
+      </Routes>
+    </AnimatePresence>
+  );
+}

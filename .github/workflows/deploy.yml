@@ -1,0 +1,185 @@
+name: Production Deploy
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build (client + server)
+        run: npm run build
+
+      - name: Verify build output
+        run: |
+          test -f dist/index.js
+          test -d client/dist
+
+      - name: Package release
+        run: |
+          mkdir -p .release
+          cp -r dist .release/dist
+          mkdir -p .release/client
+          cp -r client/dist .release/client/dist
+          # Include server files
+          mkdir -p .release/server
+          # Copy only necessary server directories
+          cp -r server/config server/lib server/middleware server/models server/routes server/services server/types server/utils .release/server/
+          cp package.json .release/
+          if [ -f package-lock.json ]; then cp package-lock.json .release/; fi
+          cp ecosystem.config.cjs .release/
+          tar -C .release -czf anatscrawler-release.tar.gz .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: anatscrawler-release
+          path: anatscrawler-release.tar.gz
+          if-no-files-found: error
+
+  deploy:
+    name: Deploy to server
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: anatscrawler-release
+          path: .
+
+      - name: Upload package to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          source: "anatscrawler-release.tar.gz"
+          target: "/var/www/anatscrawler/"
+
+      - name: Activate release and restart PM2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          command_timeout: 10m
+          envs: JWT_SECRET,COOKIE_SECRET,MONGODB_URL
+          script: |
+            set -e
+            BASE_DIR=/var/www/anatscrawler
+            RELEASE_TGZ=${BASE_DIR}/anatscrawler-release.tar.gz
+            CURRENT_DIR=${BASE_DIR}/current
+
+            echo "Preparing directories..."
+            umask 022
+            mkdir -p "${CURRENT_DIR}" "${BASE_DIR}/data" "${BASE_DIR}/data/backups" "${BASE_DIR}/logs"
+            chmod -R 755 "${BASE_DIR}/data" "${BASE_DIR}/logs" || true
+            mkdir -p /var/www/anatscrawler/logs || true
+            chmod 755 /var/www/anatscrawler/logs || true
+            # Ensure PM2 is available
+            command -v pm2 >/dev/null 2>&1 || sudo npm i -g pm2
+
+            echo "Stopping PM2 app (if running)..."
+            pm2 stop anatscrawler || true
+
+            echo "Extracting release into current..."
+            rm -rf "${CURRENT_DIR:?}"/*
+            tar -xzf "${RELEASE_TGZ}" -C "${CURRENT_DIR}"
+            rm -f "${RELEASE_TGZ}"
+
+            cd "${CURRENT_DIR}"
+
+            echo "Installing runtime dependencies (prod only)..."
+            if [ -f package-lock.json ]; then
+              npm ci --omit=dev --no-audit --no-fund
+            else
+              npm install --omit=dev --no-audit --no-fund
+            fi
+
+            echo "Ensuring stable server path via symlink..."
+            mkdir -p ${BASE_DIR}/server
+            # Symlink /var/www/anatscrawler/server -> /var/www/anatscrawler/current/server
+            if [ -L "${BASE_DIR}/server" ]; then
+              rm -f "${BASE_DIR}/server"
+            fi
+            ln -sfn "${CURRENT_DIR}/server" "${BASE_DIR}/server"
+
+            echo "Listing deployment contents for diagnostics..."
+            if [ -f "${BASE_DIR}/anatscrawler-release.tar.gz" ]; then
+              tar -tzf "${BASE_DIR}/anatscrawler-release.tar.gz" | head -n 200 || true
+            else
+              echo "(artifact already extracted/removed)"
+            fi
+            echo "--- CURRENT_DIR contents ---"; ls -la "${CURRENT_DIR}" || true
+            echo "--- server dir ---"; ls -la "${CURRENT_DIR}/server" || true
+
+            echo "Writing .env with production secrets..."
+            cat > .env <<EOF
+            NODE_ENV=production
+            PORT=5000
+            HOST=0.0.0.0
+            JWT_SECRET=${JWT_SECRET}
+            COOKIE_SECRET=${COOKIE_SECRET}
+            MONGODB_URL=${MONGODB_URL}
+            CORS_ORIGIN=https://horus.anatsecurity.fr
+            MAX_CONCURRENT_SCANS=10
+            EOF
+
+            echo "Starting PM2 via ecosystem.config.cjs..."
+            pm2 startOrReload ecosystem.config.cjs || pm2 start ecosystem.config.cjs
+            pm2 save
+
+            echo "Waiting for app to stabilize..."
+            for i in {1..30}; do
+              if curl -fsS -m 5 http://127.0.0.1:5000/health > /dev/null; then
+                echo "App healthy on 127.0.0.1:5000"; break
+              fi
+              sleep 1
+            done
+
+            echo "Verifying API health..."
+            API_OK=0
+            for i in {1..30}; do
+              if curl -fsS -m 5 http://127.0.0.1:5000/health > /dev/null; then
+                API_OK=1; echo "API health check OK"; break
+              fi
+              sleep 1
+            done
+            if [ "$API_OK" -ne 1 ]; then
+              echo "API health check failed; showing logs"
+              pm2 logs anatscrawler --lines 120 --nostream || true
+              exit 1
+            fi
+
+      - name: Final status
+        if: always()
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          command_timeout: 3m
+          script: |
+            echo "PM2 status:"
+            pm2 status anatscrawler || true
+            echo "External health (if DNS/SSL configured):"
+            curl -fsS -m 10 https://horus.anatsecurity.fr/health || true
