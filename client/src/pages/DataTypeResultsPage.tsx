@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import Layout from "@/components/layout/Layout";
 import { X, Info, Calendar, Shield, User, Globe } from "lucide-react";
 
 interface DataTypeResult {
@@ -79,15 +78,12 @@ const DataTypeResultsPage = () => {
 
   if (!scanId || !dataType) {
     return (
-      <Layout>
-        <div className="p-8 text-red-400">Invalid scan ID or data type.</div>
-      </Layout>
+      <div className="p-8 text-red-400">Invalid scan ID or data type.</div>
     );
   }
 
   return (
-    <Layout>
-      <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-6 max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">
           <button
@@ -402,7 +398,7 @@ const DataTypeResultsPage = () => {
           </div>
         )}
       </div>
-    </Layout>
+    </div>
   );
 };
 

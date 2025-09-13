@@ -1,46 +1,162 @@
 import { Router } from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { spiderFootService } from '../services/spiderfoot.service';
+import { OSINT_CONFIG } from '../config';
 
 const router = Router();
 
-const SPIDERFOOT_HOST = process.env.SPIDERFOOT_HOST || '127.0.0.1';
-const SPIDERFOOT_PORT = parseInt(process.env.SPIDERFOOT_PORT || '5001', 10);
-const SPIDERFOOT_TARGET = `http://${SPIDERFOOT_HOST}:${SPIDERFOOT_PORT}`;
-const DOCROOT = process.env.SPIDERFOOT_DOCROOT || '/osint';
+const SPIDERFOOT_TARGET = `http://${OSINT_CONFIG.SPIDERFOOT.HOST}:${OSINT_CONFIG.SPIDERFOOT.PORT}`;
+const DOCROOT = OSINT_CONFIG.SPIDERFOOT.DOCROOT;
 
-// Health endpoint to ensure underlying service is up
+console.log(`🕷️ SpiderFoot OSINT Route initialized:`);
+console.log(`   Target: ${SPIDERFOOT_TARGET}`);
+console.log(`   DocRoot: ${DOCROOT}`);
+
+// Health endpoint to ensure underlying OSINT service is up
 router.get('/health', async (_req, res) => {
-  const result = await spiderFootService.ensureStarted();
-  if (!result.ok) return res.status(500).json({ ok: false, error: result.reason });
-  res.json({ ok: true });
+  try {
+    const result = await spiderFootService.ensureStarted();
+    if (!result.ok) {
+      console.error(`❌ SpiderFoot health check failed: ${result.reason}`);
+      return res.status(503).json({ 
+        ok: false, 
+        service: 'SpiderFoot OSINT Engine',
+        error: result.reason,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    const status = spiderFootService.getStatus();
+    res.json({ 
+      ok: true, 
+      service: 'SpiderFoot OSINT Engine',
+      status: status.running ? 'running' : 'stopped',
+      config: {
+        host: status.config.host,
+        port: status.config.port,
+        docroot: status.config.docroot
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ SpiderFoot health check error:', error);
+    res.status(500).json({ 
+      ok: false, 
+      service: 'SpiderFoot OSINT Engine',
+      error: 'Internal server error during health check',
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
-// Ensure SpiderFoot is running before proxying
+// Status endpoint for detailed information
+router.get('/status', async (_req, res) => {
+  try {
+    const status = spiderFootService.getStatus();
+    res.json({
+      osint_engine: 'SpiderFoot',
+      version: '4.0',
+      status: status.running ? 'running' : 'stopped',
+      config: status.config,
+      integration: 'native',
+      endpoints: {
+        health: `${DOCROOT}/health`,
+        web_ui: `${DOCROOT}/`,
+        api: `${DOCROOT}/api`
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ SpiderFoot status error:', error);
+    res.status(500).json({ 
+      error: 'Failed to retrieve OSINT engine status',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Middleware to ensure SpiderFoot is running before proxying
 router.use(async (req, res, next) => {
-  const result = await spiderFootService.ensureStarted();
-  if (!result.ok) return res.status(500).json({ ok: false, error: result.reason });
-  next();
+  try {
+    console.log(`🔍 OSINT request: ${req.method} ${req.originalUrl}`);
+    
+    const result = await spiderFootService.ensureStarted();
+    if (!result.ok) {
+      console.error(`❌ Failed to start SpiderFoot: ${result.reason}`);
+      return res.status(503).json({ 
+        error: 'OSINT engine unavailable',
+        reason: result.reason,
+        service: 'SpiderFoot',
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    next();
+  } catch (error) {
+    console.error('❌ OSINT middleware error:', error);
+    res.status(500).json({ 
+      error: 'OSINT service error',
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Proxy everything under /osint to SpiderFoot, preserving path
-router.use(
-  '*',
-  createProxyMiddleware({
-    target: SPIDERFOOT_TARGET,
-    changeOrigin: true,
-    ws: true,
-    secure: false,
-    pathRewrite: (incomingPath) => {
-      // We expose SpiderFoot under /osint but upstream expects to be at '/'
-      const p = incomingPath || '/';
-      if (p.startsWith(DOCROOT)) {
-        const stripped = p.slice(DOCROOT.length);
-        return stripped.startsWith('/') ? stripped : `/${stripped}`;
-      }
-      return p;
-    },
-  })
-);
+const proxyMiddleware = createProxyMiddleware({
+  target: SPIDERFOOT_TARGET,
+  changeOrigin: true,
+  ws: true, // Enable WebSocket support
+  secure: false,
+  
+  // Path rewriting for native integration
+  pathRewrite: (path) => {
+    // We expose SpiderFoot under /osint but upstream expects to be at '/'
+    const p = path || '/';
+    if (p.startsWith(DOCROOT)) {
+      const stripped = p.slice(DOCROOT.length);
+      const rewritten = stripped.startsWith('/') ? stripped : `/${stripped}`;
+      console.log(`🔄 Path rewrite: ${p} -> ${rewritten}`);
+      return rewritten;
+    }
+    return p;
+  }
+});
+
+// Add error handling and logging middleware
+router.use('*', (req, res, next) => {
+  // Log proxy requests in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`➡️ Proxying ${req.method} ${req.url} to SpiderFoot`);
+  }
+  
+  // Handle proxy errors
+  const originalSend = res.send;
+  res.send = function(data) {
+    // Add CORS headers for browser compatibility
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
+    // Add service identification header
+    res.header('X-OSINT-Engine', 'SpiderFoot-4.0');
+    res.header('X-Service', 'ANAT-Security-OSINT-Platform');
+    
+    return originalSend.call(this, data);
+  };
+  
+  next();
+}, proxyMiddleware);
+
+// Error handler for proxy failures
+router.use('*', (err: any, req: any, res: any, next: any) => {
+  console.error(`❌ SpiderFoot proxy error for ${req.url}:`, err.message);
+  if (!res.headersSent) {
+    res.status(502).json({
+      error: 'OSINT engine proxy error',
+      message: 'Unable to communicate with SpiderFoot service',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
 
 export default router;

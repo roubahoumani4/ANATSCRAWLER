@@ -1,6 +1,7 @@
 /**
- * Environment-aware configuration
+ * Environment-aware configuration for ANAT Security OSINT Platform
  * - Adapts automatically for local development on macOS or production Linux
+ * - Handles SpiderFoot OSINT engine integration
  */
 
 import path from 'path';
@@ -23,10 +24,9 @@ try {
     : ((() => { try { return require('fs').existsSync(sourceConfig) ? sourceConfig : distConfig; } catch { return distConfig; } })());
   dotenv.config({ path: selectedConfig });
 
-  // Production-specific config loading can be added here if needed
-  // (SpiderFoot-related code has been removed)
-} catch {
-  // Non-fatal in dev
+  console.log(`🔧 Loaded environment config from: ${selectedConfig}`);
+} catch (e) {
+  console.warn('⚠️ Environment config loading error (non-fatal in dev):', (e as Error).message);
 }
 
 // Environment detection
@@ -36,24 +36,37 @@ export const IS_PRODUCTION = NODE_ENV === 'production';
 // Resolve base path
 // - In production default to /var/www/anatscrawler unless BASE_PATH is set
 // - In development default to current working directory
-const defaultBase = process.env.BASE_PATH || (IS_PRODUCTION ? '/var/www/anatscrawler' : process.cwd());
+const defaultBase = process.env.BASE_PATH || (IS_PRODUCTION ? '/var/www/anatscrawler/current' : process.cwd());
 const repoRootCandidate = path.resolve(defaultBase);
 export const BASE_PATH = repoRootCandidate;
 
-// Base configuration - previous spiderfoot code removed
+console.log(`🏠 Base path: ${BASE_PATH}`);
+console.log(`🌍 Environment: ${NODE_ENV} (Production: ${IS_PRODUCTION})`);
 
 // Compute paths for application data
-const dataDirDefault = path.resolve(BASE_PATH, 'data');
+const dataDirDefault = path.resolve(BASE_PATH, IS_PRODUCTION ? '../data' : 'data');
 
-// Configuration for application (spiderfoot config removed)
+// OSINT/SpiderFoot Configuration
+const spiderFootConfig = {
+  DIR: process.env.SPIDERFOOT_DIR || path.resolve(BASE_PATH, 'server', 'spiderfoot-4.0'),
+  DATA_DIR: process.env.SPIDERFOOT_DATA || path.resolve(dataDirDefault, 'spiderfoot'),
+  CACHE_DIR: process.env.SPIDERFOOT_CACHE || path.resolve(dataDirDefault, 'spiderfoot', 'cache'),
+  LOGS_DIR: process.env.SPIDERFOOT_LOGS || path.resolve(dataDirDefault, 'spiderfoot', 'logs'),
+  DB_PATH: process.env.SPIDERFOOT_DB || path.resolve(dataDirDefault, 'spiderfoot', 'spiderfoot.db'),
+  HOST: process.env.SPIDERFOOT_HOST || '0.0.0.0',
+  PORT: parseInt(process.env.SPIDERFOOT_PORT || '5001', 10),
+  DOCROOT: process.env.SPIDERFOOT_DOCROOT || '/osint'
+};
 
 export const PATHS = {
-  DATA_DIR: path.resolve(BASE_PATH, 'data'),
-  LOGS_DIR: path.resolve(BASE_PATH, 'logs'),
-  BACKUPS_DIR: path.resolve(BASE_PATH, 'data', 'backups'),
+  DATA_DIR: dataDirDefault,
+  LOGS_DIR: path.resolve(BASE_PATH, IS_PRODUCTION ? '../logs' : 'logs'),
+  BACKUPS_DIR: path.resolve(dataDirDefault, 'backups'),
   CLIENT_BUILD: path.resolve(BASE_PATH, 'client', 'dist'),
   SERVER_DIR: path.resolve(BASE_PATH, 'server'),
   SCRIPTS_DIR: path.resolve(BASE_PATH, 'scripts'),
+  // SpiderFoot OSINT paths
+  SPIDERFOOT: spiderFootConfig
 };
 
 // App DB path
@@ -63,10 +76,22 @@ export function getDatabasePath(): string {
 
 // Ensure required directories exist
 export function ensureDirectories(): void {
-  const dirs = [PATHS.DATA_DIR, PATHS.LOGS_DIR, PATHS.BACKUPS_DIR];
+  const dirs = [
+    PATHS.DATA_DIR, 
+    PATHS.LOGS_DIR, 
+    PATHS.BACKUPS_DIR,
+    // SpiderFoot OSINT directories
+    PATHS.SPIDERFOOT.DATA_DIR,
+    PATHS.SPIDERFOOT.CACHE_DIR,
+    PATHS.SPIDERFOOT.LOGS_DIR
+  ];
+  
   for (const dir of dirs) {
     try {
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true, mode: 0o755 });
+        console.log(`📁 Created directory: ${dir}`);
+      }
     } catch (error) {
       console.warn(`⚠️ Could not create directory ${dir}:`, error);
     }
@@ -81,4 +106,13 @@ export const ENVIRONMENT_CONFIG = {
   PATHS,
   DATABASE_PATH: getDatabasePath(),
   ensureDirectories,
+  // OSINT Engine Configuration
+  SPIDERFOOT: spiderFootConfig
 };
+
+// Log configuration summary
+console.log(`🔍 OSINT Configuration:`);
+console.log(`   SpiderFoot Dir: ${spiderFootConfig.DIR}`);
+console.log(`   Data Dir: ${spiderFootConfig.DATA_DIR}`);
+console.log(`   Host:Port: ${spiderFootConfig.HOST}:${spiderFootConfig.PORT}`);
+console.log(`   Doc Root: ${spiderFootConfig.DOCROOT}`);
