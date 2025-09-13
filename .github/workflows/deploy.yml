@@ -43,6 +43,10 @@ jobs:
           # Include SpiderFoot integration code
           mkdir -p .release/server/spiderfoot-4.0
           cp -r server/spiderfoot-4.0 .release/server/
+          # Ensure production requirements are included
+          if [ -f server/spiderfoot-4.0/requirements-production.txt ]; then
+            cp server/spiderfoot-4.0/requirements-production.txt .release/server/spiderfoot-4.0/
+          fi
           cp package.json .release/
           if [ -f package-lock.json ]; then cp package-lock.json .release/; fi
           cp ecosystem.config.cjs .release/
@@ -173,14 +177,28 @@ jobs:
               if [ -x "$SF_DIR/.venv/bin/pip" ]; then
                 echo "Installing SpiderFoot dependencies..."
                 cd "$SF_DIR"
-                ".venv/bin/pip" install --upgrade pip || true
-                if [ -f "requirements.txt" ]; then
+                ".venv/bin/pip" install --upgrade pip setuptools wheel || true
+                
+                # Use production requirements if available, otherwise fallback to original
+                if [ -f "requirements-production.txt" ]; then
+                  echo "Using production-optimized requirements..."
+                  ".venv/bin/pip" install -r requirements-production.txt || {
+                    echo "⚠️ Production requirements failed, trying original requirements..."
+                    ".venv/bin/pip" install -r requirements.txt || {
+                      echo "⚠️ Installing core packages individually..."
+                      ".venv/bin/pip" install cherrypy cherrypy-cors requests beautifulsoup4 lxml dnspython || true
+                    }
+                  }
+                elif [ -f "requirements.txt" ]; then
+                  echo "Installing requirements with compatibility fixes..."
+                  # Install core packages first
+                  ".venv/bin/pip" install cherrypy cherrypy-cors requests beautifulsoup4 lxml dnspython || true
+                  # Install others with error tolerance
                   ".venv/bin/pip" install -r requirements.txt || {
-                    echo "⚠️ Some SpiderFoot dependencies failed to install"
-                    echo "SpiderFoot may fall back to system Python packages"
+                    echo "⚠️ Some dependencies failed, SpiderFoot will use available packages"
                   }
                 fi
-                echo "✅ SpiderFoot dependencies installed"
+                echo "✅ SpiderFoot dependencies installation completed"
               fi
               
               # Ensure SpiderFoot data directories exist with proper permissions
@@ -267,7 +285,10 @@ jobs:
             EOF
 
             echo "Starting PM2 via ecosystem.config.cjs..."
-            pm2 startOrReload ecosystem.config.cjs || pm2 start ecosystem.config.cjs
+            cd "${CURRENT_DIR}"
+            ls -la ecosystem.config.cjs || echo "ecosystem.config.cjs not found in current directory"
+            pwd
+            pm2 startOrReload ./ecosystem.config.cjs || pm2 start ./ecosystem.config.cjs
             pm2 save
 
             echo "Waiting for app to stabilize..."
