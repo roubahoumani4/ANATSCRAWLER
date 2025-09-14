@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { spiderFootService } from '../services/spiderfoot.service';
 import { OSINT_CONFIG } from '../config';
+import authenticate from '../middleware/auth';
 
 const router = Router();
 
@@ -88,6 +89,19 @@ router.get('/status', async (_req, res) => {
       timestamp: new Date().toISOString()
     });
   }
+});
+
+// Conditional authentication - health and status are public, everything else requires auth
+router.use((req, res, next) => {
+  const path = req.path;
+  
+  // Public endpoints - no authentication required
+  if (path === '/health' || path === '/status') {
+    return next();
+  }
+  
+  // All other endpoints require authentication
+  return authenticate(req, res, next);
 });
 
 // Middleware to ensure SpiderFoot is running before proxying
