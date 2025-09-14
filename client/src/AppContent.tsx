@@ -45,7 +45,8 @@ export default function AppContent() {
         
         {/* Protected Routes */}
         <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-  <Route path="/dashboard/search" element={<ProtectedRoute><SpiderFootPage /></ProtectedRoute>} />
+        <Route path="/dashboard/search" element={<ProtectedRoute><SpiderFootPage /></ProtectedRoute>} />
+        <Route path="/osint" element={<ProtectedRoute><SpiderFootPage /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><GeneralSettingsPage /></ProtectedRoute>} />
         
         {/* Fallback Route */}
