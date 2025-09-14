@@ -37,8 +37,24 @@ export async function registerRoutes(app: Express): Promise<void> {
   // Search routes - authenticated users only
   app.use(`${apiV1}/search`, authenticate, searchRoutes);
 
-  // SpiderFoot UI/API proxy - authenticated users only under /osint
+  // SpiderFoot OSINT Engine - accessible at /osint
+  // Health endpoint public, main interface requires authentication
+  app.use('/osint/health', spiderfootProxy);
+  app.use('/osint/status', spiderfootProxy);
   app.use('/osint', authenticate, spiderfootProxy);
+
+  // Debug endpoint for OSINT testing (remove in production)
+  if (process.env.NODE_ENV !== 'production') {
+    app.get('/osint-debug', (req, res) => {
+      res.json({ 
+        message: 'OSINT debug endpoint working',
+        timestamp: new Date().toISOString(),
+        note: 'Main OSINT endpoint is at /osint and requires authentication',
+        healthCheck: '/osint/health (public)',
+        statusCheck: '/osint/status (public)'
+      });
+    });
+  }
 
   // Public search endpoint for landing page - no authentication required
   app.use('/api/public-search', searchRoutes);

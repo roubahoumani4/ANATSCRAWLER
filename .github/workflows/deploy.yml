@@ -266,7 +266,7 @@ jobs:
             MISP_VERIFY_TLS=${MISP_VERIFY_TLS}
             MISP_TIMEOUT_MS=${MISP_TIMEOUT_MS}
             # SpiderFoot OSINT Engine Configuration
-            SPIDERFOOT_HOST=0.0.0.0
+            SPIDERFOOT_HOST=127.0.0.1
             SPIDERFOOT_PORT=5001
             SPIDERFOOT_DIR=/var/www/anatscrawler/current/server/spiderfoot-4.0
             SPIDERFOOT_DOCROOT=/osint

@@ -143,8 +143,8 @@ async function startServer() {
   // Register API routes first
     await registerRoutes(app);
     
-  // OSINT engine integration
-  console.log('🔍 OSINT engine routes are registered under /api/v1/osint');
+  // OSINT engine integration - accessible at /osint (not /api/v1/osint)
+  console.log('🔍 OSINT engine routes are registered under /osint');
 
     // Handle static files and client routing
     const isDev = process.env.NODE_ENV !== 'production';
@@ -329,15 +329,30 @@ async function startServer() {
     }
 
     const port = parseInt(process.env.PORT || '5000', 10);
-    const host = '0.0.0.0';
-    httpServer.listen({ port, host }, () => {
-      console.log(`🚀 Server running at http://${host}:${port}`);
-      console.log('You can access the server at:');
-      console.log(`- Local: http://localhost:${port}`);
-      console.log(`- Network: http://${host}:${port}`);
-      console.log(`Environment: ${isDev ? 'development' : 'production'}`);
-      console.log(`🌐 OSINT API: http://localhost:${port}/api/v1/osint/health`);
-    });
+    const host = process.env.HOST || '0.0.0.0';
+    
+    // Ensure we're not using the SpiderFoot port
+    if (port === parseInt(process.env.SPIDERFOOT_PORT || '5001', 10)) {
+      console.error(`❌ Server port ${port} conflicts with SpiderFoot port. Using fallback port 5000.`);
+      const fallbackPort = 5000;
+      httpServer.listen({ port: fallbackPort, host }, () => {
+        console.log(`🚀 Server running at http://${host}:${fallbackPort}`);
+        console.log('You can access the server at:');
+        console.log(`- Local: http://localhost:${fallbackPort}`);
+        console.log(`- Network: http://${host}:${fallbackPort}`);
+        console.log(`Environment: ${isDev ? 'development' : 'production'}`);
+        console.log(`🌐 OSINT API: http://localhost:${fallbackPort}/osint/health`);
+      });
+    } else {
+      httpServer.listen({ port, host }, () => {
+        console.log(`🚀 Server running at http://${host}:${port}`);
+        console.log('You can access the server at:');
+        console.log(`- Local: http://localhost:${port}`);
+        console.log(`- Network: http://${host}:${port}`);
+        console.log(`Environment: ${isDev ? 'development' : 'production'}`);
+        console.log(`🌐 OSINT API: http://localhost:${port}/osint/health`);
+      });
+    }
 
     httpServer.on('error', console.error);
   } catch (error) {

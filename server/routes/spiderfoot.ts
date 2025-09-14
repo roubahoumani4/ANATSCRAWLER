@@ -5,12 +5,13 @@ import { OSINT_CONFIG } from '../config';
 
 const router = Router();
 
-const SPIDERFOOT_TARGET = `http://${OSINT_CONFIG.SPIDERFOOT.HOST}:${OSINT_CONFIG.SPIDERFOOT.PORT}`;
+const SPIDERFOOT_TARGET = `http://127.0.0.1:${OSINT_CONFIG.SPIDERFOOT.PORT}`;
 const DOCROOT = OSINT_CONFIG.SPIDERFOOT.DOCROOT;
 
 console.log(`🕷️ SpiderFoot OSINT Route initialized:`);
 console.log(`   Target: ${SPIDERFOOT_TARGET}`);
 console.log(`   DocRoot: ${DOCROOT}`);
+console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
 
 // Health endpoint to ensure underlying OSINT service is up
 router.get('/health', async (_req, res) => {

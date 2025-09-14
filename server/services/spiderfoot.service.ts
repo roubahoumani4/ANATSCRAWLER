@@ -23,7 +23,7 @@ class SpiderFootService {
 
   constructor() {
     this.config = {
-      host: process.env.SPIDERFOOT_HOST || '0.0.0.0',
+      host: process.env.SPIDERFOOT_HOST || '127.0.0.1', // Use 127.0.0.1 for internal communication
       port: parseInt(process.env.SPIDERFOOT_PORT || '5001', 10),
       dir: process.env.SPIDERFOOT_DIR || path.resolve(process.cwd(), 'server', 'spiderfoot-4.0'),
       docroot: process.env.SPIDERFOOT_DOCROOT || '/osint',
@@ -32,6 +32,12 @@ class SpiderFootService {
       logsDir: process.env.SPIDERFOOT_LOGS || path.resolve(process.cwd(), 'data', 'spiderfoot', 'logs'),
       dbPath: process.env.SPIDERFOOT_DB || path.resolve(process.cwd(), 'data', 'spiderfoot', 'spiderfoot.db')
     };
+    
+    console.log('🕷️ SpiderFoot Service Configuration:');
+    console.log(`   Host: ${this.config.host}:${this.config.port}`);
+    console.log(`   Directory: ${this.config.dir}`);
+    console.log(`   Data Dir: ${this.config.dataDir}`);
+    console.log(`   Doc Root: ${this.config.docroot}`);
   }
 
   private findSpiderfootDir(): string | null {
@@ -115,7 +121,7 @@ class SpiderFootService {
       let content = fs.readFileSync(sfPath, 'utf-8');
       
       // Check if already patched
-      if (content.includes('SPIDERFOOT_DOCROOT')) {
+      if (content.includes('ANAT Security OSINT Platform Integration')) {
         console.log('✅ SpiderFoot already patched for integration');
         return;
       }
@@ -128,7 +134,28 @@ class SpiderFootService {
       if (idx !== -1) {
         const insertAfter = content.indexOf('}', idx);
         if (insertAfter !== -1) {
-          const addition = `\n\n    # ANAT Security OSINT Platform Integration\n    # Allow overriding host/port/docroot via environment for embedding\n    sfWebUiConfig['root'] = os.getenv('SPIDERFOOT_DOCROOT', sfWebUiConfig.get('root', '/'))\n    env_host = os.getenv('SPIDERFOOT_HOST')\n    env_port = os.getenv('SPIDERFOOT_PORT')\n    if env_host: sfWebUiConfig['host'] = env_host\n    if env_port: sfWebUiConfig['port'] = int(env_port)\n    \n    # Enable CORS for ANAT Security integration\n    sfWebUiConfig['cors_origins'] = ['*']  # Allow all origins for native integration\n`;
+          const addition = `
+
+    # ANAT Security OSINT Platform Integration
+    # Allow overriding host/port/docroot via environment for embedding
+    import os
+    sfWebUiConfig['root'] = os.getenv('SPIDERFOOT_DOCROOT', sfWebUiConfig.get('root', '/'))
+    env_host = os.getenv('SPIDERFOOT_HOST')
+    env_port = os.getenv('SPIDERFOOT_PORT')
+    if env_host: 
+        sfWebUiConfig['host'] = env_host
+    if env_port: 
+        sfWebUiConfig['port'] = int(env_port)
+    
+    # Enable CORS for ANAT Security integration
+    sfWebUiConfig['cors_origins'] = ['*']  # Allow all origins for native integration
+    
+    # Production logging
+    if os.getenv('NODE_ENV') == 'production':
+        print(f"🕷️  SpiderFoot OSINT Engine starting on {sfWebUiConfig['host']}:{sfWebUiConfig['port']}")
+        print(f"📁 Data directory: {os.getenv('SPIDERFOOT_DATA', './data')}")
+        print(f"🌐 Document root: {sfWebUiConfig['root']}")
+`;
           content = content.slice(0, insertAfter + 1) + addition + content.slice(insertAfter + 1);
           fs.writeFileSync(sfPath, content, 'utf-8');
           console.log('✅ SpiderFoot successfully patched for native integration');

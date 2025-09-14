@@ -12,7 +12,7 @@ module.exports = {
       PORT: 5000,
       MAX_CONCURRENT_SCANS: 10,
       // SpiderFoot OSINT Engine Environment
-      SPIDERFOOT_HOST: '0.0.0.0',
+      SPIDERFOOT_HOST: '127.0.0.1',
       SPIDERFOOT_PORT: 5001,
       SPIDERFOOT_DIR: '/var/www/anatscrawler/current/server/spiderfoot-4.0',
       SPIDERFOOT_DOCROOT: '/osint',
