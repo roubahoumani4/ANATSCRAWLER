@@ -68,15 +68,40 @@ class SpiderFootService {
 
   private async ensureDirectories(): Promise<void> {
     const dirs = [this.config.dataDir, this.config.cacheDir, this.config.logsDir];
-    for (const dir of dirs) {
+    
+    for (const dirPath of dirs) {
       try {
-        if (!fs.existsSync(dir)) {
-          fs.mkdirSync(dir, { recursive: true, mode: 0o755 });
-          console.log(`📁 Created directory: ${dir}`);
+        if (!fs.existsSync(dirPath)) {
+          console.log(`📁 Creating directory: ${dirPath}`);
+          fs.mkdirSync(dirPath, { recursive: true });
+        }
+        
+        // Check if we can write to the directory
+        const testFile = path.join(dirPath, '.write_test');
+        try {
+          fs.writeFileSync(testFile, 'test');
+          fs.unlinkSync(testFile);
+          console.log(`✅ Directory writable: ${dirPath}`);
+        } catch (writeError) {
+          console.error(`❌ Cannot write to directory ${dirPath}:`, writeError);
+          throw new Error(`Permission denied: Cannot write to ${dirPath}`);
         }
       } catch (error) {
-        console.warn(`⚠️ Could not create directory ${dir}:`, error);
+        console.error(`❌ Failed to ensure directory ${dirPath}:`, error);
+        throw error;
       }
+    }
+    
+    // Ensure authentication is disabled by creating/clearing passwd file
+    try {
+      const passwdFile = path.join(this.config.dataDir, 'passwd');
+      console.log(`🔒 Ensuring no authentication: ${passwdFile}`);
+      
+      // Create empty passwd file to explicitly disable authentication
+      fs.writeFileSync(passwdFile, '', 'utf8');
+      console.log(`✅ Authentication disabled: empty passwd file created`);
+    } catch (error) {
+      console.warn(`⚠️ Could not create passwd file:`, error);
     }
   }
 
@@ -164,6 +189,24 @@ class SpiderFootService {
     } catch (e) {
       console.warn('⚠️ Could not patch SpiderFoot config (will try proxy-only mode):', (e as Error).message);
     }
+  }
+
+  private async checkPortAvailable(port: number): Promise<boolean> {
+    return new Promise((resolve) => {
+      const net = require('net');
+      const server = net.createServer();
+      
+      server.listen(port, '127.0.0.1', () => {
+        server.once('close', () => {
+          resolve(true); // Port is available
+        });
+        server.close();
+      });
+      
+      server.on('error', () => {
+        resolve(false); // Port is in use
+      });
+    });
   }
 
   private async waitReady(timeoutMs = 180000): Promise<boolean> { // Increased to 3 minutes
@@ -266,6 +309,20 @@ class SpiderFootService {
         await this.ensureVenv(dir);
       }
 
+      // Check if port is available before starting
+      try {
+        const isPortAvailable = await this.checkPortAvailable(this.config.port);
+        if (!isPortAvailable) {
+          console.error(`❌ Port ${this.config.port} is already in use`);
+          return { 
+            ok: false, 
+            reason: `Port ${this.config.port} is already in use. Another SpiderFoot instance may be running.` 
+          };
+        }
+      } catch (portError) {
+        console.warn(`⚠️ Could not check port availability: ${(portError as Error).message}`);
+      }
+
       const py = this.getVenvPython(dir) || 'python3';
 
       const env = {
@@ -313,23 +370,29 @@ class SpiderFootService {
       child.stderr.on('data', d => {
         const output = d.toString().trim();
         if (output) {
-          console.warn(`[SpiderFoot] ${output}`);
+          console.error(`[SpiderFoot ERROR] ${output}`);
         }
       });
-      
+
       child.on('exit', (code, signal) => {
         console.log(`[SpiderFoot] Process exited with code ${code}, signal ${signal}`);
+        if (code !== 0 && code !== null) {
+          console.error(`❌ SpiderFoot failed with exit code ${code}`);
+          if (code === 70) {
+            console.error(`💡 Exit code 70 suggests a software/configuration error. Common causes:
+              - Port ${this.config.port} already in use
+              - Permission denied accessing data directory: ${this.config.dataDir}
+              - Database file permissions: ${this.config.dbPath}
+              - Python module import errors`);
+          }
+        }
         this.proc = null;
-        this.starting = false;
       });
 
       child.on('error', (error) => {
-        console.error(`[SpiderFoot] Process error:`, error);
+        console.error(`❌ SpiderFoot process error:`, error);
         this.proc = null;
-        this.starting = false;
-      });
-
-      const ok = await this.waitReady();
+      });      const ok = await this.waitReady();
       if (!ok) {
         if (this.proc) {
           this.proc.kill('SIGTERM');
