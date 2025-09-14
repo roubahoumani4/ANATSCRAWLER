@@ -34,6 +34,11 @@ function SpiderFootPage() {
         const response = await fetch('/osint/health');
         
         if (!response.ok) {
+          // Check if it's an authentication error
+          if (response.status === 401) {
+            throw new Error('Authentication required - please log in again to access OSINT features');
+          }
+          
           // Try to get error details from response
           try {
             const errorData = await response.json();
@@ -65,6 +70,17 @@ function SpiderFootPage() {
           <div className="text-red-400 text-xl mb-4">⚠️ OSINT Engine Unavailable</div>
           <div className="text-gray-300 mb-6 text-sm font-mono bg-gray-800 p-3 rounded">{error}</div>
           <div className="space-y-3">
+            {error.includes('Authentication required') && (
+              <button 
+                onClick={() => {
+                  // Redirect to login page
+                  window.location.href = '/login';
+                }} 
+                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 mr-3"
+              >
+                Login to Continue
+              </button>
+            )}
             <button 
               onClick={() => {
                 setError(null);
@@ -74,6 +90,9 @@ function SpiderFootPage() {
                   try {
                     const response = await fetch('/osint/health');
                     if (!response.ok) {
+                      if (response.status === 401) {
+                        throw new Error('Authentication required - please log in again to access OSINT features');
+                      }
                       const errorData = await response.json();
                       throw new Error(`OSINT engine not ready: ${response.status} - ${errorData.error || 'Unknown error'}`);
                     }
