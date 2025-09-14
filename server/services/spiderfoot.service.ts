@@ -23,7 +23,7 @@ class SpiderFootService {
 
   constructor() {
     this.config = {
-      host: process.env.SPIDERFOOT_HOST || '127.0.0.1', // Use 127.0.0.1 for internal communication
+      host: process.env.SPIDERFOOT_HOST || '127.0.0.1', // Use 127.0.0.1 for internal communication (security)
       port: parseInt(process.env.SPIDERFOOT_PORT || '5001', 10),
       dir: process.env.SPIDERFOOT_DIR || path.resolve(process.cwd(), 'server', 'spiderfoot-4.0'),
       docroot: process.env.SPIDERFOOT_DOCROOT || '/osint',
@@ -166,7 +166,7 @@ class SpiderFootService {
     }
   }
 
-  private async waitReady(timeoutMs = 120000): Promise<boolean> {
+  private async waitReady(timeoutMs = 180000): Promise<boolean> { // Increased to 3 minutes
     const start = Date.now();
     console.log(`⏳ Waiting for SpiderFoot to be ready on ${this.config.host}:${this.config.port}...`);
     
