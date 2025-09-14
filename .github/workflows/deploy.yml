@@ -246,43 +246,43 @@ jobs:
             echo "--- server dir ---"; ls -la "${CURRENT_DIR}/server" || true
 
             echo "Writing .env with production secrets..."
-            cat > .env <<EOF
+            # Create .env file for runtime
+            cat > .env << 'EOF'
             NODE_ENV=production
-            PORT=${APP_PORT:-5000}
             HOST=0.0.0.0
-            BASE_PATH=/var/www/anatscrawler/current
-            # Search/DB/Cache services (set via GitHub Secrets)
-            ELASTICSEARCH_URL=${ELASTICSEARCH_URL:-http://192.168.1.110:9200}
-            MONGODB_URL=${MONGODB_URL:-mongodb://192.168.1.110:27017/anat_security}
-            REDIS_URL=${REDIS_URL:-redis://192.168.1.110:6379}
-            # API base for frontend (client may ignore at runtime)
-            VITE_API_URL=${VITE_API_URL:-/api}
-            # Auth secrets
+            PORT=5000
+            # Database and Services
+            MONGODB_URL=${MONGODB_URL}
+            ELASTICSEARCH_URL=${ELASTICSEARCH_URL}
+            REDIS_URL=${REDIS_URL}
+            # Security
             JWT_SECRET=${JWT_SECRET}
             COOKIE_SECRET=${COOKIE_SECRET}
-            # Optional MISP integration
-            MISP_URL=${MISP_URL}
-            MISP_API_KEY=${MISP_API_KEY}
-            MISP_VERIFY_TLS=${MISP_VERIFY_TLS}
-            MISP_TIMEOUT_MS=${MISP_TIMEOUT_MS}
-            # SpiderFoot OSINT Engine Configuration
+            # Optional MISP Integration
+            MISP_URL=${MISP_URL:-}
+            MISP_API_KEY=${MISP_API_KEY:-}
+            MISP_VERIFY_TLS=${MISP_VERIFY_TLS:-true}
+            MISP_TIMEOUT_MS=${MISP_TIMEOUT_MS:-30000}
+            # SpiderFoot OSINT Engine (localhost binding for security)
             SPIDERFOOT_HOST=127.0.0.1
             SPIDERFOOT_PORT=5001
             SPIDERFOOT_DIR=/var/www/anatscrawler/current/server/spiderfoot-4.0
             SPIDERFOOT_DOCROOT=/osint
-            SPIDERFOOT_NO_VENV=0
-            # Persist SpiderFoot data on shared disk
             SPIDERFOOT_DATA=/var/www/anatscrawler/data/spiderfoot
             SPIDERFOOT_CACHE=/var/www/anatscrawler/data/spiderfoot/cache
             SPIDERFOOT_LOGS=/var/www/anatscrawler/data/spiderfoot/logs
             SPIDERFOOT_DB=/var/www/anatscrawler/data/spiderfoot/spiderfoot.db
-            # Web Configuration
+            # CORS Configuration
             CORS_ORIGIN=https://horus.anatsecurity.fr
             MAX_CONCURRENT_SCANS=10
             # Production Optimization
             CLUSTER_MODE=true
             WORKER_PROCESSES=2
+            # Debug flag for troubleshooting
+            DEBUG_STARTUP=true
             EOF
+
+            echo "Environment configured. Starting PM2..."
 
             echo "Starting PM2 via ecosystem.config.cjs..."
             cd "${CURRENT_DIR}"
@@ -291,25 +291,37 @@ jobs:
             pm2 startOrReload ./ecosystem.config.cjs || pm2 start ./ecosystem.config.cjs
             pm2 save
 
+            echo "Waiting for PM2 to start app..."
+            sleep 5
+            pm2 list
+            pm2 logs anatscrawler --lines 20 --nostream || true
+
             echo "Waiting for app to stabilize..."
-            for i in {1..30}; do
-              if curl -fsS -m 5 http://127.0.0.1:5000/health > /dev/null; then
-                echo "App healthy on 127.0.0.1:5000"; break
+            API_READY=0
+            for i in {1..60}; do
+              echo "Health check attempt $i/60..."
+              if curl -fsS --connect-timeout 10 -m 10 http://127.0.0.1:5000/health > /dev/null 2>&1; then
+                echo "✅ App healthy on 127.0.0.1:5000"
+                API_READY=1
+                break
               fi
-              sleep 1
+              if curl -fsS --connect-timeout 10 -m 10 http://0.0.0.0:5000/health > /dev/null 2>&1; then
+                echo "✅ App healthy on 0.0.0.0:5000"
+                API_READY=1
+                break
+              fi
+              echo "⏳ App not ready yet, waiting..."
+              sleep 2
             done
 
-            echo "Verifying API health..."
-            API_OK=0
-            for i in {1..30}; do
-              if curl -fsS -m 5 http://127.0.0.1:5000/health > /dev/null; then
-                API_OK=1; echo "API health check OK"; break
-              fi
-              sleep 1
-            done
-            if [ "$API_OK" -ne 1 ]; then
-              echo "API health check failed; showing logs"
-              pm2 logs anatscrawler --lines 120 --nostream || true
+            if [ "$API_READY" -ne 1 ]; then
+              echo "❌ API health check failed after 2 minutes. Showing PM2 status and logs..."
+              pm2 list
+              pm2 logs anatscrawler --lines 50 --nostream || true
+              echo "Checking if port 5000 is in use..."
+              netstat -tulpn 2>/dev/null | grep :5000 || ss -tulpn 2>/dev/null | grep :5000 || echo "Port 5000 not found in netstat/ss"
+              echo "Testing basic network connectivity..."
+              curl -v --connect-timeout 5 http://127.0.0.1:5000/health || true
               exit 1
             fi
 

@@ -40,6 +40,16 @@ Object.entries(requiredEnvVars).forEach(([key, value]) => {
   process.env[key] = value; // Ensure they're set in process.env
 });
 
+// Debug startup if flag is set
+if (process.env.DEBUG_STARTUP === 'true') {
+  console.log('🔍 Debug mode: Environment variables:');
+  console.log(`   NODE_ENV: ${process.env.NODE_ENV}`);
+  console.log(`   HOST: ${process.env.HOST}`);
+  console.log(`   PORT: ${process.env.PORT}`);
+  console.log(`   PWD: ${process.cwd()}`);
+  console.log(`   __dirname: ${__dirname}`);
+}
+
 // Import MongoDB client after environment is loaded
 let mongodb: any;
 
@@ -170,20 +180,13 @@ async function startServer() {
 
       const possibleClientPaths = [
         path.resolve(deploymentRoot, 'client/dist'),      // Expected build output (primary)
-        path.resolve(deploymentRoot, 'app/client/dist'),  // Server deployment structure (fallback)
-        path.resolve(deploymentRoot, 'dist/client'),      // Alternative build location
+        path.resolve(deploymentRoot, 'dist/client'),      // Alternative build location  
         path.resolve(deploymentRoot, 'client'),           // Fallback location
-        path.resolve(deploymentRoot, 'app/client'),       // Server deployment fallback
-        path.resolve(deploymentRoot, 'client-dist'),      // Alternative build location
         // Add absolute paths for common deployment scenarios
-        '/var/www/ANATSCRAWLER/current/client/dist',      // Current deployment path (uppercase)
         '/var/www/anatscrawler/current/client/dist',      // Current deployment path (lowercase)
-        '/var/www/ANATSCRAWLER/client/dist',              // Common production path (uppercase)
-        '/var/www/anatscrawler/client/dist',              // Common production path (lowercase)
-        '/var/www/ANATSCRAWLER/app/client/dist',          // Alternative production path (uppercase)
-        '/var/www/anatscrawler/app/client/dist',          // Alternative production path (lowercase)
-        '/var/www/ANATSCRAWLER/dist/client',              // Alternative production path (uppercase)
+        '/var/www/ANATSCRAWLER/current/client/dist',      // Current deployment path (uppercase)
         '/var/www/anatscrawler/dist/client',              // Alternative production path (lowercase)
+        '/var/www/ANATSCRAWLER/dist/client',              // Alternative production path (uppercase)
       ];
 
       let clientDistPath: string | null = null;
@@ -211,11 +214,11 @@ async function startServer() {
       }
 
       if (!clientDistPath || !indexHtmlPath) {
-        console.error('❌ Client build files not found!');
-        console.error('Searched in:');
-        possibleClientPaths.forEach(p => console.error(`  - ${p}`));
-        console.error(`Deployment root: ${deploymentRoot}`);
-        console.error(`Server location: ${__dirname}`);
+        console.warn('⚠️ Client build files not found! Server will run in API-only mode.');
+        console.warn('Searched in:');
+        possibleClientPaths.forEach(p => console.warn(`  - ${p}`));
+        console.warn(`Deployment root: ${deploymentRoot}`);
+        console.warn(`Server location: ${__dirname}`);
 
         // List contents for debugging
         try {
@@ -244,9 +247,25 @@ async function startServer() {
           console.error('Could not list directory contents:', e);
         }
 
-        console.error('❌ Cannot start production server without client files');
-        throw new Error('Client build files not found');
-      }
+        // Continue in API-only mode instead of failing
+        console.warn('⚠️ Continuing in API-only mode without client files');
+        
+        // Serve a simple message for all non-API routes
+        app.get('*', (req, res, next) => {
+          if (req.path.startsWith('/api') || req.path.startsWith('/osint') || req.path.startsWith('/health')) {
+            return next(); // Let API routes be handled by the API router
+          }
+
+          res.json({
+            status: 'api-only',
+            message: 'Server running in API-only mode. Client files not found.',
+            api: 'API endpoints available at /api/*',
+            health: '/health',
+            osint: '/osint/health',
+            timestamp: new Date().toISOString()
+          });
+        });
+      } else {
 
       console.log('Serving static files from:', clientDistPath);
 
@@ -325,32 +344,35 @@ async function startServer() {
             next(err);
           }
         });
-      });
+        });
+      }
     }
 
     const port = parseInt(process.env.PORT || '5000', 10);
-    const host = process.env.HOST || '0.0.0.0';
-    
-    // Ensure we're not using the SpiderFoot port
+    const host = process.env.HOST || '0.0.0.0';    // Ensure we're not using the SpiderFoot port
     if (port === parseInt(process.env.SPIDERFOOT_PORT || '5001', 10)) {
       console.error(`❌ Server port ${port} conflicts with SpiderFoot port. Using fallback port 5000.`);
       const fallbackPort = 5000;
+      console.log(`🚀 Starting server on ${host}:${fallbackPort}...`);
       httpServer.listen({ port: fallbackPort, host }, () => {
-        console.log(`🚀 Server running at http://${host}:${fallbackPort}`);
+        console.log(`✅ Server successfully started at http://${host}:${fallbackPort}`);
         console.log('You can access the server at:');
         console.log(`- Local: http://localhost:${fallbackPort}`);
         console.log(`- Network: http://${host}:${fallbackPort}`);
         console.log(`Environment: ${isDev ? 'development' : 'production'}`);
         console.log(`🌐 OSINT API: http://localhost:${fallbackPort}/osint/health`);
+        console.log(`🏥 Health check: http://localhost:${fallbackPort}/health`);
       });
     } else {
+      console.log(`🚀 Starting server on ${host}:${port}...`);
       httpServer.listen({ port, host }, () => {
-        console.log(`🚀 Server running at http://${host}:${port}`);
+        console.log(`✅ Server successfully started at http://${host}:${port}`);
         console.log('You can access the server at:');
         console.log(`- Local: http://localhost:${port}`);
         console.log(`- Network: http://${host}:${port}`);
         console.log(`Environment: ${isDev ? 'development' : 'production'}`);
         console.log(`🌐 OSINT API: http://localhost:${port}/osint/health`);
+        console.log(`🏥 Health check: http://localhost:${port}/health`);
       });
     }
 
