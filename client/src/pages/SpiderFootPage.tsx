@@ -10,6 +10,25 @@ function SpiderFootPage() {
     const checkHealth = async () => {
       try {
         console.log('🔍 Checking OSINT health...');
+        
+        // First, test if main server is responding at all
+        try {
+          console.log('🔍 Testing main server health first...');
+          const mainHealthResponse = await fetch('/health');
+          console.log('📊 Main server health response:', mainHealthResponse.status);
+          
+          if (!mainHealthResponse.ok) {
+            throw new Error(`Main server not responding: ${mainHealthResponse.status}`);
+          }
+          
+          const mainHealthData = await mainHealthResponse.json();
+          console.log('✅ Main server is healthy:', mainHealthData);
+        } catch (mainError) {
+          console.error('❌ Main server health check failed:', mainError);
+          throw new Error(`Main server unavailable: ${mainError instanceof Error ? mainError.message : 'Unknown error'}`);
+        }
+        
+        // Now test OSINT specifically
         const response = await fetch('/osint/health');
         
         if (!response.ok) {
