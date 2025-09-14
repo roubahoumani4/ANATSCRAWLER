@@ -16,6 +16,12 @@ console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
 // Health endpoint to ensure underlying OSINT service is up
 router.get('/health', async (_req, res) => {
   try {
+    console.log('🔍 OSINT health check requested');
+    
+    // Get current service status first
+    const serviceStatus = spiderFootService.getStatus();
+    console.log(`📊 Current SpiderFoot status: running=${serviceStatus.running}, config=${JSON.stringify(serviceStatus.config)}`);
+    
     const result = await spiderFootService.ensureStarted();
     if (!result.ok) {
       console.error(`❌ SpiderFoot health check failed: ${result.reason}`);
@@ -23,19 +29,27 @@ router.get('/health', async (_req, res) => {
         ok: false, 
         service: 'SpiderFoot OSINT Engine',
         error: result.reason,
-        timestamp: new Date().toISOString()
+        status: serviceStatus.running ? 'running' : 'stopped',
+        config: serviceStatus.config,
+        timestamp: new Date().toISOString(),
+        debug: {
+          processRunning: !!serviceStatus.running,
+          configHost: serviceStatus.config.host,
+          configPort: serviceStatus.config.port,
+          targetUrl: `http://${serviceStatus.config.host}:${serviceStatus.config.port}`
+        }
       });
     }
     
-    const status = spiderFootService.getStatus();
+    const currentStatus = spiderFootService.getStatus();
     res.json({ 
       ok: true, 
       service: 'SpiderFoot OSINT Engine',
-      status: status.running ? 'running' : 'stopped',
+      status: currentStatus.running ? 'running' : 'stopped',
       config: {
-        host: status.config.host,
-        port: status.config.port,
-        docroot: status.config.docroot
+        host: currentStatus.config.host,
+        port: currentStatus.config.port,
+        docroot: currentStatus.config.docroot
       },
       timestamp: new Date().toISOString()
     });
