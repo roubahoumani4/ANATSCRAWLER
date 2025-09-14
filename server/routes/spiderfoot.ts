@@ -166,6 +166,12 @@ router.use('*', (req, res, next) => {
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     
+    // Allow iframe embedding for same origin
+    res.header('X-Frame-Options', 'SAMEORIGIN');
+    
+    // Set permissive permissions policy for iframe
+    res.header('Permissions-Policy', 'fullscreen=(self), downloads=(self)');
+    
     // Add service identification header
     res.header('X-OSINT-Engine', 'SpiderFoot-4.0');
     res.header('X-Service', 'ANAT-Security-OSINT-Platform');

@@ -3,7 +3,9 @@ import * as React from 'react';
 function SpiderFootPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const base = '/osint';
+  
+  // The iframe should point to the backend proxy endpoint, not a frontend route
+  const spiderfootUrl = '/osint/';
 
   // Check OSINT health on mount
   React.useEffect(() => {
@@ -89,6 +91,15 @@ function SpiderFootPage() {
             </button>
             <button 
               onClick={() => {
+                // Open OSINT in new window to bypass iframe restrictions
+                window.open('/osint/', '_blank', 'noopener,noreferrer');
+              }} 
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 mr-3"
+            >
+              Open in New Window
+            </button>
+            <button 
+              onClick={() => {
                 setError(null);
                 setIsLoading(false);
                 // Force load anyway
@@ -119,10 +130,11 @@ function SpiderFootPage() {
     <div className="w-full h-[calc(100vh-80px)] bg-black/90 rounded-md overflow-hidden border border-gray-800">
       <iframe
         title="SpiderFoot OSINT Engine"
-        src={base}
+        src={spiderfootUrl}
         className="w-full h-full"
-        sandbox="allow-scripts allow-forms allow-popups allow-downloads"
-        allow="fullscreen"
+        sandbox="allow-scripts allow-forms allow-popups allow-downloads allow-same-origin"
+        allow="fullscreen; downloads"
+        referrerPolicy="strict-origin-when-cross-origin"
         onLoad={() => console.log('SpiderFoot interface loaded')}
         onError={() => setError('Failed to load SpiderFoot interface')}
       />
