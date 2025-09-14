@@ -191,6 +191,60 @@ class SpiderFootService {
     }
   }
 
+  private async killExistingSpiderFoot(): Promise<void> {
+    try {
+      console.log('🔍 Checking for existing SpiderFoot processes...');
+      
+      // Kill any processes using our port
+      const { exec } = require('child_process');
+      const killCmd = process.platform === 'win32' 
+        ? `netstat -ano | findstr :${this.config.port}` 
+        : `lsof -ti:${this.config.port}`;
+      
+      return new Promise((resolve) => {
+        exec(killCmd, (error: any, stdout: string) => {
+          if (error || !stdout.trim()) {
+            console.log('✅ No existing processes found on port', this.config.port);
+            resolve();
+            return;
+          }
+          
+          const pids = stdout.trim().split('\n').map(line => {
+            if (process.platform === 'win32') {
+              return line.trim().split(/\s+/).pop();
+            } else {
+              return line.trim();
+            }
+          }).filter(pid => pid && !isNaN(Number(pid)));
+          
+          if (pids.length === 0) {
+            console.log('✅ No processes to kill');
+            resolve();
+            return;
+          }
+          
+          console.log(`🔪 Killing existing processes: ${pids.join(', ')}`);
+          const killPidCmd = process.platform === 'win32' 
+            ? `taskkill /F /PID ${pids.join(' /PID ')}`
+            : `kill -9 ${pids.join(' ')}`;
+            
+          exec(killPidCmd, (killError: any) => {
+            if (killError) {
+              console.warn('⚠️ Could not kill some processes:', killError.message);
+            } else {
+              console.log('✅ Killed existing SpiderFoot processes');
+            }
+            
+            // Wait a moment for processes to fully terminate
+            setTimeout(resolve, 2000);
+          });
+        });
+      });
+    } catch (error) {
+      console.warn('⚠️ Could not check for existing processes:', error);
+    }
+  }
+
   private async checkPortAvailable(port: number): Promise<boolean> {
     return new Promise((resolve) => {
       const net = require('net');
@@ -301,6 +355,9 @@ class SpiderFootService {
       // Ensure all required directories exist
       await this.ensureDirectories();
 
+      // Kill any existing SpiderFoot processes on our port
+      await this.killExistingSpiderFoot();
+
       // Patch SpiderFoot for native integration
       await this.patchSpiderFootConfig(dir);
 
@@ -309,16 +366,17 @@ class SpiderFootService {
         await this.ensureVenv(dir);
       }
 
-      // Check if port is available before starting
+      // Check if port is available after cleanup
       try {
         const isPortAvailable = await this.checkPortAvailable(this.config.port);
         if (!isPortAvailable) {
-          console.error(`❌ Port ${this.config.port} is already in use`);
+          console.error(`❌ Port ${this.config.port} is still in use after cleanup attempt`);
           return { 
             ok: false, 
-            reason: `Port ${this.config.port} is already in use. Another SpiderFoot instance may be running.` 
+            reason: `Port ${this.config.port} is still in use. Try waiting a few moments and retry, or restart the server.` 
           };
         }
+        console.log(`✅ Port ${this.config.port} is available`);
       } catch (portError) {
         console.warn(`⚠️ Could not check port availability: ${(portError as Error).message}`);
       }
@@ -417,29 +475,42 @@ class SpiderFootService {
   async stop(): Promise<void> {
     if (this.proc && !this.proc.killed) {
       console.log('🛑 Stopping SpiderFoot...');
-      this.proc.kill('SIGTERM');
       
-      // Wait for graceful shutdown
-      await new Promise(resolve => {
-        if (!this.proc) return resolve(void 0);
+      try {
+        // Try graceful shutdown first
+        this.proc.kill('SIGTERM');
         
-        const timeout = setTimeout(() => {
-          if (this.proc && !this.proc.killed) {
-            console.warn('⚠️ Force killing SpiderFoot (SIGKILL)');
-            this.proc.kill('SIGKILL');
+        // Wait for graceful shutdown
+        await new Promise<void>((resolve) => {
+          const timeout = setTimeout(() => {
+            if (this.proc && !this.proc.killed) {
+              console.log('⚡ Force killing SpiderFoot...');
+              this.proc.kill('SIGKILL');
+            }
+            resolve();
+          }, 5000);
+          
+          if (this.proc) {
+            this.proc.on('exit', () => {
+              clearTimeout(timeout);
+              resolve();
+            });
+          } else {
+            clearTimeout(timeout);
+            resolve();
           }
-          resolve(void 0);
-        }, 10000);
-        
-        this.proc.on('exit', () => {
-          clearTimeout(timeout);
-          resolve(void 0);
         });
-      });
-      
-      this.proc = null;
-      console.log('✅ SpiderFoot stopped');
+        
+        console.log('✅ SpiderFoot stopped');
+      } catch (error) {
+        console.error('❌ Error stopping SpiderFoot:', error);
+      } finally {
+        this.proc = null;
+      }
     }
+    
+    // Also kill any lingering processes on our port
+    await this.killExistingSpiderFoot();
   }
 
   getStatus(): { running: boolean; config: SpiderFootConfig } {
