@@ -169,8 +169,8 @@ router.use('*', (req, res, next) => {
     // Allow iframe embedding for same origin
     res.header('X-Frame-Options', 'SAMEORIGIN');
     
-    // Set permissive permissions policy for iframe
-    res.header('Permissions-Policy', 'fullscreen=(self), downloads=(self)');
+    // Set minimal permissions policy (avoid unsupported features)
+    res.header('Permissions-Policy', 'fullscreen=(self)');
     
     // Add service identification header
     res.header('X-OSINT-Engine', 'SpiderFoot-4.0');

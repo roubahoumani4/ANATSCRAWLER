@@ -132,11 +132,18 @@ function SpiderFootPage() {
         title="SpiderFoot OSINT Engine"
         src={spiderfootUrl}
         className="w-full h-full"
-        sandbox="allow-scripts allow-forms allow-popups allow-downloads allow-same-origin"
-        allow="fullscreen; downloads"
+        sandbox="allow-scripts allow-forms allow-popups allow-same-origin"
+        allow="fullscreen"
         referrerPolicy="strict-origin-when-cross-origin"
-        onLoad={() => console.log('SpiderFoot interface loaded')}
-        onError={() => setError('Failed to load SpiderFoot interface')}
+        onLoad={() => {
+          console.log('SpiderFoot interface loaded successfully');
+          // Clear any previous errors since iframe loaded
+          setError(null);
+        }}
+        onError={() => {
+          console.error('SpiderFoot iframe failed to load');
+          setError('Failed to load SpiderFoot interface - try opening in new window');
+        }}
       />
     </div>
   );
