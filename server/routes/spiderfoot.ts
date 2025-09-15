@@ -105,59 +105,76 @@ router.get('/diagnostic', async (_req, res) => {
       });
     }
 
-    // Test direct connectivity to SpiderFoot
+    // Test direct connectivity to SpiderFoot with multiple paths
     const fetch = require('node-fetch');
-    const testUrl = `http://${status.config.host}:${status.config.port}/`;
-    console.log(`🔍 Testing direct SpiderFoot connectivity: ${testUrl}`);
+    const baseUrl = `http://${status.config.host}:${status.config.port}`;
+    const testPaths = ['/', '/index', '/static/spiderfoot.png', '/opts', '/newscan'];
     
-    try {
-      const response = await fetch(testUrl, { 
-        timeout: 10000,
-        headers: {
-          'User-Agent': 'ANAT-Security-Diagnostic/1.0'
-        }
-      });
-      
-      const isOk = response.ok;
-      const statusCode = response.status;
-      const contentType = response.headers.get('content-type') || 'unknown';
-      const contentLength = response.headers.get('content-length') || 'unknown';
-      
-      // Try to get a small sample of the content
-      let contentSample = '';
+    console.log(`🔍 Testing SpiderFoot connectivity: ${baseUrl}`);
+    
+    const results: any[] = [];
+    
+    for (const path of testPaths) {
+      const testUrl = `${baseUrl}${path}`;
       try {
-        const text = await response.text();
-        contentSample = text.slice(0, 200) + (text.length > 200 ? '...' : '');
-      } catch (e) {
-        contentSample = 'Could not read response body';
-      }
-      
-      return res.json({
-        diagnostic: 'Direct SpiderFoot connectivity test',
-        status: isOk ? 'success' : 'warning',
-        spiderfoot_response: {
+        console.log(`🔍 Testing path: ${testUrl}`);
+        const response = await fetch(testUrl, { 
+          timeout: 5000,
+          headers: {
+            'User-Agent': 'ANAT-Security-Diagnostic/1.0'
+          }
+        });
+        
+        const isOk = response.ok;
+        const statusCode = response.status;
+        const contentType = response.headers.get('content-type') || 'unknown';
+        const contentLength = response.headers.get('content-length') || 'unknown';
+        
+        // Try to get a small sample of the content
+        let contentSample = '';
+        try {
+          const text = await response.text();
+          contentSample = text.slice(0, 100) + (text.length > 100 ? '...' : '');
+        } catch (e) {
+          contentSample = 'Could not read response body';
+        }
+        
+        results.push({
+          path,
+          url: testUrl,
           status_code: statusCode,
           ok: isOk,
           content_type: contentType,
           content_length: contentLength,
-          content_sample: contentSample
-        },
-        test_url: testUrl,
-        service_config: status.config,
-        timestamp: new Date().toISOString()
-      });
-      
-    } catch (fetchError: any) {
-      console.error('❌ Direct SpiderFoot test failed:', fetchError);
-      return res.json({
-        diagnostic: 'Direct SpiderFoot connectivity test failed',
-        status: 'error',
-        error: fetchError?.message || String(fetchError),
-        test_url: testUrl,
-        service_config: status.config,
-        timestamp: new Date().toISOString()
-      });
+          content_sample: contentSample.replace(/\n/g, ' ').trim()
+        });
+        
+      } catch (fetchError: any) {
+        console.error(`❌ Path ${path} test failed:`, fetchError?.message);
+        results.push({
+          path,
+          url: testUrl,
+          status_code: 'ERROR',
+          ok: false,
+          error: fetchError?.message || String(fetchError)
+        });
+      }
     }
+    
+    const successfulPaths = results.filter(r => r.ok);
+    
+    return res.json({
+      diagnostic: 'Multi-path SpiderFoot connectivity test',
+      status: successfulPaths.length > 0 ? 'success' : 'error',
+      summary: {
+        total_paths: testPaths.length,
+        successful_paths: successfulPaths.length,
+        working_paths: successfulPaths.map(r => r.path)
+      },
+      results,
+      service_config: status.config,
+      timestamp: new Date().toISOString()
+    });
     
   } catch (error: any) {
     console.error('❌ SpiderFoot diagnostic error:', error);
