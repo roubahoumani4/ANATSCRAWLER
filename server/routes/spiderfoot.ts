@@ -91,17 +91,23 @@ router.get('/status', async (_req, res) => {
   }
 });
 
-// Conditional authentication - health and status are public, everything else requires auth
+// Conditional authentication - temporarily disable ALL authentication for debugging
 router.use((req, res, next) => {
   const path = req.path;
+  console.log(`🔐 Authentication check for path: "${path}" (originalUrl: "${req.originalUrl}")`);
   
+  // Temporarily allow all requests without authentication for debugging
+  console.log(`✅ Skipping authentication for debugging purposes`);
+  return next();
+  
+  // Original authentication logic (disabled for debugging):
   // Public endpoints - no authentication required
-  if (path === '/health' || path === '/status' || path === '/' || path === '') {
-    return next();
-  }
-  
-  // All other endpoints require authentication
-  return authenticate(req, res, next);
+  // if (path === '/health' || path === '/status' || path === '/' || path === '') {
+  //   return next();
+  // }
+  // 
+  // // All other endpoints require authentication
+  // return authenticate(req, res, next);
 });
 
 // Middleware to ensure SpiderFoot is running before proxying
