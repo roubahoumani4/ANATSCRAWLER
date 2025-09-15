@@ -240,24 +240,26 @@ const proxyMiddleware = createProxyMiddleware({
   
   // Path rewriting for native integration
   pathRewrite: (path, req) => {
-    // The path here is relative to the mount point
-    // For /osint/newscan, path will be '/newscan' (since router is mounted at /osint)
+    // Extract the actual endpoint from the original URL
+    // For /osint/newscan, we want to send /newscan to SpiderFoot
     const originalUrl = (req as any).originalUrl || '';
     const p = path || '/';
     
     console.log(`🔄 Path rewrite debug: originalUrl="${originalUrl}", path="${p}", DOCROOT="${DOCROOT}"`);
     
-    // If this is the root path, serve SpiderFoot's main page
-    if (p === '/' || p === '') {
-      console.log(`🔄 Path rewrite: ${p} -> / (root page)`);
-      return '/';
+    // Extract the SpiderFoot endpoint from the original URL
+    let spiderFootPath = '/';
+    if (originalUrl.startsWith(DOCROOT)) {
+      spiderFootPath = originalUrl.slice(DOCROOT.length) || '/';
     }
     
-    // For other paths, forward them directly to SpiderFoot
-    // e.g., /newscan, /opts, /scanstatus, etc.
-    const rewritten = p.startsWith('/') ? p : `/${p}`;
-    console.log(`🔄 Path rewrite: ${p} -> ${rewritten}`);
-    return rewritten;
+    // Ensure path starts with /
+    if (!spiderFootPath.startsWith('/')) {
+      spiderFootPath = `/${spiderFootPath}`;
+    }
+    
+    console.log(`🔄 Path rewrite: ${originalUrl} -> ${spiderFootPath} (extracted from originalUrl)`);
+    return spiderFootPath;
   }
 });
 
