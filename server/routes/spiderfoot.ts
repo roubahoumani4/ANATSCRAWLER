@@ -92,96 +92,43 @@ router.get('/status', async (_req, res) => {
 });
 
 // Diagnostic endpoint to test direct SpiderFoot connectivity
-router.get('/diagnostic', async (_req, res) => {
+router.get('/diagtest', async (req, res) => {
   try {
-    console.log('🔍 Running SpiderFoot diagnostic...');
-    const status = spiderFootService.getStatus();
-    
-    if (!status.running) {
-      return res.json({
-        diagnostic: 'SpiderFoot service not running',
-        status: 'error',
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    // Test direct connectivity to SpiderFoot with multiple paths
-    const fetch = require('node-fetch');
-    const baseUrl = `http://${status.config.host}:${status.config.port}`;
-    const testPaths = ['/', '/index', '/static/spiderfoot.png', '/opts', '/newscan'];
-    
-    console.log(`🔍 Testing SpiderFoot connectivity: ${baseUrl}`);
+    // Test SpiderFoot direct access with the proper docroot path
+    const testUrls = [
+      'http://127.0.0.1:5001/osint',         // Root with docroot
+      'http://127.0.0.1:5001/osint/',        // Root with trailing slash
+      'http://127.0.0.1:5001/osint/newscan', // Newscan endpoint
+    ];
     
     const results: any[] = [];
-    
-    for (const path of testPaths) {
-      const testUrl = `${baseUrl}${path}`;
+    for (const url of testUrls) {
       try {
-        console.log(`🔍 Testing path: ${testUrl}`);
-        const response = await fetch(testUrl, { 
-          timeout: 5000,
-          headers: {
-            'User-Agent': 'ANAT-Security-Diagnostic/1.0'
-          }
+        const response = await fetch(url, { 
+          method: 'GET'
         });
-        
-        const isOk = response.ok;
-        const statusCode = response.status;
-        const contentType = response.headers.get('content-type') || 'unknown';
-        const contentLength = response.headers.get('content-length') || 'unknown';
-        
-        // Try to get a small sample of the content
-        let contentSample = '';
-        try {
-          const text = await response.text();
-          contentSample = text.slice(0, 100) + (text.length > 100 ? '...' : '');
-        } catch (e) {
-          contentSample = 'Could not read response body';
-        }
-        
         results.push({
-          path,
-          url: testUrl,
-          status_code: statusCode,
-          ok: isOk,
-          content_type: contentType,
-          content_length: contentLength,
-          content_sample: contentSample.replace(/\n/g, ' ').trim()
+          url,
+          status: response.status,
+          headers: Object.fromEntries(response.headers.entries()),
+          body: response.status < 400 ? await response.text() : `Error: ${response.statusText}`
         });
-        
-      } catch (fetchError: any) {
-        console.error(`❌ Path ${path} test failed:`, fetchError?.message);
+      } catch (error: any) {
         results.push({
-          path,
-          url: testUrl,
-          status_code: 'ERROR',
-          ok: false,
-          error: fetchError?.message || String(fetchError)
+          url,
+          error: error?.message || 'Unknown error'
         });
       }
     }
     
-    const successfulPaths = results.filter(r => r.ok);
-    
-    return res.json({
-      diagnostic: 'Multi-path SpiderFoot connectivity test',
-      status: successfulPaths.length > 0 ? 'success' : 'error',
-      summary: {
-        total_paths: testPaths.length,
-        successful_paths: successfulPaths.length,
-        working_paths: successfulPaths.map(r => r.path)
-      },
-      results,
-      service_config: status.config,
-      timestamp: new Date().toISOString()
+    res.json({
+      message: 'SpiderFoot diagnostic test with proper docroot paths',
+      results
     });
-    
   } catch (error: any) {
-    console.error('❌ SpiderFoot diagnostic error:', error);
     res.status(500).json({ 
-      diagnostic: 'Diagnostic test failed',
-      error: error?.message || String(error),
-      timestamp: new Date().toISOString()
+      error: 'Diagnostic test failed', 
+      details: error?.message || 'Unknown error'
     });
   }
 });
@@ -240,25 +187,18 @@ const proxyMiddleware = createProxyMiddleware({
   
   // Path rewriting for native integration
   pathRewrite: (path, req) => {
-    // Extract the actual endpoint from the original URL
-    // For /osint/newscan, we want to send /newscan to SpiderFoot
+    // SpiderFoot is configured with docroot='/osint' so it expects the full path
+    // We should NOT strip the docroot - SpiderFoot expects it
     const originalUrl = (req as any).originalUrl || '';
     const p = path || '/';
     
     console.log(`🔄 Path rewrite debug: originalUrl="${originalUrl}", path="${p}", DOCROOT="${DOCROOT}"`);
     
-    // Extract the SpiderFoot endpoint from the original URL
-    let spiderFootPath = '/';
-    if (originalUrl.startsWith(DOCROOT)) {
-      spiderFootPath = originalUrl.slice(DOCROOT.length) || '/';
-    }
+    // SpiderFoot expects the full path including the docroot
+    // /osint/newscan should be sent as /osint/newscan to SpiderFoot
+    const spiderFootPath = originalUrl || p;
     
-    // Ensure path starts with /
-    if (!spiderFootPath.startsWith('/')) {
-      spiderFootPath = `/${spiderFootPath}`;
-    }
-    
-    console.log(`🔄 Path rewrite: ${originalUrl} -> ${spiderFootPath} (extracted from originalUrl)`);
+    console.log(`🔄 Path rewrite: ${originalUrl} -> ${spiderFootPath} (preserve full path for SpiderFoot)`);
     return spiderFootPath;
   }
 });

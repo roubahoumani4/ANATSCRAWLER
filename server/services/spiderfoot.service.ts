@@ -267,39 +267,88 @@ class SpiderFootService {
     const start = Date.now();
     console.log(`⏳ Waiting for SpiderFoot to be ready on ${this.config.host}:${this.config.port}...`);
     
-    // Try a few likely readiness endpoints
-    const candidates = [
-      `${this.config.docroot}`,
-      `${this.config.docroot}/`,
-      '/',
-    ];
-    
     while (Date.now() - start < timeoutMs) {
       try {
-        for (const p of candidates) {
-          const url = `http://${this.config.host}:${this.config.port}${p}`;
-          const resp = await fetch(url, { 
-            method: 'GET',
-            timeout: 5000,
-            headers: {
-              'User-Agent': 'ANAT-Security-OSINT-Platform/2.0'
-            }
-          });
-          if (resp.ok || resp.status === 404) { // 404 is also okay, means server is up
-            console.log(`✅ SpiderFoot is ready and responding`);
-            return true;
+        // Test basic connectivity first
+        const baseUrl = `http://${this.config.host}:${this.config.port}`;
+        
+        // Try the root endpoint first (SpiderFoot's main page)
+        const rootResponse = await fetch(`${baseUrl}/`, { 
+          method: 'GET',
+          timeout: 5000,
+          headers: {
+            'User-Agent': 'ANAT-Security-OSINT-Platform/2.0'
           }
+        });
+        
+        console.log(`🔍 Root endpoint status: ${rootResponse.status}`);
+        
+        if (rootResponse.ok) {
+          // If root works, verify that SpiderFoot web UI is actually serving content
+          const content = await rootResponse.text();
+          
+          // Check if this looks like a SpiderFoot page
+          if (content.includes('SpiderFoot') || content.includes('OSINT') || content.includes('newscan')) {
+            console.log(`✅ SpiderFoot web UI is ready and serving content`);
+            return true;
+          } else {
+            console.log(`⚠️ SpiderFoot responding but content doesn't look like SpiderFoot UI`);
+            console.log(`📄 Content sample: ${content.slice(0, 200)}...`);
+          }
+        } else if (rootResponse.status === 404) {
+          // Try alternative endpoints that SpiderFoot commonly serves
+          const alternativeEndpoints = ['/newscan', '/index', '/opts'];
+          let foundWorking = false;
+          
+          for (const endpoint of alternativeEndpoints) {
+            try {
+              const altResponse = await fetch(`${baseUrl}${endpoint}`, { 
+                method: 'GET',
+                timeout: 3000,
+                headers: {
+                  'User-Agent': 'ANAT-Security-OSINT-Platform/2.0'
+                }
+              });
+              
+              console.log(`🔍 Alternative endpoint ${endpoint} status: ${altResponse.status}`);
+              
+              if (altResponse.ok) {
+                const altContent = await altResponse.text();
+                if (altContent.includes('SpiderFoot') || altContent.includes('OSINT')) {
+                  console.log(`✅ SpiderFoot is ready via endpoint: ${endpoint}`);
+                  foundWorking = true;
+                  break;
+                }
+              }
+            } catch (e) {
+              // Continue trying other endpoints
+            }
+          }
+          
+          if (foundWorking) return true;
         }
+        
       } catch (e) {
-        // Not ready yet, continue waiting
+        // Connection failed, SpiderFoot likely not ready yet
+        console.log(`⏳ Connection failed: ${(e as Error).message}`);
       }
-      await new Promise(r => setTimeout(r, 2000));
+      
+      await new Promise(r => setTimeout(r, 3000));
       
       // Log progress every 20 seconds
-      if ((Date.now() - start) % 20000 < 2000) {
-        console.log(`⏳ Still waiting for SpiderFoot... (${Math.round((Date.now() - start) / 1000)}s elapsed)`);
+      if ((Date.now() - start) % 20000 < 3000) {
+        const elapsed = Math.round((Date.now() - start) / 1000);
+        console.log(`⏳ Still waiting for SpiderFoot web UI... (${elapsed}s elapsed)`);
+        
+        // Add more detailed debugging if we're waiting a while
+        if (elapsed > 60) {
+          console.log(`🔍 Debug: Checking if SpiderFoot process is actually running...`);
+          this.debugSpiderFootProcess();
+        }
       }
     }
+    
+    console.error(`❌ SpiderFoot web UI did not become ready within ${timeoutMs/1000} seconds`);
     return false;
   }
 
@@ -327,6 +376,21 @@ class SpiderFootService {
         }
       });
     });
+  }
+
+  private debugSpiderFootProcess(): void {
+    try {
+      if (this.proc && !this.proc.killed) {
+        console.log(`🔍 SpiderFoot process PID: ${this.proc.pid}`);
+        console.log(`🔍 SpiderFoot process exitCode: ${this.proc.exitCode}`);
+        console.log(`🔍 SpiderFoot process signalCode: ${this.proc.signalCode}`);
+        console.log(`🔍 SpiderFoot process killed: ${this.proc.killed}`);
+      } else {
+        console.log(`❌ SpiderFoot process is not running or was killed`);
+      }
+    } catch (error) {
+      console.error(`⚠️ Error checking SpiderFoot process:`, error);
+    }
   }
 
   async ensureStarted(): Promise<StartResult> {
@@ -403,17 +467,23 @@ class SpiderFootService {
         'sf.py', 
         '-l', 
         `${this.config.host}:${this.config.port}`,
-        '-r'  // Enable web UI
+        '-r',  // Enable web UI
+        '-d'   // Enable debug mode for better logging
       ];
       
       console.log(`🚀 Starting SpiderFoot with: ${py} ${args.join(' ')}`);
       console.log(`📂 Working directory: ${dir}`);
       console.log(`🌐 Will be available at: http://${this.config.host}:${this.config.port}${this.config.docroot}`);
+      console.log(`🔧 Environment variables:`);
+      console.log(`   SPIDERFOOT_HOST: ${env.SPIDERFOOT_HOST}`);
+      console.log(`   SPIDERFOOT_PORT: ${env.SPIDERFOOT_PORT}`);
+      console.log(`   SPIDERFOOT_DATA: ${env.SPIDERFOOT_DATA}`);
 
       const child = spawn(py, args, { 
         cwd: dir, 
         env,
-        stdio: ['ignore', 'pipe', 'pipe']
+        stdio: ['ignore', 'pipe', 'pipe'],
+        detached: false  // Keep attached to monitor properly
       } as SpawnOptionsWithoutStdio);
       
       this.proc = child;
@@ -422,13 +492,28 @@ class SpiderFootService {
         const output = d.toString().trim();
         if (output) {
           console.log(`[SpiderFoot] ${output}`);
+          
+          // Check for specific startup messages
+          if (output.includes('Starting web server') || output.includes('Bottle')) {
+            console.log(`🌐 SpiderFoot web server is starting...`);
+          } else if (output.includes('ERROR') || output.includes('CRITICAL')) {
+            console.error(`❌ SpiderFoot error: ${output}`);
+          }
         }
       });
       
       child.stderr.on('data', d => {
         const output = d.toString().trim();
         if (output) {
-          console.error(`[SpiderFoot ERROR] ${output}`);
+          console.error(`[SpiderFoot STDERR] ${output}`);
+          
+          // Check for critical errors that would prevent web UI from starting
+          if (output.includes('Permission denied') || 
+              output.includes('Address already in use') ||
+              output.includes('ModuleNotFoundError') ||
+              output.includes('ImportError')) {
+            console.error(`🚨 Critical SpiderFoot error detected: ${output}`);
+          }
         }
       });
 
