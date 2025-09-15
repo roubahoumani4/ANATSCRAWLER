@@ -3,9 +3,17 @@ import * as React from 'react';
 function SpiderFootPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [currentUrl, setCurrentUrl] = React.useState(0);
   
-  // The iframe should point to the backend proxy endpoint with absolute URL
-  const spiderfootUrl = `${window.location.origin}/osint/`;
+  // Try multiple SpiderFoot paths in order of likelihood to work
+  const spiderfootUrls = [
+    `${window.location.origin}/osint/newscan`,
+    `${window.location.origin}/osint/opts`, 
+    `${window.location.origin}/osint/`,
+    `${window.location.origin}/osint/index`
+  ];
+  
+  const spiderfootUrl = spiderfootUrls[currentUrl];
 
   // Check OSINT health on mount
   React.useEffect(() => {
@@ -112,12 +120,24 @@ function SpiderFootPage() {
             <button 
               onClick={() => {
                 // Open OSINT in new window to bypass iframe restrictions
-                window.open('/osint/', '_blank', 'noopener,noreferrer');
+                window.open(spiderfootUrl, '_blank', 'noopener,noreferrer');
               }} 
               className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 mr-3"
             >
               Open in New Window
             </button>
+            {currentUrl < spiderfootUrls.length - 1 && (
+              <button 
+                onClick={() => {
+                  setCurrentUrl(prev => prev + 1);
+                  setError(null);
+                  setIsLoading(false);
+                }} 
+                className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 mr-3"
+              >
+                Try Next URL ({spiderfootUrls[currentUrl + 1].split('/').pop()})
+              </button>
+            )}
             <button 
               onClick={() => {
                 setError(null);
@@ -162,7 +182,12 @@ function SpiderFootPage() {
         }}
         onError={(e) => {
           console.error(`❌ SpiderFoot iframe failed to load from: ${spiderfootUrl}`, e);
-          setError('Failed to load SpiderFoot interface - try opening in new window');
+          if (currentUrl < spiderfootUrls.length - 1) {
+            console.log(`🔄 Trying next URL: ${spiderfootUrls[currentUrl + 1]}`);
+            setCurrentUrl(prev => prev + 1);
+          } else {
+            setError('Failed to load SpiderFoot interface - try opening in new window');
+          }
         }}
       />
     </div>
