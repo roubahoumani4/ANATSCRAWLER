@@ -164,41 +164,122 @@ jobs:
             if [ -d "$SF_DIR" ]; then
               echo "🕷️ Setting up SpiderFoot OSINT Engine..."
               
-              # Create venv if not present
-              if [ ! -d "$SF_DIR/.venv" ]; then
-                echo "Creating Python virtual environment..."
-                cd "$SF_DIR"
-                python3 -m venv .venv || python -m venv .venv || {
-                  echo "⚠️ Failed to create virtual environment, SpiderFoot may not work properly"
+              # Ensure system dependencies are available
+              echo "Checking system dependencies..."
+              if command -v apt-get >/dev/null 2>&1; then
+                # Ubuntu/Debian
+                echo "Installing system packages for SpiderFoot..."
+                sudo apt-get update && sudo apt-get install -y \
+                  python3 python3-venv python3-pip python3-dev \
+                  libxml2-dev libxslt1-dev libffi-dev libssl-dev \
+                  build-essential pkg-config || echo "⚠️ Some system packages failed to install"
+              elif command -v yum >/dev/null 2>&1; then
+                # CentOS/RHEL/Rocky
+                echo "Installing system packages for SpiderFoot..."
+                sudo yum install -y \
+                  python3 python3-venv python3-pip python3-devel \
+                  libxml2-devel libxslt-devel libffi-devel openssl-devel \
+                  gcc gcc-c++ make pkgconfig || echo "⚠️ Some system packages failed to install"
+              else
+                echo "⚠️ Unknown package manager, assuming dependencies are pre-installed"
+              fi
+              
+              # Ensure Python is available
+              if ! command -v python3 >/dev/null 2>&1; then
+                echo "❌ Python3 not found after installation attempt"
+                exit 1
+              fi
+              
+              echo "🐍 Found Python: $(python3 --version)"
+              
+              # Create or recreate venv for clean deployment
+              echo "Setting up fresh Python virtual environment..."
+              cd "$SF_DIR"
+              rm -rf .venv
+              python3 -m venv .venv || {
+                echo "❌ Failed to create virtual environment"
+                exit 1
+              }
+              
+              # Verify venv was created successfully
+              if [ ! -x ".venv/bin/pip" ]; then
+                echo "❌ Virtual environment pip not found"
+                exit 1
+              fi
+              
+              echo "📦 Installing SpiderFoot dependencies..."
+              
+              # Upgrade pip and essential tools first
+              ".venv/bin/pip" install --upgrade pip setuptools wheel || {
+                echo "❌ Failed to upgrade pip"
+                exit 1
+              }
+              
+              # Install core dependencies with specific compatibility versions
+              echo "Installing core SpiderFoot dependencies..."
+              ".venv/bin/pip" install \
+                "cherrypy>=18.6.0" \
+                "cherrypy-cors>=1.6" \
+                "requests>=2.25.0" \
+                "beautifulsoup4>=4.9.0" \
+                "dnspython>=2.1.0" \
+                "netaddr>=0.8.0" \
+                "cryptography>=3.4.0" \
+                "pyyaml>=5.4.0" || {
+                echo "❌ Failed to install core dependencies"
+                exit 1
+              }
+              
+              # Install XML processing (with fallback for compatibility)
+              echo "Installing XML processing dependencies..."
+              ".venv/bin/pip" install lxml || {
+                echo "⚠️ lxml failed, installing libxml2-python3 as fallback..."
+                ".venv/bin/pip" install libxml2-python3 || {
+                  echo "⚠️ XML processing libraries failed, some features may be limited"
+                }
+              }
+              
+              # Install additional useful dependencies
+              echo "Installing additional SpiderFoot dependencies..."
+              ".venv/bin/pip" install \
+                "openpyxl>=3.0.0" \
+                "networkx>=2.5" \
+                "phonenumbers>=8.12.0" \
+                "pyopenssl>=20.0.0" \
+                "publicsuffixlist>=0.9.0" \
+                "python-whois>=0.7.0" \
+                "ipwhois>=1.2.0" \
+                "pysocks>=1.7.0" || {
+                echo "⚠️ Some optional dependencies failed, continuing..."
+              }
+              
+              # Use production requirements if available, with fallback handling
+              if [ -f "requirements-production.txt" ]; then
+                echo "Installing from production-optimized requirements..."
+                ".venv/bin/pip" install -r requirements-production.txt || {
+                  echo "⚠️ Some production requirements failed, continuing with core packages..."
+                }
+              elif [ -f "requirements.txt" ]; then
+                echo "Installing from standard requirements..."
+                ".venv/bin/pip" install -r requirements.txt || {
+                  echo "⚠️ Some requirements failed, continuing with core packages..."
                 }
               fi
               
-              # Install dependencies if venv was created successfully
-              if [ -x "$SF_DIR/.venv/bin/pip" ]; then
-                echo "Installing SpiderFoot dependencies..."
-                cd "$SF_DIR"
-                ".venv/bin/pip" install --upgrade pip setuptools wheel || true
-                
-                # Use production requirements if available, otherwise fallback to original
-                if [ -f "requirements-production.txt" ]; then
-                  echo "Using production-optimized requirements..."
-                  ".venv/bin/pip" install -r requirements-production.txt || {
-                    echo "⚠️ Production requirements failed, trying original requirements..."
-                    ".venv/bin/pip" install -r requirements.txt || {
-                      echo "⚠️ Installing core packages individually..."
-                      ".venv/bin/pip" install cherrypy cherrypy-cors requests beautifulsoup4 lxml dnspython || true
-                    }
-                  }
-                elif [ -f "requirements.txt" ]; then
-                  echo "Installing requirements with compatibility fixes..."
-                  # Install core packages first
-                  ".venv/bin/pip" install cherrypy cherrypy-cors requests beautifulsoup4 lxml dnspython || true
-                  # Install others with error tolerance
-                  ".venv/bin/pip" install -r requirements.txt || {
-                    echo "⚠️ Some dependencies failed, SpiderFoot will use available packages"
-                  }
-                fi
-                echo "✅ SpiderFoot dependencies installation completed"
+              # Verify critical imports work
+              echo "🧪 Verifying SpiderFoot dependencies..."
+              ".venv/bin/python" -c "import cherrypy, requests, bs4, dns.resolver, netaddr; print('✅ Core dependencies verified')" || {
+                echo "❌ Core dependency verification failed"
+                exit 1
+              }
+              
+              # Run comprehensive installation verification
+              if [ -f "verify_installation.py" ]; then
+                echo "Running comprehensive SpiderFoot verification..."
+                ".venv/bin/python" verify_installation.py || {
+                  echo "⚠️ SpiderFoot verification found issues, but continuing deployment..."
+                  echo "Some optional features may not work properly"
+                }
               fi
               
               # Ensure SpiderFoot data directories exist with proper permissions
@@ -206,20 +287,38 @@ jobs:
               mkdir -p "${SHARED_DATA}/spiderfoot" "${SHARED_DATA}/spiderfoot/cache" "${SHARED_DATA}/spiderfoot/logs"
               chmod -R 755 "${SHARED_DATA}/spiderfoot" || true
               
-              # Check if SpiderFoot is properly configured
+              # Create empty passwd file to disable authentication
+              echo "Configuring SpiderFoot authentication..."
+              touch "${SHARED_DATA}/spiderfoot/passwd"
+              chmod 644 "${SHARED_DATA}/spiderfoot/passwd"
+              
+              # Test SpiderFoot functionality
+              echo "🧪 Testing SpiderFoot functionality..."
               cd "$SF_DIR"
               if [ -f "sf.py" ]; then
-                echo "✅ SpiderFoot main script found"
-                # Test if SpiderFoot can start (quick test)
-                timeout 10 python3 sf.py --help > /dev/null 2>&1 && echo "✅ SpiderFoot is functional" || echo "⚠️ SpiderFoot may have issues"
+                # Test help command
+                ".venv/bin/python" sf.py --help > /dev/null 2>&1 && {
+                  echo "✅ SpiderFoot help command works"
+                } || {
+                  echo "❌ SpiderFoot test failed"
+                  ".venv/bin/python" sf.py --help 2>&1 | head -20 || true
+                  exit 1
+                }
+                
+                # Test module imports
+                ".venv/bin/python" -c "import sys; sys.path.insert(0, '.'); import spiderfoot; import sflib; print('✅ SpiderFoot modules import successfully')" || {
+                  echo "❌ SpiderFoot module verification failed"
+                  exit 1
+                }
+                
+                echo "✅ SpiderFoot OSINT Engine setup completed successfully"
               else
                 echo "❌ SpiderFoot main script not found"
+                exit 1
               fi
-              
-              echo "✅ SpiderFoot OSINT Engine setup completed"
             else
               echo "⚠️ SpiderFoot directory not found at $SF_DIR"
-              echo "OSINT functionality may be limited"
+              echo "OSINT functionality will be limited"
             fi
 
             echo "Ensuring stable server path via symlink..."

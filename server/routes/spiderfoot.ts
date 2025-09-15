@@ -272,8 +272,8 @@ router.use('*', (req, res, next) => {
     // Allow iframe embedding for same origin
     res.header('X-Frame-Options', 'SAMEORIGIN');
     
-    // Set minimal permissions policy (avoid unsupported features)
-    res.header('Permissions-Policy', 'fullscreen=(self)');
+        // Set minimal permissions policy (avoid unsupported features)
+    res.header('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
     
     // Add service identification header
     res.header('X-OSINT-Engine', 'SpiderFoot-4.0');

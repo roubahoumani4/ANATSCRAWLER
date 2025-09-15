@@ -48,6 +48,27 @@ def main():
         'cors_origins': [],
     }
 
+    # ANAT Security OSINT Platform Integration
+    # Allow overriding host/port/docroot via environment for embedding
+    import os
+    sfWebUiConfig['root'] = os.getenv('SPIDERFOOT_DOCROOT', sfWebUiConfig.get('root', '/'))
+    env_host = os.getenv('SPIDERFOOT_HOST')
+    env_port = os.getenv('SPIDERFOOT_PORT')
+    if env_host: 
+        sfWebUiConfig['host'] = env_host
+    if env_port: 
+        sfWebUiConfig['port'] = int(env_port)
+    
+    # Enable CORS for ANAT Security integration
+    sfWebUiConfig['cors_origins'] = ['*']  # Allow all origins for native integration
+    
+    # Production logging
+    if os.getenv('NODE_ENV') == 'production':
+        print(f"🕷️  SpiderFoot OSINT Engine starting on {sfWebUiConfig['host']}:{sfWebUiConfig['port']}")
+        print(f"📁 Data directory: {os.getenv('SPIDERFOOT_DATA', './data')}")
+        print(f"🌐 Document root: {sfWebUiConfig['root']}")
+
+
     # 'Global' configuration options
     # These can be overriden on a per-module basis, and some will
     # be overridden from saved configuration settings stored in the DB.
