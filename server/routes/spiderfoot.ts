@@ -96,7 +96,7 @@ router.use((req, res, next) => {
   const path = req.path;
   
   // Public endpoints - no authentication required
-  if (path === '/health' || path === '/status') {
+  if (path === '/health' || path === '/status' || path === '/' || path === '') {
     return next();
   }
   
