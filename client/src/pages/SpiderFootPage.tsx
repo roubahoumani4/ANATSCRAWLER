@@ -4,14 +4,15 @@ function SpiderFootPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   
-  // The iframe should point to the backend proxy endpoint, not a frontend route
-  const spiderfootUrl = '/osint/';
+  // The iframe should point to the backend proxy endpoint with absolute URL
+  const spiderfootUrl = `${window.location.origin}/osint/`;
 
   // Check OSINT health on mount
   React.useEffect(() => {
     const checkHealth = async () => {
       try {
         console.log('🔍 Checking OSINT health...');
+        console.log('🔗 SpiderFoot iframe URL will be:', spiderfootUrl);
         
         // First, test if main server is responding at all
         try {
@@ -155,12 +156,12 @@ function SpiderFootPage() {
         allow="fullscreen"
         referrerPolicy="strict-origin-when-cross-origin"
         onLoad={() => {
-          console.log('SpiderFoot interface loaded successfully');
+          console.log(`✅ SpiderFoot interface loaded successfully from: ${spiderfootUrl}`);
           // Clear any previous errors since iframe loaded
           setError(null);
         }}
-        onError={() => {
-          console.error('SpiderFoot iframe failed to load');
+        onError={(e) => {
+          console.error(`❌ SpiderFoot iframe failed to load from: ${spiderfootUrl}`, e);
           setError('Failed to load SpiderFoot interface - try opening in new window');
         }}
       />
