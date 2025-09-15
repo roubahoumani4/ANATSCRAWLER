@@ -141,22 +141,24 @@ const proxyMiddleware = createProxyMiddleware({
   pathRewrite: (path) => {
     // We expose SpiderFoot under /osint but upstream expects to be at '/'
     const p = path || '/';
+    console.log(`🔄 Path rewrite input: "${p}", DOCROOT: "${DOCROOT}"`);
+    
     if (p.startsWith(DOCROOT)) {
       const stripped = p.slice(DOCROOT.length);
       const rewritten = stripped.startsWith('/') ? stripped : `/${stripped}`;
-      console.log(`🔄 Path rewrite: ${p} -> ${rewritten}`);
+      console.log(`🔄 Path rewrite: ${p} -> ${rewritten} (stripped: "${stripped}")`);
       return rewritten;
     }
+    
+    console.log(`🔄 Path rewrite: ${p} -> ${p} (no rewriting needed)`);
     return p;
   }
 });
 
 // Add error handling and logging middleware
 router.use('*', (req, res, next) => {
-  // Log proxy requests in development
-  if (process.env.NODE_ENV === 'development') {
-    console.log(`➡️ Proxying ${req.method} ${req.url} to SpiderFoot`);
-  }
+  // Log proxy requests in development and temporarily in production for debugging
+  console.log(`➡️ Proxying ${req.method} ${req.url} to SpiderFoot (originalUrl: ${req.originalUrl}, path: ${req.path})`);
   
   // Handle proxy errors
   const originalSend = res.send;
