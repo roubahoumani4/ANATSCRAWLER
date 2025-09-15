@@ -91,6 +91,84 @@ router.get('/status', async (_req, res) => {
   }
 });
 
+// Diagnostic endpoint to test direct SpiderFoot connectivity
+router.get('/diagnostic', async (_req, res) => {
+  try {
+    console.log('🔍 Running SpiderFoot diagnostic...');
+    const status = spiderFootService.getStatus();
+    
+    if (!status.running) {
+      return res.json({
+        diagnostic: 'SpiderFoot service not running',
+        status: 'error',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Test direct connectivity to SpiderFoot
+    const fetch = require('node-fetch');
+    const testUrl = `http://${status.config.host}:${status.config.port}/`;
+    console.log(`🔍 Testing direct SpiderFoot connectivity: ${testUrl}`);
+    
+    try {
+      const response = await fetch(testUrl, { 
+        timeout: 10000,
+        headers: {
+          'User-Agent': 'ANAT-Security-Diagnostic/1.0'
+        }
+      });
+      
+      const isOk = response.ok;
+      const statusCode = response.status;
+      const contentType = response.headers.get('content-type') || 'unknown';
+      const contentLength = response.headers.get('content-length') || 'unknown';
+      
+      // Try to get a small sample of the content
+      let contentSample = '';
+      try {
+        const text = await response.text();
+        contentSample = text.slice(0, 200) + (text.length > 200 ? '...' : '');
+      } catch (e) {
+        contentSample = 'Could not read response body';
+      }
+      
+      return res.json({
+        diagnostic: 'Direct SpiderFoot connectivity test',
+        status: isOk ? 'success' : 'warning',
+        spiderfoot_response: {
+          status_code: statusCode,
+          ok: isOk,
+          content_type: contentType,
+          content_length: contentLength,
+          content_sample: contentSample
+        },
+        test_url: testUrl,
+        service_config: status.config,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (fetchError: any) {
+      console.error('❌ Direct SpiderFoot test failed:', fetchError);
+      return res.json({
+        diagnostic: 'Direct SpiderFoot connectivity test failed',
+        status: 'error',
+        error: fetchError?.message || String(fetchError),
+        test_url: testUrl,
+        service_config: status.config,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+  } catch (error: any) {
+    console.error('❌ SpiderFoot diagnostic error:', error);
+    res.status(500).json({ 
+      diagnostic: 'Diagnostic test failed',
+      error: error?.message || String(error),
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Conditional authentication - temporarily disable ALL authentication for debugging
 router.use((req, res, next) => {
   const path = req.path;
