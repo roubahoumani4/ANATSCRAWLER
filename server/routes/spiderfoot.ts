@@ -184,6 +184,7 @@ const proxyMiddleware = createProxyMiddleware({
   changeOrigin: true,
   ws: true, // Enable WebSocket support
   secure: false,
+  timeout: 30000, // 30 second timeout for scan operations
   
   // Path rewriting for native integration
   pathRewrite: (path, req) => {
@@ -200,6 +201,23 @@ const proxyMiddleware = createProxyMiddleware({
     
     console.log(`🔄 Path rewrite: ${originalUrl} -> ${spiderFootPath} (preserve full path for SpiderFoot)`);
     return spiderFootPath;
+  },
+  
+  // Handle response headers to fix browser warnings
+  onProxyRes: (proxyRes: any, req: any, res: any) => {
+    // Fix Permissions-Policy header issues
+    const permissionsPolicy = proxyRes.headers['permissions-policy'];
+    if (permissionsPolicy && typeof permissionsPolicy === 'string') {
+      // Remove 'browsing-topics' feature that causes browser warnings
+      const cleanPolicy = permissionsPolicy.replace(/browsing-topics[^,]*(,\s*)?/g, '');
+      proxyRes.headers['permissions-policy'] = cleanPolicy;
+    }
+    
+    // Add security headers for OSINT interface
+    proxyRes.headers['x-frame-options'] = 'SAMEORIGIN';
+    proxyRes.headers['x-content-type-options'] = 'nosniff';
+    
+    console.log(`📤 Response headers modified for ${req.originalUrl}`);
   }
 });
 
