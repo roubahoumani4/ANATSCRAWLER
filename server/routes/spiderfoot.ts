@@ -96,12 +96,12 @@ router.get('/diagtest', async (req, res) => {
   try {
     const fetch = (await import('node-fetch')).default;
     
-    // Test SpiderFoot direct access without docroot paths
+    // Test SpiderFoot direct access with the proper docroot paths
     const testUrls = [
-      'http://127.0.0.1:5001/',           // Root without docroot
-      'http://127.0.0.1:5001/newscan',    // Newscan endpoint
-      'http://127.0.0.1:5001/opts',       // Options endpoint
-      'http://127.0.0.1:5001/scanlist',   // Scan list endpoint
+      'http://127.0.0.1:5001/osint',         // Root with docroot
+      'http://127.0.0.1:5001/osint/',        // Root with trailing slash
+      'http://127.0.0.1:5001/osint/newscan', // Newscan endpoint
+      'http://127.0.0.1:5001/osint/opts',    // Options endpoint
     ];
     
     const results: any[] = [];
@@ -216,25 +216,22 @@ const createSpiderFootProxy = (timeoutMs: number) => createProxyMiddleware({
   
   // Path rewriting for native integration
   pathRewrite: (path, req) => {
-    // SpiderFoot is configured with docroot='/osint' but we need to strip it for internal routing
+    // SpiderFoot is configured with docroot='/osint' so we need to preserve the full path
     const originalUrl = (req as any).originalUrl || '';
     const p = path || '/';
     
     console.log(`🔄 Path rewrite debug: originalUrl="${originalUrl}", path="${p}", DOCROOT="${DOCROOT}"`);
     
-    // Remove the /osint prefix for SpiderFoot's internal routing
-    // SpiderFoot expects clean paths like /newscan, not /osint/newscan
+    // SpiderFoot expects the full path including the docroot
+    // /osint/newscan should be sent as /osint/newscan to SpiderFoot
     let spiderFootPath = originalUrl;
-    if (spiderFootPath.startsWith('/osint')) {
-      spiderFootPath = spiderFootPath.replace('/osint', '');
+    
+    // If the path doesn't start with /osint, add it
+    if (!spiderFootPath.startsWith('/osint')) {
+      spiderFootPath = '/osint' + (spiderFootPath.startsWith('/') ? spiderFootPath : '/' + spiderFootPath);
     }
     
-    // Ensure we have at least a root path
-    if (!spiderFootPath || spiderFootPath === '') {
-      spiderFootPath = '/';
-    }
-    
-    console.log(`🔄 Path rewrite: ${originalUrl} -> ${spiderFootPath} (stripped docroot for SpiderFoot)`);
+    console.log(`🔄 Path rewrite: ${originalUrl} -> ${spiderFootPath} (preserved/added /osint prefix for SpiderFoot)`);
     return spiderFootPath;
   }
 });
