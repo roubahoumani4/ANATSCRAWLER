@@ -15,7 +15,6 @@ module.exports = {
       SPIDERFOOT_HOST: '127.0.0.1',
       SPIDERFOOT_PORT: 5001,
       SPIDERFOOT_DIR: '/var/www/anatscrawler/current/server/spiderfoot-4.0',
-      SPIDERFOOT_DOCROOT: '/osint',
       SPIDERFOOT_DATA: '/var/www/anatscrawler/data/spiderfoot',
       SPIDERFOOT_CACHE: '/var/www/anatscrawler/data/spiderfoot/cache',
       SPIDERFOOT_LOGS: '/var/www/anatscrawler/data/spiderfoot/logs',

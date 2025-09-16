@@ -153,38 +153,96 @@ class SpiderFootService {
 
       console.log('🔧 Patching SpiderFoot for native integration...');
       
-      // Insert after sfWebUiConfig definition
-      const needle = "sfWebUiConfig = {";
-      const idx = content.indexOf(needle);
-      if (idx !== -1) {
-        const insertAfter = content.indexOf('}', idx);
-        if (insertAfter !== -1) {
-          const addition = `
+      // Find the main function or startup configuration
+      const sfWebUiConfigPattern = /sfWebUiConfig\s*=\s*{[^}]*}/s;
+      const match = content.match(sfWebUiConfigPattern);
+      
+      if (match) {
+        const configBlock = match[0];
+        const insertion = `
+# ANAT Security OSINT Platform Integration
+import os
 
-    # ANAT Security OSINT Platform Integration
-    # Allow overriding host/port/docroot via environment for embedding
-    import os
-    sfWebUiConfig['root'] = os.getenv('SPIDERFOOT_DOCROOT', sfWebUiConfig.get('root', '/'))
-    env_host = os.getenv('SPIDERFOOT_HOST')
-    env_port = os.getenv('SPIDERFOOT_PORT')
-    if env_host: 
-        sfWebUiConfig['host'] = env_host
-    if env_port: 
-        sfWebUiConfig['port'] = int(env_port)
-    
-    # Enable CORS for ANAT Security integration
-    sfWebUiConfig['cors_origins'] = ['*']  # Allow all origins for native integration
-    
-    # Production logging
-    if os.getenv('NODE_ENV') == 'production':
-        print(f"🕷️  SpiderFoot OSINT Engine starting on {sfWebUiConfig['host']}:{sfWebUiConfig['port']}")
-        print(f"📁 Data directory: {os.getenv('SPIDERFOOT_DATA', './data')}")
-        print(f"🌐 Document root: {sfWebUiConfig['root']}")
+# Override configuration from environment
+if os.getenv('SPIDERFOOT_HOST'):
+    sfWebUiConfig['host'] = os.getenv('SPIDERFOOT_HOST')
+if os.getenv('SPIDERFOOT_PORT'):
+    sfWebUiConfig['port'] = int(os.getenv('SPIDERFOOT_PORT'))
+
+# Set docroot to empty for clean routing (proxy handles /osint prefix)
+sfWebUiConfig['root'] = '/'
+
+# Enable CORS for iframe integration
+sfWebUiConfig.update({
+    'cors_origins': ['*'],
+    'cors_headers': ['Content-Type', 'Authorization', 'X-Requested-With'],
+    'cors_methods': ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+})
+
+# Production logging
+if os.getenv('NODE_ENV') == 'production':
+    print(f"🕷️  SpiderFoot OSINT Engine starting on {sfWebUiConfig.get('host', '127.0.0.1')}:{sfWebUiConfig.get('port', 5001)}")
+    print(f"📁 Data directory: {os.getenv('SPIDERFOOT_DATA', './data')}")
+    print(f"🌐 Document root: {sfWebUiConfig.get('root', '/')}")
+
 `;
-          content = content.slice(0, insertAfter + 1) + addition + content.slice(insertAfter + 1);
-          fs.writeFileSync(sfPath, content, 'utf-8');
-          console.log('✅ SpiderFoot successfully patched for native integration');
+        const newContent = content.replace(match[0], configBlock + insertion);
+        fs.writeFileSync(sfPath, newContent, 'utf-8');
+        console.log('✅ SpiderFoot successfully patched for native integration');
+      } else {
+        console.warn('⚠️ Could not find sfWebUiConfig in SpiderFoot sf.py - trying alternative patch method');
+        
+        // Alternative patching method - add configuration at the beginning of the file
+        const integrationPatch = `
+# ANAT Security OSINT Platform Integration Patch
+import os
+import sys
+
+# Apply ANAT Security configuration overrides
+def apply_anat_security_config():
+    global sfWebUiConfig
+    
+    # Override host/port from environment
+    if os.getenv('SPIDERFOOT_HOST'):
+        sfWebUiConfig['host'] = os.getenv('SPIDERFOOT_HOST')
+    if os.getenv('SPIDERFOOT_PORT'):
+        sfWebUiConfig['port'] = int(os.getenv('SPIDERFOOT_PORT'))
+    
+    # Set clean docroot (proxy handles /osint routing)
+    sfWebUiConfig['root'] = '/'
+    
+    # Enable CORS for integration
+    sfWebUiConfig.update({
+        'cors_origins': ['*'],
+        'cors_headers': ['Content-Type', 'Authorization'],
+        'cors_methods': ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+    })
+    
+    print(f"🕷️ ANAT Security OSINT Engine configured: {sfWebUiConfig.get('host', '127.0.0.1')}:{sfWebUiConfig.get('port', 5001)}")
+
+# Register the configuration function to be called after sfWebUiConfig is defined
+import atexit
+atexit.register(apply_anat_security_config)
+
+`;
+        
+        // Insert at the beginning of the file after imports
+        const lines = content.split('\n');
+        let insertIndex = 0;
+        
+        // Find a good place to insert after imports
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].trim().startsWith('import ') || lines[i].trim().startsWith('from ')) {
+            insertIndex = i + 1;
+          } else if (lines[i].trim() === '' && insertIndex > 0) {
+            insertIndex = i + 1;
+            break;
+          }
         }
+        
+        lines.splice(insertIndex, 0, integrationPatch);
+        fs.writeFileSync(sfPath, lines.join('\n'), 'utf-8');
+        console.log('✅ SpiderFoot patched with alternative integration method');
       }
     } catch (e) {
       console.warn('⚠️ Could not patch SpiderFoot config (will try proxy-only mode):', (e as Error).message);
@@ -467,17 +525,17 @@ class SpiderFootService {
         'sf.py', 
         '-l', 
         `${this.config.host}:${this.config.port}`,
-        '-r',  // Enable web UI
-        '-d'   // Enable debug mode for better logging
+        '-r'   // Enable web UI (removed debug mode to reduce noise)
       ];
       
       console.log(`🚀 Starting SpiderFoot with: ${py} ${args.join(' ')}`);
       console.log(`📂 Working directory: ${dir}`);
-      console.log(`🌐 Will be available at: http://${this.config.host}:${this.config.port}${this.config.docroot}`);
+      console.log(`🌐 Will be available at: http://${this.config.host}:${this.config.port}/`);
       console.log(`🔧 Environment variables:`);
       console.log(`   SPIDERFOOT_HOST: ${env.SPIDERFOOT_HOST}`);
       console.log(`   SPIDERFOOT_PORT: ${env.SPIDERFOOT_PORT}`);
       console.log(`   SPIDERFOOT_DATA: ${env.SPIDERFOOT_DATA}`);
+      console.log(`   Proxy docroot: ${this.config.docroot} (handled by ANAT Security proxy)`);
 
       const child = spawn(py, args, { 
         cwd: dir, 

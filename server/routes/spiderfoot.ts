@@ -94,61 +94,89 @@ router.get('/status', async (_req, res) => {
 // Diagnostic endpoint to test direct SpiderFoot connectivity
 router.get('/diagtest', async (req, res) => {
   try {
-    // Test SpiderFoot direct access with the proper docroot path
+    const fetch = (await import('node-fetch')).default;
+    
+    // Test SpiderFoot direct access without docroot paths
     const testUrls = [
-      'http://127.0.0.1:5001/osint',         // Root with docroot
-      'http://127.0.0.1:5001/osint/',        // Root with trailing slash
-      'http://127.0.0.1:5001/osint/newscan', // Newscan endpoint
+      'http://127.0.0.1:5001/',           // Root without docroot
+      'http://127.0.0.1:5001/newscan',    // Newscan endpoint
+      'http://127.0.0.1:5001/opts',       // Options endpoint
+      'http://127.0.0.1:5001/scanlist',   // Scan list endpoint
     ];
     
     const results: any[] = [];
     for (const url of testUrls) {
       try {
         const response = await fetch(url, { 
-          method: 'GET'
+          method: 'GET',
+          timeout: 10000,
+          headers: {
+            'User-Agent': 'ANAT-Security-OSINT-Platform/2.0',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+          }
         });
+        
+        const body = await response.text();
         results.push({
           url,
           status: response.status,
+          statusText: response.statusText,
           headers: Object.fromEntries(response.headers.entries()),
-          body: response.status < 400 ? await response.text() : `Error: ${response.statusText}`
+          bodyLength: body.length,
+          isSpiderFoot: body.includes('SpiderFoot') || body.includes('OSINT'),
+          hasNewScan: body.includes('newscan') || body.includes('New Scan'),
+          bodyPreview: body.substring(0, 200)
         });
       } catch (error: any) {
         results.push({
           url,
-          error: error?.message || 'Unknown error'
+          error: error?.message || 'Unknown error',
+          code: error?.code,
+          errno: error?.errno
         });
       }
     }
     
+    const serviceStatus = spiderFootService.getStatus();
+    
     res.json({
-      message: 'SpiderFoot diagnostic test with proper docroot paths',
-      results
+      message: 'SpiderFoot diagnostic test - direct connectivity',
+      timestamp: new Date().toISOString(),
+      spiderFootService: {
+        running: serviceStatus.running,
+        config: serviceStatus.config
+      },
+      testResults: results,
+      recommendations: results.some(r => r.isSpiderFoot) 
+        ? ['✅ SpiderFoot is responding correctly', 'Navigation should work within the interface']
+        : ['❌ SpiderFoot may not be properly started', 'Check service logs for startup errors']
     });
   } catch (error: any) {
     res.status(500).json({ 
       error: 'Diagnostic test failed', 
-      details: error?.message || 'Unknown error'
+      details: error?.message || 'Unknown error',
+      timestamp: new Date().toISOString()
     });
   }
 });
 
-// Conditional authentication - temporarily disable ALL authentication for debugging
+// Conditional authentication - allow access to SpiderFoot interface
 router.use((req, res, next) => {
   const path = req.path;
   console.log(`🔐 Authentication check for path: "${path}" (originalUrl: "${req.originalUrl}")`);
   
-  // Temporarily allow all requests without authentication for debugging
-  console.log(`✅ Skipping authentication for debugging purposes`);
+  // Public endpoints - no authentication required
+  if (path === '/health' || path === '/status' || path === '/' || path === '' || path === '/diagtest') {
+    console.log(`✅ Public endpoint, skipping authentication`);
+    return next();
+  }
+  
+  // For debugging - allow access to SpiderFoot interface without authentication
+  // TODO: Re-enable authentication once navigation issues are resolved
+  console.log(`✅ Allowing SpiderFoot access for debugging`);
   return next();
   
-  // Original authentication logic (disabled for debugging):
-  // Public endpoints - no authentication required
-  // if (path === '/health' || path === '/status' || path === '/' || path === '') {
-  //   return next();
-  // }
-  // 
-  // // All other endpoints require authentication
+  // Original authentication logic (will be re-enabled after debugging):
   // return authenticate(req, res, next);
 });
 
@@ -188,18 +216,25 @@ const createSpiderFootProxy = (timeoutMs: number) => createProxyMiddleware({
   
   // Path rewriting for native integration
   pathRewrite: (path, req) => {
-    // SpiderFoot is configured with docroot='/osint' so it expects the full path
-    // We should NOT strip the docroot - SpiderFoot expects it
+    // SpiderFoot is configured with docroot='/osint' but we need to strip it for internal routing
     const originalUrl = (req as any).originalUrl || '';
     const p = path || '/';
     
     console.log(`🔄 Path rewrite debug: originalUrl="${originalUrl}", path="${p}", DOCROOT="${DOCROOT}"`);
     
-    // SpiderFoot expects the full path including the docroot
-    // /osint/newscan should be sent as /osint/newscan to SpiderFoot
-    const spiderFootPath = originalUrl || p;
+    // Remove the /osint prefix for SpiderFoot's internal routing
+    // SpiderFoot expects clean paths like /newscan, not /osint/newscan
+    let spiderFootPath = originalUrl;
+    if (spiderFootPath.startsWith('/osint')) {
+      spiderFootPath = spiderFootPath.replace('/osint', '');
+    }
     
-    console.log(`🔄 Path rewrite: ${originalUrl} -> ${spiderFootPath} (preserve full path for SpiderFoot)`);
+    // Ensure we have at least a root path
+    if (!spiderFootPath || spiderFootPath === '') {
+      spiderFootPath = '/';
+    }
+    
+    console.log(`🔄 Path rewrite: ${originalUrl} -> ${spiderFootPath} (stripped docroot for SpiderFoot)`);
     return spiderFootPath;
   }
 });
