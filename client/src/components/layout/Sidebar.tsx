@@ -60,20 +60,45 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
 
   const menuItems = [
     {
-      path: "/",
+      path: "/dashboard",
       icon: <BarChart2 size={20} />,
       label: "Dashboard",
       color: "text-blue-400"
     },
     {
-      path: "/dashboard",
+      path: "/osint",
       icon: <Terminal size={20} />,
       label: "OSINT Platform",
       color: "text-green-400",
       hasSubmenu: true,
       features: [
-        { path: "/dashboard/search", label: "Search", icon: <Search size={16} /> },
-        { path: "/dashboard", label: "Overview", icon: <Activity size={16} /> }
+        { path: "/dashboard/search", label: "SpiderFoot OSINT", icon: <Search size={16} />, color: "text-purple-400" },
+        { path: "/osint", label: "Advanced Search", icon: <Eye size={16} />, color: "text-indigo-400" },
+        { path: "/darkweb", label: "Dark Web Monitor", icon: <Skull size={16} />, color: "text-red-400" }
+      ]
+    },
+    {
+      path: "/analytics",
+      icon: <Activity size={20} />,
+      label: "Threat Analytics",
+      color: "text-cyan-400",
+      hasSubmenu: true,
+      features: [
+        { path: "/analytics/threats", label: "Threat Intelligence", icon: <Shield size={16} />, color: "text-red-400" },
+        { path: "/analytics/network", label: "Network Analysis", icon: <Globe size={16} />, color: "text-blue-400" },
+        { path: "/analytics/vulnerabilities", label: "Vulnerabilities", icon: <Bug size={16} />, color: "text-orange-400" }
+      ]
+    },
+    {
+      path: "/users",
+      icon: <Users size={20} />,
+      label: "User Management",
+      color: "text-yellow-400",
+      hasSubmenu: true,
+      features: [
+        { path: "/users/management", label: "Manage Users", icon: <UserCog size={16} />, color: "text-blue-400" },
+        { path: "/users/permissions", label: "Permissions", icon: <Lock size={16} />, color: "text-green-400" },
+        { path: "/users/activity", label: "Activity Logs", icon: <Clock size={16} />, color: "text-purple-400" }
       ]
     }
   ];
@@ -150,8 +175,12 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
                 <div className="space-y-1 mb-2" style={{ marginLeft: '1.5rem' }}>
                   {item.features?.map((feature) => (
                     <Link key={feature.path} to={feature.path} className="no-underline">
-                      <div className="flex items-center px-3 py-2 text-sm text-coolWhite cursor-pointer hover:bg-darkGray hover:border hover:border-gray-700/50 rounded-lg transition-colors duration-200">
-                        <span className="text-gray-400">
+                      <div className={`flex items-center px-3 py-2 text-sm cursor-pointer rounded-lg transition-colors duration-200 
+                        ${location.pathname === feature.path 
+                          ? 'bg-gradient-to-r from-cyan-600/20 to-purple-600/20 border border-cyan-400/30 text-coolWhite' 
+                          : 'text-coolWhite hover:bg-darkGray hover:border hover:border-gray-700/50'
+                        }`}>
+                        <span className={feature.color || "text-gray-400"}>
                           {feature.icon}
                         </span>
                         <span className="ml-3">{feature.label}</span>

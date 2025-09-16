@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { pageVariants } from "@/utils/animations";
 import SpiderFootIntegrated from "@/components/osint/SpiderFootIntegrated";
 
-const SpiderFootPage = () => {
+const OSINTPage = () => {
   return (
     <motion.div
       variants={pageVariants}
@@ -17,4 +17,4 @@ const SpiderFootPage = () => {
   );
 };
 
-export default SpiderFootPage;
+export default OSINTPage;

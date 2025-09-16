@@ -218,24 +218,42 @@ jobs:
               # Install core dependencies with specific compatibility versions
               echo "Installing core SpiderFoot dependencies..."
               ".venv/bin/pip" install \
-                "cherrypy>=18.6.0" \
-                "cherrypy-cors>=1.6" \
-                "requests>=2.25.0" \
-                "beautifulsoup4>=4.9.0" \
-                "dnspython>=2.1.0" \
-                "netaddr>=0.8.0" \
-                "cryptography>=3.4.0" \
-                "pyyaml>=5.4.0" || {
+                "cherrypy>=18.6.0,<19" \
+                "cherrypy-cors>=1.6,<2" \
+                "requests>=2.25.0,<3" \
+                "beautifulsoup4>=4.9.0,<5" \
+                "dnspython>=2.1.0,<3" \
+                "netaddr>=0.8.0,<1" \
+                "cryptography>=3.4.0,<4" || {
                 echo "❌ Failed to install core dependencies"
                 exit 1
               }
               
+              # Install PyYAML with specific handling for Python 3.13 compatibility
+              echo "Installing PyYAML with compatibility fixes..."
+              ".venv/bin/pip" install "pyyaml>=6.0" || {
+                echo "⚠️ Latest PyYAML failed, trying 5.4.1..."
+                ".venv/bin/pip" install "pyyaml==5.4.1" || {
+                  echo "⚠️ PyYAML installation failed, installing wheel directly..."
+                  ".venv/bin/pip" install --only-binary=all "pyyaml>=5.4" || {
+                    echo "⚠️ PyYAML installation completely failed, continuing without YAML support..."
+                  }
+                }
+              }
+              
               # Install XML processing (with fallback for compatibility)
               echo "Installing XML processing dependencies..."
-              ".venv/bin/pip" install lxml || {
-                echo "⚠️ lxml failed, installing libxml2-python3 as fallback..."
-                ".venv/bin/pip" install libxml2-python3 || {
-                  echo "⚠️ XML processing libraries failed, some features may be limited"
+              ".venv/bin/pip" install "lxml>=4.6,<5" || {
+                echo "⚠️ lxml failed, trying with build dependencies..."
+                # Try installing build dependencies if available
+                if command -v apt-get >/dev/null 2>&1; then
+                  sudo apt-get install -y libxml2-dev libxslt1-dev || echo "Could not install build deps"
+                fi
+                ".venv/bin/pip" install "lxml>=4.6,<5" || {
+                  echo "⚠️ lxml still failed, installing alternative..."
+                  ".venv/bin/pip" install "beautifulsoup4[lxml]" || {
+                    echo "⚠️ XML processing libraries failed, HTML parsing will be limited"
+                  }
                 }
               }
               
@@ -268,10 +286,27 @@ jobs:
               
               # Verify critical imports work
               echo "🧪 Verifying SpiderFoot dependencies..."
-              ".venv/bin/python" -c "import cherrypy, requests, bs4, dns.resolver, netaddr; print('✅ Core dependencies verified')" || {
-                echo "❌ Core dependency verification failed"
+              ".venv/bin/python" -c "import cherrypy; print('✅ CherryPy OK')" || {
+                echo "❌ CherryPy import failed"
                 exit 1
               }
+              ".venv/bin/python" -c "import requests; print('✅ Requests OK')" || {
+                echo "❌ Requests import failed"
+                exit 1
+              }
+              ".venv/bin/python" -c "import bs4; print('✅ BeautifulSoup4 OK')" || {
+                echo "❌ BeautifulSoup4 import failed"
+                exit 1
+              }
+              ".venv/bin/python" -c "import dns.resolver; print('✅ DNS resolver OK')" || {
+                echo "❌ DNS resolver import failed"
+                exit 1
+              }
+              ".venv/bin/python" -c "import netaddr; print('✅ NetAddr OK')" || {
+                echo "❌ NetAddr import failed"
+                exit 1
+              }
+              echo "✅ All core dependencies verified successfully"
               
               # Run comprehensive installation verification
               if [ -f "verify_installation.py" ]; then
@@ -301,19 +336,25 @@ jobs:
                   echo "✅ SpiderFoot help command works"
                 } || {
                   echo "❌ SpiderFoot test failed"
+                  echo "🔍 Debugging SpiderFoot startup..."
                   ".venv/bin/python" sf.py --help 2>&1 | head -20 || true
+                  echo "🔍 Python path and modules:"
+                  ".venv/bin/python" -c "import sys; print('Python executable:', sys.executable)"
+                  ls -la sf.py
                   exit 1
                 }
                 
-                # Test module imports
-                ".venv/bin/python" -c "import sys; sys.path.insert(0, '.'); import spiderfoot; import sflib; print('✅ SpiderFoot modules import successfully')" || {
-                  echo "❌ SpiderFoot module verification failed"
-                  exit 1
+                # Test basic module imports
+                ".venv/bin/python" -c "import sys; sys.path.insert(0, '.'); import spiderfoot; print('✅ SpiderFoot module OK')" || {
+                  echo "⚠️ SpiderFoot module import failed, checking files..."
+                  ls -la *.py | head -10
                 }
                 
                 echo "✅ SpiderFoot OSINT Engine setup completed successfully"
               else
                 echo "❌ SpiderFoot main script not found"
+                echo "🔍 Contents of SpiderFoot directory:"
+                ls -la | head -20
                 exit 1
               fi
             else

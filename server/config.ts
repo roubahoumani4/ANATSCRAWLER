@@ -28,6 +28,8 @@ export const TIMEOUT_CONFIG = {
   // SpiderFoot OSINT timeout settings
   SPIDERFOOT_STARTUP_TIMEOUT: parseInt(process.env.SPIDERFOOT_STARTUP_TIMEOUT || '120000'),
   SPIDERFOOT_REQUEST_TIMEOUT: parseInt(process.env.SPIDERFOOT_REQUEST_TIMEOUT || '30000'),
+  SPIDERFOOT_SCAN_TIMEOUT: parseInt(process.env.SPIDERFOOT_SCAN_TIMEOUT || '300000'),
+  SPIDERFOOT_LONG_SCAN_TIMEOUT: parseInt(process.env.SPIDERFOOT_LONG_SCAN_TIMEOUT || '600000'),
 };
 
 // External service configurations

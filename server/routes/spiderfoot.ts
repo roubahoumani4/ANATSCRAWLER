@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { spiderFootService } from '../services/spiderfoot.service';
-import { OSINT_CONFIG } from '../config';
+import { OSINT_CONFIG, TIMEOUT_CONFIG } from '../config';
 import authenticate from '../middleware/auth';
 
 const router = Router();
@@ -178,13 +178,13 @@ router.use(async (req, res, next) => {
   }
 });
 
-// Proxy everything under /osint to SpiderFoot, preserving path
-const proxyMiddleware = createProxyMiddleware({
+// Create specialized proxy middleware for different types of requests
+const createSpiderFootProxy = (timeoutMs: number) => createProxyMiddleware({
   target: SPIDERFOOT_TARGET,
   changeOrigin: true,
   ws: true, // Enable WebSocket support
   secure: false,
-  timeout: 30000, // 30 second timeout for scan operations
+  timeout: timeoutMs,
   
   // Path rewriting for native integration
   pathRewrite: (path, req) => {
@@ -201,27 +201,119 @@ const proxyMiddleware = createProxyMiddleware({
     
     console.log(`🔄 Path rewrite: ${originalUrl} -> ${spiderFootPath} (preserve full path for SpiderFoot)`);
     return spiderFootPath;
-  },
-  
-  // Handle response headers to fix browser warnings
-  onProxyRes: (proxyRes: any, req: any, res: any) => {
-    // Fix Permissions-Policy header issues
-    const permissionsPolicy = proxyRes.headers['permissions-policy'];
-    if (permissionsPolicy && typeof permissionsPolicy === 'string') {
-      // Remove 'browsing-topics' feature that causes browser warnings
-      const cleanPolicy = permissionsPolicy.replace(/browsing-topics[^,]*(,\s*)?/g, '');
-      proxyRes.headers['permissions-policy'] = cleanPolicy;
-    }
-    
-    // Add security headers for OSINT interface
-    proxyRes.headers['x-frame-options'] = 'SAMEORIGIN';
-    proxyRes.headers['x-content-type-options'] = 'nosniff';
-    
-    console.log(`📤 Response headers modified for ${req.originalUrl}`);
   }
 });
 
-// Add error handling and logging middleware
+// Create different proxy instances for different timeout requirements
+const standardProxy = createSpiderFootProxy(TIMEOUT_CONFIG.SPIDERFOOT_REQUEST_TIMEOUT);   // 30s for standard requests
+const scanProxy = createSpiderFootProxy(TIMEOUT_CONFIG.SPIDERFOOT_SCAN_TIMEOUT);          // 5 minutes for scan operations  
+const longScanProxy = createSpiderFootProxy(TIMEOUT_CONFIG.SPIDERFOOT_LONG_SCAN_TIMEOUT); // 10 minutes for heavy scan operations
+
+// Async scan endpoint to handle long-running scan initialization
+router.post('/async-scan', async (req, res) => {
+  try {
+    console.log('🚀 Starting async scan operation');
+    
+    // Extract scan parameters from request
+    const scanData = req.body;
+    console.log(`📊 Scan parameters:`, JSON.stringify(scanData, null, 2));
+    
+    // Return immediately with scan accepted status
+    res.status(202).json({
+      status: 'accepted',
+      message: 'Scan initialization started',
+      scan_id: `scan_${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      instructions: {
+        message: 'Scan is being initialized in the background',
+        next_steps: [
+          'Monitor progress in the SpiderFoot interface',
+          'Use the scan status endpoint to check progress',
+          'Large scans may take several minutes to initialize'
+        ],
+        spiderfoot_interface: `http://localhost:5001/osint`,
+        estimated_time: '2-15 minutes depending on scan scope'
+      }
+    });
+    
+    // Start the actual scan in the background (don't wait for response)
+    setImmediate(async () => {
+      try {
+        console.log('🔄 Initiating background scan to SpiderFoot...');
+        
+        const response = await fetch(`${SPIDERFOOT_TARGET}/osint/newscan`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': 'ANAT-Security-Platform/1.0'
+          },
+          body: new URLSearchParams(scanData).toString(),
+          signal: AbortSignal.timeout(TIMEOUT_CONFIG.SPIDERFOOT_LONG_SCAN_TIMEOUT) // Use config timeout for background operation
+        });
+        
+        console.log(`📤 Background scan response: ${response.status} ${response.statusText}`);
+        
+        if (response.ok) {
+          console.log('✅ Background scan initiated successfully');
+        } else {
+          console.warn(`⚠️ Background scan response: ${response.status} - ${await response.text()}`);
+        }
+      } catch (error: any) {
+        console.error('❌ Background scan error:', error.message);
+      }
+    });
+    
+  } catch (error: any) {
+    console.error('❌ Async scan endpoint error:', error.message);
+    res.status(500).json({
+      error: 'Failed to initiate async scan',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Route-specific middleware to choose appropriate proxy timeout
+router.use((req, res, next) => {
+  const path = req.path.toLowerCase();
+  const method = req.method.toUpperCase();
+  
+  // Set timeout based on the type of operation
+  if (method === 'POST' && (path.includes('newscan') || path.includes('startscan'))) {
+    console.log(`🕐 Using extended timeout for scan operation: ${req.originalUrl}`);
+    (req as any).useProxy = 'longScan';
+  } else if (path.includes('scan') || path.includes('status') || path.includes('result')) {
+    console.log(`🕐 Using medium timeout for scan-related operation: ${req.originalUrl}`);
+    (req as any).useProxy = 'scan';
+  } else {
+    console.log(`🕐 Using standard timeout for operation: ${req.originalUrl}`);
+    (req as any).useProxy = 'standard';
+  }
+  
+  next();
+});
+
+// Response processor middleware to fix headers
+router.use((req, res, next) => {
+  const originalSend = res.send;
+  const originalJson = res.json;
+  
+  // Intercept response headers for all proxy responses
+  const originalSetHeader = res.setHeader;
+  res.setHeader = function(name: string, value: any) {
+    // Fix Permissions-Policy header issues
+    if (name.toLowerCase() === 'permissions-policy' && typeof value === 'string') {
+      // Remove 'browsing-topics' feature that causes browser warnings
+      const cleanPolicy = value.replace(/browsing-topics[^,]*(,\s*)?/g, '');
+      return originalSetHeader.call(this, name, cleanPolicy);
+    }
+    return originalSetHeader.call(this, name, value);
+  };
+  
+  next();
+});
+
+// Add error handling and logging middleware with dynamic proxy selection
 router.use('*', (req, res, next) => {
   // Log proxy requests in development and temporarily in production for debugging
   console.log(`➡️ Proxying ${req.method} ${req.url} to SpiderFoot (originalUrl: ${req.originalUrl}, path: ${req.path})`);
@@ -237,7 +329,7 @@ router.use('*', (req, res, next) => {
     // Allow iframe embedding for same origin
     res.header('X-Frame-Options', 'SAMEORIGIN');
     
-        // Set minimal permissions policy (avoid unsupported features)
+    // Set minimal permissions policy (avoid unsupported features)
     res.header('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
     
     // Add service identification header
@@ -247,18 +339,54 @@ router.use('*', (req, res, next) => {
     return originalSend.call(this, data);
   };
   
-  next();
-}, proxyMiddleware);
+  // Choose the appropriate proxy based on request type
+  const proxyType = (req as any).useProxy || 'standard';
+  let selectedProxy;
+  
+  switch (proxyType) {
+    case 'longScan':
+      selectedProxy = longScanProxy;
+      break;
+    case 'scan':
+      selectedProxy = scanProxy;
+      break;
+    default:
+      selectedProxy = standardProxy;
+      break;
+  }
+  
+  console.log(`🔄 Using ${proxyType} proxy for ${req.originalUrl}`);
+  
+  // Use the selected proxy
+  selectedProxy(req, res, next);
+});
 
-// Error handler for proxy failures
+// Error handler for proxy failures and timeouts
 router.use('*', (err: any, req: any, res: any, next: any) => {
   console.error(`❌ SpiderFoot proxy error for ${req.url}:`, err.message);
+  
   if (!res.headersSent) {
-    res.status(502).json({
-      error: 'OSINT engine proxy error',
-      message: 'Unable to communicate with SpiderFoot service',
-      timestamp: new Date().toISOString()
-    });
+    // Check for timeout errors specifically
+    if (err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT' || err.message?.includes('timeout')) {
+      res.status(504).json({
+        error: 'Scan operation timeout',
+        message: 'The scan is taking longer than expected. This is normal for comprehensive OSINT scans.',
+        suggestions: [
+          'Try refreshing the SpiderFoot interface directly',
+          'Check scan progress in the SpiderFoot UI',
+          'Consider reducing the scan scope for faster results',
+          'Large scans can take 5-15 minutes to initialize'
+        ],
+        spiderfoot_url: `http://localhost:5001/osint`,
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      res.status(502).json({
+        error: 'OSINT engine proxy error',
+        message: 'Unable to communicate with SpiderFoot service',
+        timestamp: new Date().toISOString()
+      });
+    }
   }
 });
 

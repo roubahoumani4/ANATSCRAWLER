@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { pageVariants } from "@/utils/animations";
-import SimpleDashboard from "@/components/dashboard/SimpleDashboard";
+import EnhancedDashboard from "@/components/dashboard/EnhancedDashboard";
 
 const DashboardPage = () => {
   return (
@@ -10,7 +10,7 @@ const DashboardPage = () => {
       animate="in"
       exit="out"
     >
-      <SimpleDashboard />
+      <EnhancedDashboard />
     </motion.div>
   );
 };
