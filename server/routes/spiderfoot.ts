@@ -96,12 +96,12 @@ router.get('/diagtest', async (req, res) => {
   try {
     const fetch = (await import('node-fetch')).default;
     
-    // Test SpiderFoot direct access with the proper docroot paths
+    // Test SpiderFoot direct access with clean paths (no /osint prefix)
     const testUrls = [
-      'http://127.0.0.1:5001/osint',         // Root with docroot
-      'http://127.0.0.1:5001/osint/',        // Root with trailing slash
-      'http://127.0.0.1:5001/osint/newscan', // Newscan endpoint
-      'http://127.0.0.1:5001/osint/opts',    // Options endpoint
+      'http://127.0.0.1:5001/',         // Root
+      'http://127.0.0.1:5001/newscan',  // Newscan endpoint
+      'http://127.0.0.1:5001/opts',     // Options endpoint
+      'http://127.0.0.1:5001/scans',    // Scans endpoint
     ];
     
     const results: any[] = [];
@@ -216,22 +216,25 @@ const createSpiderFootProxy = (timeoutMs: number) => createProxyMiddleware({
   
   // Path rewriting for native integration
   pathRewrite: (path, req) => {
-    // SpiderFoot is configured with docroot='/osint' so we need to preserve the full path
     const originalUrl = (req as any).originalUrl || '';
     const p = path || '/';
     
     console.log(`🔄 Path rewrite debug: originalUrl="${originalUrl}", path="${p}", DOCROOT="${DOCROOT}"`);
     
-    // SpiderFoot expects the full path including the docroot
-    // /osint/newscan should be sent as /osint/newscan to SpiderFoot
+    // Remove /osint prefix since SpiderFoot serves from root
     let spiderFootPath = originalUrl;
     
-    // If the path doesn't start with /osint, add it
-    if (!spiderFootPath.startsWith('/osint')) {
-      spiderFootPath = '/osint' + (spiderFootPath.startsWith('/') ? spiderFootPath : '/' + spiderFootPath);
+    // Strip /osint prefix - SpiderFoot expects clean paths
+    if (spiderFootPath.startsWith('/osint')) {
+      spiderFootPath = spiderFootPath.substring(6) || '/';
     }
     
-    console.log(`🔄 Path rewrite: ${originalUrl} -> ${spiderFootPath} (preserved/added /osint prefix for SpiderFoot)`);
+    // Ensure path starts with /
+    if (!spiderFootPath.startsWith('/')) {
+      spiderFootPath = '/' + spiderFootPath;
+    }
+    
+    console.log(`🔄 Path rewrite: ${originalUrl} -> ${spiderFootPath} (removed /osint prefix for SpiderFoot)`);
     return spiderFootPath;
   }
 });
@@ -273,7 +276,8 @@ router.post('/async-scan', async (req, res) => {
       try {
         console.log('🔄 Initiating background scan to SpiderFoot...');
         
-        const response = await fetch(`${SPIDERFOOT_TARGET}/osint/newscan`, {
+        const fetch = (await import('node-fetch')).default;
+        const response = await fetch(`${SPIDERFOOT_TARGET}/newscan`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -325,13 +329,11 @@ router.use((req, res, next) => {
   next();
 });
 
-// Response processor middleware to fix headers
+// Response processor middleware to fix headers and rewrite links
 router.use((req, res, next) => {
   const originalSend = res.send;
-  const originalJson = res.json;
-  
-  // Intercept response headers for all proxy responses
   const originalSetHeader = res.setHeader;
+  
   res.setHeader = function(name: string, value: any) {
     // Fix Permissions-Policy header issues
     if (name.toLowerCase() === 'permissions-policy' && typeof value === 'string') {
@@ -340,6 +342,37 @@ router.use((req, res, next) => {
       return originalSetHeader.call(this, name, cleanPolicy);
     }
     return originalSetHeader.call(this, name, value);
+  };
+
+  // Override send to fix HTML content
+  res.send = function(data: any) {
+    const contentType = res.getHeader('content-type') as string;
+    
+    if (contentType && contentType.includes('text/html') && typeof data === 'string') {
+      // Fix relative links to include /osint prefix for browser navigation
+      const modifiedBody = data
+        .replace(/href="\/(?!osint)/g, 'href="/osint/')
+        .replace(/src="\/(?!osint)/g, 'src="/osint/')
+        .replace(/action="\/(?!osint)/g, 'action="/osint/')
+        .replace(/url\(\/(?!osint)/g, 'url(/osint/')
+        .replace(/"\/ajax/g, '"/osint/ajax')
+        .replace(/"\/static/g, '"/osint/static')
+        .replace(/"\/css/g, '"/osint/css')
+        .replace(/"\/js/g, '"/osint/js')
+        .replace(/window\.location\.href\s*=\s*["']\/(?!osint)/g, 'window.location.href="/osint/')
+        .replace(/location\.href\s*=\s*["']\/(?!osint)/g, 'location.href="/osint/');
+
+      // Set proper headers for iframe integration
+      res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      
+      // Remove restrictive CSP headers
+      res.removeHeader('Content-Security-Policy');
+      
+      return originalSend.call(this, modifiedBody);
+    }
+    
+    return originalSend.call(this, data);
   };
   
   next();

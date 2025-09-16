@@ -56,7 +56,7 @@ export const OSINT_CONFIG = {
     HOST: process.env.SPIDERFOOT_HOST || '0.0.0.0',
     PORT: parseInt(process.env.SPIDERFOOT_PORT || '5001', 10),
     DIR: process.env.SPIDERFOOT_DIR || ENVIRONMENT_CONFIG.PATHS.SPIDERFOOT.DIR,
-    DOCROOT: '/osint', // Fixed docroot for SpiderFoot to expect /osint paths
+    DOCROOT: '/', // SpiderFoot serves from root, proxy handles /osint routing
     DATA_DIR: process.env.SPIDERFOOT_DATA || ENVIRONMENT_CONFIG.PATHS.SPIDERFOOT.DATA_DIR,
     CACHE_DIR: process.env.SPIDERFOOT_CACHE || ENVIRONMENT_CONFIG.PATHS.SPIDERFOOT.CACHE_DIR,
     LOGS_DIR: process.env.SPIDERFOOT_LOGS || ENVIRONMENT_CONFIG.PATHS.SPIDERFOOT.LOGS_DIR,
@@ -71,7 +71,7 @@ console.log(`   DB_PATH: ${OSINT_CONFIG.DB_PATH}`);
 console.log(`   SpiderFoot Host: ${OSINT_CONFIG.SPIDERFOOT.HOST}:${OSINT_CONFIG.SPIDERFOOT.PORT}`);
 console.log(`   SpiderFoot Dir: ${OSINT_CONFIG.SPIDERFOOT.DIR}`);
 console.log(`   SpiderFoot Data: ${OSINT_CONFIG.SPIDERFOOT.DATA_DIR}`);
-console.log(`   SpiderFoot DocRoot: ${OSINT_CONFIG.SPIDERFOOT.DOCROOT}`);
+console.log(`   SpiderFoot DocRoot: ${OSINT_CONFIG.SPIDERFOOT.DOCROOT} (serves from root, proxy adds /osint)`);
 
 // Production optimizations
 export const PRODUCTION_CONFIG = {

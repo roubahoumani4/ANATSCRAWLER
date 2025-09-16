@@ -15,300 +15,47 @@ const SpiderFootIntegrated: React.FC<SpiderFootIntegratedProps> = ({ className =
   const { language } = useLanguage();
   const navigate = useNavigate();
 
-  // Custom CSS to inject into SpiderFoot to match our theme
-  const spiderFootCustomCSS = `
-    <style>
-      /* Dark theme matching DARKSCRAWLER aesthetic */
-      body {
-        background: linear-gradient(135deg, #111827 0%, #000000 50%, #111827 100%) !important;
-        color: #e5e7eb !important;
-        font-family: 'Inter', system-ui, sans-serif !important;
-      }
-      
-      /* Header styling */
-      .navbar, .nav, .header, #header {
-        background: rgba(17, 24, 39, 0.9) !important;
-        border-bottom: 2px solid rgba(59, 130, 246, 0.2) !important;
-        backdrop-filter: blur(10px) !important;
-      }
-      
-      /* Navigation items */
-      .nav-link, .navbar-nav .nav-link, a {
-        color: #60a5fa !important;
-        font-weight: 600 !important;
-        transition: all 0.3s ease !important;
-      }
-      
-      .nav-link:hover, .navbar-nav .nav-link:hover, a:hover {
-        color: #3b82f6 !important;
-        text-shadow: 0 0 10px rgba(59, 130, 246, 0.5) !important;
-      }
-      
-      /* SpiderFoot logo and branding */
-      .navbar-brand, .logo {
-        color: #3b82f6 !important;
-        font-weight: 900 !important;
-        text-shadow: 0 0 10px rgba(59, 130, 246, 0.3) !important;
-      }
-      
-      /* Main content areas */
-      .container, .container-fluid, .main-content {
-        background: transparent !important;
-        color: #e5e7eb !important;
-      }
-      
-      /* Cards and panels */
-      .card, .panel, .well, .box {
-        background: rgba(17, 24, 39, 0.6) !important;
-        border: 2px solid rgba(59, 130, 246, 0.2) !important;
-        border-radius: 16px !important;
-        backdrop-filter: blur(10px) !important;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
-      }
-      
-      .card-header, .panel-heading {
-        background: linear-gradient(90deg, rgba(59, 130, 246, 0.2), rgba(99, 102, 241, 0.2)) !important;
-        border-bottom: 1px solid rgba(59, 130, 246, 0.3) !important;
-        color: #60a5fa !important;
-        font-weight: 700 !important;
-      }
-      
-      /* Form elements */
-      .form-control, input, select, textarea {
-        background: rgba(31, 41, 55, 0.8) !important;
-        border: 2px solid rgba(59, 130, 246, 0.2) !important;
-        border-radius: 12px !important;
-        color: #e5e7eb !important;
-        font-family: 'JetBrains Mono', monospace !important;
-      }
-      
-      .form-control:focus, input:focus, select:focus, textarea:focus {
-        border-color: #3b82f6 !important;
-        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
-        background: rgba(31, 41, 55, 0.9) !important;
-      }
-      
-      /* Buttons */
-      .btn, button {
-        background: linear-gradient(90deg, #3b82f6, #6366f1) !important;
-        border: 2px solid rgba(59, 130, 246, 0.5) !important;
-        border-radius: 12px !important;
-        color: white !important;
-        font-weight: 700 !important;
-        text-transform: uppercase !important;
-        letter-spacing: 1px !important;
-        transition: all 0.3s ease !important;
-      }
-      
-      .btn:hover, button:hover {
-        background: linear-gradient(90deg, #2563eb, #4f46e5) !important;
-        border-color: #3b82f6 !important;
-        box-shadow: 0 0 20px rgba(59, 130, 246, 0.4) !important;
-        transform: translateY(-2px) !important;
-      }
-      
-      .btn-primary { background: linear-gradient(90deg, #3b82f6, #6366f1) !important; }
-      .btn-success { background: linear-gradient(90deg, #10b981, #059669) !important; }
-      .btn-warning { background: linear-gradient(90deg, #f59e0b, #d97706) !important; }
-      .btn-danger { background: linear-gradient(90deg, #ef4444, #dc2626) !important; }
-      
-      /* Tables */
-      .table, table {
-        background: rgba(17, 24, 39, 0.6) !important;
-        color: #e5e7eb !important;
-        border-radius: 12px !important;
-        overflow: hidden !important;
-      }
-      
-      .table th, table th {
-        background: linear-gradient(90deg, rgba(59, 130, 246, 0.2), rgba(99, 102, 241, 0.2)) !important;
-        color: #60a5fa !important;
-        font-weight: 700 !important;
-        border-bottom: 2px solid rgba(59, 130, 246, 0.3) !important;
-      }
-      
-      .table td, table td {
-        border-bottom: 1px solid rgba(75, 85, 99, 0.3) !important;
-        color: #d1d5db !important;
-      }
-      
-      .table-striped tbody tr:nth-of-type(odd) {
-        background: rgba(31, 41, 55, 0.3) !important;
-      }
-      
-      /* Progress bars */
-      .progress {
-        background: rgba(31, 41, 55, 0.6) !important;
-        border-radius: 8px !important;
-        overflow: hidden !important;
-      }
-      
-      .progress-bar {
-        background: linear-gradient(90deg, #3b82f6, #6366f1) !important;
-        box-shadow: 0 0 10px rgba(59, 130, 246, 0.5) !important;
-      }
-      
-      /* Alerts and messages */
-      .alert {
-        background: rgba(17, 24, 39, 0.8) !important;
-        border: 2px solid rgba(59, 130, 246, 0.3) !important;
-        border-radius: 12px !important;
-        color: #e5e7eb !important;
-      }
-      
-      .alert-info { border-color: rgba(59, 130, 246, 0.5) !important; }
-      .alert-success { border-color: rgba(16, 185, 129, 0.5) !important; }
-      .alert-warning { border-color: rgba(245, 158, 11, 0.5) !important; }
-      .alert-danger { border-color: rgba(239, 68, 68, 0.5) !important; }
-      
-      /* Sidebar */
-      .sidebar, .nav-sidebar {
-        background: rgba(17, 24, 39, 0.9) !important;
-        border-right: 2px solid rgba(59, 130, 246, 0.2) !important;
-      }
-      
-      /* Footer */
-      .footer, footer {
-        background: rgba(17, 24, 39, 0.9) !important;
-        border-top: 2px solid rgba(59, 130, 246, 0.2) !important;
-        color: #9ca3af !important;
-      }
-      
-      /* Dropdown menus */
-      .dropdown-menu {
-        background: rgba(17, 24, 39, 0.95) !important;
-        border: 2px solid rgba(59, 130, 246, 0.2) !important;
-        border-radius: 12px !important;
-        backdrop-filter: blur(10px) !important;
-      }
-      
-      .dropdown-item {
-        color: #e5e7eb !important;
-        transition: all 0.3s ease !important;
-      }
-      
-      .dropdown-item:hover {
-        background: rgba(59, 130, 246, 0.2) !important;
-        color: #60a5fa !important;
-      }
-      
-      /* Badges and labels */
-      .badge, .label {
-        background: linear-gradient(90deg, #3b82f6, #6366f1) !important;
-        color: white !important;
-        border-radius: 8px !important;
-        font-weight: 600 !important;
-      }
-      
-      /* Custom scrollbar */
-      ::-webkit-scrollbar {
-        width: 8px !important;
-      }
-      
-      ::-webkit-scrollbar-track {
-        background: rgba(31, 41, 55, 0.5) !important;
-      }
-      
-      ::-webkit-scrollbar-thumb {
-        background: linear-gradient(180deg, #3b82f6, #6366f1) !important;
-        border-radius: 4px !important;
-      }
-      
-      ::-webkit-scrollbar-thumb:hover {
-        background: linear-gradient(180deg, #2563eb, #4f46e5) !important;
-      }
-      
-      /* Animation effects */
-      * {
-        transition: all 0.3s ease !important;
-      }
-      
-      /* Matrix-like effects for text inputs */
-      input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focus {
-        text-shadow: 0 0 5px rgba(59, 130, 246, 0.5) !important;
-      }
-      
-      /* Glowing borders for important elements */
-      .btn-primary:hover, .form-control:focus {
-        animation: glow 2s infinite alternate !important;
-      }
-      
-      @keyframes glow {
-        from {
-          box-shadow: 0 0 5px rgba(59, 130, 246, 0.5) !important;
-        }
-        to {
-          box-shadow: 0 0 20px rgba(59, 130, 246, 0.8) !important;
-        }
-      }
-      
-      /* Hide or modify SpiderFoot branding to integrate with DARKSCRAWLER */
-      .spiderfoot-logo, #spiderfoot-logo {
-        filter: hue-rotate(200deg) brightness(1.2) !important;
-      }
-      
-      /* Custom header integration */
-      body::before {
-        content: "🕷️ DARKSCRAWLER OSINT ENGINE - SPIDERFOOT INTEGRATION";
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        background: linear-gradient(90deg, #1f2937, #111827, #1f2937);
-        color: #60a5fa;
-        text-align: center;
-        padding: 8px;
-        font-weight: 700;
-        font-size: 12px;
-        letter-spacing: 2px;
-        z-index: 10000;
-        border-bottom: 2px solid rgba(59, 130, 246, 0.3);
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-      }
-      
-      /* Adjust body padding to account for custom header */
-      body {
-        padding-top: 35px !important;
-      }
-    </style>
-  `;
-
   useEffect(() => {
     const iframe = iframeRef.current;
     if (!iframe) return;
 
-    const injectCustomStyling = () => {
+    const handleIframeLoad = () => {
       try {
         const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
         if (iframeDoc) {
-          // Remove existing custom styles
-          const existingStyles = iframeDoc.querySelector('#darkscrawler-custom-styles');
-          if (existingStyles) {
-            existingStyles.remove();
-          }
-
-          // Inject new styles
-          const styleElement = iframeDoc.createElement('div');
-          styleElement.id = 'darkscrawler-custom-styles';
-          styleElement.innerHTML = spiderFootCustomCSS;
-          iframeDoc.head.appendChild(styleElement);
-
-          console.log('✅ DARKSCRAWLER theme applied to SpiderFoot interface');
+          console.log('✅ SpiderFoot iframe loaded successfully');
+          
+          // Only add minimal fixes for navigation without conflicting with server-side theming
+          const navigationFix = iframeDoc.createElement('script');
+          navigationFix.textContent = `
+            // Fix for relative links in iframe context
+            document.addEventListener('DOMContentLoaded', function() {
+              const links = document.querySelectorAll('a[href^="/"]');
+              links.forEach(link => {
+                if (!link.href.includes('/osint/')) {
+                  const originalHref = link.getAttribute('href');
+                  if (originalHref && !originalHref.startsWith('/osint')) {
+                    link.setAttribute('href', '/osint' + originalHref);
+                  }
+                }
+              });
+            });
+          `;
+          
+          iframeDoc.head.appendChild(navigationFix);
+          console.log('✅ Navigation fixes applied to SpiderFoot interface');
         }
       } catch (error) {
-        console.warn('⚠️ Could not inject custom styles into SpiderFoot iframe:', error);
+        console.warn('⚠️ Could not apply navigation fixes to SpiderFoot iframe:', error);
+        // This is expected due to CORS restrictions - the server-side theming will handle it
       }
     };
 
-    // Try to inject styles when iframe loads
-    iframe.addEventListener('load', injectCustomStyling);
-
-    // Also try to inject styles periodically in case of dynamic content
-    const styleInterval = setInterval(injectCustomStyling, 3000);
+    // Try to apply fixes when iframe loads
+    iframe.addEventListener('load', handleIframeLoad);
 
     return () => {
-      iframe.removeEventListener('load', injectCustomStyling);
-      clearInterval(styleInterval);
+      iframe.removeEventListener('load', handleIframeLoad);
     };
   }, []);
 

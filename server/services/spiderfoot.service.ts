@@ -25,7 +25,7 @@ class SpiderFootService {
       host: process.env.SPIDERFOOT_HOST || '127.0.0.1', // Use 127.0.0.1 for internal communication (security)
       port: parseInt(process.env.SPIDERFOOT_PORT || '5001', 10),
       dir: process.env.SPIDERFOOT_DIR || path.resolve(process.cwd(), 'server', 'spiderfoot-4.0'),
-      docroot: '/osint', // Use /osint docroot to match SpiderFoot's expected configuration
+      docroot: '/', // SpiderFoot should serve from root - proxy will handle /osint routing
       dataDir: process.env.SPIDERFOOT_DATA || path.resolve(process.cwd(), 'data', 'spiderfoot'),
       cacheDir: process.env.SPIDERFOOT_CACHE || path.resolve(process.cwd(), 'data', 'spiderfoot', 'cache'),
       logsDir: process.env.SPIDERFOOT_LOGS || path.resolve(process.cwd(), 'data', 'spiderfoot', 'logs'),
@@ -36,7 +36,7 @@ class SpiderFootService {
     console.log(`   Host: ${this.config.host}:${this.config.port}`);
     console.log(`   Directory: ${this.config.dir}`);
     console.log(`   Data Dir: ${this.config.dataDir}`);
-    console.log(`   Doc Root: ${this.config.docroot} (SpiderFoot expects this prefix)`);
+    console.log(`   Doc Root: ${this.config.docroot} (SpiderFoot serves from root, proxy handles /osint routing)`);
   }
 
   private findSpiderfootDir(): string | null {
@@ -168,8 +168,8 @@ if os.getenv('SPIDERFOOT_HOST'):
 if os.getenv('SPIDERFOOT_PORT'):
     sfWebUiConfig['port'] = int(os.getenv('SPIDERFOOT_PORT'))
 
-# Set docroot to /osint for proper routing (matches proxy expectations)
-sfWebUiConfig['root'] = os.getenv('SPIDERFOOT_DOCROOT', '/osint')
+# Set docroot to root path - proxy will handle /osint routing
+sfWebUiConfig['root'] = '/'
 
 # Enable CORS for iframe integration
 sfWebUiConfig.update({
@@ -182,7 +182,7 @@ sfWebUiConfig.update({
 if os.getenv('NODE_ENV') == 'production':
     print(f"🕷️  SpiderFoot OSINT Engine starting on {sfWebUiConfig.get('host', '127.0.0.1')}:{sfWebUiConfig.get('port', 5001)}")
     print(f"📁 Data directory: {os.getenv('SPIDERFOOT_DATA', './data')}")
-    print(f"🌐 Document root: {sfWebUiConfig.get('root', '/osint')} (accessible via proxy)")
+    print(f"🌐 Document root: {sfWebUiConfig.get('root', '/')} (proxy adds /osint prefix)")
 
 `;
         const newContent = content.replace(match[0], configBlock + insertion);
@@ -255,6 +255,17 @@ if __name__ == '__main__':
         
         console.log('✅ SpiderFoot patched with alternative integration method');
       }
+      
+      // Inject DARKSCRAWLER theme
+      try {
+        const { injectThemeIntoSpiderFoot } = require('../utils/spiderfoot-theme-injector.js');
+        console.log('🎨 Injecting DARKSCRAWLER theme into SpiderFoot...');
+        injectThemeIntoSpiderFoot(dir);
+        console.log('✅ DARKSCRAWLER theme injection completed');
+      } catch (themeError) {
+        console.warn('⚠️ Could not inject DARKSCRAWLER theme:', (themeError as Error).message);
+      }
+      
     } catch (e) {
       console.warn('⚠️ Could not patch SpiderFoot config (will try proxy-only mode):', (e as Error).message);
     }
