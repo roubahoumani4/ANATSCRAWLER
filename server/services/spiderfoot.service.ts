@@ -1,7 +1,6 @@
 import path from 'path';
 import fs from 'fs';
 import { spawn, SpawnOptionsWithoutStdio, ChildProcessWithoutNullStreams } from 'child_process';
-import fetch from 'node-fetch';
 
 type StartResult = { ok: boolean; reason?: string };
 
@@ -335,23 +334,30 @@ if __name__ == '__main__':
 
   private async waitReady(timeoutMs = 180000): Promise<boolean> { // Increased to 3 minutes
     const start = Date.now();
-    console.log(`⏳ Waiting for SpiderFoot to be ready on ${this.config.host}:${this.config.port}...`);
+    console.log(`⏳ Waiting for SpiderFoot to be ready on ${this.config.host}:${this.config.port}${this.config.docroot}...`);
+    
+    // Give SpiderFoot a moment to fully start up before testing
+    await new Promise(r => setTimeout(r, 5000));
     
     while (Date.now() - start < timeoutMs) {
       try {
-        // Test basic connectivity first
+        // Import fetch dynamically for compatibility
+        const fetch = (await import('node-fetch')).default;
+        
+        // Test basic connectivity first with the correct docroot
         const baseUrl = `http://${this.config.host}:${this.config.port}`;
         
-        // Try the root endpoint first (SpiderFoot's main page)
-        const rootResponse = await fetch(`${baseUrl}/`, { 
+        // Try the root endpoint with docroot first
+        const rootResponse = await fetch(`${baseUrl}${this.config.docroot}`, { 
           method: 'GET',
-          timeout: 5000,
+          timeout: 10000,
           headers: {
-            'User-Agent': 'ANAT-Security-OSINT-Platform/2.0'
+            'User-Agent': 'ANAT-Security-OSINT-Platform/2.0',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
           }
         });
         
-        console.log(`🔍 Root endpoint status: ${rootResponse.status}`);
+        console.log(`🔍 Root endpoint (${this.config.docroot}) status: ${rootResponse.status}`);
         
         if (rootResponse.ok) {
           // If root works, verify that SpiderFoot web UI is actually serving content
@@ -359,24 +365,25 @@ if __name__ == '__main__':
           
           // Check if this looks like a SpiderFoot page
           if (content.includes('SpiderFoot') || content.includes('OSINT') || content.includes('newscan')) {
-            console.log(`✅ SpiderFoot web UI is ready and serving content`);
+            console.log(`✅ SpiderFoot web UI is ready and serving content at ${this.config.docroot}`);
             return true;
           } else {
             console.log(`⚠️ SpiderFoot responding but content doesn't look like SpiderFoot UI`);
             console.log(`📄 Content sample: ${content.slice(0, 200)}...`);
           }
         } else if (rootResponse.status === 404) {
-          // Try alternative endpoints that SpiderFoot commonly serves
-          const alternativeEndpoints = ['/newscan', '/index', '/opts'];
+          // Try alternative endpoints that SpiderFoot commonly serves (with docroot)
+          const alternativeEndpoints = [`${this.config.docroot}/newscan`, `${this.config.docroot}/index`, `${this.config.docroot}/opts`];
           let foundWorking = false;
           
           for (const endpoint of alternativeEndpoints) {
             try {
               const altResponse = await fetch(`${baseUrl}${endpoint}`, { 
                 method: 'GET',
-                timeout: 3000,
+                timeout: 5000,
                 headers: {
-                  'User-Agent': 'ANAT-Security-OSINT-Platform/2.0'
+                  'User-Agent': 'ANAT-Security-OSINT-Platform/2.0',
+                  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
                 }
               });
               
@@ -391,7 +398,7 @@ if __name__ == '__main__':
                 }
               }
             } catch (e) {
-              // Continue trying other endpoints
+              console.log(`⚠️ Alternative endpoint ${endpoint} failed: ${(e as Error).message}`);
             }
           }
           
@@ -403,10 +410,10 @@ if __name__ == '__main__':
         console.log(`⏳ Connection failed: ${(e as Error).message}`);
       }
       
-      await new Promise(r => setTimeout(r, 3000));
+      await new Promise(r => setTimeout(r, 5000)); // Increased interval
       
-      // Log progress every 20 seconds
-      if ((Date.now() - start) % 20000 < 3000) {
+      // Log progress every 30 seconds
+      if ((Date.now() - start) % 30000 < 5000) {
         const elapsed = Math.round((Date.now() - start) / 1000);
         console.log(`⏳ Still waiting for SpiderFoot web UI... (${elapsed}s elapsed)`);
         
@@ -414,6 +421,29 @@ if __name__ == '__main__':
         if (elapsed > 60) {
           console.log(`🔍 Debug: Checking if SpiderFoot process is actually running...`);
           this.debugSpiderFootProcess();
+          
+          // Try a direct connection test
+          try {
+            const fetch = (await import('node-fetch')).default;
+            const testUrl = `http://${this.config.host}:${this.config.port}${this.config.docroot}`;
+            console.log(`🧪 Testing direct connection to: ${testUrl}`);
+            
+            const testResponse = await fetch(testUrl, { 
+              method: 'GET',
+              timeout: 10000,
+              headers: {
+                'User-Agent': 'ANAT-Security-Debug/1.0'
+              }
+            });
+            
+            const testContent = await testResponse.text();
+            console.log(`🧪 Direct test result: ${testResponse.status} ${testResponse.statusText}`);
+            console.log(`🧪 Response headers:`, Object.fromEntries(testResponse.headers.entries()));
+            console.log(`🧪 Content preview: ${testContent.slice(0, 500)}`);
+            
+          } catch (testError) {
+            console.log(`🧪 Direct connection test failed: ${(testError as Error).message}`);
+          }
         }
       }
     }
