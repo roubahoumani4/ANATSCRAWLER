@@ -118,7 +118,12 @@ class SpiderFootWebUi:
 
         cherrypy.config.update({
             "tools.response_headers.on": True,
-            "tools.response_headers.headers": secure_headers.framework.cherrypy()
+            "tools.response_headers.headers": [
+                ("X-Frame-Options", "SAMEORIGIN"),
+                ("X-Content-Type-Options", "nosniff"),
+                ("X-XSS-Protection", "1; mode=block"),
+                ("Referrer-Policy", "no-referrer")
+            ]
         })
 
     def error_page(self: 'SpiderFootWebUi') -> None:

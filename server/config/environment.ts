@@ -44,7 +44,7 @@ console.log(`🏠 Base path: ${BASE_PATH}`);
 console.log(`🌍 Environment: ${NODE_ENV} (Production: ${IS_PRODUCTION})`);
 
 // Compute paths for application data
-const dataDirDefault = path.resolve(BASE_PATH, IS_PRODUCTION ? '../data' : 'data');
+const dataDirDefault = path.resolve(BASE_PATH, 'data');
 
 // OSINT/SpiderFoot Configuration
 const spiderFootConfig = {
@@ -60,7 +60,7 @@ const spiderFootConfig = {
 
 export const PATHS = {
   DATA_DIR: dataDirDefault,
-  LOGS_DIR: path.resolve(BASE_PATH, IS_PRODUCTION ? '../logs' : 'logs'),
+  LOGS_DIR: path.resolve(BASE_PATH, 'logs'),
   BACKUPS_DIR: path.resolve(dataDirDefault, 'backups'),
   CLIENT_BUILD: path.resolve(BASE_PATH, 'client', 'dist'),
   SERVER_DIR: path.resolve(BASE_PATH, 'server'),
