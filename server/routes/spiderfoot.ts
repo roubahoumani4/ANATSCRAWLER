@@ -391,56 +391,252 @@ router.use((req, res, next) => {
       modifiedBody = modifiedBody.replace(/["']\/css\//g, '"/osint/css/');
       modifiedBody = modifiedBody.replace(/["']\/js\//g, '"/osint/js/');
       
-      // Inject our custom CSS for better integration
+      // Inject our custom CSS and JavaScript for better integration
       if (modifiedBody.includes('</head>')) {
         const customCSS = `
 <style id="anat-security-integration">
 /* ANAT Security OSINT Platform - SpiderFoot Integration */
-body {
+* {
+  box-sizing: border-box !important;
+}
+
+html, body {
   background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%) !important;
   color: #e2e8f0 !important;
   font-family: 'Inter', system-ui, sans-serif !important;
+  height: auto !important;
+  min-height: 100vh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow-x: hidden !important;
 }
 
+/* Hide unnecessary elements and links */
+.navbar-brand, .navbar-header, .navbar-toggle,
+a[href*="twitter"], a[href*="discord"], a[href*="youtube"],
+a[href*="github"], a[href*="spiderfoot.net"], a[href*="support@spiderfoot"],
+.navbar-nav .dropdown, .navbar-nav .dropdown-menu,
+footer, .footer, .copyright, .powered-by {
+  display: none !important;
+}
+
+/* Simplify navigation - keep only essential links */
+.navbar-nav {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 20px !important;
+}
+
+.navbar-nav .nav-link {
+  color: #60a5fa !important;
+  font-weight: 600 !important;
+  text-decoration: none !important;
+  padding: 8px 16px !important;
+  border-radius: 8px !important;
+  transition: all 0.3s ease !important;
+  background: rgba(59, 130, 246, 0.1) !important;
+  border: 1px solid rgba(59, 130, 246, 0.2) !important;
+}
+
+.navbar-nav .nav-link:hover {
+  color: #ffffff !important;
+  background: rgba(59, 130, 246, 0.3) !important;
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.4) !important;
+  transform: translateY(-2px) !important;
+}
+
+/* Header styling */
 .navbar, .nav, .header, #header {
   background: rgba(15, 23, 42, 0.95) !important;
   border-bottom: 2px solid rgba(59, 130, 246, 0.3) !important;
   backdrop-filter: blur(10px) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+  padding: 15px 20px !important;
 }
 
-.nav-link, .navbar-nav .nav-link, a {
-  color: #60a5fa !important;
-  transition: all 0.3s ease !important;
-}
-
-.nav-link:hover, .navbar-nav .nav-link:hover, a:hover {
-  color: #3b82f6 !important;
-  text-shadow: 0 0 10px rgba(59, 130, 246, 0.5) !important;
-}
-
-.container, .container-fluid, .main-content {
+/* Main content styling */
+.container, .container-fluid, .main-content, .content {
   background: transparent !important;
+  color: #e2e8f0 !important;
+  padding: 20px !important;
+}
+
+/* Cards and panels */
+.card, .panel, .well, .box, .info-box {
+  background: rgba(15, 23, 42, 0.8) !important;
+  border: 2px solid rgba(59, 130, 246, 0.2) !important;
+  border-radius: 16px !important;
+  backdrop-filter: blur(10px) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+  margin-bottom: 20px !important;
   color: #e2e8f0 !important;
 }
 
-.card, .panel, .well, .box {
+.card-header, .panel-heading, .box-header {
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.2), rgba(99, 102, 241, 0.2)) !important;
+  border-bottom: 1px solid rgba(59, 130, 246, 0.3) !important;
+  color: #60a5fa !important;
+  font-weight: 700 !important;
+  padding: 15px 20px !important;
+  border-radius: 14px 14px 0 0 !important;
+}
+
+/* Form elements */
+.form-control, input, select, textarea {
+  background: rgba(31, 41, 55, 0.9) !important;
+  border: 2px solid rgba(59, 130, 246, 0.2) !important;
+  border-radius: 12px !important;
+  color: #e5e7eb !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  padding: 12px 16px !important;
+  transition: all 0.3s ease !important;
+}
+
+.form-control:focus, input:focus, select:focus, textarea:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+  background: rgba(31, 41, 55, 1) !important;
+  outline: none !important;
+}
+
+/* Buttons */
+.btn, button, input[type="submit"], input[type="button"] {
+  background: linear-gradient(90deg, #3b82f6, #6366f1) !important;
+  border: 2px solid rgba(59, 130, 246, 0.5) !important;
+  border-radius: 12px !important;
+  color: white !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  transition: all 0.3s ease !important;
+  padding: 12px 24px !important;
+  cursor: pointer !important;
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3) !important;
+}
+
+.btn:hover, button:hover, input[type="submit"]:hover, input[type="button"]:hover {
+  background: linear-gradient(90deg, #2563eb, #4f46e5) !important;
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.4) !important;
+  transform: translateY(-2px) !important;
+  color: white !important;
+}
+
+/* Tables */
+.table, table {
   background: rgba(15, 23, 42, 0.8) !important;
+  color: #e5e7eb !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(59, 130, 246, 0.2) !important;
+}
+
+.table th, table th, thead th {
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.3), rgba(99, 102, 241, 0.3)) !important;
+  color: #60a5fa !important;
+  font-weight: 700 !important;
+  border-bottom: 2px solid rgba(59, 130, 246, 0.3) !important;
+  padding: 15px !important;
+}
+
+.table td, table td, tbody td {
+  border-bottom: 1px solid rgba(75, 85, 99, 0.3) !important;
+  color: #d1d5db !important;
+  padding: 12px 15px !important;
+}
+
+.table-striped tbody tr:nth-of-type(odd), tr:nth-child(odd) {
+  background: rgba(31, 41, 55, 0.4) !important;
+}
+
+/* Progress bars */
+.progress {
+  background: rgba(31, 41, 55, 0.6) !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+  height: 20px !important;
+}
+
+.progress-bar {
+  background: linear-gradient(90deg, #3b82f6, #6366f1) !important;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.5) !important;
+}
+
+/* Alerts and messages */
+.alert {
+  background: rgba(15, 23, 42, 0.9) !important;
+  border: 2px solid rgba(59, 130, 246, 0.3) !important;
+  border-radius: 12px !important;
+  color: #e5e7eb !important;
+  padding: 15px 20px !important;
+}
+
+.alert-info { border-color: rgba(59, 130, 246, 0.5) !important; }
+.alert-success { border-color: rgba(16, 185, 129, 0.5) !important; }
+.alert-warning { border-color: rgba(245, 158, 11, 0.5) !important; }
+.alert-danger { border-color: rgba(239, 68, 68, 0.5) !important; }
+
+/* Dropdown menus */
+.dropdown-menu {
+  background: rgba(15, 23, 42, 0.95) !important;
   border: 2px solid rgba(59, 130, 246, 0.2) !important;
   border-radius: 12px !important;
   backdrop-filter: blur(10px) !important;
 }
 
-.btn, button, input[type="submit"] {
-  background: linear-gradient(90deg, #3b82f6, #6366f1) !important;
-  border: 2px solid rgba(59, 130, 246, 0.5) !important;
-  border-radius: 8px !important;
-  color: white !important;
+.dropdown-item {
+  color: #e5e7eb !important;
   transition: all 0.3s ease !important;
+  padding: 10px 15px !important;
 }
 
-.btn:hover, button:hover, input[type="submit"]:hover {
-  background: linear-gradient(90deg, #2563eb, #4f46e5) !important;
-  box-shadow: 0 0 20px rgba(59, 130, 246, 0.4) !important;
+.dropdown-item:hover {
+  background: rgba(59, 130, 246, 0.2) !important;
+  color: #60a5fa !important;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 12px !important;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(31, 41, 55, 0.5) !important;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #3b82f6, #6366f1) !important;
+  border-radius: 6px !important;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #2563eb, #4f46e5) !important;
+}
+
+/* Custom ANAT Security header */
+body::before {
+  content: "🕷️ ANAT SECURITY OSINT ENGINE - SPIDERFOOT INTEGRATION";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(90deg, #1f2937, #111827, #1f2937);
+  color: #60a5fa;
+  text-align: center;
+  padding: 8px;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 2px;
+  z-index: 10000;
+  border-bottom: 2px solid rgba(59, 130, 246, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+/* Adjust body padding for custom header */
+body {
+  padding-top: 35px !important;
 }
 
 /* Fix navigation issues */
@@ -449,16 +645,118 @@ a[href^="/"] {
   z-index: 1;
 }
 
-/* Ensure proper iframe integration */
-html, body {
-  height: auto !important;
-  min-height: 100vh !important;
-  margin: 0 !important;
-  padding: 0 !important;
+/* Loading states */
+.loading {
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.1), rgba(99, 102, 241, 0.1)) !important;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+  .container, .container-fluid {
+    padding: 10px !important;
+  }
+  
+  .card, .panel, .well, .box {
+    margin-bottom: 15px !important;
+  }
+  
+  .btn, button {
+    padding: 10px 20px !important;
+    font-size: 14px !important;
+  }
+}
+
+/* Fix z-index issues */
+.modal, .popup {
+  z-index: 10001 !important;
+}
+
+/* Animation for smooth transitions */
+* {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease !important;
 }
 </style>`;
         
-        modifiedBody = modifiedBody.replace('</head>', `${customCSS}\n</head>`);
+        const customJS = `
+<script id="anat-security-js">
+// ANAT Security OSINT Platform - SpiderFoot Integration JavaScript
+(function() {
+  'use strict';
+  
+  // Fix for 'sf is not defined' error
+  if (typeof window.sf === 'undefined') {
+    window.sf = {
+      replace_sfurltag: function(data) {
+        return data;
+      },
+      replace_sfurl: function(data) {
+        return data;
+      }
+    };
+  }
+  
+  // Enhanced navigation fixes
+  function fixNavigation() {
+    const links = document.querySelectorAll('a[href^="/"]');
+    links.forEach(link => {
+      if (!link.href.includes('/osint/')) {
+        const originalHref = link.getAttribute('href');
+        if (originalHref && !originalHref.startsWith('/osint')) {
+          link.setAttribute('href', '/osint' + originalHref);
+        }
+      }
+    });
+  }
+  
+  // Remove unnecessary elements
+  function cleanupUI() {
+    // Remove unwanted links and elements
+    const unwantedSelectors = [
+      'a[href*="twitter"]',
+      'a[href*="discord"]', 
+      'a[href*="youtube"]',
+      'a[href*="github"]',
+      'a[href*="spiderfoot.net"]',
+      'a[href*="support@spiderfoot"]',
+      'footer',
+      '.footer',
+      '.copyright',
+      '.powered-by'
+    ];
+    
+    unwantedSelectors.forEach(selector => {
+      const elements = document.querySelectorAll(selector);
+      elements.forEach(el => el.remove());
+    });
+  }
+  
+  // Apply fixes when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      fixNavigation();
+      cleanupUI();
+    });
+  } else {
+    fixNavigation();
+    cleanupUI();
+  }
+  
+  // Re-apply fixes periodically for dynamic content
+  setInterval(function() {
+    fixNavigation();
+    cleanupUI();
+  }, 2000);
+  
+})();
+</script>`;
+        
+        modifiedBody = modifiedBody.replace('</head>', `${customCSS}\n${customJS}\n</head>`);
       }
 
       // Set proper headers for iframe integration

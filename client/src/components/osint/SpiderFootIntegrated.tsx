@@ -25,11 +25,23 @@ const SpiderFootIntegrated: React.FC<SpiderFootIntegratedProps> = ({ className =
         if (iframeDoc) {
           console.log('✅ SpiderFoot iframe loaded successfully');
           
-          // Only add minimal fixes for navigation without conflicting with server-side theming
-          const navigationFix = iframeDoc.createElement('script');
-          navigationFix.textContent = `
-            // Fix for relative links in iframe context
-            document.addEventListener('DOMContentLoaded', function() {
+          // Enhanced JavaScript fixes for SpiderFoot integration
+          const enhancedFix = iframeDoc.createElement('script');
+          enhancedFix.textContent = `
+            // Fix for 'sf is not defined' error
+            if (typeof window.sf === 'undefined') {
+              window.sf = {
+                replace_sfurltag: function(data) {
+                  return data;
+                },
+                replace_sfurl: function(data) {
+                  return data;
+                }
+              };
+            }
+            
+            // Enhanced navigation fixes
+            function fixNavigation() {
               const links = document.querySelectorAll('a[href^="/"]');
               links.forEach(link => {
                 if (!link.href.includes('/osint/')) {
@@ -39,14 +51,52 @@ const SpiderFootIntegrated: React.FC<SpiderFootIntegratedProps> = ({ className =
                   }
                 }
               });
-            });
+            }
+            
+            // Remove unnecessary elements
+            function cleanupUI() {
+              const unwantedSelectors = [
+                'a[href*="twitter"]',
+                'a[href*="discord"]', 
+                'a[href*="youtube"]',
+                'a[href*="github"]',
+                'a[href*="spiderfoot.net"]',
+                'a[href*="support@spiderfoot"]',
+                'footer',
+                '.footer',
+                '.copyright',
+                '.powered-by'
+              ];
+              
+              unwantedSelectors.forEach(selector => {
+                const elements = document.querySelectorAll(selector);
+                elements.forEach(el => el.remove());
+              });
+            }
+            
+            // Apply fixes when DOM is ready
+            if (document.readyState === 'loading') {
+              document.addEventListener('DOMContentLoaded', function() {
+                fixNavigation();
+                cleanupUI();
+              });
+            } else {
+              fixNavigation();
+              cleanupUI();
+            }
+            
+            // Re-apply fixes periodically for dynamic content
+            setInterval(function() {
+              fixNavigation();
+              cleanupUI();
+            }, 2000);
           `;
           
-          iframeDoc.head.appendChild(navigationFix);
-          console.log('✅ Navigation fixes applied to SpiderFoot interface');
+          iframeDoc.head.appendChild(enhancedFix);
+          console.log('✅ Enhanced fixes applied to SpiderFoot interface');
         }
       } catch (error) {
-        console.warn('⚠️ Could not apply navigation fixes to SpiderFoot iframe:', error);
+        console.warn('⚠️ Could not apply enhanced fixes to SpiderFoot iframe:', error);
         // This is expected due to CORS restrictions - the server-side theming will handle it
       }
     };
@@ -161,7 +211,7 @@ const SpiderFootIntegrated: React.FC<SpiderFootIntegratedProps> = ({ className =
           src="/osint/"
           className="w-full h-full border-0 rounded-lg"
           title="SpiderFoot OSINT Engine"
-          sandbox="allow-scripts allow-same-origin allow-forms allow-downloads allow-popups"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-downloads allow-popups allow-top-navigation"
           onLoad={() => {
             // Hide loading overlay
             const overlay = document.querySelector('.absolute.inset-0.bg-gray-900\\/90');
