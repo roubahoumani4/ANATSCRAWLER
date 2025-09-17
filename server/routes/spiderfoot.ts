@@ -6,7 +6,7 @@ import authenticate from '../middleware/auth';
 
 const router = Router();
 
-const SPIDERFOOT_TARGET = `http://127.0.0.1:${OSINT_CONFIG.SPIDERFOOT.PORT}`;
+const SPIDERFOOT_TARGET = `http://0.0.0.0:${OSINT_CONFIG.SPIDERFOOT.PORT}`;
 const DOCROOT = OSINT_CONFIG.SPIDERFOOT.DOCROOT;
 
 console.log(`🕷️ SpiderFoot OSINT Route initialized:`);
@@ -98,10 +98,10 @@ router.get('/diagtest', async (req, res) => {
     
     // Test SpiderFoot direct access with clean paths (no /osint prefix)
     const testUrls = [
-      'http://127.0.0.1:5001/',         // Root
-      'http://127.0.0.1:5001/newscan',  // Newscan endpoint
-      'http://127.0.0.1:5001/opts',     // Options endpoint
-      'http://127.0.0.1:5001/scans',    // Scans endpoint
+      `http://0.0.0.0:${OSINT_CONFIG.SPIDERFOOT.PORT}/`,         // Root
+      `http://0.0.0.0:${OSINT_CONFIG.SPIDERFOOT.PORT}/newscan`,  // Newscan endpoint
+      `http://0.0.0.0:${OSINT_CONFIG.SPIDERFOOT.PORT}/opts`,     // Options endpoint
+      `http://0.0.0.0:${OSINT_CONFIG.SPIDERFOOT.PORT}/scans`,    // Scans endpoint
     ];
     
     const results: any[] = [];
@@ -229,9 +229,19 @@ const createSpiderFootProxy = (timeoutMs: number) => createProxyMiddleware({
       spiderFootPath = spiderFootPath.substring(6) || '/';
     }
     
+    // Handle special cases for SpiderFoot navigation
+    if (spiderFootPath === '' || spiderFootPath === '/') {
+      spiderFootPath = '/';
+    }
+    
     // Ensure path starts with /
     if (!spiderFootPath.startsWith('/')) {
       spiderFootPath = '/' + spiderFootPath;
+    }
+    
+    // Fix common SpiderFoot paths that might be broken
+    if (spiderFootPath === '/osint') {
+      spiderFootPath = '/';
     }
     
     console.log(`🔄 Path rewrite: ${originalUrl} -> ${spiderFootPath} (removed /osint prefix for SpiderFoot)`);
@@ -266,7 +276,7 @@ router.post('/async-scan', async (req, res) => {
           'Use the scan status endpoint to check progress',
           'Large scans may take several minutes to initialize'
         ],
-        spiderfoot_interface: `http://localhost:5001/osint`,
+        spiderfoot_interface: `http://0.0.0.0:${OSINT_CONFIG.SPIDERFOOT.PORT}/osint`,
         estimated_time: '2-15 minutes depending on scan scope'
       }
     });
@@ -315,16 +325,19 @@ router.use((req, res, next) => {
   const method = req.method.toUpperCase();
   
   // Set timeout based on the type of operation
-  if (method === 'POST' && (path.includes('newscan') || path.includes('startscan'))) {
+  if (method === 'POST' && (path.includes('newscan') || path.includes('startscan') || path.includes('scan'))) {
     console.log(`🕐 Using extended timeout for scan operation: ${req.originalUrl}`);
     (req as any).useProxy = 'longScan';
-  } else if (path.includes('scan') || path.includes('status') || path.includes('result')) {
+  } else if (path.includes('scan') || path.includes('status') || path.includes('result') || path.includes('ajax')) {
     console.log(`🕐 Using medium timeout for scan-related operation: ${req.originalUrl}`);
     (req as any).useProxy = 'scan';
   } else {
     console.log(`🕐 Using standard timeout for operation: ${req.originalUrl}`);
     (req as any).useProxy = 'standard';
   }
+  
+  // Set response timeout headers to prevent browser timeouts
+  res.setTimeout(600000); // 10 minutes for long operations
   
   next();
 });
@@ -350,17 +363,103 @@ router.use((req, res, next) => {
     
     if (contentType && contentType.includes('text/html') && typeof data === 'string') {
       // Fix relative links to include /osint prefix for browser navigation
-      const modifiedBody = data
-        .replace(/href="\/(?!osint)/g, 'href="/osint/')
-        .replace(/src="\/(?!osint)/g, 'src="/osint/')
-        .replace(/action="\/(?!osint)/g, 'action="/osint/')
-        .replace(/url\(\/(?!osint)/g, 'url(/osint/')
-        .replace(/"\/ajax/g, '"/osint/ajax')
-        .replace(/"\/static/g, '"/osint/static')
-        .replace(/"\/css/g, '"/osint/css')
-        .replace(/"\/js/g, '"/osint/js')
-        .replace(/window\.location\.href\s*=\s*["']\/(?!osint)/g, 'window.location.href="/osint/')
-        .replace(/location\.href\s*=\s*["']\/(?!osint)/g, 'location.href="/osint/');
+      let modifiedBody = data;
+      
+      // Fix href attributes (but not already /osint prefixed ones)
+      modifiedBody = modifiedBody.replace(/href="\/(?!osint)([^"]*)"/g, 'href="/osint/$1"');
+      
+      // Fix src attributes for static resources
+      modifiedBody = modifiedBody.replace(/src="\/(?!osint)([^"]*)"/g, 'src="/osint/$1"');
+      
+      // Fix action attributes for forms
+      modifiedBody = modifiedBody.replace(/action="\/(?!osint)([^"]*)"/g, 'action="/osint/$1"');
+      
+      // Fix CSS url() references
+      modifiedBody = modifiedBody.replace(/url\(\/(?!osint)([^)]*)\)/g, 'url(/osint/$1)');
+      
+      // Fix JavaScript navigation
+      modifiedBody = modifiedBody.replace(/window\.location\.href\s*=\s*["']\/(?!osint)([^"']*)["']/g, 'window.location.href="/osint/$1"');
+      modifiedBody = modifiedBody.replace(/location\.href\s*=\s*["']\/(?!osint)([^"']*)["']/g, 'location.href="/osint/$1"');
+      
+      // Fix AJAX calls
+      modifiedBody = modifiedBody.replace(/["']\/ajax\//g, '"/osint/ajax/');
+      
+      // Fix static resource paths
+      modifiedBody = modifiedBody.replace(/["']\/static\//g, '"/osint/static/');
+      
+      // Fix CSS and JS paths
+      modifiedBody = modifiedBody.replace(/["']\/css\//g, '"/osint/css/');
+      modifiedBody = modifiedBody.replace(/["']\/js\//g, '"/osint/js/');
+      
+      // Inject our custom CSS for better integration
+      if (modifiedBody.includes('</head>')) {
+        const customCSS = `
+<style id="anat-security-integration">
+/* ANAT Security OSINT Platform - SpiderFoot Integration */
+body {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%) !important;
+  color: #e2e8f0 !important;
+  font-family: 'Inter', system-ui, sans-serif !important;
+}
+
+.navbar, .nav, .header, #header {
+  background: rgba(15, 23, 42, 0.95) !important;
+  border-bottom: 2px solid rgba(59, 130, 246, 0.3) !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+.nav-link, .navbar-nav .nav-link, a {
+  color: #60a5fa !important;
+  transition: all 0.3s ease !important;
+}
+
+.nav-link:hover, .navbar-nav .nav-link:hover, a:hover {
+  color: #3b82f6 !important;
+  text-shadow: 0 0 10px rgba(59, 130, 246, 0.5) !important;
+}
+
+.container, .container-fluid, .main-content {
+  background: transparent !important;
+  color: #e2e8f0 !important;
+}
+
+.card, .panel, .well, .box {
+  background: rgba(15, 23, 42, 0.8) !important;
+  border: 2px solid rgba(59, 130, 246, 0.2) !important;
+  border-radius: 12px !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+.btn, button, input[type="submit"] {
+  background: linear-gradient(90deg, #3b82f6, #6366f1) !important;
+  border: 2px solid rgba(59, 130, 246, 0.5) !important;
+  border-radius: 8px !important;
+  color: white !important;
+  transition: all 0.3s ease !important;
+}
+
+.btn:hover, button:hover, input[type="submit"]:hover {
+  background: linear-gradient(90deg, #2563eb, #4f46e5) !important;
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.4) !important;
+}
+
+/* Fix navigation issues */
+a[href^="/"] {
+  position: relative;
+  z-index: 1;
+}
+
+/* Ensure proper iframe integration */
+html, body {
+  height: auto !important;
+  min-height: 100vh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+</style>`;
+        
+        modifiedBody = modifiedBody.replace('</head>', `${customCSS}\n</head>`);
+      }
 
       // Set proper headers for iframe integration
       res.setHeader('X-Frame-Options', 'SAMEORIGIN');
@@ -442,7 +541,7 @@ router.use('*', (err: any, req: any, res: any, next: any) => {
           'Consider reducing the scan scope for faster results',
           'Large scans can take 5-15 minutes to initialize'
         ],
-        spiderfoot_url: `http://localhost:5001/osint`,
+        spiderfoot_url: `http://0.0.0.0:${OSINT_CONFIG.SPIDERFOOT.PORT}/osint`,
         timestamp: new Date().toISOString()
       });
     } else {

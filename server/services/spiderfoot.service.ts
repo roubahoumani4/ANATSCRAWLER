@@ -22,7 +22,7 @@ class SpiderFootService {
 
   constructor() {
     this.config = {
-      host: process.env.SPIDERFOOT_HOST || '127.0.0.1', // Use 127.0.0.1 for internal communication (security)
+      host: process.env.SPIDERFOOT_HOST || '0.0.0.0', // Use 0.0.0.0 to allow proxy access
       port: parseInt(process.env.SPIDERFOOT_PORT || '5001', 10),
       dir: process.env.SPIDERFOOT_DIR || path.resolve(process.cwd(), 'server', 'spiderfoot-4.0'),
       docroot: '/', // SpiderFoot should serve from root - proxy will handle /osint routing
@@ -174,7 +174,7 @@ sfWebUiConfig['root'] = '/'
 # Enable CORS for iframe integration
 sfWebUiConfig.update({
     'cors_origins': ['*'],
-    'cors_headers': ['Content-Type', 'Authorization', 'X-Requested-With'],
+    'cors_headers': ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Frame-Options'],
     'cors_methods': ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 })
 
