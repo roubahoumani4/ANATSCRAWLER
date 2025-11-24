@@ -6,6 +6,7 @@ const AssessmentPage: React.FC = () => {
   const [target, setTarget] = useState('');
   const [running, setRunning] = useState(false);
   const [output, setOutput] = useState<string | null>(null);
+  const [parsed, setParsed] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deepScan, setDeepScan] = useState(false);
   const [checkBreaches, setCheckBreaches] = useState(false);
@@ -30,8 +31,9 @@ const AssessmentPage: React.FC = () => {
         const err = await res.json().catch(() => ({ error: 'Request failed' }));
         throw new Error(err.error || `HTTP ${res.status}`);
       }
-      const resp = await res.json();
-      setOutput(JSON.stringify(resp, null, 2));
+  const resp = await res.json();
+  setOutput(JSON.stringify(resp, null, 2));
+  if (resp.parsed) setParsed(resp.parsed);
     } catch (err: any) {
       setError(err.message || 'Failed to run assessment');
     } finally {
@@ -96,6 +98,68 @@ const AssessmentPage: React.FC = () => {
             <pre className="mt-4 p-3 bg-gray-900 rounded text-xs text-gray-200 overflow-x-auto max-h-[40vh]">
               {output}
             </pre>
+          )}
+          {parsed && (
+            <div className="mt-6">
+              <h2 className="text-lg font-semibold mb-3">Assessment Dashboard</h2>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 bg-gray-800 rounded">
+                  <div className="text-sm text-gray-400">IPs Discovered</div>
+                  <div className="text-2xl font-bold">{parsed.ipsDiscovered ?? '—'}</div>
+                </div>
+                <div className="p-4 bg-gray-800 rounded">
+                  <div className="text-sm text-gray-400">Subdomains Found</div>
+                  <div className="text-2xl font-bold">{parsed.subdomainsFound ?? '—'}</div>
+                </div>
+                <div className="p-4 bg-gray-800 rounded">
+                  <div className="text-sm text-gray-400">Open Ports</div>
+                  <div className="text-2xl font-bold">{parsed.openPorts ?? (parsed.openPortsList?.length ?? '—')}</div>
+                </div>
+                <div className="p-4 bg-gray-800 rounded">
+                  <div className="text-sm text-gray-400">Risk Level</div>
+                  <div className="text-2xl font-bold">{parsed.riskLevel ?? '—'}</div>
+                </div>
+              </div>
+
+              {/* Simple bar chart for vulnerabilities */}
+              <div className="mt-4 p-4 bg-gray-800 rounded">
+                <div className="text-sm text-gray-400 mb-2">Vulnerabilities</div>
+                <div className="flex items-center gap-4">
+                  <div className="w-1/2">
+                    <div className="text-xs text-gray-300">Critical</div>
+                    <div className="h-4 bg-gray-700 rounded mt-1">
+                      <div
+                        className="h-4 bg-red-600 rounded"
+                        style={{ width: `${Math.min(100, (parsed.criticalVulnerabilities || 0) * 10)}%` }}
+                      />
+                    </div>
+                    <div className="text-sm text-gray-300 mt-1">{parsed.criticalVulnerabilities ?? 0}</div>
+                  </div>
+                  <div className="w-1/2">
+                    <div className="text-xs text-gray-300">Total</div>
+                    <div className="h-4 bg-gray-700 rounded mt-1">
+                      <div
+                        className="h-4 bg-amber-500 rounded"
+                        style={{ width: `${Math.min(100, (parsed.totalVulnerabilities || 0) * 5)}%` }}
+                      />
+                    </div>
+                    <div className="text-sm text-gray-300 mt-1">{parsed.totalVulnerabilities ?? 0}</div>
+                  </div>
+                </div>
+
+                {/* simple list of open ports */}
+                {parsed.openPortsList && parsed.openPortsList.length > 0 && (
+                  <div className="mt-4">
+                    <div className="text-sm text-gray-400 mb-2">Open Ports</div>
+                    <div className="flex flex-wrap gap-2">
+                      {parsed.openPortsList.map((p: number) => (
+                        <span key={p} className="text-xs bg-gray-700 px-2 py-1 rounded">{p}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           )}
         </div>
       </div>

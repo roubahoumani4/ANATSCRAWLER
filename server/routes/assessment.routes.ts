@@ -43,11 +43,69 @@ router.post('/run', async (req: Request, res: Response) => {
 
     child.on('close', (code) => {
       clearTimeout(timer);
+
+      // Try to parse the stdout into structured results for the UI dashboard
+      const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
+      const plain = stripAnsi(stdout);
+
+      const parsed: any = {
+        ipsDiscovered: null,
+        subdomainsFound: null,
+        openPorts: null,
+        criticalVulnerabilities: null,
+        totalVulnerabilities: null,
+        riskLevel: null,
+        reportLocation: null,
+        summaryLines: [] as string[],
+      };
+
+      try {
+        // Report Location
+        const reportMatch = plain.match(/Report Location:\s*(.+)/i);
+        if (reportMatch) parsed.reportLocation = reportMatch[1].trim();
+
+        // Assessment Summary block
+        const summaryMatch = plain.match(/Assessment Summary:[\s\S]*?$/i);
+        if (summaryMatch) {
+          const summary = summaryMatch[0];
+          parsed.summaryLines = summary.split(/\n/).map((l) => l.trim()).filter(Boolean);
+          const numMatch = (label: string) => {
+            const m = summary.match(new RegExp(label + "\\s*:\\s*(\\d+)", 'i'));
+            return m ? Number(m[1]) : null;
+          };
+          parsed.ipsDiscovered = numMatch('IPs Discovered');
+          parsed.subdomainsFound = numMatch('Subdomains Found');
+          parsed.openPorts = numMatch('Open Ports');
+          parsed.criticalVulnerabilities = numMatch('Critical Vulnerabilities');
+          parsed.totalVulnerabilities = numMatch('Total Vulnerabilities');
+          const rl = summary.match(/Risk Level:\s*([A-Za-z0-9_\- ]+)/i);
+          if (rl) parsed.riskLevel = rl[1].trim();
+        }
+
+        // Try alternative patterns earlier in the output for counts
+        if (parsed.subdomainsFound == null) {
+          const sdMatch = plain.match(/Total unique subdomains found:\s*(\d+)/i);
+          if (sdMatch) parsed.subdomainsFound = Number(sdMatch[1]);
+        }
+
+        // Extract open ports list (numbers) from OPEN PORTS table
+        const portsSection = plain.match(/OPEN PORTS:[\s\S]*?\n\n/);
+        if (portsSection) {
+          const portsText = portsSection[0];
+          const portNums = Array.from(portsText.matchAll(/^(\d+)\s+/gm)).map((m) => Number(m[1]));
+          parsed.openPortsList = portNums;
+          if (parsed.openPorts == null) parsed.openPorts = portNums.length;
+        }
+      } catch (e) {
+        // parsing best-effort; don't fail the response
+      }
+
       return res.json({
         target,
         exitCode: code,
         stdout: stdout.substring(0, 20000), // cap size
         stderr: stderr.substring(0, 20000),
+        parsed,
       });
     });
 
