@@ -73,8 +73,9 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
       hasSubmenu: true,
       features: [
         { path: "/dashboard/search", label: "SpiderFoot OSINT", icon: <Search size={16} />, color: "text-purple-400" },
-        { path: "/osint", label: "Advanced Search", icon: <Eye size={16} />, color: "text-indigo-400" },
-        { path: "/darkweb", label: "Dark Web Monitor", icon: <Skull size={16} />, color: "text-red-400" }
+          { path: "/osint", label: "Advanced Search", icon: <Eye size={16} />, color: "text-indigo-400" },
+          { path: "/osint/assessment", label: "Assessment", icon: <Zap size={16} />, color: "text-emerald-400" },
+          { path: "/darkweb", label: "Dark Web Monitor", icon: <Skull size={16} />, color: "text-red-400" }
       ]
     },
     {
