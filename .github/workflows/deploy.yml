@@ -93,7 +93,7 @@ jobs:
           source: "anatscrawler-release.tar.gz"
           target: "/var/www/anatscrawler/"
 
-      - name: Activate release and restart PM2
+      - name: Activate release (fast) and restart PM2
         uses: appleboy/ssh-action@v1.0.3
         env:
           # Core app secrets and backing services
@@ -115,7 +115,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.DEPLOY_PORT }}
-          command_timeout: 10m
+          command_timeout: 6m
           envs: APP_PORT,JWT_SECRET,COOKIE_SECRET,MONGODB_URL,ELASTICSEARCH_URL,REDIS_URL,MISP_URL,MISP_API_KEY,MISP_VERIFY_TLS,MISP_TIMEOUT_MS,VITE_API_URL
           script: |
             set -e
@@ -159,217 +159,6 @@ jobs:
               npm install --omit=dev --no-audit --no-fund
             fi
 
-            echo "Preparing SpiderFoot runtime (venv + requirements)..."
-            SF_DIR="${CURRENT_DIR}/server/spiderfoot-4.0"
-            if [ -d "$SF_DIR" ]; then
-              echo "🕷️ Setting up SpiderFoot OSINT Engine..."
-              
-              # Ensure system dependencies are available
-              echo "Checking system dependencies..."
-              if command -v apt-get >/dev/null 2>&1; then
-                # Ubuntu/Debian
-                echo "Installing system packages for SpiderFoot..."
-                sudo apt-get update && sudo apt-get install -y \
-                  python3 python3-venv python3-pip python3-dev \
-                  libxml2-dev libxslt1-dev libffi-dev libssl-dev \
-                  build-essential pkg-config || echo "⚠️ Some system packages failed to install"
-              elif command -v yum >/dev/null 2>&1; then
-                # CentOS/RHEL/Rocky
-                echo "Installing system packages for SpiderFoot..."
-                sudo yum install -y \
-                  python3 python3-venv python3-pip python3-devel \
-                  libxml2-devel libxslt-devel libffi-devel openssl-devel \
-                  gcc gcc-c++ make pkgconfig || echo "⚠️ Some system packages failed to install"
-              else
-                echo "⚠️ Unknown package manager, assuming dependencies are pre-installed"
-              fi
-              
-              # Ensure Python is available
-              if ! command -v python3 >/dev/null 2>&1; then
-                echo "❌ Python3 not found after installation attempt"
-                exit 1
-              fi
-              
-              echo "🐍 Found Python: $(python3 --version)"
-              
-              # Create or recreate venv for clean deployment
-              echo "Setting up fresh Python virtual environment..."
-              cd "$SF_DIR"
-              rm -rf .venv
-              python3 -m venv .venv || {
-                echo "❌ Failed to create virtual environment"
-                exit 1
-              }
-              
-              # Verify venv was created successfully
-              if [ ! -x ".venv/bin/pip" ]; then
-                echo "❌ Virtual environment pip not found"
-                exit 1
-              fi
-              
-              echo "📦 Installing SpiderFoot dependencies..."
-              
-              # Upgrade pip and essential tools first
-              ".venv/bin/pip" install --upgrade pip setuptools wheel || {
-                echo "❌ Failed to upgrade pip"
-                exit 1
-              }
-              
-              # Install core dependencies with specific compatibility versions
-              echo "Installing core SpiderFoot dependencies..."
-              ".venv/bin/pip" install \
-                "cherrypy>=18.6.0,<19" \
-                "cherrypy-cors>=1.6,<2" \
-                "requests>=2.25.0,<3" \
-                "beautifulsoup4>=4.9.0,<5" \
-                "dnspython>=2.1.0,<3" \
-                "netaddr>=0.8.0,<1" \
-                "cryptography>=3.4.0,<4" || {
-                echo "❌ Failed to install core dependencies"
-                exit 1
-              }
-              
-              # Install PyYAML with specific handling for Python 3.13 compatibility
-              echo "Installing PyYAML with compatibility fixes..."
-              ".venv/bin/pip" install "pyyaml>=6.0" || {
-                echo "⚠️ Latest PyYAML failed, trying 5.4.1..."
-                ".venv/bin/pip" install "pyyaml==5.4.1" || {
-                  echo "⚠️ PyYAML installation failed, installing wheel directly..."
-                  ".venv/bin/pip" install --only-binary=all "pyyaml>=5.4" || {
-                    echo "⚠️ PyYAML installation completely failed, continuing without YAML support..."
-                  }
-                }
-              }
-              
-              # Install XML processing (with fallback for compatibility)
-              echo "Installing XML processing dependencies..."
-              ".venv/bin/pip" install "lxml>=4.6,<5" || {
-                echo "⚠️ lxml failed, trying with build dependencies..."
-                # Try installing build dependencies if available
-                if command -v apt-get >/dev/null 2>&1; then
-                  sudo apt-get install -y libxml2-dev libxslt1-dev || echo "Could not install build deps"
-                fi
-                ".venv/bin/pip" install "lxml>=4.6,<5" || {
-                  echo "⚠️ lxml still failed, installing alternative..."
-                  ".venv/bin/pip" install "beautifulsoup4[lxml]" || {
-                    echo "⚠️ XML processing libraries failed, HTML parsing will be limited"
-                  }
-                }
-              }
-              
-              # Install additional useful dependencies
-              echo "Installing additional SpiderFoot dependencies..."
-              ".venv/bin/pip" install \
-                "openpyxl>=3.0.0" \
-                "networkx>=2.5" \
-                "phonenumbers>=8.12.0" \
-                "pyopenssl>=20.0.0" \
-                "publicsuffixlist>=0.9.0" \
-                "python-whois>=0.7.0" \
-                "ipwhois>=1.2.0" \
-                "pysocks>=1.7.0" || {
-                echo "⚠️ Some optional dependencies failed, continuing..."
-              }
-              
-              # Use production requirements if available, with fallback handling
-              if [ -f "requirements-production.txt" ]; then
-                echo "Installing from production-optimized requirements..."
-                ".venv/bin/pip" install -r requirements-production.txt || {
-                  echo "⚠️ Some production requirements failed, continuing with core packages..."
-                }
-              elif [ -f "requirements.txt" ]; then
-                echo "Installing from standard requirements..."
-                ".venv/bin/pip" install -r requirements.txt || {
-                  echo "⚠️ Some requirements failed, continuing with core packages..."
-                }
-              fi
-              
-              # Verify critical imports work
-              echo "🧪 Verifying SpiderFoot dependencies..."
-              ".venv/bin/python" -c "import cherrypy; print('✅ CherryPy OK')" || {
-                echo "❌ CherryPy import failed"
-                exit 1
-              }
-              ".venv/bin/python" -c "import requests; print('✅ Requests OK')" || {
-                echo "❌ Requests import failed"
-                exit 1
-              }
-              ".venv/bin/python" -c "import bs4; print('✅ BeautifulSoup4 OK')" || {
-                echo "❌ BeautifulSoup4 import failed"
-                exit 1
-              }
-              ".venv/bin/python" -c "import dns.resolver; print('✅ DNS resolver OK')" || {
-                echo "❌ DNS resolver import failed"
-                exit 1
-              }
-              ".venv/bin/python" -c "import netaddr; print('✅ NetAddr OK')" || {
-                echo "❌ NetAddr import failed"
-                exit 1
-              }
-              echo "✅ All core dependencies verified successfully"
-              
-              # Run comprehensive installation verification
-              if [ -f "verify_installation.py" ]; then
-                echo "Running comprehensive SpiderFoot verification..."
-                ".venv/bin/python" verify_installation.py || {
-                  echo "⚠️ SpiderFoot verification found issues, but continuing deployment..."
-                  echo "Some optional features may not work properly"
-                }
-              fi
-              
-              # Ensure SpiderFoot data directories exist with proper permissions
-              echo "Setting up SpiderFoot data directories..."
-              mkdir -p "${SHARED_DATA}/spiderfoot" "${SHARED_DATA}/spiderfoot/cache" "${SHARED_DATA}/spiderfoot/logs"
-              chmod -R 755 "${SHARED_DATA}/spiderfoot" || true
-              
-              # Create empty passwd file to disable authentication
-              echo "Configuring SpiderFoot authentication..."
-              touch "${SHARED_DATA}/spiderfoot/passwd"
-              chmod 644 "${SHARED_DATA}/spiderfoot/passwd"
-              
-              # Test SpiderFoot functionality
-              echo "🧪 Testing SpiderFoot functionality..."
-              cd "$SF_DIR"
-              if [ -f "sf.py" ]; then
-                # Test help command
-                ".venv/bin/python" sf.py --help > /dev/null 2>&1 && {
-                  echo "✅ SpiderFoot help command works"
-                } || {
-                  echo "❌ SpiderFoot test failed"
-                  echo "🔍 Debugging SpiderFoot startup..."
-                  ".venv/bin/python" sf.py --help 2>&1 | head -20 || true
-                  echo "🔍 Python path and modules:"
-                  ".venv/bin/python" -c "import sys; print('Python executable:', sys.executable)"
-                  ls -la sf.py
-                  exit 1
-                }
-                
-                # Test basic module imports
-                ".venv/bin/python" -c "import sys; sys.path.insert(0, '.'); import spiderfoot; print('✅ SpiderFoot module OK')" || {
-                  echo "⚠️ SpiderFoot module import failed, checking files..."
-                  ls -la *.py | head -10
-                }
-                
-                echo "✅ SpiderFoot OSINT Engine setup completed successfully"
-              else
-                echo "❌ SpiderFoot main script not found"
-                echo "🔍 Contents of SpiderFoot directory:"
-                ls -la | head -20
-                exit 1
-              fi
-            else
-              echo "⚠️ SpiderFoot directory not found at $SF_DIR"
-              echo "OSINT functionality will be limited"
-            fi
-
-            echo "Ensuring stable server path via symlink..."
-            mkdir -p ${BASE_DIR}/server
-            # Symlink /var/www/anatscrawler/server -> /var/www/anatscrawler/current/server
-            if [ -L "${BASE_DIR}/server" ]; then
-              rm -f "${BASE_DIR}/server"
-            fi
-            ln -sfn "${CURRENT_DIR}/server" "${BASE_DIR}/server"
-
             # Ensure scripts directory is available and executable
             echo "Deploying helper scripts..."
             mkdir -p ${BASE_DIR}/scripts
@@ -398,6 +187,14 @@ jobs:
             else
               echo "Warning: venv pip not found at ${VENV_DIR}/bin/pip"
             fi
+
+            # Symlink /var/www/anatscrawler/server -> /var/www/anatscrawler/current/server
+            echo "Ensuring stable server path via symlink..."
+            mkdir -p ${BASE_DIR}/server
+            if [ -L "${BASE_DIR}/server" ]; then
+              rm -f "${BASE_DIR}/server"
+            fi
+            ln -sfn "${CURRENT_DIR}/server" "${BASE_DIR}/server"
 
             # Symlink /var/www/anatscrawler/client -> /var/www/anatscrawler/current/client
             if [ -L "${BASE_DIR}/client" ]; then
@@ -492,19 +289,7 @@ jobs:
               curl -v --connect-timeout 5 http://127.0.0.1:5000/health || true
               exit 1
             fi
-
-            echo "Check SpiderFoot proxy health (requires app to auto-start it)..."
-            OSINT_OK=0
-            for i in {1..60}; do
-              # Health behind auth is not public; just hit unauthenticated to trigger start
-              if curl -fsS -m 5 http://127.0.0.1:5000/osint/health > /dev/null; then
-                OSINT_OK=1; echo "SpiderFoot proxy responded"; break
-              fi
-              sleep 1
-            done
-            if [ "$OSINT_OK" -ne 1 ]; then
-              echo "SpiderFoot proxy did not respond yet (may require first authenticated request). Continuing..."
-            fi
+      
 
       - name: Final status
         if: always()
