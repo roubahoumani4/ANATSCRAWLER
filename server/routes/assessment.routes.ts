@@ -7,7 +7,7 @@ const router = Router();
 // POST /run - run the OSINT script against a target
 router.post('/run', async (req: Request, res: Response) => {
   try {
-    const { target, deepScan, checkBreaches, quick } = req.body || {};
+    const { target } = req.body || {};
     if (!target || typeof target !== 'string') {
       return res.status(400).json({ error: 'Missing or invalid target' });
     }
@@ -16,21 +16,11 @@ router.post('/run', async (req: Request, res: Response) => {
     const scriptsDir = process.env.SCRIPTS_DIR || '/var/www/anatscrawler/scripts';
     const scriptPath = path.join(scriptsDir, 'osint_pro.py');
 
-    // Build args
+    // Build args - always run FULL SCAN (no --quick) like command line
     const args: string[] = [scriptPath, target];
-    
-    // By default use --quick mode from web to avoid timeout (unless explicitly requested otherwise)
-    const useQuickMode = quick !== false && !deepScan && !checkBreaches;
-    if (useQuickMode) {
-      args.push('--quick');
-    } else {
-      // If deepScan or checkBreaches explicitly false, add those flags
-      if (deepScan === false) args.push('--no-deep-scan');
-      if (checkBreaches === false) args.push('--no-breaches');
-    }
 
-  // Spawn python process - prefer configured PYTHON_BIN or the deployment venv
-  const python = process.env.PYTHON_BIN || process.env.SCRIPTS_PYTHON || '/var/www/anatscrawler/.venv/bin/python' || 'python3';
+    // Spawn python process - prefer configured PYTHON_BIN or the deployment venv
+    const python = process.env.PYTHON_BIN || process.env.SCRIPTS_PYTHON || '/var/www/anatscrawler/.venv/bin/python' || 'python3';
     const child = spawn(python, args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
     let stdout = '';
@@ -43,9 +33,9 @@ router.post('/run', async (req: Request, res: Response) => {
       stderr += chunk.toString();
     });
 
-    // Limit execution time to avoid runaway processes
-    // Use shorter timeout for web requests to avoid 504 errors (default 60s for web, can be overridden)
-    const timeoutMs = Number(process.env.ASSESSMENT_TIMEOUT_MS || 60000); // 60 seconds default for web requests
+    // Increase timeout for full scans from web (default 300s = 5 minutes, can be overridden via env)
+    // Full comprehensive scans with deep DNS and breach checks can take a while
+    const timeoutMs = Number(process.env.ASSESSMENT_TIMEOUT_MS || 300000); // 5 minutes default for web requests
     const timer = setTimeout(() => {
       child.kill('SIGTERM');
     }, timeoutMs);
