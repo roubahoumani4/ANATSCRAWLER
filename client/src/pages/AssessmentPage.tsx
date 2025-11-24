@@ -1,7 +1,44 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Zap } from 'lucide-react';
+import { API_BASE_URL } from '@/lib/api';
 
 const AssessmentPage: React.FC = () => {
+  const [target, setTarget] = useState('');
+  const [running, setRunning] = useState(false);
+  const [output, setOutput] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [deepScan, setDeepScan] = useState(false);
+  const [checkBreaches, setCheckBreaches] = useState(false);
+
+  const runAssessment = async () => {
+    setError(null);
+    setOutput(null);
+    if (!target) return setError('Please provide a target (domain, URL or IP)');
+    setRunning(true);
+    try {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const res = await fetch(`${API_BASE_URL}/api/v1/assessment/run`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: 'include',
+        body: JSON.stringify({ target, deepScan, checkBreaches }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Request failed' }));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const resp = await res.json();
+      setOutput(JSON.stringify(resp, null, 2));
+    } catch (err: any) {
+      setError(err.message || 'Failed to run assessment');
+    } finally {
+      setRunning(false);
+    }
+  };
+
   return (
     <div className="p-8 min-h-screen bg-jetBlack text-coolWhite">
       <div className="max-w-4xl mx-auto">
@@ -16,15 +53,50 @@ const AssessmentPage: React.FC = () => {
         </div>
 
         <div className="mt-6 bg-gray-850 rounded-lg p-6 border border-gray-800">
-          <p className="text-sm text-gray-300">This is a placeholder for the Assessment workflow. You can add scans, configure modules, and review results here.</p>
+          <label className="block text-sm text-gray-300">Target (domain, IP or URL)</label>
+          <input
+            className="mt-2 w-full bg-gray-800 text-white px-3 py-2 rounded"
+            placeholder="example.com or https://example.com or 8.8.8.8"
+            value={target}
+            onChange={(e) => setTarget(e.target.value)}
+          />
 
-          <div className="mt-4 text-sm text-gray-400">
-            <ul className="list-disc pl-5 space-y-2">
-              <li>Start a new assessment for a domain or IP.</li>
-              <li>Pick modules and configure scan options.</li>
-              <li>View and export results.</li>
-            </ul>
+          <div className="mt-4 flex items-center gap-4">
+            <label className="flex items-center gap-2 text-sm text-gray-300">
+              <input type="checkbox" checked={deepScan} onChange={(e) => setDeepScan(e.target.checked)} />
+              Deep scan
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-300">
+              <input type="checkbox" checked={checkBreaches} onChange={(e) => setCheckBreaches(e.target.checked)} />
+              Check breaches
+            </label>
           </div>
+
+          <div className="mt-6 flex items-center gap-3">
+            <button
+              className={`px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-500 ${running ? 'opacity-70 cursor-wait' : ''}`}
+              onClick={runAssessment}
+              disabled={running}
+            >
+              {running ? 'Running…' : 'Run Assessment'}
+            </button>
+            <button
+              className="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600"
+              onClick={() => { setTarget(''); setOutput(null); setError(null); }}
+            >
+              Clear
+            </button>
+          </div>
+
+          {error && (
+            <div className="mt-4 text-sm text-red-400">{error}</div>
+          )}
+
+          {output && (
+            <pre className="mt-4 p-3 bg-gray-900 rounded text-xs text-gray-200 overflow-x-auto max-h-[40vh]">
+              {output}
+            </pre>
+          )}
         </div>
       </div>
     </div>

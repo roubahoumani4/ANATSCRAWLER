@@ -9,6 +9,7 @@ import userRoutes from './auth/user.routes';
 import healthRoutes from './health/health.routes';
 import searchRoutes from './search';
 import spiderfootProxy from './spiderfoot';
+import assessmentRoutes from './assessment.routes';
 
 /**
  * Register all application routes with proper organization and authentication
@@ -41,6 +42,9 @@ export async function registerRoutes(app: Express): Promise<void> {
   // The router handles /health and /status as public endpoints internally
   // and requires authentication for other endpoints
   app.use('/osint', spiderfootProxy);
+
+  // Assessment runner - runs server-side helper scripts for assessment tasks (authenticated)
+  app.use(`${apiV1}/assessment`, authenticate, assessmentRoutes);
 
   // Debug endpoint for OSINT testing (remove in production)
   if (process.env.NODE_ENV !== 'production') {

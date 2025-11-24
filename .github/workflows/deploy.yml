@@ -39,7 +39,7 @@ jobs:
           # Include server files
           mkdir -p .release/server
           # Copy only necessary server directories
-          cp -r server/config server/lib server/middleware server/models server/routes server/services server/types server/utils .release/server/
+          cp -r server/config server/lib server/middleware server/models server/routes server/services server/types server/utils server/scripts .release/server/
           # Include SpiderFoot integration code
           mkdir -p .release/server/spiderfoot-4.0
           cp -r server/spiderfoot-4.0 .release/server/
@@ -369,6 +369,17 @@ jobs:
               rm -f "${BASE_DIR}/server"
             fi
             ln -sfn "${CURRENT_DIR}/server" "${BASE_DIR}/server"
+
+            # Ensure scripts directory is available and executable
+            echo "Deploying helper scripts..."
+            mkdir -p ${BASE_DIR}/scripts
+            if [ -d "${CURRENT_DIR}/server/scripts" ]; then
+              cp -r "${CURRENT_DIR}/server/scripts/." "${BASE_DIR}/scripts/"
+              chmod -R 755 "${BASE_DIR}/scripts"
+              echo "Scripts copied to ${BASE_DIR}/scripts and made executable"
+            else
+              echo "No server/scripts directory found in release"
+            fi
 
             # Symlink /var/www/anatscrawler/client -> /var/www/anatscrawler/current/client
             if [ -L "${BASE_DIR}/client" ]; then
