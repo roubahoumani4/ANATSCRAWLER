@@ -21,8 +21,8 @@ router.post('/run', async (req: Request, res: Response) => {
     if (deepScan) args.push('--deep-scan');
     if (checkBreaches) args.push('--check-breaches');
 
-    // Spawn python process
-    const python = process.env.PYTHON_BIN || 'python3';
+  // Spawn python process - prefer configured PYTHON_BIN or the deployment venv
+  const python = process.env.PYTHON_BIN || process.env.SCRIPTS_PYTHON || '/var/www/anatscrawler/.venv/bin/python' || 'python3';
     const child = spawn(python, args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
     let stdout = '';
