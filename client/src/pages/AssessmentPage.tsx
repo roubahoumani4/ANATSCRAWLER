@@ -5,16 +5,73 @@ import { API_BASE_URL } from '@/lib/api';
 const AssessmentPage: React.FC = () => {
   const [target, setTarget] = useState('');
   const [running, setRunning] = useState(false);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [output, setOutput] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [plainOutput, setPlainOutput] = useState<string | null>(null);
   const [sections, setSections] = useState<Array<{ title: string; content: string }>>([]);
 
+  // Poll for job status
+  const pollJobStatus = async (id: string) => {
+    try {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const res = await fetch(`${API_BASE_URL}/api/v1/assessment/status/${id}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: 'include',
+      });
+
+      if (!res.ok && res.status !== 500) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      const resp = await res.json();
+
+      if (resp.status === 'completed' && resp.result) {
+        setRunning(false);
+        setJobId(null);
+        setOutput(JSON.stringify(resp.result, null, 2));
+        if (resp.result.parsed) {
+          setPlainOutput(resp.result.parsed.plainOutput || null);
+          setSections(resp.result.parsed.sections || []);
+        } else if (resp.result.stdout) {
+          const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
+          setPlainOutput(stripAnsi(resp.result.stdout));
+        }
+        setStatusMessage(`✅ Assessment completed in ${resp.elapsedSeconds}s`);
+        return true; // Stop polling
+      }
+
+      if (resp.status === 'failed') {
+        setRunning(false);
+        setJobId(null);
+        setError(resp.error || 'Assessment failed');
+        return true; // Stop polling
+      }
+
+      // Still running
+      if (resp.elapsedSeconds) {
+        setElapsedSeconds(resp.elapsedSeconds);
+        setStatusMessage(`⏳ ${resp.message}`);
+      }
+      return false; // Continue polling
+    } catch (err: any) {
+      setError(err.message || 'Failed to check status');
+      return true; // Stop polling on error
+    }
+  };
+
   const runAssessment = async () => {
     setError(null);
     setOutput(null);
+    setStatusMessage(null);
+    setElapsedSeconds(0);
     if (!target) return setError('Please provide a target (domain, URL or IP)');
     setRunning(true);
+
     try {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       const res = await fetch(`${API_BASE_URL}/api/v1/assessment/run`, {
@@ -31,18 +88,24 @@ const AssessmentPage: React.FC = () => {
         throw new Error(err.error || `HTTP ${res.status}`);
       }
       const resp = await res.json();
-      setOutput(JSON.stringify(resp, null, 2));
-      if (resp.parsed) {
-        setPlainOutput(resp.parsed.plainOutput || null);
-        setSections(resp.parsed.sections || []);
-      } else if (resp.stdout) {
-        // fallback: strip ANSI on the client (in case server didn't)
-        const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
-        setPlainOutput(stripAnsi(resp.stdout));
+
+      if (resp.jobId) {
+        setJobId(resp.jobId);
+        setStatusMessage('📝 Assessment job started, waiting for results...');
+
+        // Poll for status every 2 seconds
+        const pollInterval = setInterval(async () => {
+          const done = await pollJobStatus(resp.jobId);
+          if (done) {
+            clearInterval(pollInterval);
+          }
+        }, 2000);
+
+        // Check status immediately
+        await pollJobStatus(resp.jobId);
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to run assessment');
-    } finally {
+      setError(err.message || 'Failed to start assessment');
       setRunning(false);
     }
   };
@@ -63,10 +126,11 @@ const AssessmentPage: React.FC = () => {
   <div className="mt-6 bg-gray-850 rounded-lg p-8 border border-gray-800 w-full">
           <label className="block text-sm text-gray-300">Target (domain, IP or URL)</label>
           <input
-            className="mt-2 w-full bg-gray-800 text-white px-3 py-2 rounded"
+            className="mt-2 w-full bg-gray-800 text-white px-3 py-2 rounded disabled:opacity-50"
             placeholder="example.com or https://example.com or 8.8.8.8"
             value={target}
             onChange={(e) => setTarget(e.target.value)}
+            disabled={running}
           />
 
           <p className="mt-4 text-xs text-gray-400">
@@ -75,19 +139,24 @@ const AssessmentPage: React.FC = () => {
 
           <div className="mt-6 flex items-center gap-3 flex-wrap">
               <button
-                className={`px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-500 ${running ? 'opacity-70 cursor-wait' : ''}`}
+                className={`px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed`}
                 onClick={runAssessment}
                 disabled={running}
               >
-                {running ? 'Running comprehensive scan…' : 'Run Assessment'}
+                {running ? '⏳ Running assessment...' : 'Run Assessment'}
               </button>
             <button
-              className="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600"
-              onClick={() => { setTarget(''); setOutput(null); setError(null); setPlainOutput(null); setSections([]); }}
+              className="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-50"
+              onClick={() => { setTarget(''); setOutput(null); setError(null); setPlainOutput(null); setSections([]); setStatusMessage(null); }}
+              disabled={running}
             >
               Clear
             </button>
           </div>
+
+          {statusMessage && (
+            <div className="mt-4 text-sm text-blue-400 animate-pulse">{statusMessage}</div>
+          )}
 
           {error && (
             <div className="mt-4 text-sm text-red-400">{error}</div>
