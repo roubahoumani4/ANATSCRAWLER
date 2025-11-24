@@ -485,7 +485,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.DEPLOY_PORT }}
-          command_timeout: 3m
+          command_timeout: 4m
           script: |
             echo "PM2 status:"
             pm2 status anatscrawler || true
