@@ -7,6 +7,8 @@ const AssessmentPage: React.FC = () => {
   const [running, setRunning] = useState(false);
   const [output, setOutput] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [plainOutput, setPlainOutput] = useState<string | null>(null);
+  const [sections, setSections] = useState<Array<{ title: string; content: string }>>([]);
   const [deepScan, setDeepScan] = useState(false);
   const [checkBreaches, setCheckBreaches] = useState(false);
 
@@ -32,6 +34,14 @@ const AssessmentPage: React.FC = () => {
       }
       const resp = await res.json();
       setOutput(JSON.stringify(resp, null, 2));
+      if (resp.parsed) {
+        setPlainOutput(resp.parsed.plainOutput || null);
+        setSections(resp.parsed.sections || []);
+      } else if (resp.stdout) {
+        // fallback: strip ANSI on the client (in case server didn't)
+        const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
+        setPlainOutput(stripAnsi(resp.stdout));
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to run assessment');
     } finally {
@@ -92,10 +102,26 @@ const AssessmentPage: React.FC = () => {
             <div className="mt-4 text-sm text-red-400">{error}</div>
           )}
 
+          {plainOutput && (
+            <div className="mt-4 p-3 bg-gray-900 rounded text-xs text-gray-200 overflow-y-auto max-h-[60vh] whitespace-pre-wrap">
+              {sections.length > 0 ? (
+                sections.map((s, idx) => (
+                  <div key={idx} className="mb-4">
+                    <div className="text-sm text-gray-300 font-semibold mb-1">{s.title}</div>
+                    <pre className="bg-gray-800 p-3 rounded text-xs text-gray-200 overflow-x-auto whitespace-pre-wrap">{s.content}</pre>
+                  </div>
+                ))
+              ) : (
+                <pre className="text-xs text-gray-200">{plainOutput}</pre>
+              )}
+            </div>
+          )}
+
           {output && (
-            <pre className="mt-4 p-3 bg-gray-900 rounded text-xs text-gray-200 overflow-x-auto max-h-[40vh]">
-              {output}
-            </pre>
+            <details className="mt-4 p-3 bg-gray-850 rounded text-xs text-gray-300">
+              <summary className="cursor-pointer">Raw JSON response</summary>
+              <pre className="mt-2 text-xs text-gray-200 overflow-x-auto">{output}</pre>
+            </details>
           )}
         </div>
       </div>
