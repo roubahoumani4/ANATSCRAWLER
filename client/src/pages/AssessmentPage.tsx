@@ -9,8 +9,6 @@ const AssessmentPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [plainOutput, setPlainOutput] = useState<string | null>(null);
   const [sections, setSections] = useState<Array<{ title: string; content: string }>>([]);
-  const [deepScan, setDeepScan] = useState(false);
-  const [checkBreaches, setCheckBreaches] = useState(false);
 
   const runAssessment = async () => {
     setError(null);
@@ -26,7 +24,7 @@ const AssessmentPage: React.FC = () => {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         credentials: 'include',
-        body: JSON.stringify({ target, deepScan, checkBreaches }),
+        body: JSON.stringify({ target }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Request failed' }));
@@ -71,16 +69,9 @@ const AssessmentPage: React.FC = () => {
             onChange={(e) => setTarget(e.target.value)}
           />
 
-          <div className="mt-4 flex items-center gap-4">
-            <label className="flex items-center gap-2 text-sm text-gray-300">
-              <input type="checkbox" checked={deepScan} onChange={(e) => setDeepScan(e.target.checked)} />
-              Deep scan
-            </label>
-            <label className="flex items-center gap-2 text-sm text-gray-300">
-              <input type="checkbox" checked={checkBreaches} onChange={(e) => setCheckBreaches(e.target.checked)} />
-              Check breaches
-            </label>
-          </div>
+          <p className="mt-4 text-xs text-gray-400">
+            💡 <strong>Full Comprehensive Scan:</strong> This will run a complete OSINT analysis including deep DNS brute-forcing and data breach checks. This may take 3-5 minutes.
+          </p>
 
           <div className="mt-6 flex items-center gap-3 flex-wrap">
               <button
@@ -88,7 +79,7 @@ const AssessmentPage: React.FC = () => {
                 onClick={runAssessment}
                 disabled={running}
               >
-                {running ? 'Running…' : 'Run Assessment'}
+                {running ? 'Running comprehensive scan…' : 'Run Assessment'}
               </button>
             <button
               className="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600"
