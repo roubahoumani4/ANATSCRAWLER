@@ -92,7 +92,7 @@ const AssessmentPage: React.FC = () => {
               </button>
             <button
               className="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600"
-              onClick={() => { setTarget(''); setOutput(null); setError(null); }}
+              onClick={() => { setTarget(''); setOutput(null); setError(null); setPlainOutput(null); setSections([]); }}
             >
               Clear
             </button>
