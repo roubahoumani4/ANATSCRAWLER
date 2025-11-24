@@ -15,6 +15,56 @@ const AssessmentPage: React.FC = () => {
   const [plainOutput, setPlainOutput] = useState<string | null>(null);
   const [sections, setSections] = useState<Array<{ title: string; content: string }>>([]);
 
+  // Helper to download a file: try server download endpoint first, then fallback to status JSON
+  const downloadReportForJob = async (id: string) => {
+    try {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const hdrs: any = {};
+      if (token) hdrs['Authorization'] = `Bearer ${token}`;
+
+      // Try the dedicated download endpoint
+      const dl = await fetch(`${API_BASE_URL}/api/v1/assessment/download/${id}`, {
+        headers: hdrs,
+        credentials: 'include',
+      });
+
+      if (dl.ok) {
+        const blob = await dl.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const cd = dl.headers.get('content-disposition') || '';
+        const fnMatch = cd.match(/filename="?([^";]+)"?/i);
+        const filename = (fnMatch && fnMatch[1]) ? fnMatch[1] : `report_${id}`;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        return;
+      }
+
+      // Fallback: fetch status JSON and download as file
+      const st = await fetch(`${API_BASE_URL}/api/v1/assessment/status/${id}`, {
+        headers: hdrs,
+        credentials: 'include',
+      });
+      if (!st.ok) throw new Error(`Failed to retrieve job status: ${st.status}`);
+      const json = await st.json();
+      const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `assessment_${id}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e: any) {
+      setError(e.message || 'Download failed');
+    }
+  };
+
   // Poll for job status
   const pollJobStatus = async (id: string) => {
     try {
@@ -182,13 +232,20 @@ const AssessmentPage: React.FC = () => {
           )}
 
           {/* Summary donuts + download button */}
-          {output && (
+          {(output || plainOutput) && (
             <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Parse some key metrics from the JSON result for simple charts */}
               {(() => {
                 try {
-                  const parsed = JSON.parse(output).result.parsed || {};
-                  const plain = parsed.plainOutput || '';
+                  let parsed: any = {};
+                  if (output) {
+                    try {
+                      parsed = JSON.parse(output).result?.parsed || {};
+                    } catch (e) {
+                      parsed = {};
+                    }
+                  }
+                  const plain = (parsed && parsed.plainOutput) || plainOutput || '';
                   const num = (label: string) => {
                     const m = (plain as string).match(new RegExp(label + "\\s*:\\s*(\\d+)", 'i'));
                     return m ? Number(m[1]) : null;
@@ -230,33 +287,12 @@ const AssessmentPage: React.FC = () => {
                       <div>{donut('Critical Vulnerabilities', crit, '#ef4444')}</div>
                       <div>{donut('Total Vulnerabilities', totalVulns, '#10b981')}</div>
                       <div className="flex items-center justify-center">
-                        {/* Download button */}
-                        {lastJobId && (
+                        {/* Download button: show when we have a lastJobId or active jobId */}
+                        {(lastJobId || jobId) && (
                           <button
                             onClick={async () => {
-                              try {
-                                const downloadUrl = `${API_BASE_URL}/api/v1/assessment/download/${lastJobId}`;
-                                const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-                                const hdrs: any = {};
-                                if (token) hdrs['Authorization'] = `Bearer ${token}`;
-                                const r = await fetch(downloadUrl, { headers: hdrs, credentials: 'include' });
-                                if (!r.ok) throw new Error(`Download failed: ${r.status}`);
-                                const blob = await r.blob();
-                                const url = window.URL.createObjectURL(blob);
-                                const a = document.createElement('a');
-                                a.href = url;
-                                // try to extract filename from response headers
-                                const cd = r.headers.get('content-disposition') || '';
-                                const fnMatch = cd.match(/filename="?([^";]+)"?/i);
-                                const filename = (fnMatch && fnMatch[1]) ? fnMatch[1] : `report_${lastJobId}`;
-                                a.download = filename;
-                                document.body.appendChild(a);
-                                a.click();
-                                a.remove();
-                                window.URL.revokeObjectURL(url);
-                              } catch (e: any) {
-                                setError(e.message || 'Download failed');
-                              }
+                              const id = lastJobId || jobId!;
+                              await downloadReportForJob(id);
                             }}
                             className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500"
                           >
