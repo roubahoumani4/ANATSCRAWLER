@@ -7,7 +7,7 @@ const router = Router();
 // POST /run - run the OSINT script against a target
 router.post('/run', async (req: Request, res: Response) => {
   try {
-    const { target, deepScan, checkBreaches } = req.body || {};
+    const { target, deepScan, checkBreaches, quick } = req.body || {};
     if (!target || typeof target !== 'string') {
       return res.status(400).json({ error: 'Missing or invalid target' });
     }
@@ -18,8 +18,16 @@ router.post('/run', async (req: Request, res: Response) => {
 
     // Build args
     const args: string[] = [scriptPath, target];
-    if (deepScan) args.push('--deep-scan');
-    if (checkBreaches) args.push('--check-breaches');
+    
+    // By default use --quick mode from web to avoid timeout (unless explicitly requested otherwise)
+    const useQuickMode = quick !== false && !deepScan && !checkBreaches;
+    if (useQuickMode) {
+      args.push('--quick');
+    } else {
+      // If deepScan or checkBreaches explicitly false, add those flags
+      if (deepScan === false) args.push('--no-deep-scan');
+      if (checkBreaches === false) args.push('--no-breaches');
+    }
 
   // Spawn python process - prefer configured PYTHON_BIN or the deployment venv
   const python = process.env.PYTHON_BIN || process.env.SCRIPTS_PYTHON || '/var/www/anatscrawler/.venv/bin/python' || 'python3';
@@ -36,7 +44,8 @@ router.post('/run', async (req: Request, res: Response) => {
     });
 
     // Limit execution time to avoid runaway processes
-    const timeoutMs = Number(process.env.ASSESSMENT_TIMEOUT_MS || 120000); // 2 minutes default
+    // Use shorter timeout for web requests to avoid 504 errors (default 60s for web, can be overridden)
+    const timeoutMs = Number(process.env.ASSESSMENT_TIMEOUT_MS || 60000); // 60 seconds default for web requests
     const timer = setTimeout(() => {
       child.kill('SIGTERM');
     }, timeoutMs);

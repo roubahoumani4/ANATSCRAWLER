@@ -4,6 +4,7 @@ Professional OSINT Reconnaissance Script - AUTOMATED VERSION
 Hardcoded configuration for immediate execution
 """
 
+import argparse
 import json
 import socket
 import subprocess
@@ -47,20 +48,16 @@ from cryptography.hazmat.backends import default_backend
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # =============================================================================
-# HARDCODED CONFIGURATION - MODIFY THESE VALUES FOR YOUR SCAN
+# DEFAULT CONFIGURATION
 # =============================================================================
-
-# Target to scan (change this to your target)
-TARGET = "ccm.com.lb"
 
 # API Keys (already configured)
 HIBP_API_KEY = "00000000000000000000000000000000"
 SHODAN_API_KEY = "J45krb71x4qrP0X71SB5W7t81XjA17Wx"
 
-# Scan configuration
-DEEP_SCAN = True
-CHECK_BREACHES = True
-OUTPUT_DIR = f"osint_scan_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+# Scan configuration defaults - RUN EVERYTHING by default
+DEFAULT_DEEP_SCAN = True
+DEFAULT_CHECK_BREACHES = True
 
 # =============================================================================
 # MAIN SCRIPT - NO NEED TO MODIFY BELOW THIS LINE
@@ -1759,25 +1756,70 @@ The findings represent a point-in-time assessment and security posture may chang
             print(f"{Colors.RED}{Colors.BOLD}BREACH: {len(self.breached_accounts)} accounts found in data breaches!{Colors.END}")
 
 # =============================================================================
-# AUTOMATED EXECUTION - JUST RUN THE SCRIPT
+# COMMAND-LINE INTERFACE & EXECUTION
 # =============================================================================
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Professional OSINT Reconnaissance Tool - Runs comprehensive scan by default",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python osint_pro.py example.com                          # Full comprehensive scan
+  python osint_pro.py example.com --quick                  # Fast scan (skips deep DNS and breach checks)
+  python osint_pro.py example.com --no-deep-scan           # Skip deep DNS brute-force
+  python osint_pro.py example.com --no-breaches            # Skip breach checking
+  python osint_pro.py example.com -o /path/to/output       # Save to custom directory
+        """
+    )
+    
+    # Target is required
+    parser.add_argument('target',
+                        help='Target domain, IP, or URL to scan (REQUIRED)')
+    
+    # Quick mode - disable expensive operations
+    parser.add_argument('--quick', action='store_true', default=False,
+                        help='Quick scan mode (skips deep DNS brute-force and breach checks)')
+    
+    # Individual toggles to disable specific features (default is ON)
+    parser.add_argument('--no-deep-scan', action='store_true', default=False,
+                        help='Disable deep DNS brute-force scanning')
+    parser.add_argument('--no-breaches', action='store_true', default=False,
+                        help='Disable data breach checking via HIBP API')
+    
+    # Output directory
+    parser.add_argument('-o', '--output', dest='output_dir', default=None,
+                        help='Custom output directory for results')
+    
+    args = parser.parse_args()
+    
+    # Quick mode overrides - disable expensive operations
+    if args.quick:
+        args.no_deep_scan = True
+        args.no_breaches = True
+    
+    # Determine actual flags (default is ON, unless --no-flag is used)
+    deep_scan = not args.no_deep_scan
+    check_breaches = not args.no_breaches
+    
+    # Prepare output directory
+    output_dir = args.output_dir or f"osint_{args.target.replace('://', '_').replace('/', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    
     print(f"{Colors.BOLD}{Colors.CYAN}Starting Automated OSINT Scan...{Colors.END}")
-    print(f"{Colors.BOLD}{Colors.CYAN}Target: {TARGET}{Colors.END}")
-    print(f"{Colors.BOLD}{Colors.CYAN}Configuration: Deep Scan={DEEP_SCAN}, Breach Check={CHECK_BREACHES}{Colors.END}")
-    print(f"{Colors.BOLD}{Colors.CYAN}Output: {OUTPUT_DIR}{Colors.END}\n")
+    print(f"{Colors.BOLD}{Colors.CYAN}Target: {args.target}{Colors.END}")
+    print(f"{Colors.BOLD}{Colors.CYAN}Configuration: Deep Scan={deep_scan}, Breach Check={check_breaches}{Colors.END}")
+    print(f"{Colors.BOLD}{Colors.CYAN}Output: {output_dir}{Colors.END}\n")
     
     # Initialize and run the scan
     osint = ProfessionalOSINT(
-        target=TARGET,
-        output_dir=OUTPUT_DIR,
-        deep_scan=DEEP_SCAN,
-        check_breaches=CHECK_BREACHES
+        target=args.target,
+        output_dir=output_dir,
+        deep_scan=deep_scan,
+        check_breaches=check_breaches
     )
     
     # Run the comprehensive assessment
     osint.run_comprehensive_assessment()
     
     print(f"\n{Colors.BOLD}{Colors.GREEN}Scan completed successfully!{Colors.END}")
-    print(f"{Colors.BOLD}{Colors.GREEN}Check the '{OUTPUT_DIR}' directory for complete results.{Colors.END}")
+    print(f"{Colors.BOLD}{Colors.GREEN}Check the '{output_dir}' directory for complete results.{Colors.END}")
