@@ -51,7 +51,7 @@ const AssessmentPage: React.FC = () => {
 
   return (
     <div className="p-8 min-h-screen bg-jetBlack text-coolWhite">
-      <div className="max-w-4xl mx-auto">
+      <div className="w-full">
         <div className="flex items-center space-x-4 mb-6">
           <div className="p-3 rounded bg-emerald-700/10 text-emerald-400">
             <Zap size={28} />
@@ -62,7 +62,7 @@ const AssessmentPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="mt-6 bg-gray-850 rounded-lg p-6 border border-gray-800">
+  <div className="mt-6 bg-gray-850 rounded-lg p-8 border border-gray-800 w-full">
           <label className="block text-sm text-gray-300">Target (domain, IP or URL)</label>
           <input
             className="mt-2 w-full bg-gray-800 text-white px-3 py-2 rounded"
@@ -82,14 +82,14 @@ const AssessmentPage: React.FC = () => {
             </label>
           </div>
 
-          <div className="mt-6 flex items-center gap-3">
-            <button
-              className={`px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-500 ${running ? 'opacity-70 cursor-wait' : ''}`}
-              onClick={runAssessment}
-              disabled={running}
-            >
-              {running ? 'Running…' : 'Run Assessment'}
-            </button>
+          <div className="mt-6 flex items-center gap-3 flex-wrap">
+              <button
+                className={`px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-500 ${running ? 'opacity-70 cursor-wait' : ''}`}
+                onClick={runAssessment}
+                disabled={running}
+              >
+                {running ? 'Running…' : 'Run Assessment'}
+              </button>
             <button
               className="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600"
               onClick={() => { setTarget(''); setOutput(null); setError(null); }}
