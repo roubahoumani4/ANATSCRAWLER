@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { spawn } from 'child_process';
 import path from 'path';
+import fs from 'fs';
 
 const router = Router();
 
@@ -243,3 +244,38 @@ setInterval(() => {
 }, 5 * 60 * 1000); // Check every 5 minutes
 
 export default router;
+
+// GET /download/:jobId - Download the report artifact for a completed job (if available)
+router.get('/download/:jobId', async (req: Request, res: Response) => {
+  try {
+    const { jobId } = req.params;
+    const job = jobs.get(jobId);
+    if (!job || !job.result || !job.result.parsed || !job.result.parsed.reportLocation) {
+      return res.status(404).json({ error: 'Report not found for this job' });
+    }
+
+    const rawLocation: string = job.result.parsed.reportLocation;
+    const scriptsDir = process.env.SCRIPTS_DIR || '/var/www/anatscrawler/scripts';
+
+    // If report path is relative, resolve it under the scripts dir; otherwise use as-is
+    let resolved = rawLocation;
+    if (!path.isAbsolute(rawLocation)) {
+      resolved = path.resolve(scriptsDir, rawLocation);
+    }
+
+    // Ensure file exists and is underneath the scriptsDir for safety
+    const real = path.resolve(resolved);
+    if (!real.startsWith(path.resolve(scriptsDir))) {
+      return res.status(400).json({ error: 'Invalid report path' });
+    }
+
+    if (!fs.existsSync(real)) {
+      return res.status(404).json({ error: 'Report file not found on disk' });
+    }
+
+    // Send file as attachment
+    return res.download(real, path.basename(real));
+  } catch (err) {
+    return res.status(500).json({ error: (err as Error).message || 'Unknown error' });
+  }
+});

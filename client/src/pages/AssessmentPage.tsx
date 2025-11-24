@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Zap } from 'lucide-react';
 import { API_BASE_URL } from '@/lib/api';
+import { ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const AssessmentPage: React.FC = () => {
   const [target, setTarget] = useState('');
   const [running, setRunning] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
+  const [lastJobId, setLastJobId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [output, setOutput] = useState<string | null>(null);
@@ -32,7 +34,8 @@ const AssessmentPage: React.FC = () => {
 
       if (resp.status === 'completed' && resp.result) {
         setRunning(false);
-        setJobId(null);
+        // keep jobId for download reference
+        setLastJobId(id);
         setOutput(JSON.stringify(resp.result, null, 2));
         if (resp.result.parsed) {
           setPlainOutput(resp.result.parsed.plainOutput || null);
@@ -47,7 +50,7 @@ const AssessmentPage: React.FC = () => {
 
       if (resp.status === 'failed') {
         setRunning(false);
-        setJobId(null);
+        setLastJobId(id);
         setError(resp.error || 'Assessment failed');
         return true; // Stop polling
       }
@@ -91,6 +94,7 @@ const AssessmentPage: React.FC = () => {
 
       if (resp.jobId) {
         setJobId(resp.jobId);
+        setLastJobId(null);
         setStatusMessage('📝 Assessment job started, waiting for results...');
 
         // Poll for status every 2 seconds
@@ -174,6 +178,98 @@ const AssessmentPage: React.FC = () => {
               ) : (
                 <pre className="text-xs text-gray-200">{plainOutput}</pre>
               )}
+            </div>
+          )}
+
+          {/* Summary donuts + download button */}
+          {output && (
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Parse some key metrics from the JSON result for simple charts */}
+              {(() => {
+                try {
+                  const parsed = JSON.parse(output).result.parsed || {};
+                  const plain = parsed.plainOutput || '';
+                  const num = (label: string) => {
+                    const m = (plain as string).match(new RegExp(label + "\\s*:\\s*(\\d+)", 'i'));
+                    return m ? Number(m[1]) : null;
+                  };
+
+                  const ips = parsed.ipsDiscovered ?? num('IPs Discovered');
+                  const subs = parsed.subdomainsFound ?? num('Subdomains Found');
+                  const ports = parsed.openPorts ?? num('Open Ports') ?? (parsed.openPortsList ? parsed.openPortsList.length : null);
+                  const crit = parsed.criticalVulnerabilities ?? num('Critical Vulnerabilities');
+                  const totalVulns = parsed.totalVulnerabilities ?? num('Total Vulnerabilities');
+
+                  const donut = (label: string, value: number | null, color = '#06b6d4') => {
+                    const v = typeof value === 'number' ? value : 0;
+                    const max = Math.max(v, 1);
+                    const data = [{ name: label, value: v }, { name: 'remaining', value: max - v }];
+                    return (
+                      <div className="bg-gray-850 p-4 rounded border border-gray-800 text-center">
+                        <div style={{ width: 120, height: 120, margin: '0 auto' }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie data={data} dataKey="value" innerRadius={36} outerRadius={52} startAngle={90} endAngle={-270}>
+                                <Cell key="primary" fill={color} />
+                                <Cell key="bg" fill="#111827" />
+                              </Pie>
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                        <div className="mt-2 text-sm text-gray-300">{label}</div>
+                        <div className="text-lg font-bold text-white">{value ?? '—'}</div>
+                      </div>
+                    );
+                  };
+
+                  return (
+                    <>
+                      <div>{donut('IPs Discovered', ips, '#06b6d4')}</div>
+                      <div>{donut('Subdomains Found', subs, '#8b5cf6')}</div>
+                      <div>{donut('Open Ports', ports, '#f59e0b')}</div>
+                      <div>{donut('Critical Vulnerabilities', crit, '#ef4444')}</div>
+                      <div>{donut('Total Vulnerabilities', totalVulns, '#10b981')}</div>
+                      <div className="flex items-center justify-center">
+                        {/* Download button */}
+                        {lastJobId && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                const downloadUrl = `${API_BASE_URL}/api/v1/assessment/download/${lastJobId}`;
+                                const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+                                const hdrs: any = {};
+                                if (token) hdrs['Authorization'] = `Bearer ${token}`;
+                                const r = await fetch(downloadUrl, { headers: hdrs, credentials: 'include' });
+                                if (!r.ok) throw new Error(`Download failed: ${r.status}`);
+                                const blob = await r.blob();
+                                const url = window.URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                // try to extract filename from response headers
+                                const cd = r.headers.get('content-disposition') || '';
+                                const fnMatch = cd.match(/filename="?([^";]+)"?/i);
+                                const filename = (fnMatch && fnMatch[1]) ? fnMatch[1] : `report_${lastJobId}`;
+                                a.download = filename;
+                                document.body.appendChild(a);
+                                a.click();
+                                a.remove();
+                                window.URL.revokeObjectURL(url);
+                              } catch (e: any) {
+                                setError(e.message || 'Download failed');
+                              }
+                            }}
+                            className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500"
+                          >
+                            Download full report
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  );
+                } catch (e) {
+                  return null;
+                }
+              })()}
             </div>
           )}
 
