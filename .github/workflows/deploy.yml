@@ -22,6 +22,16 @@ jobs:
       - name: Install deps
         run: npm ci
 
+      - name: Verify jspdf installation
+        run: |
+          if npm list jspdf > /dev/null 2>&1; then
+            echo "✅ jspdf is installed"
+            npm list jspdf
+          else
+            echo "❌ jspdf not found, installing..."
+            npm install jspdf
+          fi
+
       - name: Build (client + server)
         run: npm run build
 
@@ -157,6 +167,15 @@ jobs:
               npm ci --omit=dev --no-audit --no-fund
             else
               npm install --omit=dev --no-audit --no-fund
+            fi
+
+            echo "Verifying jspdf installation..."
+            if npm list jspdf > /dev/null 2>&1; then
+              echo "✅ jspdf is installed in production"
+              npm list jspdf
+            else
+              echo "⚠️  jspdf not found, installing..."
+              npm install jspdf --no-audit --no-fund
             fi
 
             # Ensure scripts directory is available and executable

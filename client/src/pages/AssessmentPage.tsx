@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Shield, Radar, Globe, Server, Activity as ActivityIcon, Lock, AlertTriangle, Globe2, Building2, Zap } from 'lucide-react';
 import { API_BASE_URL } from '@/lib/api';
 import { ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import jsPDF from 'jspdf';
 
 type WhoisSection = {
   domain?: string;
@@ -505,53 +506,64 @@ const AssessmentPage: React.FC = () => {
     };
   }, [sectionData]);
 
-  // Helper to download a file: try server download endpoint first, then fallback to status JSON
-  const downloadReportForJob = async (id: string) => {
+  // Helper to generate and download PDF from output text
+  const downloadReportAsPDF = () => {
     try {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      const hdrs: any = {};
-      if (token) hdrs['Authorization'] = `Bearer ${token}`;
-
-      // Try the dedicated download endpoint
-      const dl = await fetch(`${API_BASE_URL}/api/v1/assessment/download/${id}`, {
-        headers: hdrs,
-        credentials: 'include',
-      });
-
-      if (dl.ok) {
-        const blob = await dl.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        const cd = dl.headers.get('content-disposition') || '';
-        const fnMatch = cd.match(/filename="?([^";]+)"?/i);
-        const filename = (fnMatch && fnMatch[1]) ? fnMatch[1] : `report_${id}`;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
+      if (!plainOutput) {
+        setError('No output available to download');
         return;
       }
 
-      // Fallback: fetch status JSON and download as file
-      const st = await fetch(`${API_BASE_URL}/api/v1/assessment/status/${id}`, {
-        headers: hdrs,
-        credentials: 'include',
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
       });
-      if (!st.ok) throw new Error(`Failed to retrieve job status: ${st.status}`);
-      const json = await st.json();
-      const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `assessment_${id}.json`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
+
+      // Set font to monospace for better code/text formatting
+      doc.setFont('courier');
+      doc.setFontSize(9);
+
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 15;
+      const maxWidth = pageWidth - 2 * margin;
+      const lineHeight = 5;
+      let yPosition = margin;
+
+      // Split text into lines and process
+      const lines = plainOutput.split('\n');
+      
+      lines.forEach((line) => {
+        // Check if we need a new page
+        if (yPosition > pageHeight - margin) {
+          doc.addPage();
+          yPosition = margin;
+        }
+
+        // Handle long lines by splitting them
+        const splitLines = doc.splitTextToSize(line, maxWidth);
+        
+        splitLines.forEach((splitLine: string) => {
+          if (yPosition > pageHeight - margin) {
+            doc.addPage();
+            yPosition = margin;
+          }
+          doc.text(splitLine, margin, yPosition);
+          yPosition += lineHeight;
+        });
+      });
+
+      // Generate filename with target and timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const filename = target 
+        ? `OSINT_Report_${target.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}.pdf`
+        : `OSINT_Report_${timestamp}.pdf`;
+
+      // Save the PDF
+      doc.save(filename);
     } catch (e: any) {
-      setError(e.message || 'Download failed');
+      setError(e.message || 'PDF generation failed');
     }
   };
 
@@ -1110,9 +1122,9 @@ const AssessmentPage: React.FC = () => {
               </div>
 
               <div className="xl:col-span-2 flex items-center justify-center">
-                {(lastJobId || jobId) && (
+                {plainOutput && (
                   <button
-                    onClick={() => downloadReportForJob(lastJobId || jobId!)}
+                    onClick={downloadReportAsPDF}
                     className="px-5 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 font-semibold"
                   >
                     ⬇️ Download full report (PDF)
@@ -1145,12 +1157,6 @@ const AssessmentPage: React.FC = () => {
             </details>
           )}
 
-          {output && (
-            <details className="mt-4 p-3 bg-gray-850 rounded text-xs text-gray-300">
-              <summary className="cursor-pointer">Raw JSON response</summary>
-              <pre className="mt-2 text-xs text-gray-200 overflow-x-auto">{output}</pre>
-            </details>
-          )}
         </div>
       </div>
     </div>
