@@ -3,6 +3,7 @@ import { Shield, Radar, Globe, Server, Activity as ActivityIcon, Lock, AlertTria
 import { API_BASE_URL } from '@/lib/api';
 import { ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import jsPDF from 'jspdf';
+import anatLogo from '@/assets/anatlogo.png';
 
 type WhoisSection = {
   domain?: string;
@@ -123,12 +124,55 @@ const extractKeyValue = (block: string, label: string) => {
 };
 
 const extractListAfterLabel = (block: string, label: string) => {
-  const match = block.match(
-    new RegExp(`${label}:[\\s\\S]*?(?=\\n\\s*[A-Z0-9_][A-Za-z0-9 _\\-/\\.]+:\\s|$)`, 'i')
-  );
-  if (!match) return [];
-  const cleaned = match[0].split(/\r?\n/).slice(1).join('\n');
-  return sanitizeList(cleaned);
+  // First, try to find the label and capture until the next section boundary
+  const labelIndex = block.toLowerCase().indexOf(label.toLowerCase() + ':');
+  if (labelIndex === -1) return [];
+  
+  const afterLabel = block.slice(labelIndex + label.length + 1);
+  const lines = afterLabel.split(/\r?\n/);
+  const result: string[] = [];
+  
+  // Get all known section titles for comparison
+  const sectionTitles = SECTION_DEFS.map(def => def.title.toUpperCase());
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const upperTrimmed = trimmed.toUpperCase();
+    
+    // Stop at section separators (lines with only = or -)
+    if (/^[=\-]{3,}$/.test(trimmed)) break;
+    
+    // Stop at section numbers (e.g., "2.") - these indicate a new section
+    if (/^\d+\.\s*$/.test(trimmed) || /^\d+\.\s+[A-Z]/.test(trimmed)) {
+      // Check if the following text is a section title
+      const nextLine = lines[lines.indexOf(line) + 1]?.trim() || '';
+      if (sectionTitles.some(title => nextLine.toUpperCase().includes(title) || upperTrimmed.includes(title))) {
+        break;
+      }
+    }
+    
+    // Stop if we encounter a known section title
+    if (sectionTitles.some(title => upperTrimmed.includes(title) && trimmed.length > 10)) {
+      break;
+    }
+    
+    // Stop at next field label (contains colon and starts with capital letter, but not a list item)
+    if (trimmed.includes(':') && /^[A-Z]/.test(trimmed) && !trimmed.startsWith('-') && !trimmed.startsWith('•')) {
+      const nextLabel = trimmed.split(':')[0].trim().toUpperCase();
+      // Check if it matches a known section title or is a new major field
+      if (sectionTitles.some(title => title.includes(nextLabel)) || nextLabel.length > 15) {
+        break;
+      }
+    }
+    
+    // Skip empty lines
+    if (trimmed === '') continue;
+    
+    // Add valid list items
+    result.push(line);
+  }
+  
+  return sanitizeList(result.join('\n'));
 };
 
 const parsePortEntries = (
@@ -507,11 +551,43 @@ const AssessmentPage: React.FC = () => {
   }, [sectionData]);
 
   // Helper to generate and download PDF from output text
-  const downloadReportAsPDF = () => {
+  const downloadReportAsPDF = async () => {
     try {
       if (!plainOutput) {
         setError('No output available to download');
         return;
+      }
+
+      // Load logo image first
+      let logoData: string | null = null;
+      try {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.src = anatLogo;
+        
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => {
+            try {
+              const canvas = document.createElement('canvas');
+              canvas.width = img.width;
+              canvas.height = img.height;
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(img, 0, 0);
+                logoData = canvas.toDataURL('image/png');
+              }
+              resolve();
+            } catch (e) {
+              reject(e);
+            }
+          };
+          img.onerror = () => {
+            console.warn('Logo could not be loaded');
+            resolve(); // Continue without logo
+          };
+        });
+      } catch (e) {
+        console.warn('Logo loading error:', e);
       }
 
       const doc = new jsPDF({
@@ -520,39 +596,214 @@ const AssessmentPage: React.FC = () => {
         format: 'a4',
       });
 
-      // Set font to monospace for better code/text formatting
-      doc.setFont('courier');
-      doc.setFontSize(9);
-
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 15;
+      const margin = 20;
+      const headerHeight = 35;
+      const footerHeight = 15;
+      const contentStartY = margin + headerHeight;
+      const maxContentHeight = pageHeight - contentStartY - footerHeight;
       const maxWidth = pageWidth - 2 * margin;
-      const lineHeight = 5;
-      let yPosition = margin;
+      let yPosition = contentStartY;
+      let pageNumber = 1;
 
-      // Split text into lines and process
-      const lines = plainOutput.split('\n');
-      
-      lines.forEach((line) => {
-        // Check if we need a new page
-        if (yPosition > pageHeight - margin) {
+      // Helper function to add header with logo
+      const addHeader = () => {
+        if (logoData) {
+          try {
+            // Add logo in top left
+            doc.addImage(logoData, 'PNG', margin, 8, 25, 25);
+          } catch (e) {
+            console.warn('Failed to add logo to PDF:', e);
+          }
+        }
+        
+        // Add company name and title
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(16);
+        doc.setTextColor(40, 40, 40);
+        doc.text('ANAT SECURITY', margin + 30, 18);
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        doc.text('OSINT Assessment Report', margin + 30, 25);
+        
+        // Add report date
+        const reportDate = new Date().toLocaleDateString('en-US', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        doc.setFontSize(8);
+        doc.text(`Generated: ${reportDate}`, pageWidth - margin, 18, { align: 'right' });
+        
+        if (target) {
+          doc.text(`Target: ${target}`, pageWidth - margin, 25, { align: 'right' });
+        }
+        
+        // Add horizontal line
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.5);
+        doc.line(margin, headerHeight - 5, pageWidth - margin, headerHeight - 5);
+      };
+
+      // Helper function to add footer
+      const addFooter = () => {
+        const footerY = pageHeight - 10;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Page ${pageNumber}`, pageWidth / 2, footerY, { align: 'center' });
+        doc.text('ANAT Security - Confidential Report', pageWidth - margin, footerY, { align: 'right' });
+      };
+
+      // Helper function to check and add new page if needed
+      const checkNewPage = (requiredSpace: number = 10) => {
+        if (yPosition + requiredSpace > pageHeight - footerHeight) {
+          addFooter();
           doc.addPage();
-          yPosition = margin;
+          pageNumber++;
+          addHeader();
+          yPosition = contentStartY;
+        }
+      };
+
+      // Helper function to add a section title
+      const addSectionTitle = (title: string, sectionNumber?: number) => {
+        checkNewPage(15);
+        yPosition += 5;
+        
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.setTextColor(30, 30, 30);
+        
+        const titleText = sectionNumber ? `${sectionNumber}. ${title}` : title;
+        doc.text(titleText, margin, yPosition);
+        yPosition += 8;
+        
+        // Add underline
+        doc.setDrawColor(70, 130, 180);
+        doc.setLineWidth(0.8);
+        doc.line(margin, yPosition - 2, pageWidth - margin, yPosition - 2);
+        yPosition += 3;
+      };
+
+      // Helper function to add text with proper formatting
+      const addText = (text: string, fontSize: number = 9, isBold: boolean = false, color: [number, number, number] = [40, 40, 40]) => {
+        doc.setFont('helvetica', isBold ? 'bold' : 'normal');
+        doc.setFontSize(fontSize);
+        doc.setTextColor(color[0], color[1], color[2]);
+        
+        const lines = doc.splitTextToSize(text, maxWidth);
+        lines.forEach((line: string) => {
+          checkNewPage(6);
+          doc.text(line, margin, yPosition);
+          yPosition += 6;
+        });
+      };
+
+      // Helper function to add a key-value pair
+      const addKeyValue = (key: string, value: string) => {
+        checkNewPage(7);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(60, 60, 60);
+        doc.text(`${key}:`, margin, yPosition);
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(40, 40, 40);
+        const valueLines = doc.splitTextToSize(value, maxWidth - 40);
+        valueLines.forEach((line: string, idx: number) => {
+          doc.text(line, margin + 35, yPosition - (idx * 6));
+        });
+        yPosition += Math.max(6, valueLines.length * 6) + 2;
+      };
+
+      // Add first page header
+      addHeader();
+
+      // Parse and format the output
+      const lines = plainOutput.split('\n');
+      let currentSection = '';
+      let sectionNumber = 0;
+      let inSection = false;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        
+        // Skip empty lines at the start
+        if (!line && yPosition === contentStartY) continue;
+        
+        // Detect section titles
+        const sectionMatch = line.match(/^(\d+)\.\s+(.+)$/);
+        if (sectionMatch) {
+          sectionNumber = parseInt(sectionMatch[1]);
+          currentSection = sectionMatch[2];
+          addSectionTitle(currentSection, sectionNumber);
+          inSection = true;
+          continue;
         }
 
-        // Handle long lines by splitting them
-        const splitLines = doc.splitTextToSize(line, maxWidth);
-        
-        splitLines.forEach((splitLine: string) => {
-          if (yPosition > pageHeight - margin) {
-            doc.addPage();
-            yPosition = margin;
+        // Detect section separators
+        if (/^[=\-]{3,}$/.test(line)) {
+          if (inSection) {
+            yPosition += 3;
           }
-          doc.text(splitLine, margin, yPosition);
-          yPosition += lineHeight;
-        });
-      });
+          continue;
+        }
+
+        // Detect field labels (key: value format)
+        const keyValueMatch = line.match(/^([^:]+):\s*(.+)$/);
+        if (keyValueMatch && !line.startsWith('  ') && !line.startsWith('-') && !line.startsWith('•')) {
+          addKeyValue(keyValueMatch[1].trim(), keyValueMatch[2].trim());
+          continue;
+        }
+
+        // Detect list items
+        if (line.match(/^\s*[-•]\s+(.+)$/)) {
+          const listItem = line.replace(/^\s*[-•]\s+/, '');
+          checkNewPage(6);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
+          doc.setTextColor(40, 40, 40);
+          doc.text('•', margin + 5, yPosition);
+          const itemLines = doc.splitTextToSize(listItem, maxWidth - 15);
+          itemLines.forEach((itemLine: string) => {
+            doc.text(itemLine, margin + 10, yPosition);
+            yPosition += 6;
+          });
+          continue;
+        }
+
+        // Regular text
+        if (line) {
+          // Skip lines that are just section numbers
+          if (/^\d+\.\s*$/.test(line)) continue;
+          
+          // Check if it's a known section title (without number)
+          const isKnownSection = SECTION_DEFS.some(def => 
+            line.toUpperCase().includes(def.title.toUpperCase())
+          );
+          
+          if (isKnownSection && line.length > 15) {
+            // This is a section title without number, add it
+            addSectionTitle(line);
+            continue;
+          }
+
+          // Regular content text
+          addText(line, 9, false, [40, 40, 40]);
+        } else if (inSection) {
+          // Add small spacing for empty lines within sections
+          yPosition += 3;
+        }
+      }
+
+      // Add final footer
+      addFooter();
 
       // Generate filename with target and timestamp
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
@@ -564,6 +815,7 @@ const AssessmentPage: React.FC = () => {
       doc.save(filename);
     } catch (e: any) {
       setError(e.message || 'PDF generation failed');
+      console.error('PDF generation error:', e);
     }
   };
 
