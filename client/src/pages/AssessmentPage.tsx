@@ -602,8 +602,8 @@ const AssessmentPage: React.FC = () => {
       const headerHeight = 35;
       const footerHeight = 15;
       const contentStartY = margin + headerHeight;
-      const maxContentHeight = pageHeight - contentStartY - footerHeight;
       const maxWidth = pageWidth - 2 * margin;
+      const baseLineHeight = 5.5;
       let yPosition = contentStartY;
       let pageNumber = 1;
 
@@ -692,114 +692,369 @@ const AssessmentPage: React.FC = () => {
       };
 
       // Helper function to add text with proper formatting
-      const addText = (text: string, fontSize: number = 9, isBold: boolean = false, color: [number, number, number] = [40, 40, 40]) => {
+      const addText = (
+        text: string,
+        fontSize: number = 9,
+        isBold: boolean = false,
+        color: [number, number, number] = [40, 40, 40],
+        customLineHeight?: number
+      ) => {
+        const lineHeight = customLineHeight || baseLineHeight;
         doc.setFont('helvetica', isBold ? 'bold' : 'normal');
         doc.setFontSize(fontSize);
         doc.setTextColor(color[0], color[1], color[2]);
-        
         const lines = doc.splitTextToSize(text, maxWidth);
         lines.forEach((line: string) => {
-          checkNewPage(6);
+          checkNewPage(lineHeight + 1);
           doc.text(line, margin, yPosition);
-          yPosition += 6;
+          yPosition += lineHeight;
         });
       };
 
-      // Helper function to add a key-value pair
-      const addKeyValue = (key: string, value: string) => {
-        checkNewPage(7);
+      const addKeyValue = (key: string, value?: string | number | null) => {
+        if (value === undefined || value === null || `${value}`.trim() === '') return;
+        const valueText = `${value}`;
+        const valueLines = doc.splitTextToSize(valueText, maxWidth - 40);
+        const blockHeight = Math.max(baseLineHeight, valueLines.length * baseLineHeight);
+        checkNewPage(blockHeight + 4);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(9);
         doc.setTextColor(60, 60, 60);
         doc.text(`${key}:`, margin, yPosition);
-        
         doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
         doc.setTextColor(40, 40, 40);
-        const valueLines = doc.splitTextToSize(value, maxWidth - 40);
         valueLines.forEach((line: string, idx: number) => {
-          doc.text(line, margin + 35, yPosition - (idx * 6));
+          doc.text(line, margin + 35, yPosition + idx * baseLineHeight);
         });
-        yPosition += Math.max(6, valueLines.length * 6) + 2;
+        yPosition += blockHeight + 4;
+      };
+
+      const addKeyValueList = (pairs: Array<{ key: string; value?: string | number | null }>) => {
+        pairs.forEach(({ key, value }) => addKeyValue(key, value));
+      };
+
+      const addSubheading = (text: string) => {
+        checkNewPage(8);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(55, 55, 55);
+        doc.text(text, margin, yPosition);
+        yPosition += 5;
+      };
+
+      const addBulletList = (title: string, items?: string[]) => {
+        const list = (items || []).filter(Boolean);
+        if (!list.length) return;
+        if (title) {
+          addSubheading(title);
+        }
+        list.forEach((item) => {
+          const lines = doc.splitTextToSize(item, maxWidth - 15);
+          const height = Math.max(baseLineHeight, lines.length * baseLineHeight);
+          checkNewPage(height + 2);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
+          doc.setTextColor(40, 40, 40);
+          doc.text('•', margin + 2, yPosition + baseLineHeight / 2);
+          lines.forEach((line: string, idx: number) => {
+            doc.text(line, margin + 8, yPosition + idx * baseLineHeight);
+          });
+          yPosition += height + 2;
+        });
+        yPosition += 2;
+      };
+
+      const addTable = (
+        title: string | null,
+        columns: Array<{ header: string; width?: number }>,
+        rows: string[][]
+      ) => {
+        if (!rows.length) return;
+
+        if (title) {
+          addSubheading(title);
+        }
+
+        const baseWidths = columns.map((col) => col.width || maxWidth / columns.length);
+        const totalWidth = baseWidths.reduce((sum, width) => sum + width, 0);
+        const scale = totalWidth > maxWidth ? maxWidth / totalWidth : 1;
+        const widths = baseWidths.map((width) => width * scale);
+        const tableWidth = widths.reduce((sum, width) => sum + width, 0);
+
+        checkNewPage(baseLineHeight + 8);
+        doc.setFillColor(236, 239, 244);
+        doc.setDrawColor(200, 200, 200);
+        doc.rect(margin, yPosition, tableWidth, baseLineHeight + 4, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        let cursorX = margin;
+        columns.forEach((col, idx) => {
+          doc.text(col.header, cursorX + 2, yPosition + baseLineHeight + 1);
+          cursorX += widths[idx];
+        });
+        yPosition += baseLineHeight + 4;
+
+        rows.forEach((row) => {
+          const cellLines = row.map((cell, idx) =>
+            doc.splitTextToSize(cell || '—', widths[idx] - 4)
+          );
+          const rowHeight =
+            Math.max(...cellLines.map((lines) => Math.max(1, lines.length))) * baseLineHeight + 3;
+          checkNewPage(rowHeight + 2);
+          let cellX = margin;
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8.5);
+          columns.forEach((col, idx) => {
+            doc.rect(cellX, yPosition, widths[idx], rowHeight);
+            const lines = cellLines[idx].length ? cellLines[idx] : ['—'];
+            lines.forEach((line: string, lineIdx: number) => {
+              doc.text(line, cellX + 2, yPosition + 4 + lineIdx * baseLineHeight);
+            });
+            cellX += widths[idx];
+          });
+          yPosition += rowHeight;
+        });
+        yPosition += 6;
+      };
+
+      const addAppendixOutput = () => {
+        addSectionTitle('Appendix: Full Scan Output');
+        const rawLines = plainOutput.split('\n');
+        rawLines.forEach((line) => {
+          if (!line.trim()) {
+            yPosition += 2;
+            return;
+          }
+          addText(line, 8, false, [80, 80, 80], 5);
+        });
       };
 
       // Add first page header
       addHeader();
 
-      // Parse and format the output
-      const lines = plainOutput.split('\n');
-      let currentSection = '';
-      let sectionNumber = 0;
-      let inSection = false;
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-        
-        // Skip empty lines at the start
-        if (!line && yPosition === contentStartY) continue;
-        
-        // Detect section titles
-        const sectionMatch = line.match(/^(\d+)\.\s+(.+)$/);
-        if (sectionMatch) {
-          sectionNumber = parseInt(sectionMatch[1]);
-          currentSection = sectionMatch[2];
-          addSectionTitle(currentSection, sectionNumber);
-          inSection = true;
-          continue;
+      if (sectionData) {
+        const whois = sectionData.whois;
+        if (whois) {
+          addSectionTitle('COMPREHENSIVE WHOIS REGISTRATION DETAILS', 1);
+          addKeyValueList([
+            { key: 'Domain', value: whois.domain },
+            { key: 'Registrar', value: whois.registrar },
+            { key: 'Created', value: whois.creationDate },
+            { key: 'Expires', value: whois.expirationDate },
+            { key: 'Contacts', value: whois.contactEmails?.length ?? 0 },
+          ]);
+          addBulletList('Name Servers', whois.nameServers);
+          addBulletList('Contact Emails', whois.contactEmails);
         }
 
-        // Detect section separators
-        if (/^[=\-]{3,}$/.test(line)) {
-          if (inSection) {
+        const dns = sectionData.dns;
+        if (dns) {
+          addSectionTitle('ENHANCED DNS CONFIGURATION ANALYSIS', 2);
+          addKeyValueList([
+            { key: 'DNSSEC Enabled', value: dns.dnssecEnabled ? 'Yes' : 'No' },
+            { key: 'SPF Record', value: dns.spfRecord || 'Not published' },
+          ]);
+          addBulletList('A Records', dns.aRecords);
+          addBulletList('MX Records', dns.mxRecords);
+          addBulletList('NS Records', dns.nsRecords);
+          addBulletList('TXT Records', dns.txtRecords);
+        }
+
+        const subdomains = sectionData.subdomains;
+        if (subdomains?.entries?.length) {
+          addSectionTitle('COMPREHENSIVE SUBDOMAIN ENUMERATION', 3);
+          addKeyValue('Total Subdomains', subdomains.total || subdomains.entries.length);
+          addTable(
+            'Resolved Subdomains',
+            [
+              { header: 'Subdomain', width: maxWidth * 0.55 },
+              { header: 'IP Address', width: maxWidth * 0.45 },
+            ],
+            subdomains.entries.map((entry) => [entry.subdomain, entry.ip || '—'])
+          );
+        }
+
+        const ports = sectionData.ports;
+        if (ports?.entries?.length) {
+          addSectionTitle('ADVANCED PORT SCANNING & SERVICE DETECTION', 4);
+          addKeyValue('Reported Open Ports', ports.total || ports.entries.length);
+          addTable(
+            'Open Ports',
+            [
+              { header: 'IP', width: 55 },
+              { header: 'Port', width: 25 },
+              { header: 'Service', width: 40 },
+              { header: 'Status', width: 25 },
+              { header: 'Banner / Details', width: maxWidth - 145 },
+            ],
+            ports.entries.map((entry) => [
+              entry.ip,
+              entry.port.toString(),
+              entry.service || 'Unknown',
+              entry.status || '—',
+              entry.banner || '—',
+            ])
+          );
+        }
+
+        const ssl = sectionData.ssl;
+        if (ssl) {
+          addSectionTitle('SSL/TLS CERTIFICATE ANALYSIS', 5);
+          addKeyValueList([
+            { key: 'Subject', value: ssl.subject },
+            { key: 'Issuer', value: ssl.issuer },
+            { key: 'Valid From', value: ssl.validFrom },
+            { key: 'Valid Until', value: ssl.validUntil },
+            { key: 'Signature Algorithm', value: ssl.signatureAlgorithm },
+          ]);
+        }
+
+        const web = sectionData.web;
+        if (web?.analyses?.length) {
+          addSectionTitle('COMPREHENSIVE WEB TECHNOLOGY ANALYSIS', 6);
+          web.analyses.forEach((analysis, idx) => {
+            addSubheading(`Analyzing: ${analysis.target}`);
+            addKeyValueList([
+              { key: 'Server', value: analysis.server },
+              { key: 'Powered-By', value: analysis.poweredBy },
+            ]);
+            if (analysis.headers?.length) {
+              addTable(
+                'Security Headers',
+                [
+                  { header: 'Header Name', width: maxWidth * 0.6 },
+                  { header: 'Status', width: maxWidth * 0.4 },
+                ],
+                analysis.headers.map((header) => [
+                  header.name,
+                  header.status === 'present' ? 'Present' : 'Missing',
+                ])
+              );
+            }
+            addBulletList('Technologies', analysis.technologies);
+            addBulletList('Critical Findings', analysis.criticalFindings);
+          });
+        }
+
+        const breach = sectionData.breach;
+        if (breach?.results?.length) {
+          addSectionTitle('REAL DATA BREACH ANALYSIS', 7);
+          addTable(
+            'HIBP Lookups',
+            [
+              { header: 'Email / Identifier', width: maxWidth * 0.35 },
+              { header: 'Status', width: maxWidth * 0.15 },
+              { header: 'Details', width: maxWidth * 0.5 },
+            ],
+            breach.results.map((result) => [
+              result.email,
+              result.status.toUpperCase(),
+              result.message,
+            ])
+          );
+        }
+
+        const waf = sectionData.waf;
+        if (waf?.detections?.length) {
+          addSectionTitle('WEB APPLICATION FIREWALL DETECTION', 8);
+          addBulletList(
+            'Detection Results',
+            waf.detections.map((det) => `${det.message} • ${det.target}`)
+          );
+        }
+
+        const geo = sectionData.geo;
+        if (geo?.locations?.length) {
+          addSectionTitle('IP GEOLOCATION & NETWORK ANALYSIS', 9);
+          addTable(
+            'Asset Inventory',
+            [
+              { header: 'IP Address', width: maxWidth * 0.28 },
+              { header: 'Organization', width: maxWidth * 0.28 },
+              { header: 'Country / City', width: maxWidth * 0.22 },
+              { header: 'ASN', width: maxWidth * 0.22 },
+            ],
+            geo.locations.map((loc) => [
+              loc.ip,
+              loc.organization || '—',
+              `${loc.country || 'Unknown'}${loc.city ? ` / ${loc.city}` : ''}`,
+              loc.asn || '—',
+            ])
+          );
+        }
+
+        const business = sectionData.business;
+        if (business) {
+          addSectionTitle('BUSINESS INTELLIGENCE & CONTEXT ANALYSIS', 10);
+          if (business.companyProfile) {
+            const profilePairs = Object.entries(business.companyProfile).map(([key, value]) => ({
+              key: key.replace(/_/g, ' '),
+              value,
+            }));
+            addKeyValueList(profilePairs);
+          }
+          addBulletList('Infrastructure Providers', business.infrastructureProviders);
+          addBulletList('Related Entities', business.relatedEntities);
+        }
+
+        addAppendixOutput();
+      } else {
+        // Fallback: render plain log output if parsing is unavailable
+        const lines = plainOutput.split('\n');
+        let currentSection = '';
+        let sectionNumber = 0;
+        let inSection = false;
+
+        lines.forEach((line) => {
+          const trimmed = line.trim();
+          if (!trimmed && yPosition === contentStartY) return;
+
+          const sectionMatch = trimmed.match(/^(\d+)\.\s+(.+)$/);
+          if (sectionMatch) {
+            sectionNumber = parseInt(sectionMatch[1]);
+            currentSection = sectionMatch[2];
+            addSectionTitle(currentSection, sectionNumber);
+            inSection = true;
+            return;
+          }
+
+          if (/^[=\-]{3,}$/.test(trimmed)) {
+            if (inSection) yPosition += 3;
+            return;
+          }
+
+          const keyValueMatch = trimmed.match(/^([^:]+):\s*(.+)$/);
+          if (
+            keyValueMatch &&
+            !trimmed.startsWith('  ') &&
+            !trimmed.startsWith('-') &&
+            !trimmed.startsWith('•')
+          ) {
+            addKeyValue(keyValueMatch[1].trim(), keyValueMatch[2].trim());
+            return;
+          }
+
+          if (/^\s*[-•]\s+(.+)$/.test(trimmed)) {
+            const listItem = trimmed.replace(/^\s*[-•]\s+/, '');
+            addBulletList('', [listItem]);
+            return;
+          }
+
+          if (trimmed) {
+            if (/^\d+\.\s*$/.test(trimmed)) return;
+            const isKnownSection = SECTION_DEFS.some((def) =>
+              trimmed.toUpperCase().includes(def.title.toUpperCase())
+            );
+            if (isKnownSection && trimmed.length > 15) {
+              addSectionTitle(trimmed);
+              return;
+            }
+            addText(trimmed, 9, false, [40, 40, 40]);
+          } else if (inSection) {
             yPosition += 3;
           }
-          continue;
-        }
-
-        // Detect field labels (key: value format)
-        const keyValueMatch = line.match(/^([^:]+):\s*(.+)$/);
-        if (keyValueMatch && !line.startsWith('  ') && !line.startsWith('-') && !line.startsWith('•')) {
-          addKeyValue(keyValueMatch[1].trim(), keyValueMatch[2].trim());
-          continue;
-        }
-
-        // Detect list items
-        if (line.match(/^\s*[-•]\s+(.+)$/)) {
-          const listItem = line.replace(/^\s*[-•]\s+/, '');
-          checkNewPage(6);
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(9);
-          doc.setTextColor(40, 40, 40);
-          doc.text('•', margin + 5, yPosition);
-          const itemLines = doc.splitTextToSize(listItem, maxWidth - 15);
-          itemLines.forEach((itemLine: string) => {
-            doc.text(itemLine, margin + 10, yPosition);
-            yPosition += 6;
-          });
-          continue;
-        }
-
-        // Regular text
-        if (line) {
-          // Skip lines that are just section numbers
-          if (/^\d+\.\s*$/.test(line)) continue;
-          
-          // Check if it's a known section title (without number)
-          const isKnownSection = SECTION_DEFS.some(def => 
-            line.toUpperCase().includes(def.title.toUpperCase())
-          );
-          
-          if (isKnownSection && line.length > 15) {
-            // This is a section title without number, add it
-            addSectionTitle(line);
-            continue;
-          }
-
-          // Regular content text
-          addText(line, 9, false, [40, 40, 40]);
-        } else if (inSection) {
-          // Add small spacing for empty lines within sections
-          yPosition += 3;
-        }
+        });
       }
 
       // Add final footer
