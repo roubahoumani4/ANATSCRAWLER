@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import { exec } from 'child_process';
 
 const router = Router();
 
@@ -273,8 +274,63 @@ router.get('/download/:jobId', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Report file not found on disk' });
     }
 
-    // Send file as attachment
-    return res.download(real, path.basename(real));
+    // Convert markdown to PDF and send
+    try {
+      const mdContent = fs.readFileSync(real, 'utf-8');
+      const pdfFilename = `assessment_${jobId}.pdf`;
+      
+      // Try to use pandoc if available, otherwise use a simple markdown-to-PDF conversion
+      const pandocAvailable = await new Promise<boolean>((resolve) => {
+        exec('which pandoc', (err) => {
+          resolve(!err);
+        });
+      });
+
+      if (pandocAvailable) {
+        // Use pandoc for better markdown to PDF conversion
+        const tempMd = path.join(scriptsDir, `temp_${jobId}.md`);
+        const tempPdf = path.join(scriptsDir, `temp_${jobId}.pdf`);
+        
+        fs.writeFileSync(tempMd, mdContent);
+        
+        return new Promise<void>((resolvePromise, rejectPromise) => {
+          exec(`pandoc "${tempMd}" -o "${tempPdf}"`, (error) => {
+            if (error) {
+              // Fallback: send markdown file as plain text
+              fs.unlinkSync(tempMd);
+              return res.download(real, path.basename(real));
+            }
+            
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${pdfFilename}"`);
+            
+            const stream = fs.createReadStream(tempPdf);
+            stream.pipe(res);
+            
+            stream.on('end', () => {
+              // Cleanup temp files
+              try {
+                fs.unlinkSync(tempMd);
+                fs.unlinkSync(tempPdf);
+              } catch (e) {
+                // Ignore cleanup errors
+              }
+              resolvePromise();
+            });
+            
+            stream.on('error', (err) => {
+              rejectPromise(err);
+            });
+          });
+        });
+      } else {
+        // Fallback: send markdown file directly
+        return res.download(real, path.basename(real));
+      }
+    } catch (convErr) {
+      // Fallback: send original file
+      return res.download(real, path.basename(real));
+    }
   } catch (err) {
     return res.status(500).json({ error: (err as Error).message || 'Unknown error' });
   }

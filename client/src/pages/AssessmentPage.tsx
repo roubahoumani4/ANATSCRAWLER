@@ -14,6 +14,7 @@ const AssessmentPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [plainOutput, setPlainOutput] = useState<string | null>(null);
   const [sections, setSections] = useState<Array<{ title: string; content: string }>>([]);
+  const [showCharts, setShowCharts] = useState(false);
 
   // Helper to download a file: try server download endpoint first, then fallback to status JSON
   const downloadReportForJob = async (id: string) => {
@@ -212,29 +213,9 @@ const AssessmentPage: React.FC = () => {
             <div className="mt-4 text-sm text-blue-400 animate-pulse">{statusMessage}</div>
           )}
 
-          {error && (
-            <div className="mt-4 text-sm text-red-400">{error}</div>
-          )}
-
-          {plainOutput && (
-            <div className="mt-4 p-3 bg-gray-900 rounded text-xs text-gray-200 overflow-y-auto max-h-[60vh] whitespace-pre-wrap">
-              {sections.length > 0 ? (
-                sections.map((s, idx) => (
-                  <div key={idx} className="mb-4">
-                    <div className="text-sm text-gray-300 font-semibold mb-1">{s.title}</div>
-                    <pre className="bg-gray-800 p-3 rounded text-xs text-gray-200 overflow-x-auto whitespace-pre-wrap">{s.content}</pre>
-                  </div>
-                ))
-              ) : (
-                <pre className="text-xs text-gray-200">{plainOutput}</pre>
-              )}
-            </div>
-          )}
-
-          {/* Summary donuts + download button */}
+          {/* SUMMARY DONUTS / CHARTS - Always visible at the top after status */}
           {(output || plainOutput) && (
             <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Parse some key metrics from the JSON result for simple charts */}
               {(() => {
                 try {
                   let parsed: any = {};
@@ -287,16 +268,12 @@ const AssessmentPage: React.FC = () => {
                       <div>{donut('Critical Vulnerabilities', crit, '#ef4444')}</div>
                       <div>{donut('Total Vulnerabilities', totalVulns, '#10b981')}</div>
                       <div className="flex items-center justify-center">
-                        {/* Download button: show when we have a lastJobId or active jobId */}
                         {(lastJobId || jobId) && (
                           <button
-                            onClick={async () => {
-                              const id = lastJobId || jobId!;
-                              await downloadReportForJob(id);
-                            }}
-                            className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500"
+                            onClick={() => downloadReportForJob(lastJobId || jobId!)}
+                            className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 font-semibold"
                           >
-                            Download full report
+                            ⬇️ Download full report (PDF)
                           </button>
                         )}
                       </div>
@@ -307,6 +284,29 @@ const AssessmentPage: React.FC = () => {
                 }
               })()}
             </div>
+          )}
+
+          {error && (
+            <div className="mt-4 text-sm text-red-400">{error}</div>
+          )}
+
+          {/* Raw output hidden in collapsible details */}
+          {plainOutput && (
+            <details className="mt-6 p-3 bg-gray-850 rounded border border-gray-800 text-xs text-gray-300">
+              <summary className="cursor-pointer font-semibold text-gray-200">📄 Full scan output (click to expand)</summary>
+              <div className="mt-4 p-3 bg-gray-900 rounded text-xs text-gray-200 overflow-y-auto max-h-[60vh] whitespace-pre-wrap">
+                {sections.length > 0 ? (
+                  sections.map((s, idx) => (
+                    <div key={idx} className="mb-4">
+                      <div className="text-sm text-gray-300 font-semibold mb-1">{s.title}</div>
+                      <pre className="bg-gray-800 p-3 rounded text-xs text-gray-200 overflow-x-auto whitespace-pre-wrap">{s.content}</pre>
+                    </div>
+                  ))
+                ) : (
+                  <pre className="text-xs text-gray-200">{plainOutput}</pre>
+                )}
+              </div>
+            </details>
           )}
 
           {output && (
