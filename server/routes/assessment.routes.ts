@@ -82,7 +82,8 @@ function runAssessmentBackground(jobId: string, target: string) {
       const reportMatch = plain.match(/Report Location:\s*(.+)/i);
       if (reportMatch) parsed.reportLocation = reportMatch[1].trim();
 
-      const summaryMatch = plain.match(/Assessment Summary:[\s\S]*$/i);
+      // Support both legacy "Assessment Summary" and new "Scan Summary" blocks
+      const summaryMatch = plain.match(/(Assessment Summary|Scan Summary)[\s\S]*$/i);
       if (summaryMatch) {
         const summary = summaryMatch[0];
         parsed.summaryLines = summary.split(/\n/).map((l) => l.trim()).filter(Boolean);
@@ -104,12 +105,40 @@ function runAssessmentBackground(jobId: string, target: string) {
         if (sdMatch) parsed.subdomainsFound = Number(sdMatch[1]);
       }
 
-      const portsSection = plain.match(/OPEN PORTS:[\s\S]*?\n\n/);
-      if (portsSection) {
-        const portsText = portsSection[0];
-        const portNums = Array.from(portsText.matchAll(/^(\d+)\s+/gm)).map((m) => Number(m[1]));
-        parsed.openPortsList = portNums;
-        if (parsed.openPorts == null) parsed.openPorts = portNums.length;
+      const portsSectionMatch = plain.match(/OPEN PORTS:[\s\S]*?(?:\n{2,}|7\.\s|8\.\s|9\.\s|10\.)/i);
+      if (portsSectionMatch) {
+        const portsText = portsSectionMatch[0];
+        const lines = portsText.split(/\r?\n/);
+        const entries: Array<{ ip: string; port: number; service: string; banner: string; status: string }> = [];
+        const portSet = new Set<number>();
+
+        for (const rawLine of lines) {
+          const line = rawLine.trim();
+          if (!line || /^IP\s+/i.test(line) || /^-{3,}/.test(line)) continue;
+
+          const fullMatch = line.match(/^(\d{1,3}(?:\.\d{1,3}){3})\s+(\d{1,5})\s+([A-Za-z0-9\-\/\+]+)\s+(.*?)\s+(OPEN|CLOSED|FILTERED)$/i);
+          if (fullMatch) {
+            const [, ip, portStr, service, banner, status] = fullMatch;
+            const port = Number(portStr);
+            portSet.add(port);
+            entries.push({ ip, port, service, banner: banner.trim(), status: status.toUpperCase() });
+            continue;
+          }
+
+          const fallback = line.match(/(\d{1,3}(?:\.\d{1,3}){3})\s+(\d{1,5})/);
+          if (fallback) {
+            const [, ip, portStr] = fallback;
+            const port = Number(portStr);
+            portSet.add(port);
+            entries.push({ ip, port, service: 'unknown', banner: line, status: 'OPEN' });
+          }
+        }
+
+        if (entries.length) {
+          parsed.openPortsList = Array.from(portSet);
+          parsed.openPortsEntries = entries;
+          if (parsed.openPorts == null) parsed.openPorts = entries.length;
+        }
       }
 
       const lines = plain.split(/\r?\n/);
