@@ -1211,6 +1211,19 @@ class ProfessionalOSINT:
         for url in urls_to_check[:3]:
             try:
                 waf_info = self.detect_waf(url)
+                # Enrich with whatwaf output when available (best-effort)
+                try:
+                    whatwaf_result = self.run_whatwaf(url)
+                    if isinstance(whatwaf_result, dict):
+                        waf_info['whatwaf'] = whatwaf_result
+                        # If whatwaf indicates detection, reflect that in the primary flag
+                        if whatwaf_result.get('detected'):
+                            waf_info['detected'] = True
+                            if whatwaf_result.get('waf_name'):
+                                waf_info['waf'] = whatwaf_result.get('waf_name')
+                except Exception as e:
+                    # Non-fatal: attach the error if possible
+                    waf_info['whatwaf_error'] = str(e)
                 if waf_info:
                     waf_data[url] = waf_info
                     if waf_info['detected']:
@@ -1273,6 +1286,47 @@ class ProfessionalOSINT:
             
         except Exception as e:
             return {'detected': False, 'error': str(e)}
+
+    def run_whatwaf(self, url):
+        """Try to run the external whatwaf tool against `url` and return raw output.
+
+        This is best-effort: if `whatwaf` is not available we attempt a pip install,
+        then run the command. Any failures are caught and returned as an error string.
+        The returned dict will contain keys: raw (string) and success (bool).
+        """
+        try:
+            # Prefer the whatwaf binary if available
+            whatwaf_cmd = shutil.which('whatwaf')
+            if not whatwaf_cmd:
+                # Attempt to pip install whatwaf quietly (best-effort)
+                try:
+                    print('Attempting to install whatwaf (pip) for WAF detection...')
+                    subprocess.run([sys.executable, '-m', 'pip', 'install', 'whatwaf'], check=False, capture_output=True, text=True, timeout=120)
+                    whatwaf_cmd = shutil.which('whatwaf')
+                except Exception:
+                    whatwaf_cmd = None
+
+            if not whatwaf_cmd:
+                return {'success': False, 'error': 'whatwaf not available'}
+
+            # Run whatwaf against the URL with a reasonable timeout
+            proc = subprocess.run([whatwaf_cmd, url], capture_output=True, text=True, timeout=120)
+            out = (proc.stdout or '') + '\n' + (proc.stderr or '')
+
+            # Basic heuristics: look for common detection lines
+            detected = False
+            name = None
+            low = out.lower()
+            if 'detected' in low or 'waf' in low:
+                detected = True
+                # try to extract a likely WAF name from output (first capitalized token after keywords)
+                m = re.search(r'Detected\s*:\s*([A-Za-z0-9\-_/ ]+)', out)
+                if m:
+                    name = m.group(1).strip()
+
+            return {'success': True, 'raw': out.strip(), 'detected': detected, 'waf_name': name}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
 
     def ip_geolocation_analysis(self):
         """Perform IP geolocation and ASN analysis"""
