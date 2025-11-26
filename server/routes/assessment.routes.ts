@@ -3,6 +3,7 @@ import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import { exec } from 'child_process';
+import net from 'net';
 
 const router = Router();
 
@@ -23,6 +24,41 @@ interface JobStatus {
 }
 
 const jobs = new Map<string, JobStatus>();
+
+const isValidIPv4 = (ip: string) => {
+  const parts = ip.split('.');
+  if (parts.length !== 4) return false;
+  return parts.every((part) => {
+    if (!/^\d+$/.test(part)) return false;
+    const num = Number(part);
+    return num >= 0 && num <= 255;
+  });
+};
+
+const verifyPortStatus = (ip: string, port: number, timeoutMs: number) =>
+  new Promise<{ open: boolean; latencyMs: number; error?: string }>((resolve) => {
+    const socket = new net.Socket();
+    let resolved = false;
+    const started = Date.now();
+
+    const conclude = (open: boolean, error?: string) => {
+      if (resolved) return;
+      resolved = true;
+      socket.destroy();
+      resolve({ open, latencyMs: Date.now() - started, error });
+    };
+
+    socket.setTimeout(timeoutMs);
+    socket.once('connect', () => conclude(true));
+    socket.once('timeout', () => conclude(false, 'timeout'));
+    socket.once('error', (err) => conclude(false, err?.message || 'connection error'));
+
+    try {
+      socket.connect(port, ip);
+    } catch (err: any) {
+      conclude(false, err?.message || 'connection error');
+    }
+  });
 
 // Helper to generate unique job IDs
 function generateJobId(): string {
@@ -82,40 +118,6 @@ function runAssessmentBackground(jobId: string, target: string) {
       const reportMatch = plain.match(/Report Location:\s*(.+)/i);
       if (reportMatch) parsed.reportLocation = reportMatch[1].trim();
 
-      // If the scanner saved artifacts next to the report, try to load port scanning and nmap script findings
-      if (parsed.reportLocation) {
-        try {
-          const scriptsDir = process.env.SCRIPTS_DIR || '/var/www/anatscrawler/scripts';
-          let resolved = parsed.reportLocation;
-          if (!path.isAbsolute(resolved)) {
-            resolved = path.resolve(scriptsDir, resolved);
-          }
-          const real = path.resolve(resolved);
-          const reportDir = path.dirname(real);
-
-          const tryReadJson = (fname: string) => {
-            try {
-              const p = path.join(reportDir, fname);
-              if (fs.existsSync(p)) {
-                const raw = fs.readFileSync(p, 'utf-8');
-                return JSON.parse(raw);
-              }
-            } catch (e) {
-              // ignore parse/read errors
-            }
-            return null;
-          };
-
-          const portScan = tryReadJson('port_scanning.json');
-          if (portScan) parsed.portScan = portScan;
-
-          const nmapScripts = tryReadJson('nmap_script_findings.json');
-          if (nmapScripts) parsed.nmapScriptFindings = nmapScripts;
-        } catch (e) {
-          // ignore artifact loading errors
-        }
-      }
-
       // Support both legacy "Assessment Summary" and new "Scan Summary" blocks
       const summaryMatch = plain.match(/(Assessment Summary|Scan Summary)[\s\S]*$/i);
       if (summaryMatch) {
@@ -173,18 +175,6 @@ function runAssessmentBackground(jobId: string, target: string) {
           parsed.openPortsEntries = entries;
           if (parsed.openPorts == null) parsed.openPorts = entries.length;
         }
-      }
-
-      // If structured portScan artifact wasn't present, but we parsed open ports from stdout,
-      // build a minimal portScan structure so the frontend can render port lists.
-      if (!parsed.portScan && parsed.openPortsEntries && parsed.openPortsEntries.length) {
-        parsed.portScan = {
-          target: parsed.reportLocation || target,
-          scan_time: new Date().toISOString(),
-          open_ports: parsed.openPortsEntries,
-          services: {},
-          vulnerabilities: [],
-        };
       }
 
       const lines = plain.split(/\r?\n/);
@@ -318,6 +308,30 @@ setInterval(() => {
     }
   }
 }, 5 * 60 * 1000); // Check every 5 minutes
+
+router.post('/verify-port', async (req: Request, res: Response) => {
+  try {
+    const { ip, port } = req.body || {};
+    if (typeof ip !== 'string' || !isValidIPv4(ip)) {
+      return res.status(400).json({ error: 'Invalid IP address' });
+    }
+    const portNum = Number(port);
+    if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) {
+      return res.status(400).json({ error: 'Invalid port' });
+    }
+    const timeoutMs = Number(process.env.PORT_VERIFY_TIMEOUT_MS || 4000);
+    const result = await verifyPortStatus(ip, portNum, timeoutMs);
+    return res.json({
+      ip,
+      port: portNum,
+      open: result.open,
+      latencyMs: result.latencyMs,
+      error: result.error,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: (err as Error).message || 'Verification failed' });
+  }
+});
 
 export default router;
 

@@ -15,8 +15,6 @@ import concurrent.futures
 import ssl
 import hashlib
 import base64
-import shutil
-import xml.etree.ElementTree as ET
 from datetime import datetime
 from urllib.parse import urlparse
 from pathlib import Path
@@ -187,8 +185,6 @@ class ProfessionalOSINT:
         self.target = target
         self.deep_scan = deep_scan
         self.check_breaches = check_breaches
-        # remote verification flag (use external port-checker like YouGetSignal)
-        self.verify_remote = False
         self.hibp_api_key = HIBP_API_KEY
         self.shodan_key = SHODAN_API_KEY
         self.output_dir = output_dir or f"osint_{target.replace('://', '_').replace('/', '_')}"
@@ -667,41 +663,8 @@ class ProfessionalOSINT:
         all_open_ports = []
         for ip in ips_to_scan[:3]:  # Limit to 3 IPs for time reasons
             print(f"{Colors.CYAN}Scanning IP: {ip}{Colors.END}")
-            # First pass: fast TCP connect + banner grab
-            candidate_ports = self.scan_ip_ports(ip, common_ports)
-            if not candidate_ports:
-                continue
-
-            # Verify candidates with nmap where available to avoid false-positives
-            ports_list = [p['port'] for p in candidate_ports]
-            verified = self.verify_open_ports_with_nmap(ip, ports_list, candidate_ports)
-
-            # Optionally perform an external remote verification (YouGetSignal) to further reduce false-positives
-            # When --verify-remote is used we take a strict approach: only ports confirmed by the remote
-            # checker are kept. If the remote check fails or is inconclusive we exclude unconfirmed ports
-            # to avoid reporting false OPEN ports in the final artifacts.
-            if self.verify_remote:
-                try:
-                    remote_verified = self.verify_open_ports_with_yougetsignal(ip, verified)
-                    if remote_verified:
-                        verified = remote_verified
-                    else:
-                        # Remote verification returned nothing -> be strict and drop unconfirmed ports
-                        self.print_warning(f"Remote verification returned no confirmed ports for {ip}; excluding unconfirmed ports.")
-                        verified = []
-                except Exception as e:
-                    # Don't let remote verification crash the scan; drop unconfirmed ports when enabled
-                    self.print_warning(f"Remote verification step failed for {ip}: {e}")
-                    verified = []
-
-            # Analyze vulnerabilities for verified ports and add to final list
-            for p in verified:
-                try:
-                    self.analyze_service_vulnerabilities(p)
-                except Exception:
-                    pass
-
-            all_open_ports.extend(verified)
+            open_ports = self.scan_ip_ports(ip, common_ports)
+            all_open_ports.extend(open_ports)
         
         # Sort by port number
         all_open_ports.sort(key=lambda x: x["port"])
@@ -738,6 +701,7 @@ class ProfessionalOSINT:
                     result = future.result()
                     if result:
                         open_ports.append(result)
+                        self.analyze_service_vulnerabilities(result)
                 except Exception as e:
                     pass
         
@@ -770,130 +734,6 @@ class ProfessionalOSINT:
         except:
             pass
         return None
-
-    def verify_open_ports_with_nmap(self, ip, ports_list, original_port_infos):
-        """Verify candidate open ports using nmap - returns only ports confirmed open by nmap.
-
-        ip: target ip
-        ports_list: list of port numbers to verify
-        original_port_infos: list of port_info dicts from the fast scan
-        """
-        # If nmap is not available, fallback to the fast-scan results
-        if not shutil.which('nmap'):
-            self.print_warning('nmap not found on PATH — skipping nmap verification (using fast-scan results)')
-            return original_port_infos
-
-        if not ports_list:
-            return []
-
-        port_str = ','.join(str(p) for p in sorted(set(ports_list)))
-        cmd = ['nmap', '-Pn', '-sV', '-p', port_str, '--host-timeout', '30s', '-oX', '-', ip]
-        try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-            xml_out = proc.stdout
-            if not xml_out:
-                return original_port_infos
-
-            root = ET.fromstring(xml_out)
-            open_ports = []
-            # Map original infos by port for merging banners
-            orig_map = {int(p['port']): p for p in original_port_infos if 'port' in p}
-
-            for port_elem in root.findall('.//port'):
-                # portid is an attribute on the <port> element
-                portid = port_elem.attrib.get('portid')
-                if not portid:
-                    continue
-                try:
-                    pid = int(portid)
-                except Exception:
-                    continue
-
-                state_elem = port_elem.find('state')
-                state = state_elem.attrib.get('state') if state_elem is not None and 'state' in state_elem.attrib else (state_elem.get('state') if state_elem is not None else None)
-                if state != 'open':
-                    continue
-
-                service_elem = port_elem.find('service')
-                srv_name = ''
-                product = ''
-                version = ''
-                if service_elem is not None:
-                    srv_name = service_elem.attrib.get('name', '')
-                    product = service_elem.attrib.get('product', '')
-                    version = service_elem.attrib.get('version', '')
-
-                merged = orig_map.get(pid, {}).copy() if pid in orig_map else { 'ip': ip, 'port': pid, 'service': srv_name or 'unknown', 'banner': '' }
-                # Prefer nmap-discovered service name/product/version
-                if srv_name:
-                    merged['service'] = srv_name
-                if product or version:
-                    merged['banner'] = ((product or '') + ((' ' + version) if version else '')).strip() or merged.get('banner', '')
-
-                # Add a flag indicating source of confirmation
-                merged['confirmed_by'] = 'nmap'
-                open_ports.append(merged)
-
-            return open_ports
-        except Exception as e:
-            self.print_warning(f"nmap verification failed: {e}")
-            return original_port_infos
-
-    def verify_open_ports_with_yougetsignal(self, ip, port_infos):
-        """Verify ports using an external remote port-checker (YouGetSignal) optionally.
-
-        This will POST to the public endpoint used by the web UI. The check is best-effort
-        and may fail if the service blocks programmatic access. The feature is disabled
-        by default and can be enabled by setting `self.verify_remote = True` or via CLI flag.
-        """
-        if not port_infos:
-            return []
-
-        verified = []
-        endpoint = 'https://ports.yougetsignal.com/check-port.php'
-        headers = {
-            'User-Agent': 'ProfessionalOSINTTool/1.0',
-            'Accept': 'application/json, text/javascript, */*; q=0.01',
-        }
-
-        for p in port_infos:
-            port = int(p.get('port'))
-            try:
-                resp = requests.post(endpoint, data={'remoteAddress': ip, 'portNumber': port}, headers=headers, timeout=10)
-                text = (resp.text or '').strip()
-                ok = False
-                # Try to parse JSON if returned
-                try:
-                    j = resp.json()
-                    # look for conventional keys
-                    if isinstance(j, dict):
-                        # common response shapes include fields mentioning "open"/"closed"
-                        jstr = json.dumps(j).lower()
-                        if 'open' in jstr and 'closed' not in jstr:
-                            ok = True
-                        elif 'portisopen' in jstr and j.get('portisopen') in (True, 'true', '1'):
-                            ok = True
-                        elif j.get('status') and 'open' in str(j.get('status')).lower():
-                            ok = True
-                except Exception:
-                    # fallback to textual check
-                    low = text.lower()
-                    if 'open' in low and 'closed' not in low:
-                        ok = True
-
-                if ok:
-                    p['confirmed_by_remote'] = 'yougetsignal'
-                    verified.append(p)
-                else:
-                    self.print_warning(f"Remote check says port {port} on {ip} is closed or inconclusive")
-            except Exception as e:
-                # don't fail the whole run for remote check issues
-                self.print_warning(f"Remote verification failed for {ip}:{port} - {e}")
-                # treat as inconclusive -> keep local result (safer to include) or skip? we'll skip when remote enabled
-                # to be strict, skip here
-                continue
-
-        return verified
 
     def detect_service_from_banner(self, banner):
         """Detect specific services from banner"""
@@ -1211,19 +1051,6 @@ class ProfessionalOSINT:
         for url in urls_to_check[:3]:
             try:
                 waf_info = self.detect_waf(url)
-                # Enrich with whatwaf output when available (best-effort)
-                try:
-                    whatwaf_result = self.run_whatwaf(url)
-                    if isinstance(whatwaf_result, dict):
-                        waf_info['whatwaf'] = whatwaf_result
-                        # If whatwaf indicates detection, reflect that in the primary flag
-                        if whatwaf_result.get('detected'):
-                            waf_info['detected'] = True
-                            if whatwaf_result.get('waf_name'):
-                                waf_info['waf'] = whatwaf_result.get('waf_name')
-                except Exception as e:
-                    # Non-fatal: attach the error if possible
-                    waf_info['whatwaf_error'] = str(e)
                 if waf_info:
                     waf_data[url] = waf_info
                     if waf_info['detected']:
@@ -1286,47 +1113,6 @@ class ProfessionalOSINT:
             
         except Exception as e:
             return {'detected': False, 'error': str(e)}
-
-    def run_whatwaf(self, url):
-        """Try to run the external whatwaf tool against `url` and return raw output.
-
-        This is best-effort: if `whatwaf` is not available we attempt a pip install,
-        then run the command. Any failures are caught and returned as an error string.
-        The returned dict will contain keys: raw (string) and success (bool).
-        """
-        try:
-            # Prefer the whatwaf binary if available
-            whatwaf_cmd = shutil.which('whatwaf')
-            if not whatwaf_cmd:
-                # Attempt to pip install whatwaf quietly (best-effort)
-                try:
-                    print('Attempting to install whatwaf (pip) for WAF detection...')
-                    subprocess.run([sys.executable, '-m', 'pip', 'install', 'whatwaf'], check=False, capture_output=True, text=True, timeout=120)
-                    whatwaf_cmd = shutil.which('whatwaf')
-                except Exception:
-                    whatwaf_cmd = None
-
-            if not whatwaf_cmd:
-                return {'success': False, 'error': 'whatwaf not available'}
-
-            # Run whatwaf against the URL with a reasonable timeout
-            proc = subprocess.run([whatwaf_cmd, url], capture_output=True, text=True, timeout=120)
-            out = (proc.stdout or '') + '\n' + (proc.stderr or '')
-
-            # Basic heuristics: look for common detection lines
-            detected = False
-            name = None
-            low = out.lower()
-            if 'detected' in low or 'waf' in low:
-                detected = True
-                # try to extract a likely WAF name from output (first capitalized token after keywords)
-                m = re.search(r'Detected\s*:\s*([A-Za-z0-9\-_/ ]+)', out)
-                if m:
-                    name = m.group(1).strip()
-
-            return {'success': True, 'raw': out.strip(), 'detected': detected, 'waf_name': name}
-        except Exception as e:
-            return {'success': False, 'error': str(e)}
 
     def ip_geolocation_analysis(self):
         """Perform IP geolocation and ASN analysis"""
@@ -2000,10 +1786,6 @@ Examples:
                         help='Disable deep DNS brute-force scanning')
     parser.add_argument('--no-breaches', action='store_true', default=False,
                         help='Disable data breach checking via HIBP API')
-
-    # Optional remote verification using an external port-checker (YouGetSignal)
-    parser.add_argument('--verify-remote', action='store_true', default=False,
-                        help='After local/nmap verification, optionally verify ports using an external remote port-checker (YouGetSignal).')
     
     # Output directory
     parser.add_argument('-o', '--output', dest='output_dir', default=None,
@@ -2035,9 +1817,6 @@ Examples:
         deep_scan=deep_scan,
         check_breaches=check_breaches
     )
-    # Enable remote verification if requested
-    if args.verify_remote:
-        osint.verify_remote = True
     
     # Run the comprehensive assessment
     osint.run_comprehensive_assessment()
