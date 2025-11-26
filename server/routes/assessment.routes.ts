@@ -82,6 +82,40 @@ function runAssessmentBackground(jobId: string, target: string) {
       const reportMatch = plain.match(/Report Location:\s*(.+)/i);
       if (reportMatch) parsed.reportLocation = reportMatch[1].trim();
 
+      // If the scanner saved artifacts next to the report, try to load port scanning and nmap script findings
+      if (parsed.reportLocation) {
+        try {
+          const scriptsDir = process.env.SCRIPTS_DIR || '/var/www/anatscrawler/scripts';
+          let resolved = parsed.reportLocation;
+          if (!path.isAbsolute(resolved)) {
+            resolved = path.resolve(scriptsDir, resolved);
+          }
+          const real = path.resolve(resolved);
+          const reportDir = path.dirname(real);
+
+          const tryReadJson = (fname: string) => {
+            try {
+              const p = path.join(reportDir, fname);
+              if (fs.existsSync(p)) {
+                const raw = fs.readFileSync(p, 'utf-8');
+                return JSON.parse(raw);
+              }
+            } catch (e) {
+              // ignore parse/read errors
+            }
+            return null;
+          };
+
+          const portScan = tryReadJson('port_scanning.json');
+          if (portScan) parsed.portScan = portScan;
+
+          const nmapScripts = tryReadJson('nmap_script_findings.json');
+          if (nmapScripts) parsed.nmapScriptFindings = nmapScripts;
+        } catch (e) {
+          // ignore artifact loading errors
+        }
+      }
+
       // Support both legacy "Assessment Summary" and new "Scan Summary" blocks
       const summaryMatch = plain.match(/(Assessment Summary|Scan Summary)[\s\S]*$/i);
       if (summaryMatch) {
@@ -139,6 +173,18 @@ function runAssessmentBackground(jobId: string, target: string) {
           parsed.openPortsEntries = entries;
           if (parsed.openPorts == null) parsed.openPorts = entries.length;
         }
+      }
+
+      // If structured portScan artifact wasn't present, but we parsed open ports from stdout,
+      // build a minimal portScan structure so the frontend can render port lists.
+      if (!parsed.portScan && parsed.openPortsEntries && parsed.openPortsEntries.length) {
+        parsed.portScan = {
+          target: parsed.reportLocation || target,
+          scan_time: new Date().toISOString(),
+          open_ports: parsed.openPortsEntries,
+          services: {},
+          vulnerabilities: [],
+        };
       }
 
       const lines = plain.split(/\r?\n/);
