@@ -162,6 +162,19 @@ jobs:
 
             echo "Skipping OS-level package installation (no sudo). Assuming runtime deps present."
 
+            echo "Ensuring nmap is available on the host (used by server/scripts/osint_pro.py)"
+            if command -v nmap >/dev/null 2>&1; then
+              echo "✅ nmap already installed"
+            else
+              echo "nmap not found. Attempting to install nmap if sudo is available..."
+              if command -v sudo >/dev/null 2>&1; then
+                sudo apt-get update -y && sudo apt-get install -y nmap || echo "Warning: sudo apt-get install nmap failed"
+              else
+                # Try non-sudo install (will fail on most systems without privileges)
+                apt-get update -y && apt-get install -y nmap || echo "Warning: apt-get install nmap failed or not permitted (no sudo)"
+              fi
+            fi
+
             echo "Installing runtime dependencies (prod only)..."
             if [ -f package-lock.json ]; then
               npm ci --omit=dev --no-audit --no-fund

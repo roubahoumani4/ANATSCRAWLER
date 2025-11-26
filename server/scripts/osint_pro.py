@@ -15,6 +15,8 @@ import concurrent.futures
 import ssl
 import hashlib
 import base64
+import shutil
+import xml.etree.ElementTree as ET
 from datetime import datetime
 from urllib.parse import urlparse
 from pathlib import Path
@@ -663,8 +665,23 @@ class ProfessionalOSINT:
         all_open_ports = []
         for ip in ips_to_scan[:3]:  # Limit to 3 IPs for time reasons
             print(f"{Colors.CYAN}Scanning IP: {ip}{Colors.END}")
-            open_ports = self.scan_ip_ports(ip, common_ports)
-            all_open_ports.extend(open_ports)
+            # First pass: fast TCP connect + banner grab
+            candidate_ports = self.scan_ip_ports(ip, common_ports)
+            if not candidate_ports:
+                continue
+
+            # Verify candidates with nmap where available to avoid false-positives
+            ports_list = [p['port'] for p in candidate_ports]
+            verified = self.verify_open_ports_with_nmap(ip, ports_list, candidate_ports)
+
+            # Analyze vulnerabilities for verified ports and add to final list
+            for p in verified:
+                try:
+                    self.analyze_service_vulnerabilities(p)
+                except Exception:
+                    pass
+
+            all_open_ports.extend(verified)
         
         # Sort by port number
         all_open_ports.sort(key=lambda x: x["port"])
@@ -701,7 +718,6 @@ class ProfessionalOSINT:
                     result = future.result()
                     if result:
                         open_ports.append(result)
-                        self.analyze_service_vulnerabilities(result)
                 except Exception as e:
                     pass
         
@@ -734,6 +750,74 @@ class ProfessionalOSINT:
         except:
             pass
         return None
+
+    def verify_open_ports_with_nmap(self, ip, ports_list, original_port_infos):
+        """Verify candidate open ports using nmap - returns only ports confirmed open by nmap.
+
+        ip: target ip
+        ports_list: list of port numbers to verify
+        original_port_infos: list of port_info dicts from the fast scan
+        """
+        # If nmap is not available, fallback to the fast-scan results
+        if not shutil.which('nmap'):
+            self.print_warning('nmap not found on PATH — skipping nmap verification (using fast-scan results)')
+            return original_port_infos
+
+        if not ports_list:
+            return []
+
+        port_str = ','.join(str(p) for p in sorted(set(ports_list)))
+        cmd = ['nmap', '-Pn', '-sV', '-p', port_str, '--host-timeout', '30s', '-oX', '-', ip]
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            xml_out = proc.stdout
+            if not xml_out:
+                return original_port_infos
+
+            root = ET.fromstring(xml_out)
+            open_ports = []
+            # Map original infos by port for merging banners
+            orig_map = {int(p['port']): p for p in original_port_infos if 'port' in p}
+
+            for port_elem in root.findall('.//port'):
+                # portid is an attribute on the <port> element
+                portid = port_elem.attrib.get('portid')
+                if not portid:
+                    continue
+                try:
+                    pid = int(portid)
+                except Exception:
+                    continue
+
+                state_elem = port_elem.find('state')
+                state = state_elem.attrib.get('state') if state_elem is not None and 'state' in state_elem.attrib else (state_elem.get('state') if state_elem is not None else None)
+                if state != 'open':
+                    continue
+
+                service_elem = port_elem.find('service')
+                srv_name = ''
+                product = ''
+                version = ''
+                if service_elem is not None:
+                    srv_name = service_elem.attrib.get('name', '')
+                    product = service_elem.attrib.get('product', '')
+                    version = service_elem.attrib.get('version', '')
+
+                merged = orig_map.get(pid, {}).copy() if pid in orig_map else { 'ip': ip, 'port': pid, 'service': srv_name or 'unknown', 'banner': '' }
+                # Prefer nmap-discovered service name/product/version
+                if srv_name:
+                    merged['service'] = srv_name
+                if product or version:
+                    merged['banner'] = ((product or '') + ((' ' + version) if version else '')).strip() or merged.get('banner', '')
+
+                # Add a flag indicating source of confirmation
+                merged['confirmed_by'] = 'nmap'
+                open_ports.append(merged)
+
+            return open_ports
+        except Exception as e:
+            self.print_warning(f"nmap verification failed: {e}")
+            return original_port_infos
 
     def detect_service_from_banner(self, banner):
         """Detect specific services from banner"""
