@@ -183,32 +183,73 @@ const extractBlock = (plain: string, targetTitle: string) => {
 // Extract a block starting at an arbitrary title and ending at the next big ALL-CAPS title
 const extractArbitraryBlock = (plain: string, title: string): string => {
   if (!plain) return '';
-  const upper = plain.toUpperCase();
-  const t = title.toUpperCase();
-  const start = upper.indexOf(t);
-  if (start === -1) return '';
-  const rest = plain.slice(start);
-  const lines = rest.split('\n');
-  let endIdx = lines.length;
-  for (let i = 1; i < lines.length; i++) {
+  const lines = plain.split(/\r?\n/);
+
+  // Normalize title tokens for fuzzy matching
+  const titleNorm = title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const titleTokens = titleNorm.split(/\s+/).filter(Boolean);
+
+  let startIdx = -1;
+
+  for (let i = 0; i < lines.length; i++) {
     const l = lines[i].trim();
     if (!l) continue;
-    if (/^[=\-]{3,}$/.test(l)) {
-      endIdx = i;
+
+    // Exact include (case-insensitive)
+    if (l.toLowerCase().includes(title.toLowerCase())) {
+      startIdx = i;
       break;
     }
-    // Stop at another ALL-CAPS title or a known section title
-    if (/^[A-Z0-9 \-&]{10,}$/.test(l) && l === l.toUpperCase()) {
-      endIdx = i;
-      break;
+
+    // Lines like '11. SOCIAL MEDIA & DIGITAL FOOTPRINT ANALYSIS'
+    const numberedMatch = l.match(/^\s*\d+\.\s*(.+)$/);
+    if (numberedMatch) {
+      const rest = numberedMatch[1].toLowerCase();
+      if (rest.includes(titleNorm) || titleTokens.every((t) => rest.includes(t))) {
+        startIdx = i;
+        break;
+      }
     }
-    if (SECTION_DEFS.some((def) => l.toUpperCase().includes(def.title.toUpperCase()))) {
-      endIdx = i;
+
+    // Fuzzy token match: at least half tokens present
+    const lower = l.toLowerCase();
+    const matched = titleTokens.filter((t) => lower.includes(t)).length;
+    if (titleTokens.length && matched >= Math.ceil(titleTokens.length / 2)) {
+      startIdx = i;
       break;
     }
   }
-  const slice = lines.slice(0, endIdx).join('\n');
-  return slice.replace(new RegExp(title, 'i'), '').trim();
+
+  if (startIdx === -1) return '';
+
+  // Find end: next section number or big ALL-CAPS line or separator
+  let endIdx = lines.length;
+  for (let j = startIdx + 1; j < lines.length; j++) {
+    const ln = lines[j].trim();
+    if (!ln) continue;
+    if (/^[=\-]{3,}$/.test(ln)) {
+      endIdx = j;
+      break;
+    }
+    if (/^\s*\d+\./.test(ln)) {
+      endIdx = j;
+      break;
+    }
+    // Large ALL-CAPS title line
+    if (ln.length > 8 && ln === ln.toUpperCase()) {
+      endIdx = j;
+      break;
+    }
+    if (SECTION_DEFS.some((def) => ln.toUpperCase().includes(def.title.toUpperCase()))) {
+      endIdx = j;
+      break;
+    }
+  }
+
+  const slice = lines.slice(startIdx, endIdx).join('\n');
+  // Remove the heading line to leave only the block content
+  const withoutHeading = slice.split(/\r?\n/).slice(1).join('\n');
+  return withoutHeading.trim();
 };
 
 // Parsers for specific end-of-scan blocks
