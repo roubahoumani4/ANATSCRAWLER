@@ -52,6 +52,49 @@ type WebTechSection = {
   }>;
 };
 
+type SocialSection = {
+  profiles: Array<{ platform: string; handle: string; url?: string }>; 
+  emailPatterns?: string[];
+};
+
+type TechStackSection = {
+  detections: Array<{ target: string; tech: string; version?: string; source?: string }>;
+  cdnProviders?: string[];
+  cloudProviders?: string[];
+};
+
+type PassiveDnsSection = {
+  records: Array<{ name: string; type: string; value: string; firstSeen?: string; lastSeen?: string }>;
+};
+
+type IpRangeSection = {
+  ranges: Array<{ cidr: string; allocatedTo?: string; notes?: string }>;
+};
+
+type VulnerabilitySection = {
+  entries: Array<{ id?: string; title: string; severity?: string; cve?: string[]; description?: string }>;
+};
+
+type ThreatIntelSection = {
+  indicators: Array<{ indicator: string; type: string; reputation: string; source?: string }>;
+};
+
+type EmailSection = {
+  spf?: string;
+  dmarc?: string;
+  dkim?: string;
+  policyAssessment?: string;
+};
+
+type MobileSection = {
+  apps: Array<{ name: string; storeUrl?: string; package?: string }>;
+  apiEndpoints?: string[];
+};
+
+type DocumentSection = {
+  files: Array<{ path: string; findings: string[] }>
+};
+
 type BreachSection = {
   results: Array<{ email: string; status: 'clean' | 'error'; message: string }>;
 };
@@ -81,6 +124,15 @@ type SectionData = {
   waf?: WafSection;
   geo?: GeoSection;
   business?: BusinessSection;
+  social?: SocialSection;
+  techstack?: TechStackSection;
+  passiveDns?: PassiveDnsSection;
+  ipRanges?: IpRangeSection;
+  vulnerabilities?: VulnerabilitySection;
+  threatIntel?: ThreatIntelSection;
+  email?: EmailSection;
+  mobile?: MobileSection;
+  documents?: DocumentSection;
 };
 
 const SECTION_DEFS = [
@@ -94,6 +146,15 @@ const SECTION_DEFS = [
   { key: 'waf', title: 'WEB APPLICATION FIREWALL DETECTION' },
   { key: 'geo', title: 'IP GEOLOCATION & NETWORK ANALYSIS' },
   { key: 'business', title: 'BUSINESS INTELLIGENCE & CONTEXT ANALYSIS' },
+  { key: 'social', title: 'SOCIAL MEDIA & DIGITAL FOOTPRINT' },
+  { key: 'techstack', title: 'TECHNOLOGY STACK, CDN & CLOUD DETECTION' },
+  { key: 'passiveDns', title: 'PASSIVE DNS & HISTORICAL DNS ANALYSIS' },
+  { key: 'ipRanges', title: 'IP RANGE & NETWORK BLOCK ANALYSIS' },
+  { key: 'vulnerabilities', title: 'VULNERABILITY & CVE INTEGRATION' },
+  { key: 'threatIntel', title: 'THREAT INTELLIGENCE & REPUTATION' },
+  { key: 'email', title: 'EMAIL SECURITY (SPF / DKIM / DMARC) ANALYSIS' },
+  { key: 'mobile', title: 'MOBILE & API ENUMERATION' },
+  { key: 'documents', title: 'DOCUMENT METADATA & PUBLIC FILE ANALYSIS' },
 ];
 
 const sanitizeList = (block: string): string[] =>

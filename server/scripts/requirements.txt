@@ -3,3 +3,9 @@ dnspython
 python-whois
 beautifulsoup4
 urllib3
+pytz
+geoip2
+selenium
+pillow
+scapy
+paramiko
