@@ -180,6 +180,37 @@ const extractBlock = (plain: string, targetTitle: string) => {
   return plain.slice(start, end).replace(targetTitle, '').trim();
 };
 
+// Extract a block starting at an arbitrary title and ending at the next big ALL-CAPS title
+const extractArbitraryBlock = (plain: string, title: string): string => {
+  if (!plain) return '';
+  const upper = plain.toUpperCase();
+  const t = title.toUpperCase();
+  const start = upper.indexOf(t);
+  if (start === -1) return '';
+  const rest = plain.slice(start);
+  const lines = rest.split('\n');
+  let endIdx = lines.length;
+  for (let i = 1; i < lines.length; i++) {
+    const l = lines[i].trim();
+    if (!l) continue;
+    if (/^[=\-]{3,}$/.test(l)) {
+      endIdx = i;
+      break;
+    }
+    // Stop at another ALL-CAPS title or a known section title
+    if (/^[A-Z0-9 \-&]{10,}$/.test(l) && l === l.toUpperCase()) {
+      endIdx = i;
+      break;
+    }
+    if (SECTION_DEFS.some((def) => l.toUpperCase().includes(def.title.toUpperCase()))) {
+      endIdx = i;
+      break;
+    }
+  }
+  const slice = lines.slice(0, endIdx).join('\n');
+  return slice.replace(new RegExp(title, 'i'), '').trim();
+};
+
 const extractKeyValue = (block: string, label: string) => {
   const match = block.match(new RegExp(`${label}:\\s*(.+)`, 'i'));
   return match ? match[1].trim() : undefined;
@@ -1029,7 +1060,7 @@ const AssessmentPage: React.FC = () => {
       // Add first page header
       addHeader();
 
-      if (sectionData) {
+  if (sectionData) {
         const whois = sectionData.whois;
         if (whois) {
           addSectionTitle('COMPREHENSIVE WHOIS REGISTRATION DETAILS', 1);
@@ -1193,8 +1224,39 @@ const AssessmentPage: React.FC = () => {
           addBulletList('Infrastructure Providers', business.infrastructureProviders);
           addBulletList('Related Entities', business.relatedEntities);
         }
+        // Include additional sections from the raw full scan output when available.
+        // These are the social, email pattern, tech stack, cloud infra and live vulnerability
+        // sections the scanner prints near the end of the run. We only include them when
+        // `plainOutput` is present so the PDF stays compact otherwise.
+        if (plainOutput) {
+          const addPlainSection = (title: string) => {
+            const block = extractArbitraryBlock(plainOutput, title);
+            if (block) {
+              addSectionTitle(title);
+              addText(block, 9, false, [60, 60, 60]);
+            }
+          };
 
-  // Appendix removed: full raw scan output is excluded from the main report.
+          addPlainSection('SOCIAL MEDIA & DIGITAL FOOTPRINT ANALYSIS');
+          addPlainSection('EMAIL PATTERN DISCOVERY');
+          addPlainSection('ADVANCED TECHNOLOGY STACK ANALYSIS');
+          addPlainSection('CLOUD INFRASTRUCTURE ANALYSIS');
+          addPlainSection('LIVE VULNERABILITY SCANNING - NVD & CVE DATABASES');
+          addPlainSection('VULNERABILITY DETAILS - COMPREHENSIVE LIST');
+
+          // Also pick up Vulnerability Summary and Enhanced Scan Summary blocks if present
+          const vulnSummaryMatch = plainOutput.match(/Vulnerability Summary:[\s\S]*?(?:\n\n|$)/i);
+          if (vulnSummaryMatch) {
+            addSectionTitle('Vulnerability Summary');
+            addText(vulnSummaryMatch[0].trim(), 9, false, [60, 60, 60]);
+          }
+
+          const enhancedSummaryMatch = plainOutput.match(/Enhanced Scan Summary:[\s\S]*?(?:\n\n|$)/i);
+          if (enhancedSummaryMatch) {
+            addSectionTitle('Enhanced Scan Summary');
+            addText(enhancedSummaryMatch[0].trim(), 9, false, [60, 60, 60]);
+          }
+        }
       } else {
         // Fallback: render plain log output if parsing is unavailable
         const lines = plainOutput.split('\n');
@@ -1270,239 +1332,7 @@ const AssessmentPage: React.FC = () => {
     }
   };
 
-  // Generate a separate professional PDF containing the full scan output (structured when possible)
-  const downloadFullOutputAsPDF = async () => {
-    try {
-      if (!plainOutput && !sectionData) {
-        setError('No full scan output available to download');
-        return;
-      }
-
-      // Load logo image first (reuse same logic)
-      let logoData: string | null = null;
-      try {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.src = anatLogo;
-        await new Promise<void>((resolve) => {
-          img.onload = () => {
-            try {
-              const canvas = document.createElement('canvas');
-              canvas.width = img.width;
-              canvas.height = img.height;
-              const ctx = canvas.getContext('2d');
-              if (ctx) {
-                ctx.drawImage(img, 0, 0);
-                logoData = canvas.toDataURL('image/png');
-              }
-            } catch (e) {
-              // continue without logo
-            }
-            resolve();
-          };
-          img.onerror = () => resolve();
-        });
-      } catch (e) {
-        // ignore
-      }
-
-      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 20;
-      const headerHeight = 35;
-      const footerHeight = 15;
-      const contentStartY = margin + headerHeight;
-      const maxWidth = pageWidth - 2 * margin;
-      const baseLineHeight = 5.5;
-      let yPosition = contentStartY;
-      let pageNumber = 1;
-
-      const addHeader = () => {
-        if (logoData) {
-          try { doc.addImage(logoData, 'PNG', margin, 8, 25, 25); } catch {}
-        }
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(16);
-        doc.setTextColor(40, 40, 40);
-        doc.text('ANAT SECURITY', margin + 30, 18);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(10);
-        doc.setTextColor(100, 100, 100);
-        doc.text('Full Scan Output', margin + 30, 25);
-        const reportDate = new Date().toLocaleString();
-        doc.setFontSize(8);
-        doc.text(`Generated: ${reportDate}`, pageWidth - margin, 18, { align: 'right' });
-        if (target) doc.text(`Target: ${target}`, pageWidth - margin, 25, { align: 'right' });
-        doc.setDrawColor(200, 200, 200);
-        doc.setLineWidth(0.5);
-        doc.line(margin, headerHeight - 5, pageWidth - margin, headerHeight - 5);
-      };
-
-      const addFooter = () => {
-        const footerY = pageHeight - 10;
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150);
-        doc.text(`Page ${pageNumber}`, pageWidth / 2, footerY, { align: 'center' });
-      };
-
-      const checkNewPage = (requiredSpace = 10) => {
-        if (yPosition + requiredSpace > pageHeight - footerHeight) {
-          addFooter();
-          doc.addPage();
-          pageNumber++;
-          addHeader();
-          yPosition = contentStartY;
-        }
-      };
-
-      const addSectionTitle = (title: string) => {
-        checkNewPage(15);
-        yPosition += 5;
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(12);
-        doc.setTextColor(30, 30, 30);
-        doc.text(title, margin, yPosition);
-        yPosition += 8;
-        doc.setDrawColor(70, 130, 180);
-        doc.setLineWidth(0.8);
-        doc.line(margin, yPosition - 2, pageWidth - margin, yPosition - 2);
-        yPosition += 3;
-      };
-
-      const addText = (text: string, fontSize = 9, color: [number, number, number] = [80, 80, 80]) => {
-        const lines = doc.splitTextToSize(text, maxWidth);
-        const height = Math.max(1, lines.length) * baseLineHeight;
-        checkNewPage(height + 4);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(fontSize);
-        doc.setTextColor(color[0], color[1], color[2]);
-        lines.forEach((ln: string, idx: number) => {
-          doc.text(ln, margin, yPosition + idx * baseLineHeight);
-        });
-        yPosition += height + 4;
-      };
-
-      const addTable = (title: string | null, columns: Array<{ header: string; width?: number }>, rows: string[][]) => {
-        if (!rows.length) return;
-        if (title) addSectionTitle(title);
-        const baseWidths = columns.map((col) => col.width || maxWidth / columns.length);
-        const totalWidth = baseWidths.reduce((s, w) => s + w, 0);
-        const scale = totalWidth > maxWidth ? maxWidth / totalWidth : 1;
-        const widths = baseWidths.map((w) => w * scale);
-        checkNewPage(baseLineHeight + 8);
-        doc.setFillColor(236, 239, 244);
-        doc.setDrawColor(200, 200, 200);
-        doc.rect(margin, yPosition, widths.reduce((s, w) => s + w, 0), baseLineHeight + 4, 'F');
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(9);
-        let cursorX = margin;
-        columns.forEach((col, idx) => { doc.text(col.header, cursorX + 2, yPosition + baseLineHeight + 1); cursorX += widths[idx]; });
-        yPosition += baseLineHeight + 4;
-        rows.forEach((row: string[]) => {
-          const cellLines = row.map((cell: string, idx: number) => doc.splitTextToSize(cell || '—', widths[idx] - 4));
-          const rowHeight = Math.max(...cellLines.map((cl) => Math.max(1, cl.length))) * baseLineHeight + 3;
-          checkNewPage(rowHeight + 2);
-          let cellX = margin;
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(8.5);
-          columns.forEach((col, idx: number) => {
-            doc.rect(cellX, yPosition, widths[idx], rowHeight);
-            const lines = cellLines[idx].length ? cellLines[idx] : ['—'];
-            lines.forEach((line: string, li: number) => {
-              doc.text(line, cellX + 2, yPosition + 4 + li * baseLineHeight);
-            });
-            cellX += widths[idx];
-          });
-          yPosition += rowHeight;
-        });
-        yPosition += 6;
-      };
-
-      // Compose PDF
-      addHeader();
-
-      // Table of contents using section titles from SECTION_DEFS if plainOutput is present
-      if (plainOutput) {
-        addSectionTitle('Table of Contents');
-        const toc = SECTION_DEFS.map((s) => s.title);
-        addText(toc.join(' • '), 9, [60, 60, 60]);
-      }
-
-      // If parsed structured data is available, render tables for key sections
-      if (sectionData) {
-        // Subdomains
-        if (sectionData.subdomains?.entries?.length) {
-          addSectionTitle('Subdomains');
-          addTable(
-            'Resolved Subdomains',
-            [ { header: 'Subdomain', width: maxWidth * 0.6 }, { header: 'IP Address', width: maxWidth * 0.4 } ],
-            sectionData.subdomains.entries.map((e) => [e.subdomain, e.ip || '—'])
-          );
-        }
-
-        // Ports
-        if (sectionData.ports?.entries?.length) {
-          addSectionTitle('Open Ports');
-          addTable(
-            null,
-            [ { header: 'IP', width: 50 }, { header: 'Port', width: 25 }, { header: 'Service', width: 50 }, { header: 'Status', width: 30 }, { header: 'Banner / Details', width: maxWidth - 155 } ],
-            sectionData.ports.entries.map((p) => [p.ip, String(p.port), p.service || '—', p.status || '—', p.banner || '—'])
-          );
-        }
-
-        // Vulnerabilities: as table
-        if (sectionData.vulnerabilities?.entries?.length) {
-          addSectionTitle('Vulnerabilities');
-          addTable(
-            null,
-            [ { header: 'Severity', width: 30 }, { header: 'Title / ID', width: maxWidth * 0.45 }, { header: 'Source', width: maxWidth * 0.25 } ],
-            sectionData.vulnerabilities.entries.map((v) => [ (v.severity || 'UNKNOWN'), (v.title || v.id || v.description || '—'), (v.cve?.join(', ') || '—') ])
-          );
-        }
-
-        // For other sections, print readable blocks
-        const otherSections = ['web', 'dns', 'ssl', 'business', 'geo', 'waf', 'breach'];
-        otherSections.forEach((key) => {
-          const content = (sectionData as any)[key];
-          if (!content) return;
-          addSectionTitle(key.toUpperCase());
-          addText(JSON.stringify(content, null, 2), 8, [80, 80, 80]);
-        });
-      } else if (plainOutput) {
-        // No structured data: split plain output into major sections and print
-        const lines = plainOutput.split('\n');
-        let buffer: string[] = [];
-        let currentTitle = 'Full Scan Output';
-        const flushBuffer = () => {
-          if (!buffer.length) return;
-          addSectionTitle(currentTitle);
-          addText(buffer.join('\n'), 8, [80, 80, 80]);
-          buffer = [];
-        };
-        for (const ln of lines) {
-          const m = ln.match(/^\s*([A-Z][A-Z0-9 &-]{3,})\s*$/);
-          if (m && m[1].length > 6) {
-            flushBuffer();
-            currentTitle = m[1];
-            continue;
-          }
-          buffer.push(ln);
-        }
-        flushBuffer();
-      }
-
-      addFooter();
-
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-      const filename = target ? `Full_Scan_Output_${target.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}.pdf` : `Full_Scan_Output_${timestamp}.pdf`;
-      doc.save(filename);
-    } catch (e: any) {
-      setError(e.message || 'Full scan PDF generation failed');
-      console.error('Full scan PDF generation error:', e);
-    }
-  };
+  
 
   // Poll for job status
   const pollJobStatus = async (id: string) => {
@@ -2069,13 +1899,6 @@ const AssessmentPage: React.FC = () => {
                         className="px-5 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 font-semibold"
                       >
                         ⬇️ Download summary report (PDF)
-                      </button>
-
-                      <button
-                        onClick={downloadFullOutputAsPDF}
-                        className="px-5 py-3 rounded-lg bg-gray-700 hover:bg-gray-600 font-semibold"
-                      >
-                        ⬇️ Download full scan output (PDF)
                       </button>
                     </>
                   )}
