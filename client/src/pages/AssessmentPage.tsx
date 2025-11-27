@@ -1835,7 +1835,7 @@ const AssessmentPage: React.FC = () => {
               </div>
 
                 {/* Vulnerability graphs (live vs comprehensive) */}
-                <VulnerabilityGraphs sectionData={sectionData} />
+                <VulnerabilityGraphs sectionData={sectionData} plainOutput={plainOutput} />
 
                 <div className="xl:col-span-2 flex items-center justify-center">
                   {plainOutput && (
