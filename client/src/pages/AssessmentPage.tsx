@@ -1477,6 +1477,84 @@ const AssessmentPage: React.FC = () => {
             addSectionTitle('Enhanced Scan Summary');
             addText(enhancedSummaryMatch[0].trim(), 9, false, [60, 60, 60]);
           }
+
+          // SUPPLEMENTARY: Extract only the output lines that weren't captured by
+          // the structured parsers above but look important (CVE lines, live-scan
+          // markers, vulnerability headings, critical flags). This keeps the PDF
+          // compact while ensuring nothing important is silently missing.
+          const computeSupplementaryLines = (plain: string) => {
+            if (!plain) return [] as string[];
+
+            // Work on a copy and strip already-captured major blocks to reduce noise
+            let reduced = plain;
+
+            // Remove known big sections by title (SECTION_DEFS)
+            SECTION_DEFS.forEach(({ title }) => {
+              const idx = reduced.toUpperCase().indexOf(title.toUpperCase());
+              if (idx !== -1) {
+                // Find next section title after this one
+                let end = reduced.length;
+                SECTION_DEFS.forEach(({ title: t }) => {
+                  if (t === title) return;
+                  const i = reduced.toUpperCase().indexOf(t.toUpperCase(), idx + title.length);
+                  if (i !== -1 && i < end) end = i;
+                });
+                reduced = reduced.slice(0, idx) + '\n' + reduced.slice(end);
+              }
+            });
+
+            // Remove blocks we've already explicitly extracted above
+            reduced = reduced.replace(/Vulnerability Summary:[\s\S]*?(?:\n\n|$)/ig, '');
+            reduced = reduced.replace(/Enhanced Scan Summary:[\s\S]*?(?:\n\n|$)/ig, '');
+            reduced = reduced.replace(/LIVE VULNERABILITY SCANNING[\s\S]*?(?:\n\n|$)/ig, '');
+            reduced = reduced.replace(/VULNERABILITY DETAILS - COMPREHENSIVE LIST[\s\S]*?(?:\n\n|$)/ig, '');
+
+            const lines = reduced.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+
+            // Pick only lines that look security-relevant or are likely to be missing
+            const interesting = lines.filter((l) =>
+              /CVE-\d+-\d+|\[🔴|LIVE SCAN:|LIVE VULNERABILITY|VULNERABILITY DETAILS|Vulnerability Summary|Enhanced Scan Summary|CRITICAL:|HIGH:|MEDIUM:/i.test(l)
+            );
+
+            // De-duplicate while preserving order
+            const seen = new Set<string>();
+            const out: string[] = [];
+            for (const ln of interesting) {
+              if (!seen.has(ln)) {
+                seen.add(ln);
+                out.push(ln);
+              }
+            }
+
+            // Limit to a reasonable number of lines to avoid bloating the PDF
+            return out.slice(0, 400);
+          };
+
+          const supplementary = computeSupplementaryLines(plainOutput);
+          if (supplementary.length) {
+            addSectionTitle('SUPPLEMENTARY: ADDITIONAL OUTPUT EXCERPTS');
+
+            // monospace rendering helper for compact, preformatted feel
+            const addMonospace = (text: string, fontSize = 8, lineHeight = 4.2) => {
+              doc.setFont('courier', 'normal');
+              doc.setFontSize(fontSize);
+              doc.setTextColor(60, 60, 60);
+              const wrapped = doc.splitTextToSize(text, maxWidth);
+              wrapped.forEach((ln: string) => {
+                checkNewPage(lineHeight + 1);
+                doc.text(ln, margin, yPosition);
+                yPosition += lineHeight;
+              });
+              // restore default font
+              doc.setFont('helvetica', 'normal');
+            };
+
+            supplementary.forEach((ln) => {
+              // Simple bullet-like presentation but keep monospace for clarity
+              addMonospace(ln);
+            });
+            yPosition += 4;
+          }
         }
       } else {
         // Fallback: render plain log output if parsing is unavailable
