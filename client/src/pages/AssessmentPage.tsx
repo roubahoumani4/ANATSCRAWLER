@@ -272,6 +272,131 @@ const parsePortEntries = (
 };
 
 const parseAssessmentSections = (plain: string | null, parsedExtras?: any): SectionData | null => {
+  // Prefer structured parsedExtras produced by the scanner when available.
+  if (parsedExtras && typeof parsedExtras === 'object') {
+    const hasStructured = ['portScan','webAnalysis','wafDetection','sslAnalysis','dnsAnalysis','completeResults','social','techstack','passiveDns','ipRanges','vulnerabilities','threatIntel','email','mobile','documents'].some(k => k in parsedExtras);
+    if (hasStructured) {
+      const data: SectionData = {};
+
+      // Ports
+      if (parsedExtras.portScan) {
+        const portsSrc = parsedExtras.portScan.open_ports || parsedExtras.portScan.entries || parsedExtras.portScan;
+        data.ports = {
+          entries: Array.isArray(portsSrc)
+            ? portsSrc.map((p: any) => ({ ip: p.ip || p.host || '', port: Number(p.port || p.port_number || 0), service: p.service || p.name || p.protocol || '', banner: p.banner || p.info || JSON.stringify(p), status: p.state || p.status || 'OPEN' }))
+            : [],
+          total: parsedExtras.portScan.total || (Array.isArray(portsSrc) ? portsSrc.length : undefined),
+        };
+      }
+
+      // Web technology / techstack
+      if (parsedExtras.webAnalysis || parsedExtras.techstack) {
+        const src = parsedExtras.webAnalysis || parsedExtras.techstack;
+        data.web = {
+          analyses: (src.analyzed_urls || src.analyses || src.detections || []).map((a: any) => ({
+            target: a.target || a.url || a.host || '',
+            server: a.server || a.headers?.server,
+            poweredBy: a.poweredBy || a.powered_by || a.headers?.['x-powered-by'],
+            headers: (a.headersList || a.headers || []).map((h: any) => ({ name: h.name || h[0], status: h.present ? 'present' : 'missing' })),
+            technologies: a.technologies || a.tech || a.detected || [],
+            criticalFindings: a.criticalFindings || a.critical || [],
+          })),
+        };
+      }
+
+      // WAF
+      if (parsedExtras.wafDetection) {
+        data.waf = { detections: (parsedExtras.wafDetection.detections || parsedExtras.wafDetection.findings || []).map((d: any) => ({ target: d.target || d.host || '', message: d.message || d.raw || JSON.stringify(d) })) };
+      }
+
+      // SSL
+      if (parsedExtras.sslAnalysis) {
+        data.ssl = {
+          subject: parsedExtras.sslAnalysis.subject,
+          issuer: parsedExtras.sslAnalysis.issuer,
+          validFrom: parsedExtras.sslAnalysis.valid_from || parsedExtras.sslAnalysis.not_before,
+          validUntil: parsedExtras.sslAnalysis.valid_until || parsedExtras.sslAnalysis.not_after,
+          signatureAlgorithm: parsedExtras.sslAnalysis.signatureAlgorithm || parsedExtras.sslAnalysis.sig_alg,
+        };
+      }
+
+      // DNS
+      if (parsedExtras.dnsAnalysis) {
+        data.dns = {
+          aRecords: parsedExtras.dnsAnalysis.a || parsedExtras.dnsAnalysis.aRecords || [],
+          mxRecords: parsedExtras.dnsAnalysis.mx || parsedExtras.dnsAnalysis.mxRecords || [],
+          nsRecords: parsedExtras.dnsAnalysis.ns || parsedExtras.dnsAnalysis.nsRecords || [],
+          txtRecords: parsedExtras.dnsAnalysis.txt || parsedExtras.dnsAnalysis.txtRecords || [],
+          dnssecEnabled: parsedExtras.dnsAnalysis.dnssec === true || false,
+          spfRecord: parsedExtras.dnsAnalysis.spf || parsedExtras.dnsAnalysis.spfRecord,
+        };
+      }
+
+      // Geo
+      if (parsedExtras.geoAnalysis || parsedExtras.geo) {
+        const g = parsedExtras.geoAnalysis || parsedExtras.geo;
+        data.geo = { locations: (g.locations || g || []).map((l: any) => ({ ip: l.ip || l.address || '', organization: l.org || l.organization, country: l.country, city: l.city, asn: l.asn })) };
+      }
+
+      // Business
+      if (parsedExtras.business) {
+        data.business = {
+          companyProfile: parsedExtras.business.companyProfile || parsedExtras.business.profile,
+          infrastructureProviders: parsedExtras.business.infrastructureProviders || parsedExtras.business.providers || [],
+          relatedEntities: parsedExtras.business.relatedEntities || parsedExtras.business.related || [],
+        };
+      }
+
+      // Social
+      if (parsedExtras.social) {
+        data.social = { profiles: parsedExtras.social.profiles || parsedExtras.social.accounts || [], emailPatterns: parsedExtras.social.emailPatterns || parsedExtras.social.patterns };
+      }
+
+      // Techstack (CDN / Cloud)
+      if (parsedExtras.techstack) {
+        data.techstack = { detections: parsedExtras.techstack.detections || parsedExtras.techstack.entries || [], cdnProviders: parsedExtras.techstack.cdns || parsedExtras.techstack.cdnProviders || [], cloudProviders: parsedExtras.techstack.clouds || parsedExtras.techstack.cloudProviders || [] };
+      }
+
+      // Passive DNS
+      if (parsedExtras.passiveDns) {
+        data.passiveDns = { records: parsedExtras.passiveDns.records || parsedExtras.passiveDns };
+      }
+
+      // IP ranges
+      if (parsedExtras.ipRanges) {
+        data.ipRanges = { ranges: parsedExtras.ipRanges.ranges || parsedExtras.ipRanges };
+      }
+
+      // Vulnerabilities
+      if (parsedExtras.vulnerabilities || parsedExtras.completeResults?.vulnerabilities) {
+        const src = parsedExtras.vulnerabilities || parsedExtras.completeResults?.vulnerabilities || [];
+        data.vulnerabilities = { entries: src.map((v: any) => ({ id: v.id || v.cve || undefined, title: v.title || v.name || v.summary || '', severity: v.severity || v.score || undefined, cve: v.cves || (v.cve ? [v.cve] : []), description: v.description || v.details })) };
+      }
+
+      // Threat intel
+      if (parsedExtras.threatIntel) {
+        data.threatIntel = { indicators: parsedExtras.threatIntel.indicators || parsedExtras.threatIntel };
+      }
+
+      // Email
+      if (parsedExtras.email) {
+        data.email = { spf: parsedExtras.email.spf, dmarc: parsedExtras.email.dmarc, dkim: parsedExtras.email.dkim, policyAssessment: parsedExtras.email.assessment };
+      }
+
+      // Mobile
+      if (parsedExtras.mobile) {
+        data.mobile = { apps: parsedExtras.mobile.apps || [], apiEndpoints: parsedExtras.mobile.apiEndpoints || [] };
+      }
+
+      // Documents
+      if (parsedExtras.documents) {
+        data.documents = { files: parsedExtras.documents.files || parsedExtras.documents };
+      }
+
+      return data;
+    }
+  }
+
   if (!plain) return null;
   const data: SectionData = {};
 
