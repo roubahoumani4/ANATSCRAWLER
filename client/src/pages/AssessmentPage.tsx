@@ -4,6 +4,7 @@ import { API_BASE_URL } from '@/lib/api';
 import { ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import jsPDF from 'jspdf';
 import anatLogo from '@/assets/anatlogo.png';
+import VulnerabilityGraphs from '@/components/VulnerabilityGraphs';
 
 type WhoisSection = {
   domain?: string;
@@ -1833,16 +1834,19 @@ const AssessmentPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="xl:col-span-2 flex items-center justify-center">
-                {plainOutput && (
-                  <button
-                    onClick={downloadReportAsPDF}
-                    className="px-5 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 font-semibold"
-                  >
-                    ⬇️ Download full report (PDF)
-                  </button>
-                )}
-              </div>
+                {/* Vulnerability graphs (live vs comprehensive) */}
+                <VulnerabilityGraphs sectionData={sectionData} />
+
+                <div className="xl:col-span-2 flex items-center justify-center">
+                  {plainOutput && (
+                    <button
+                      onClick={downloadReportAsPDF}
+                      className="px-5 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 font-semibold"
+                    >
+                      ⬇️ Download full report (PDF)
+                    </button>
+                  )}
+                </div>
             </div>
           )}
 
