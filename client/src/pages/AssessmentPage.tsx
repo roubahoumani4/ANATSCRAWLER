@@ -211,6 +211,140 @@ const extractArbitraryBlock = (plain: string, title: string): string => {
   return slice.replace(new RegExp(title, 'i'), '').trim();
 };
 
+// Parsers for specific end-of-scan blocks
+const parseSocialBlock = (block: string) => {
+  const results: Array<{ platform: string; url?: string; status?: string }> = [];
+  if (!block) return results;
+  const lines = block.split(/\r?\n/);
+  for (const l of lines) {
+    const m = l.match(/\[\+\]\s*([A-Za-z0-9_\-]+):\s*(https?:\/\/\S+)/i);
+    if (m) {
+      results.push({ platform: m[1], url: m[2] });
+      continue;
+    }
+    const m2 = l.match(/\[DEBUG\]\s*([^:]+):\s*(.+)/i);
+    if (m2) {
+      results.push({ platform: m2[1].trim(), status: m2[2].trim() });
+    }
+  }
+  return results;
+};
+
+const parseEmailPatterns = (block: string) => {
+  if (!block) return [] as string[];
+  const lines = block.split(/\r?\n/);
+  const out: string[] = [];
+  let startCollect = false;
+  for (const l of lines) {
+    if (/Sample generated email patterns:/i.test(l)) {
+      startCollect = true;
+      continue;
+    }
+    if (startCollect) {
+      const m = l.match(/^-\s*(\S+@\S+)/);
+      if (m) out.push(m[1]);
+      else if (!l.trim()) break;
+    }
+  }
+  // fallback: any lines that look like emails
+  if (!out.length) {
+    for (const l of lines) {
+      const m = l.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+      if (m) out.push(m[0]);
+    }
+  }
+  return Array.from(new Set(out));
+};
+
+const parseTechStackBlock = (block: string) => {
+  if (!block) return [] as Array<{ url: string; technologies: string[] }>;
+  const blocks = block.split(/\r?\n/);
+  const results: Array<{ url: string; technologies: string[] }> = [];
+  let currentUrl = '';
+  let techs: string[] = [];
+  for (const l of blocks) {
+    const m = l.match(/Technologies detected on\s*([^:]+):/i);
+    if (m) {
+      if (currentUrl) results.push({ url: currentUrl, technologies: techs });
+      currentUrl = m[1].trim();
+      techs = [];
+      continue;
+    }
+    const tm = l.match(/^\s*[-•]\s*(\S+)/);
+    if (tm && currentUrl) {
+      techs.push(tm[1].trim());
+    }
+  }
+  if (currentUrl) results.push({ url: currentUrl, technologies: techs });
+  return results;
+};
+
+const parseCloudBlock = (block: string) => {
+  if (!block) return [] as string[];
+  return block
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .slice(0, 30);
+};
+
+const parseLiveVulnBlock = (block: string) => {
+  if (!block) return [] as Array<{ cve?: string; software?: string; cvss?: string; severity?: string }>;
+  const lines = block.split(/\r?\n/);
+  const out: Array<{ cve?: string; software?: string; cvss?: string; severity?: string }> = [];
+  for (const l of lines) {
+    const m = l.match(/\[.*\]\s*LIVE SCAN:\s*(CVE-\d+-\d+)\s*-\s*([^\-]+)\s*-\s*CVSS:\s*([0-9.]+)/i);
+    if (m) {
+      out.push({ cve: m[1], software: m[2].trim(), cvss: m[3], severity: 'CRITICAL' });
+      continue;
+    }
+    // Generic CVE line with severity indicator
+    const m2 = l.match(/\[(?:[^\]]*)\]\s*(?:LIVE SCAN:)?\s*(CVE-\d+-\d+)\s*-?\s*([^\-]+)?/i);
+    if (m2) {
+      out.push({ cve: m2[1], software: (m2[2] || '').trim() });
+    }
+  }
+  return out;
+};
+
+const parseVulnDetailsBlock = (block: string) => {
+  if (!block) return [] as Array<any>;
+  const chunks = block.split(/\n\n+/).map((c) => c.trim()).filter(Boolean);
+  const results: Array<any> = [];
+  for (const c of chunks) {
+    // try to extract severity and title from first line
+    const firstLine = c.split(/\r?\n/)[0];
+  // match possible leading emoji or non-word chars then severity and title
+  const titleMatch = firstLine.match(/^[^A-Za-z0-9]*?(CRITICAL|HIGH|MEDIUM|LOW)[:\s-]*\s*(.+)/i);
+    let severity = 'UNKNOWN';
+    let title = firstLine;
+    if (titleMatch) {
+      severity = titleMatch[1].toUpperCase();
+      title = titleMatch[2] || title;
+    }
+
+    const getField = (label: string) => {
+      const re = new RegExp(label + ":\\s*([\s\S]*?)(?:\\n[A-Z][a-zA-Z ]+:|$)", 'i');
+      const m = c.match(re);
+      if (m) return m[1].trim();
+      return undefined;
+    };
+
+    const description = getField('Description') || '';
+    const location = getField('Location') || getField('Location:') || '';
+    const software = getField('Software') || '';
+    const cves = (getField('CVEs') || getField('CVEs:') || '').replace(/\s+/g, ' ').trim();
+    const cvss = (getField('CVSS Score') || getField('CVSS') || '').trim();
+    const recommendation = getField('Recommendation') || '';
+    const source = getField('Source') || '';
+
+    // ignore very short chunks that aren't findings
+    if (!description && !title && !cves && !software) continue;
+
+    results.push({ severity, title, description, location, software, cves, cvss, recommendation, source });
+  }
+  return results;
+};
 const extractKeyValue = (block: string, label: string) => {
   const match = block.match(new RegExp(`${label}:\\s*(.+)`, 'i'));
   return match ? match[1].trim() : undefined;
@@ -1229,20 +1363,66 @@ const AssessmentPage: React.FC = () => {
         // sections the scanner prints near the end of the run. We only include them when
         // `plainOutput` is present so the PDF stays compact otherwise.
         if (plainOutput) {
-          const addPlainSection = (title: string) => {
-            const block = extractArbitraryBlock(plainOutput, title);
-            if (block) {
-              addSectionTitle(title);
-              addText(block, 9, false, [60, 60, 60]);
-            }
-          };
+          // SOCIAL
+          const socialBlock = extractArbitraryBlock(plainOutput, 'SOCIAL MEDIA & DIGITAL FOOTPRINT ANALYSIS');
+          const socials = parseSocialBlock(socialBlock);
+          if (socials.length) {
+            addSectionTitle('SOCIAL MEDIA & DIGITAL FOOTPRINT ANALYSIS');
+            const rows = socials.map((s) => [s.platform || 'Unknown', s.url || s.status || 'Not found']);
+            addTable(null, [{ header: 'Platform', width: 50 }, { header: 'URL / Status', width: maxWidth - 50 }], rows);
+          }
 
-          addPlainSection('SOCIAL MEDIA & DIGITAL FOOTPRINT ANALYSIS');
-          addPlainSection('EMAIL PATTERN DISCOVERY');
-          addPlainSection('ADVANCED TECHNOLOGY STACK ANALYSIS');
-          addPlainSection('CLOUD INFRASTRUCTURE ANALYSIS');
-          addPlainSection('LIVE VULNERABILITY SCANNING - NVD & CVE DATABASES');
-          addPlainSection('VULNERABILITY DETAILS - COMPREHENSIVE LIST');
+          // EMAIL PATTERNS
+          const emailBlock = extractArbitraryBlock(plainOutput, 'EMAIL PATTERN DISCOVERY');
+          const patterns = parseEmailPatterns(emailBlock);
+          if (patterns.length) {
+            addSectionTitle('EMAIL PATTERN DISCOVERY');
+            addBulletList('Generated email patterns', patterns);
+          }
+
+          // TECH STACK
+          const techBlock = extractArbitraryBlock(plainOutput, 'ADVANCED TECHNOLOGY STACK ANALYSIS');
+          const techs = parseTechStackBlock(techBlock);
+          if (techs.length) {
+            addSectionTitle('ADVANCED TECHNOLOGY STACK ANALYSIS');
+            addTable(null, [{ header: 'URL', width: maxWidth * 0.45 }, { header: 'Technologies', width: maxWidth * 0.55 }], techs.map(t => [t.url, t.technologies.join(', ')]));
+          }
+
+          // CLOUD INFRASTRUCTURE
+          const cloudBlock = extractArbitraryBlock(plainOutput, 'CLOUD INFRASTRUCTURE ANALYSIS');
+          const cloudLines = parseCloudBlock(cloudBlock);
+          if (cloudLines.length) {
+            addSectionTitle('CLOUD INFRASTRUCTURE ANALYSIS');
+            addBulletList('', cloudLines);
+          }
+
+          // LIVE VULNERABILITY SCANNING
+          const liveBlock = extractArbitraryBlock(plainOutput, 'LIVE VULNERABILITY SCANNING - NVD & CVE DATABASES');
+          const liveEntries = parseLiveVulnBlock(liveBlock);
+          if (liveEntries.length) {
+            addSectionTitle('LIVE VULNERABILITY SCANNING - NVD & CVE DATABASES');
+            addTable(null, [{ header: 'CVE', width: 40 }, { header: 'Software', width: maxWidth * 0.45 }, { header: 'CVSS', width: 30 }], liveEntries.map((e) => [e.cve || '—', e.software || '—', e.cvss || '—']));
+          }
+
+          // VULNERABILITY DETAILS
+          const vulnBlock = extractArbitraryBlock(plainOutput, 'VULNERABILITY DETAILS - COMPREHENSIVE LIST');
+          const vulnDetails = parseVulnDetailsBlock(vulnBlock);
+          if (vulnDetails.length) {
+            addSectionTitle('VULNERABILITY DETAILS - COMPREHENSIVE LIST');
+            addTable(null, [
+              { header: 'Severity', width: 30 },
+              { header: 'Title', width: maxWidth * 0.35 },
+              { header: 'Location', width: maxWidth * 0.2 },
+              { header: 'Software / CVEs', width: maxWidth * 0.35 },
+            ], vulnDetails.map((v) => [v.severity || '—', v.title || '—', v.location || '—', ((v.software || '') + (v.cves ? ` • ${v.cves}` : '')).trim() || '—']));
+            // If recommendations exist, add them as a short subsection
+            vulnDetails.forEach((v) => {
+              if (v.recommendation) {
+                addSubheading(`${v.severity}: ${v.title}`);
+                addText(`Recommendation: ${v.recommendation}`, 9, false, [60, 60, 60]);
+              }
+            });
+          }
 
           // Also pick up Vulnerability Summary and Enhanced Scan Summary blocks if present
           const vulnSummaryMatch = plainOutput.match(/Vulnerability Summary:[\s\S]*?(?:\n\n|$)/i);
