@@ -50,13 +50,7 @@ jobs:
           mkdir -p .release/server
           # Copy only necessary server directories
           cp -r server/config server/lib server/middleware server/models server/routes server/services server/types server/utils server/scripts .release/server/
-          # Include SpiderFoot integration code
-          mkdir -p .release/server/spiderfoot-4.0
-          cp -r server/spiderfoot-4.0 .release/server/
-          # Ensure production requirements are included
-          if [ -f server/spiderfoot-4.0/requirements-production.txt ]; then
-            cp server/spiderfoot-4.0/requirements-production.txt .release/server/spiderfoot-4.0/
-          fi
+          # Embedded OSINT engine integration removed from release packaging
           cp package.json .release/
           if [ -f package-lock.json ]; then cp package-lock.json .release/; fi
           cp ecosystem.config.cjs .release/
@@ -162,6 +156,19 @@ jobs:
 
             echo "Skipping OS-level package installation (no sudo). Assuming runtime deps present."
 
+            echo "Ensuring nmap is available on the host (used by server/scripts/osint_pro.py)"
+            if command -v nmap >/dev/null 2>&1; then
+              echo "✅ nmap already installed"
+            else
+              echo "nmap not found. Attempting to install nmap if sudo is available..."
+              if command -v sudo >/dev/null 2>&1; then
+                sudo apt-get update -y && sudo apt-get install -y nmap || echo "Warning: sudo apt-get install nmap failed"
+              else
+                # Try non-sudo install (will fail on most systems without privileges)
+                apt-get update -y && apt-get install -y nmap || echo "Warning: apt-get install nmap failed or not permitted (no sudo)"
+              fi
+            fi
+
             echo "Installing runtime dependencies (prod only)..."
             if [ -f package-lock.json ]; then
               npm ci --omit=dev --no-audit --no-fund
@@ -248,14 +255,7 @@ jobs:
             MISP_API_KEY=${MISP_API_KEY:-}
             MISP_VERIFY_TLS=${MISP_VERIFY_TLS:-true}
             MISP_TIMEOUT_MS=${MISP_TIMEOUT_MS:-30000}
-            # SpiderFoot OSINT Engine (localhost binding for security)
-            SPIDERFOOT_HOST=127.0.0.1
-            SPIDERFOOT_PORT=5001
-            SPIDERFOOT_DIR=/var/www/anatscrawler/current/server/spiderfoot-4.0
-            SPIDERFOOT_DATA=/var/www/anatscrawler/data/spiderfoot
-            SPIDERFOOT_CACHE=/var/www/anatscrawler/data/spiderfoot/cache
-            SPIDERFOOT_LOGS=/var/www/anatscrawler/data/spiderfoot/logs
-            SPIDERFOOT_DB=/var/www/anatscrawler/data/spiderfoot/spiderfoot.db
+            # Embedded OSINT engine integration removed; no engine-specific env vars set
             # CORS Configuration
             CORS_ORIGIN=https://horus.anatsecurity.fr
             MAX_CONCURRENT_SCANS=10

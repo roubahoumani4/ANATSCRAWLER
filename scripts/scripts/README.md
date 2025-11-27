@@ -1,6 +1,6 @@
 # 🛠️ ANATSCRAWLER Operations Scripts
 
-This directory contains consolidated scripts for deployment, maintenance, and SpiderFoot integration management.
+This directory contains consolidated scripts for deployment, maintenance, and OSINT engine management.
 
 ## 🚀 Quick Start
 
@@ -11,11 +11,11 @@ Use the consolidated operations script for most tasks:
 # Check system health
 ./ops.sh health
 
-# Fix SpiderFoot issues  
-./ops.sh spiderfoot-fix
+# Fix system issues
+./ops.sh fix
 
-# Test SpiderFoot functionality
-./ops.sh spiderfoot-test
+# Test OSINT functionality
+./ops.sh test
 
 # Clean system
 ./ops.sh clean
@@ -29,27 +29,27 @@ Use the consolidated operations script for most tasks:
 ### 🔧 Core Scripts
 Essential operational scripts:
 - `check-deployment.sh` - Deployment verification
-- `diagnose-spiderfoot-issues.sh` - Comprehensive diagnostics  
-- `fix-spiderfoot-integration.sh` - Development environment fixes
-- `fix-production-spiderfoot.sh` - Production environment fixes
+- `diagnose-issues.sh` - Comprehensive diagnostics
+- `fix-integration.sh` - Development environment fixes
+- `fix-production.sh` - Production environment fixes
 
 ### 🗄️ Database Scripts  
 Database-specific operations:
-- `fix-spiderfoot-database-location.sh` - Fix database location conflicts
-- `fix-spiderfoot-database-production.sh` - Production database fixes
-- `fix-spiderfoot-database-schema.sh` - Schema initialization
-- `fix-spiderfoot-db.py` - Python database utilities
+- `fix-database-location.sh` - Fix database location conflicts
+- `fix-database-production.sh` - Production database fixes
+- `fix-database-schema.sh` - Schema initialization
+- `db_utils.py` - Python database utilities
 
 ### 🔧 Maintenance Scripts
 System maintenance utilities:
-- `fix-spiderfoot-dependencies.sh` - Install Python dependencies
-- `disable-spiderfoot-auth.sh` - Disable SpiderFoot authentication
+- `install-dependencies.sh` - Install runtime dependencies
+- `disable-auth.sh` - Disable embedded engine authentication (if applicable)
 - Various Python test and check scripts
 
 ### 📦 Deployment Scripts
 Production deployment utilities:
 - `deploy.sh` - Main deployment script
-- `setup_spiderfoot_db.py` - Database initialization
+- `setup_db.py` - Database initialization
 
 ### 📚 Archive Directory
 Archived scripts organized by category:
@@ -65,19 +65,19 @@ Archived scripts organized by category:
 ./ops.sh health
 
 # Fix issues
-./ops.sh spiderfoot-fix
+./ops.sh fix
 
 # Test functionality  
-./ops.sh spiderfoot-test
+./ops.sh test
 ```
 
-### For Production Deployment
+# For Production Deployment
 ```bash
 # On production server
-./core/fix-production-spiderfoot.sh
+./core/fix-production.sh
 
 # Or use consolidated script
-./ops.sh spiderfoot-fix
+./ops.sh fix
 ```
 
 ### For Troubleshooting
@@ -86,8 +86,8 @@ Archived scripts organized by category:
 ./ops.sh diagnose
 
 # Specific issue fixes
-./database/fix-spiderfoot-database-schema.sh
-./maintenance/fix-spiderfoot-dependencies.sh
+./database/fix-database-schema.sh
+./maintenance/install-dependencies.sh
 ```
 
 ## 📋 Script Consolidation Summary

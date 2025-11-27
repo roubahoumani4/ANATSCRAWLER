@@ -42,8 +42,7 @@ fi
 # Create directory structure
 log_info "Creating directory structure..."
 sudo mkdir -p "$BASE_DIR"/{current,releases,shared,data,logs}
-sudo mkdir -p "$DATA_DIR"/{spiderfoot,backups}
-sudo mkdir -p "$DATA_DIR/spiderfoot"/{cache,logs}
+sudo mkdir -p "$DATA_DIR"/{backups}
 sudo mkdir -p "$LOGS_DIR"
 
 # Set proper ownership and permissions
@@ -82,26 +81,13 @@ else
     exit 1
 fi
 
-# Python 3
+# Python and pip are optional; embedded OSINT engine integration has been removed
 if command -v python3 &> /dev/null; then
     PYTHON_VERSION=$(python3 --version)
-    log_success "Python 3 found: $PYTHON_VERSION"
-else
-    log_error "Python 3 not found. Required for SpiderFoot OSINT engine"
-    exit 1
+    log_info "Python 3 found: $PYTHON_VERSION"
 fi
-
-# pip
 if command -v pip3 &> /dev/null || command -v pip &> /dev/null; then
-    if command -v pip3 &> /dev/null; then
-        PIP_VERSION=$(pip3 --version)
-    else
-        PIP_VERSION=$(pip --version)
-    fi
-    log_success "pip found: $PIP_VERSION"
-else
-    log_error "pip not found. Required for SpiderFoot dependencies"
-    exit 1
+    log_info "pip found"
 fi
 
 # PM2
@@ -138,37 +124,7 @@ else
     log_warning "Cannot connect to Redis at 192.168.1.110:6379"
 fi
 
-# System dependencies for SpiderFoot
-log_info "Checking system dependencies for SpiderFoot..."
-
-REQUIRED_PACKAGES=(
-    "python3-venv"
-    "python3-dev"
-    "build-essential"
-    "libssl-dev"
-    "libffi-dev"
-    "libxml2-dev"
-    "libxslt1-dev"
-    "zlib1g-dev"
-)
-
-MISSING_PACKAGES=()
-
-for package in "${REQUIRED_PACKAGES[@]}"; do
-    if dpkg -l | grep -q "^ii  $package "; then
-        log_success "Package $package is installed"
-    else
-        MISSING_PACKAGES+=("$package")
-        log_warning "Package $package is missing"
-    fi
-done
-
-if [ ${#MISSING_PACKAGES[@]} -gt 0 ]; then
-    log_info "Installing missing packages..."
-    sudo apt-get update
-    sudo apt-get install -y "${MISSING_PACKAGES[@]}"
-    log_success "System dependencies installed"
-fi
+# (Embedded OSINT engine removed) No special Python system dependencies required by default
 
 # Create symbolic links for stable paths
 log_info "Setting up symbolic links..."
@@ -195,16 +151,6 @@ BASE_PATH=/var/www/anatscrawler/current
 ELASTICSEARCH_URL=http://192.168.1.110:9200
 MONGODB_URL=mongodb://192.168.1.110:27017/anat_security
 REDIS_URL=redis://192.168.1.110:6379
-
-# SpiderFoot OSINT Engine
-SPIDERFOOT_HOST=0.0.0.0
-SPIDERFOOT_PORT=5001
-SPIDERFOOT_DIR=/var/www/anatscrawler/current/server/spiderfoot-4.0
-SPIDERFOOT_DOCROOT=/osint
-SPIDERFOOT_DATA=/var/www/anatscrawler/data/spiderfoot
-SPIDERFOOT_CACHE=/var/www/anatscrawler/data/spiderfoot/cache
-SPIDERFOOT_LOGS=/var/www/anatscrawler/data/spiderfoot/logs
-SPIDERFOOT_DB=/var/www/anatscrawler/data/spiderfoot/spiderfoot.db
 
 # Security (set these via GitHub Secrets)
 JWT_SECRET=your-jwt-secret-here
@@ -279,22 +225,7 @@ server {
         add_header Cache-Control "public, immutable";
     }
 
-    # SpiderFoot OSINT Engine (WebSocket support)
-    location /osint/ {
-        proxy_pass http://127.0.0.1:5000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        
-        # Longer timeouts for OSINT scanning
-        proxy_connect_timeout 120s;
-        proxy_send_timeout 120s;
-        proxy_read_timeout 120s;
-    }
+    # Additional locations can be added here for proxied services
 }
 EOF
 
@@ -366,7 +297,6 @@ echo "📁 Important Paths:"
 echo "   • Application: $BASE_DIR/current"
 echo "   • Data: $DATA_DIR"
 echo "   • Logs: $LOGS_DIR"
-echo "   • SpiderFoot Data: $DATA_DIR/spiderfoot"
 echo ""
 echo "🔧 Configuration Templates:"
 echo "   • Environment: $BASE_DIR/.env.template"

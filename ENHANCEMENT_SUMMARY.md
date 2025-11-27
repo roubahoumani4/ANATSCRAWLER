@@ -7,7 +7,7 @@
 
 **Features Implemented**:
 - **User Registration Analytics**: Live user count, new registrations, active users
-- **OSINT Search Metrics**: Total scans, daily activity, SpiderFoot integration stats
+- **OSINT Search Metrics**: Total scans, daily activity, OSINT engine integration stats
 - **Dark Web Data Analytics**: Indexed data points, breach monitoring, threat distribution
 - **Real-time System Performance**: CPU, memory, network monitoring
 - **Interactive Charts**: User growth, threat analysis, OSINT activity breakdown
@@ -19,15 +19,15 @@
 - Responsive grid layout with glassmorphism effects
 - Status indicators with pulsing animations
 
-### ✅ 2. SpiderFoot Theme Integration
-**File**: `/client/src/components/osint/SpiderFootIntegrated.tsx`
+### ✅ 2. OSINT Engine Theme Integration
+**File**: `/client/src/components/osint/EmbeddedOSINT.tsx`
 
 **Custom CSS Injection**:
-- **Dark Theme**: Complete SpiderFoot interface restyled to match DARKSCRAWLER aesthetic
+- **Dark Theme**: Complete OSINT engine interface restyled to match DARKSCRAWLER aesthetic
 - **Color Scheme**: Blue/cyan gradients, dark backgrounds, glowing effects
 - **Typography**: Monospace fonts for terminal feel, enhanced readability
 - **Interactive Elements**: Hover effects, gradient buttons, animated borders
-- **Custom Header**: DARKSCRAWLER branding integration within SpiderFoot
+- **Custom Header**: DARKSCRAWLER branding integration within the OSINT engine
 - **Responsive Design**: Mobile-friendly adaptations
 
 **Technical Features**:
@@ -43,7 +43,7 @@
 ```
 🏠 Dashboard
 🔍 OSINT Platform
-   ├── 🕷️ SpiderFoot OSINT
+   ├── 🕷️ OSINT Engine
    ├── 👁️ Advanced Search  
    └── 💀 Dark Web Monitor
 📊 Threat Analytics
@@ -74,9 +74,9 @@
 
 ## 🔧 Technical Improvements
 
-### ✅ 1. SpiderFoot Timeout Fixes
+### ✅ 1. OSINT Timeout Fixes
 **Files**: 
-- `/server/routes/spiderfoot.ts`
+- `/server/routes/osint.ts`
 - `/server/config.ts`
 - `/.github/workflows/deploy.yml`
 
@@ -96,9 +96,9 @@
 ### ✅ 2. Production Deployment Enhancements
 **File**: `/.github/workflows/deploy.yml`
 
-**SpiderFoot Setup**:
+**OSINT Setup**:
 - Python 3.13 compatibility fixes
-- Virtual environment management
+- Virtual environment management (if using embedded engines)
 - Dependency installation with fallbacks
 - Health check verification
 - Automated startup and monitoring
@@ -114,7 +114,7 @@
 2. **OSINT Operations**:
    - Total OSINT scans: `89,432`
    - Daily scan activity: `156`
-   - SpiderFoot integrations: Live monitoring
+   - OSINT engine integrations: Live monitoring
 
 3. **Dark Web Intelligence**:
    - Indexed data points: `2.8M` records
@@ -128,14 +128,14 @@
 
 ### Interactive Charts:
 - **User Growth**: Area chart showing 5-month registration trends
-- **OSINT Activity**: Bar chart comparing SpiderFoot vs manual searches
+- **OSINT Activity**: Bar chart comparing automated OSINT engine vs manual searches
 - **Threat Distribution**: Pie chart of malware, phishing, breaches
 - **System Performance**: Line chart of resource utilization
 
 ## 🎯 User Experience Enhancements
 
 ### ✅ 1. Seamless Navigation
-- **Single-click access** to SpiderFoot from dashboard
+- **Single-click access** to the OSINT engine from dashboard
 - **Breadcrumb navigation** showing current location
 - **Context-sensitive menus** based on user permissions
 - **Progressive loading** with informative status messages
@@ -171,7 +171,7 @@
 
 ### ✅ Fully Functional:
 - ✅ Enhanced Dashboard with live metrics
-- ✅ SpiderFoot integration with custom theming
+- ✅ OSINT engine integration with custom theming
 - ✅ User registration and management system
 - ✅ OSINT search capabilities with timeout fixes
 - ✅ Dark web search functionality on landing page
@@ -179,4 +179,4 @@
 - ✅ Production-ready deployment pipeline
 
 ### 🎉 Achievement Summary:
-**The DARKSCRAWLER OSINT platform now provides a comprehensive, visually cohesive, and highly functional cybersecurity intelligence platform that seamlessly integrates SpiderFoot OSINT capabilities with advanced user management, threat analytics, and real-time monitoring - all wrapped in a professional dark theme that maintains the sophisticated aesthetic throughout the entire user experience.**
+**The DARKSCRAWLER OSINT platform now provides a comprehensive, visually cohesive, and highly functional cybersecurity intelligence platform that seamlessly integrates OSINT engine capabilities with advanced user management, threat analytics, and real-time monitoring - all wrapped in a professional dark theme that maintains the sophisticated aesthetic throughout the entire user experience.**

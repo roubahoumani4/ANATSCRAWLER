@@ -1,6 +1,6 @@
 # 🛠️ ANATSCRAWLER Operations Scripts
 
-This directory contains consolidated scripts for deployment, maintenance, and SpiderFoot integration management.
+This directory contains consolidated scripts for deployment, maintenance, and OSINT engine management.
 
 ## 🚀 Quick Start
 
@@ -11,7 +11,7 @@ Use the consolidated operations script for all tasks:
 # Check system health
 ./ops.sh health
 
-# Fix SpiderFoot setup
+# Fix system setup
 ./ops.sh fix
 
 # Deploy application
@@ -34,7 +34,7 @@ scripts/
 ├── ops.sh                    # Main consolidated operations script
 ├── README.md                 # This file
 ├── archive/                  # Archived old scripts
-│   ├── legacy/              # Legacy SpiderFoot scripts
+│   ├── legacy/              # Legacy integration scripts
 │   ├── redundant/           # Redundant fix scripts
 │   └── obsolete/            # Obsolete test scripts
 ├── maintenance/             # Maintenance and testing scripts
@@ -49,7 +49,7 @@ scripts/
 | Command | Description |
 |---------|-------------|
 | `health` | Check system health and status |
-| `fix` | Fix SpiderFoot setup and dependencies |
+| `fix` | Fix system setup and dependencies |
 | `deploy` | Deploy the application |
 | `test` | Test all endpoints |
 | `cleanup` | Maintenance cleanup |
@@ -87,7 +87,6 @@ The script automatically detects the environment:
 Check logs in the `logs/` directory:
 - `combined.log` - All application logs
 - `error.log` - Error logs
-- `spiderfoot.debug.log` - SpiderFoot debug logs
 
 ## 📋 Maintenance
 

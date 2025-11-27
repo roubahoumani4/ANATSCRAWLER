@@ -1,7 +1,7 @@
 /**
  * Environment-aware configuration for ANAT Security OSINT Platform
  * - Adapts automatically for local development on macOS or production Linux
- * - Handles SpiderFoot OSINT engine integration
+ * - Handles OSINT engine integration
  */
 
 import path from 'path';
@@ -46,18 +46,6 @@ console.log(`🌍 Environment: ${NODE_ENV} (Production: ${IS_PRODUCTION})`);
 // Compute paths for application data
 const dataDirDefault = path.resolve(BASE_PATH, 'data');
 
-// OSINT/SpiderFoot Configuration
-const spiderFootConfig = {
-  DIR: process.env.SPIDERFOOT_DIR || path.resolve(BASE_PATH, 'server', 'spiderfoot-4.0'),
-  DATA_DIR: process.env.SPIDERFOOT_DATA || path.resolve(dataDirDefault, 'spiderfoot'),
-  CACHE_DIR: process.env.SPIDERFOOT_CACHE || path.resolve(dataDirDefault, 'spiderfoot', 'cache'),
-  LOGS_DIR: process.env.SPIDERFOOT_LOGS || path.resolve(dataDirDefault, 'spiderfoot', 'logs'),
-  DB_PATH: process.env.SPIDERFOOT_DB || path.resolve(dataDirDefault, 'spiderfoot', 'spiderfoot.db'),
-  HOST: process.env.SPIDERFOOT_HOST || '0.0.0.0',
-  PORT: parseInt(process.env.SPIDERFOOT_PORT || '5001', 10),
-  DOCROOT: process.env.SPIDERFOOT_DOCROOT || '/osint'
-};
-
 export const PATHS = {
   DATA_DIR: dataDirDefault,
   LOGS_DIR: path.resolve(BASE_PATH, 'logs'),
@@ -65,8 +53,7 @@ export const PATHS = {
   CLIENT_BUILD: path.resolve(BASE_PATH, 'client', 'dist'),
   SERVER_DIR: path.resolve(BASE_PATH, 'server'),
   SCRIPTS_DIR: path.resolve(BASE_PATH, 'scripts'),
-  // SpiderFoot OSINT paths
-  SPIDERFOOT: spiderFootConfig
+  // NOTE: embedded OSINT engine integration removed — no dedicated OSINT paths
 };
 
 // App DB path
@@ -80,10 +67,7 @@ export function ensureDirectories(): void {
     PATHS.DATA_DIR, 
     PATHS.LOGS_DIR, 
     PATHS.BACKUPS_DIR,
-    // SpiderFoot OSINT directories
-    PATHS.SPIDERFOOT.DATA_DIR,
-    PATHS.SPIDERFOOT.CACHE_DIR,
-    PATHS.SPIDERFOOT.LOGS_DIR
+  // (No additional OSINT-specific directories required)
   ];
   
   for (const dir of dirs) {
@@ -106,13 +90,6 @@ export const ENVIRONMENT_CONFIG = {
   PATHS,
   DATABASE_PATH: getDatabasePath(),
   ensureDirectories,
-  // OSINT Engine Configuration
-  SPIDERFOOT: spiderFootConfig
+  // Embedded OSINT engine integration has been removed from this build
 };
 
-// Log configuration summary
-console.log(`🔍 OSINT Configuration:`);
-console.log(`   SpiderFoot Dir: ${spiderFootConfig.DIR}`);
-console.log(`   Data Dir: ${spiderFootConfig.DATA_DIR}`);
-console.log(`   Host:Port: ${spiderFootConfig.HOST}:${spiderFootConfig.PORT}`);
-console.log(`   Doc Root: ${spiderFootConfig.DOCROOT}`);

@@ -11,14 +11,7 @@ module.exports = {
       HOST: '0.0.0.0',
       PORT: 5000,
       MAX_CONCURRENT_SCANS: 10,
-      // SpiderFoot OSINT Engine Environment
-      SPIDERFOOT_HOST: '127.0.0.1',
-      SPIDERFOOT_PORT: 5001,
-      SPIDERFOOT_DIR: '/var/www/anatscrawler/current/server/spiderfoot-4.0',
-      SPIDERFOOT_DATA: '/var/www/anatscrawler/data/spiderfoot',
-      SPIDERFOOT_CACHE: '/var/www/anatscrawler/data/spiderfoot/cache',
-      SPIDERFOOT_LOGS: '/var/www/anatscrawler/data/spiderfoot/logs',
-      SPIDERFOOT_DB: '/var/www/anatscrawler/data/spiderfoot/spiderfoot.db',
+  // Embedded OSINT engine integration removed
       // Database and Services
       MONGODB_URL: process.env.MONGODB_URL || 'mongodb://192.168.1.110:27017/anat_security',
       ELASTICSEARCH_URL: process.env.ELASTICSEARCH_URL || 'http://192.168.1.110:9200',

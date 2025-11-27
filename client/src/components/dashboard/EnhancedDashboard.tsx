@@ -51,10 +51,10 @@ const EnhancedDashboard = () => {
   ];
 
   const osintActivityData = [
-    { name: 'Week 1', spiderfoot: 45, manual: 12, darkweb: 28 },
-    { name: 'Week 2', spiderfoot: 62, manual: 18, darkweb: 34 },
-    { name: 'Week 3', spiderfoot: 78, manual: 25, darkweb: 41 },
-    { name: 'Week 4', spiderfoot: 89, manual: 31, darkweb: 52 }
+    { name: 'Week 1', automated: 45, manual: 12, darkweb: 28 },
+    { name: 'Week 2', automated: 62, manual: 18, darkweb: 34 },
+    { name: 'Week 3', automated: 78, manual: 25, darkweb: 41 },
+    { name: 'Week 4', automated: 89, manual: 31, darkweb: 52 }
   ];
 
   const threatDistribution = [
@@ -396,7 +396,7 @@ const EnhancedDashboard = () => {
                   }} 
                 />
                 <Legend />
-                <Bar dataKey="spiderfoot" fill="#8b5cf6" name="SpiderFoot Scans" />
+                <Bar dataKey="automated" fill="#8b5cf6" name="Automated OSINT" />
                 <Bar dataKey="manual" fill="#06b6d4" name="Manual OSINT" />
                 <Bar dataKey="darkweb" fill="#e11d48" name="Dark Web Monitoring" />
               </BarChart>
@@ -450,7 +450,7 @@ const EnhancedDashboard = () => {
             </h3>
             <div className="space-y-3">
               {[
-                { label: "Launch SpiderFoot OSINT", icon: Search, color: "indigo" },
+                { label: "Run Automated OSINT", icon: Search, color: "indigo" },
                 { label: "View Dark Web Alerts", icon: Skull, color: "purple" },
                 { label: "System Diagnostics", icon: Terminal, color: "cyan" },
                 { label: "User Management", icon: Users, color: "blue" }
@@ -481,7 +481,7 @@ const EnhancedDashboard = () => {
             </h3>
             <div className="space-y-3 max-h-64 overflow-y-auto">
               {[
-                { time: "14:23", action: "New SpiderFoot scan initiated", type: "osint", color: "indigo" },
+                { time: "14:23", action: "New automated OSINT scan initiated", type: "osint", color: "indigo" },
                 { time: "14:20", action: "Dark web data breach detected", type: "alert", color: "red" },
                 { time: "14:18", action: "User authentication successful", type: "auth", color: "green" },
                 { time: "14:15", action: "System backup completed", type: "system", color: "blue" },

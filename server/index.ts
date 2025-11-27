@@ -349,32 +349,16 @@ async function startServer() {
     }
 
     const port = parseInt(process.env.PORT || '5000', 10);
-    const host = process.env.HOST || '0.0.0.0';    // Ensure we're not using the SpiderFoot port
-    if (port === parseInt(process.env.SPIDERFOOT_PORT || '5001', 10)) {
-      console.error(`❌ Server port ${port} conflicts with SpiderFoot port. Using fallback port 5000.`);
-      const fallbackPort = 5000;
-      console.log(`🚀 Starting server on ${host}:${fallbackPort}...`);
-      httpServer.listen({ port: fallbackPort, host }, () => {
-        console.log(`✅ Server successfully started at http://${host}:${fallbackPort}`);
-        console.log('You can access the server at:');
-        console.log(`- Local: http://localhost:${fallbackPort}`);
-        console.log(`- Network: http://${host}:${fallbackPort}`);
-        console.log(`Environment: ${isDev ? 'development' : 'production'}`);
-        console.log(`🌐 OSINT API: http://localhost:${fallbackPort}/osint/health`);
-        console.log(`🏥 Health check: http://localhost:${fallbackPort}/health`);
-      });
-    } else {
-      console.log(`🚀 Starting server on ${host}:${port}...`);
-      httpServer.listen({ port, host }, () => {
-        console.log(`✅ Server successfully started at http://${host}:${port}`);
-        console.log('You can access the server at:');
-        console.log(`- Local: http://localhost:${port}`);
-        console.log(`- Network: http://${host}:${port}`);
-        console.log(`Environment: ${isDev ? 'development' : 'production'}`);
-        console.log(`🌐 OSINT API: http://localhost:${port}/osint/health`);
-        console.log(`🏥 Health check: http://localhost:${port}/health`);
-      });
-    }
+    const host = process.env.HOST || '0.0.0.0';
+    console.log(`🚀 Starting server on ${host}:${port}...`);
+    httpServer.listen({ port, host }, () => {
+      console.log(`✅ Server successfully started at http://${host}:${port}`);
+      console.log('You can access the server at:');
+      console.log(`- Local: http://localhost:${port}`);
+      console.log(`- Network: http://${host}:${port}`);
+      console.log(`Environment: ${isDev ? 'development' : 'production'}`);
+      console.log(`🏥 Health check: http://localhost:${port}/health`);
+    });
 
     httpServer.on('error', console.error);
   } catch (error) {

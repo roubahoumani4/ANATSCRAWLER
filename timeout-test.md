@@ -1,8 +1,8 @@
-# SpiderFoot Scan Timeout Fix - Implementation Summary
+# OSINT Scan Timeout Fix - Implementation Summary
 
 ## 🎯 Problem Solved
-**Issue**: 504 Gateway Timeout when starting OSINT scans through SpiderFoot interface
-**Root Cause**: 30-second proxy timeout was insufficient for SpiderFoot scan initialization
+**Issue**: 504 Gateway Timeout when starting OSINT scans through the embedded OSINT engine
+**Root Cause**: 30-second proxy timeout was insufficient for scan initialization
 
 ## ✅ Solutions Implemented
 
@@ -17,11 +17,11 @@ The system now automatically selects appropriate timeouts based on request type:
 ```typescript
 // POST requests to /newscan or /startscan
 if (method === 'POST' && (path.includes('newscan') || path.includes('startscan'))) {
-  // Uses 10-minute timeout (SPIDERFOOT_LONG_SCAN_TIMEOUT)
+  // Uses 10-minute timeout (OSINT_LONG_SCAN_TIMEOUT)
 } else if (path.includes('scan') || path.includes('status') || path.includes('result')) {
-  // Uses 5-minute timeout (SPIDERFOOT_SCAN_TIMEOUT)  
+  // Uses 5-minute timeout (OSINT_SCAN_TIMEOUT)  
 } else {
-  // Uses 30-second timeout (SPIDERFOOT_REQUEST_TIMEOUT)
+  // Uses 30-second timeout (OSINT_REQUEST_TIMEOUT)
 }
 ```
 
@@ -33,15 +33,15 @@ New endpoint `/osint/async-scan` for background scan processing:
 
 ### 4. Enhanced Error Handling
 - Timeout-specific error messages with helpful suggestions
-- Direct links to SpiderFoot interface for manual monitoring
+- Direct links to the OSINT engine interface for manual monitoring
 - Clear guidance on expected scan duration (2-15 minutes)
 
 ### 5. Configurable Timeouts
 Environment variables for fine-tuning:
 ```bash
-SPIDERFOOT_REQUEST_TIMEOUT=30000       # 30s for standard requests
-SPIDERFOOT_SCAN_TIMEOUT=300000         # 5m for scan operations  
-SPIDERFOOT_LONG_SCAN_TIMEOUT=600000    # 10m for heavy scans
+OSINT_REQUEST_TIMEOUT=30000       # 30s for standard requests
+OSINT_SCAN_TIMEOUT=300000         # 5m for scan operations  
+OSINT_LONG_SCAN_TIMEOUT=600000    # 10m for heavy scans
 ```
 
 ## 🧪 Testing the Fix
@@ -79,8 +79,8 @@ curl -X POST http://localhost:5000/osint/async-scan \
 Add to your environment configuration:
 ```bash
 # For very large organizations or comprehensive scans
-export SPIDERFOOT_LONG_SCAN_TIMEOUT=900000  # 15 minutes
-export SPIDERFOOT_SCAN_TIMEOUT=450000       # 7.5 minutes
+export OSINT_LONG_SCAN_TIMEOUT=900000  # 15 minutes
+export OSINT_SCAN_TIMEOUT=450000       # 7.5 minutes
 ```
 
 ## 📊 Expected Behavior After Fix
@@ -92,13 +92,13 @@ User clicks "Start Scan" → 30s timeout → 504 Gateway Timeout Error
 
 ### ✅ After Fix (Working)
 ```
-User clicks "Start Scan" → Scan initializes → Progress visible in SpiderFoot UI
+User clicks "Start Scan" → Scan initializes → Progress visible in the OSINT engine UI
                        ↘ If still slow → Clear timeout message with guidance
 ```
 
 ## 🔍 Monitoring Scan Progress
 
-1. **Direct SpiderFoot Interface**: http://localhost:5001/osint
+1. **Direct OSINT Engine Interface**: http://localhost:5001/osint
 2. **Async endpoint**: Use `/osint/async-scan` for immediate response
 3. **Error messages**: Now include helpful troubleshooting steps
 
@@ -106,10 +106,10 @@ User clicks "Start Scan" → Scan initializes → Progress visible in SpiderFoot
 
 When scans timeout, users now receive:
 - Clear explanation that scans can take 5-15 minutes
-- Direct link to SpiderFoot interface
+- Direct link to OSINT engine interface
 - Suggestions for optimizing scan scope
 - Alternative async scan option
 
 ## 🎉 Result
 
-**SpiderFoot OSINT scans now work reliably without proxy timeouts!**
+**OSINT scans now work reliably without proxy timeouts!**

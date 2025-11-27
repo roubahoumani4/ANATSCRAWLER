@@ -1,4 +1,4 @@
-// SpiderFoot imports removed
+// Embedded OSINT imports removed
 
 // Global console declaration for Node.js environment
 declare const console: {
@@ -49,7 +49,7 @@ export interface OsintSearchResult {
 }
 
 /**
- * Perform OSINT search - simplified version after SpiderFoot removal
+ * Perform OSINT search - simplified version after embedded OSINT removal
  */
 export async function performOsintSearch(
   query: string,
@@ -61,7 +61,7 @@ export async function performOsintSearch(
   console.log('Starting OSINT search for:', query);
 
   try {
-    // Return empty results since SpiderFoot was removed
+  // Return empty results since the embedded OSINT engine was removed
     return [];
   } catch (error) {
     console.error('OSINT search failed:', error);
@@ -177,7 +177,7 @@ function getThreatLevel(risk: number): string {
  */
 export async function performLocalOsintSearch(query: string): Promise<OsintSearchResult[]> {
   // Implementation of local OSINT search as a fallback
-  // This would search through any locally cached SpiderFoot data
+  // This would search through any locally cached OSINT engine data
   return [];
 }
 

@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# SpiderFoot Timeout Fix Test Script
+# OSINT Timeout Fix Test Script
 # This script tests the different timeout configurations
 
-echo "🧪 Testing SpiderFoot Timeout Improvements"
+echo "🧪 Testing OSINT Timeout Improvements"
 echo "=========================================="
 
 SERVER_URL="http://localhost:5000"
@@ -41,9 +41,9 @@ echo "Test 2: OSINT Engine Health"
 echo "---------------------------"
 response=$(curl -s -w "%{http_code}" -o /tmp/osint_health "$OSINT_URL/health")
 echo "Response code: $response"
-if [ "$response" = "200" ] || [ "$response" = "503" ]; then
+    if [ "$response" = "200" ] || [ "$response" = "503" ]; then
     test_result 0
-    echo "ℹ️  OSINT engine status checked (503 is normal if SpiderFoot not running)"
+    echo "ℹ️  OSINT engine status checked (503 is normal if engine not running)"
 else
     test_result 1
 fi
@@ -110,7 +110,7 @@ elif [ "$response" = "504" ]; then
     echo -e "${YELLOW}⚠️  Timeout occurred but after extended period${NC}"
     test_result 0
 else
-    echo -e "${YELLOW}⚠️  Quick response (may indicate SpiderFoot not running)${NC}"
+    echo -e "${YELLOW}⚠️  Quick response (may indicate OSINT engine not running)${NC}"
     test_result 0
 fi
 
@@ -122,7 +122,7 @@ echo "✅ Async scans: Immediate response (< 5s)"
 echo "✅ Scan requests: Extended timeout (> 30s)"
 echo "✅ Error handling: Helpful timeout messages"
 echo
-echo -e "${GREEN}🎉 SpiderFoot timeout improvements are working!${NC}"
+echo -e "${GREEN}🎉 OSINT timeout improvements are working!${NC}"
 echo
 echo "💡 Tips for users:"
 echo "   • Use /osint/async-scan for long scans"

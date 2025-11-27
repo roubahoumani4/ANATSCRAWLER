@@ -8,7 +8,6 @@ import authRoutes from './auth/auth.routes';
 import userRoutes from './auth/user.routes';
 import healthRoutes from './health/health.routes';
 import searchRoutes from './search';
-import spiderfootProxy from './spiderfoot';
 import assessmentRoutes from './assessment.routes';
 
 /**
@@ -38,26 +37,9 @@ export async function registerRoutes(app: Express): Promise<void> {
   // Search routes - authenticated users only
   app.use(`${apiV1}/search`, authenticate, searchRoutes);
 
-  // SpiderFoot OSINT Engine - mount the entire router at /osint
-  // The router handles /health and /status as public endpoints internally
-  // and requires authentication for other endpoints
-  app.use('/osint', spiderfootProxy);
-
   // Assessment runner - runs server-side helper scripts for assessment tasks (authenticated)
   app.use(`${apiV1}/assessment`, authenticate, assessmentRoutes);
 
-  // Debug endpoint for OSINT testing (remove in production)
-  if (process.env.NODE_ENV !== 'production') {
-    app.get('/osint-debug', (req, res) => {
-      res.json({ 
-        message: 'OSINT debug endpoint working',
-        timestamp: new Date().toISOString(),
-        note: 'Main OSINT endpoint is at /osint and requires authentication',
-        healthCheck: '/osint/health (public)',
-        statusCheck: '/osint/status (public)'
-      });
-    });
-  }
 
   // Public search endpoint for landing page - no authentication required
   app.use('/api/public-search', searchRoutes);

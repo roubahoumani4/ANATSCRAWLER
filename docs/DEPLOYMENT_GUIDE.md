@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide covers the complete deployment of the ANAT Security OSINT Platform with native SpiderFoot integration for production environments.
+This guide covers the complete deployment of the ANAT Security OSINT Platform for production environments.
 
 ## Architecture Summary
 
@@ -10,9 +10,9 @@ This guide covers the complete deployment of the ANAT Security OSINT Platform wi
 ┌─────────────────────────────────────────────────────────────┐
 │                    Production Environment                    │
 ├─────────────────────────────────────────────────────────────┤
-│  Nginx (SSL Termination)  →  ANAT Platform  →  SpiderFoot   │
-│  Port 443/80              →  Port 5000      →  Port 5001    │
-│  horus.anatsecurity.fr                                      │
+│  Nginx (SSL Termination)  →  ANAT Platform                       │
+│  Port 443/80              →  Port 5000                            │
+│  horus.anatsecurity.fr                                          │
 └─────────────────────────────────────────────────────────────┘
 
 External Services (192.168.1.110):
@@ -128,15 +128,7 @@ ELASTICSEARCH_URL=http://192.168.1.110:9200
 MONGODB_URL=mongodb://192.168.1.110:27017/anat_security
 REDIS_URL=redis://192.168.1.110:6379
 
-# SpiderFoot OSINT Engine
-SPIDERFOOT_HOST=0.0.0.0
-SPIDERFOOT_PORT=5001
-SPIDERFOOT_DIR=/var/www/anatscrawler/current/server/spiderfoot-4.0
-SPIDERFOOT_DOCROOT=/osint
-SPIDERFOOT_DATA=/var/www/anatscrawler/data/spiderfoot
-SPIDERFOOT_CACHE=/var/www/anatscrawler/data/spiderfoot/cache
-SPIDERFOOT_LOGS=/var/www/anatscrawler/data/spiderfoot/logs
-SPIDERFOOT_DB=/var/www/anatscrawler/data/spiderfoot/spiderfoot.db
+<!-- Embedded OSINT engine integration removed; no engine-specific environment variables required -->
 
 # Security
 JWT_SECRET=your-jwt-secret-here
@@ -156,15 +148,12 @@ WORKER_PROCESSES=2
 ├── current/                     # Current deployment
 │   ├── dist/                   # Built Node.js application
 │   ├── client/dist/            # Built React frontend
-│   ├── server/spiderfoot-4.0/  # SpiderFoot OSINT engine
+│   ├── server/                 # Server application
 │   ├── package.json
 │   ├── ecosystem.config.cjs
 │   └── .env
 ├── data/                       # Persistent data
-│   ├── spiderfoot/            # SpiderFoot data
-│   │   ├── cache/
-│   │   ├── logs/
-│   │   └── spiderfoot.db
+│   ├── data/                  # Application data (no embedded OSINT-specific files)
 │   └── backups/               # Application backups
 ├── logs/                      # Application logs
 │   ├── combined.log
@@ -215,9 +204,6 @@ sudo systemctl enable anatscrawler
 # Main application
 curl -f http://localhost:5000/health
 
-# SpiderFoot OSINT Engine
-curl -f http://localhost:5000/osint/health
-
 # Public endpoint (with SSL)
 curl -f https://horus.anatsecurity.fr/health
 ```
@@ -228,10 +214,9 @@ curl -f https://horus.anatsecurity.fr/health
 {
   "ok": true,
   "timestamp": "2025-09-14T12:00:00.000Z",
-  "services": {
-    "database": "connected",
-    "spiderfoot": "running"
-  }
+   "services": {
+      "database": "connected"
+   }
 }
 ```
 
@@ -246,9 +231,7 @@ tail -f /var/www/anatscrawler/logs/combined.log
 # PM2 logs
 pm2 logs anatscrawler --lines 100
 
-# SpiderFoot specific logs
-tail -f /var/www/anatscrawler/data/spiderfoot/logs/spiderfoot.log
-
+<!-- Embedded OSINT-specific logs removed -->
 # Nginx logs
 sudo tail -f /var/log/nginx/access.log
 sudo tail -f /var/log/nginx/error.log
@@ -272,9 +255,7 @@ netstat -tulpn | grep :5000
 ### Database Backup
 
 ```bash
-# SpiderFoot database
-cp /var/www/anatscrawler/data/spiderfoot/spiderfoot.db \
-   /var/www/anatscrawler/data/backups/spiderfoot-$(date +%Y%m%d).db
+<!-- Embedded OSINT database backup removed -->
 
 # MongoDB backup (if applicable)
 mongodump --host 192.168.1.110:27017 --db anat_security \
@@ -297,19 +278,7 @@ sudo cp /etc/nginx/sites-available/anatscrawler \
 
 ### Common Issues
 
-#### 1. SpiderFoot Won't Start
-
-```bash
-# Check Python environment
-cd /var/www/anatscrawler/current/server/spiderfoot-4.0
-.venv/bin/python sf.py --help
-
-# Check dependencies
-.venv/bin/pip list | grep -E "(cherrypy|dnspython|requests)"
-
-# Manual start for debugging
-.venv/bin/python sf.py -l 0.0.0.0:5001
-```
+<!-- Embedded OSINT troubleshooting removed -->
 
 #### 2. Permission Issues
 
@@ -350,29 +319,17 @@ sudo certbot renew --dry-run
 pm2 restart anatscrawler --max-memory-restart 4G
 ```
 
-#### 2. SpiderFoot Module Configuration
-
-```bash
-# Access SpiderFoot configuration at
-# https://horus.anatsecurity.fr/osint
-```
+<!-- Embedded OSINT module configuration removed -->
 
 #### 3. Database Optimization
 
-```bash
-# Monitor SpiderFoot database size
-du -sh /var/www/anatscrawler/data/spiderfoot/spiderfoot.db
-
-# Clean old scans if database grows too large
-# (Use SpiderFoot web interface for this)
-```
+<!-- Embedded OSINT database monitoring and cleanup instructions removed -->
 
 ## Security Considerations
 
 ### 1. Network Security
 
-- SpiderFoot only accessible through main application proxy
-- No direct external access to port 5001
+<!-- Embedded OSINT-specific network notes removed -->
 - SSL/TLS encryption for all external communication
 
 ### 2. Data Protection
@@ -384,8 +341,7 @@ du -sh /var/www/anatscrawler/data/spiderfoot/spiderfoot.db
 ### 3. Access Control
 
 - Application-level authentication required
-- SpiderFoot inherits security context from main platform
-- Role-based access control for OSINT features
+- Role-based access control for platform features
 
 ## Maintenance
 

@@ -5,9 +5,9 @@ This directory contains scripts that have been consolidated into the main `ops.s
 ## Directory Structure
 
 ### `legacy/` - Legacy Master Fix Scripts
-These scripts were early attempts at comprehensive SpiderFoot fixes:
+These scripts were early attempts at comprehensive fixes for embedded OSINT integrations:
 - Multiple "master fix" scripts with overlapping functionality
-- Consolidated into `ops.sh spiderfoot-fix`
+- Consolidated into `ops.sh fix`
 
 ### `redundant/` - Redundant Fix Scripts  
 Scripts that duplicate functionality now available in core scripts:

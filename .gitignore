@@ -17,14 +17,11 @@ build/
 .env
 .env.*
 !.env.example
-!server/config/spiderfoot.production.env
-!server/config/spiderfoot.env.example
 
 # Python virtual environments and cache
 .venv/
 venv/
 env/
-spiderfoot-venv/
 __pycache__/
 *.py[cod]
 *$py.class
@@ -199,30 +196,9 @@ data/*.log
 data/*.sqlite
 data/*.sqlite3
 !data/
-spiderfoot.db
-spiderfoot_scanmeta.json
 
-# SpiderFoot specific (but allow important files)
-server/spiderfoot/spiderfoot.db*
-server/spiderfoot/cookies.txt
-server/spiderfoot/tmp/
-server/spiderfoot/test/
-server/spiderfoot/data/*.db
-server/spiderfoot/data/*.db-shm
-server/spiderfoot/data/*.db-wal
-server/spiderfoot/data/*.sqlite
-server/spiderfoot/data/*.sqlite3
-!server/spiderfoot/data/
-!server/spiderfoot/
-!server/spiderfoot/spiderfoot/
-!server/spiderfoot/modules/
-!server/spiderfoot/sf.py
-!server/spiderfoot/sflib.py
-!server/spiderfoot/sf_wrapper.py
-!server/spiderfoot/spiderfoot.conf
 
 # Scan logs
-tmp/spiderfoot_scan_*.log
 
 # Backups
 data/backups/
@@ -230,7 +206,6 @@ data/backups/
 
 # Generated files
 .github/.DS_Store
-server/spiderfoot/docs/
 
 # Local configuration overrides
 server/config.local.*
