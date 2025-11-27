@@ -2061,14 +2061,23 @@ const AssessmentPage: React.FC = () => {
                 {/* Vulnerability graphs (live vs comprehensive) */}
                 <VulnerabilityGraphs sectionData={sectionData} plainOutput={plainOutput} />
 
-                <div className="xl:col-span-2 flex items-center justify-center">
+                <div className="xl:col-span-2 flex items-center justify-center space-x-4">
                   {plainOutput && (
-                    <button
-                      onClick={downloadReportAsPDF}
-                      className="px-5 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 font-semibold"
-                    >
-                      ⬇️ Download full report (PDF)
-                    </button>
+                    <>
+                      <button
+                        onClick={downloadReportAsPDF}
+                        className="px-5 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 font-semibold"
+                      >
+                        ⬇️ Download summary report (PDF)
+                      </button>
+
+                      <button
+                        onClick={downloadFullOutputAsPDF}
+                        className="px-5 py-3 rounded-lg bg-gray-700 hover:bg-gray-600 font-semibold"
+                      >
+                        ⬇️ Download full scan output (PDF)
+                      </button>
+                    </>
                   )}
                 </div>
             </div>
