@@ -1429,20 +1429,10 @@ const AssessmentPage: React.FC = () => {
       // Add first page header
       addHeader();
 
-      // If we have the raw plain output (the "Full scan output" shown in the UI),
-      // produce a PDF that contains that full output (preserves headings and raw text)
-      if (plainOutput) {
-        // Reconstruct what the details panel shows: either `sections` grouped or the raw `plainOutput`
-        let fullText = '';
-        if (sections && sections.length) {
-          fullText = sections.map((s) => `${s.title}\n\n${s.content}`).join('\n\n');
-        } else {
-          fullText = plainOutput;
-        }
-
-        addSectionTitle('FULL SCAN OUTPUT');
-        addMonospace(fullText, 8, 4.2);
-      } else if (sectionData) {
+      // Prefer the structured `sectionData` when available so we can render
+      // professional tables. If `sectionData` is missing but `plainOutput`
+      // exists, fall back to the raw full-scan text (preserves current behaviour).
+      if (sectionData) {
         const whois = sectionData.whois;
         if (whois) {
           addSectionTitle('COMPREHENSIVE WHOIS REGISTRATION DETAILS', 1);
@@ -1763,6 +1753,17 @@ const AssessmentPage: React.FC = () => {
             yPosition += 4;
           }
         }
+      } else if (plainOutput) {
+        // Reconstruct what the details panel shows: either `sections` grouped or the raw `plainOutput`
+        let fullText = '';
+        if (sections && sections.length) {
+          fullText = sections.map((s) => `${s.title}\n\n${s.content}`).join('\n\n');
+        } else {
+          fullText = plainOutput;
+        }
+
+        addSectionTitle('FULL SCAN OUTPUT');
+        addMonospace(fullText, 8, 4.2);
       } else {
         // Fallback: render plain log output if parsing is unavailable
         const lines = plainOutput.split('\n');
