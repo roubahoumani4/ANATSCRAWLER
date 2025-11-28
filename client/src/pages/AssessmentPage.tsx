@@ -1596,14 +1596,28 @@ const AssessmentPage: React.FC = () => {
           addBulletList('Infrastructure Providers', business.infrastructureProviders);
           addBulletList('Related Entities', business.relatedEntities);
         }
-        // If the UI has 'sections' (used by the collapsible "Full scan output" panel),
-        // include them in the PDF as a monospace full-scan section so content shown
-        // in the collapsible is not omitted when `plainOutput` is not available.
-        if (sections && sections.length) {
-          addSectionTitle('FULL SCAN OUTPUT');
+        // If the UI has `sections` (used by the collapsible "Full scan output" panel),
+        // include them in the PDF only when `plainOutput` is absent to avoid duplication.
+        // Render titles that start with a leading number (e.g. "11. SOCIAL ...") as
+        // continued numbered sections so points 11-14 appear in sequence.
+        if (!plainOutput && sections && sections.length) {
+          // If none of the sections are already numbered (e.g. "11. ..."),
+          // render a top-level appendix heading. If sections contain numbered
+          // titles we'll render them using their numbers to continue the main
+          // report numbering and avoid repeating the 'FULL SCAN OUTPUT' header.
+          const hasNumbered = sections.some((s) => !!(s.title || '').match(/^\s*\d+\./));
+          if (!hasNumbered) addSectionTitle('FULL SCAN OUTPUT');
+
           sections.forEach((s) => {
-            if (s.title) {
-              addSubheading(s.title);
+            const title = s.title ? s.title.trim() : '';
+            const numbered = title.match(/^\s*(\d+)\.\s*(.+)$/);
+            if (numbered) {
+              const num = Number(numbered[1]);
+              const t = numbered[2];
+              // Continue numbering from the parsed title
+              addSectionTitle(t, num);
+            } else if (title) {
+              addSubheading(title);
             }
             if (s.content) {
               addMonospace(s.content, 8, 4.2);
