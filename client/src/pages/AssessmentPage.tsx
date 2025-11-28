@@ -1333,12 +1333,40 @@ const AssessmentPage: React.FC = () => {
         yPosition += 6;
       };
 
+      // monospace rendering helper for full plain output (preserve formatting)
+      const addMonospace = (text: string, fontSize = 8, lineHeight = 4.2) => {
+        doc.setFont('courier', 'normal');
+        doc.setFontSize(fontSize);
+        doc.setTextColor(60, 60, 60);
+        const wrapped = doc.splitTextToSize(text, maxWidth);
+        wrapped.forEach((ln: string) => {
+          checkNewPage(lineHeight + 1);
+          doc.text(ln, margin, yPosition);
+          yPosition += lineHeight;
+        });
+        // restore default font
+        doc.setFont('helvetica', 'normal');
+      };
+
       // Appendix removed from main report by request. Full scan output is available via separate download.
 
       // Add first page header
       addHeader();
 
-  if (sectionData) {
+      // If we have the raw plain output (the "Full scan output" shown in the UI),
+      // produce a PDF that contains that full output (preserves headings and raw text)
+      if (plainOutput) {
+        // Reconstruct what the details panel shows: either `sections` grouped or the raw `plainOutput`
+        let fullText = '';
+        if (sections && sections.length) {
+          fullText = sections.map((s) => `${s.title}\n\n${s.content}`).join('\n\n');
+        } else {
+          fullText = plainOutput;
+        }
+
+        addSectionTitle('FULL SCAN OUTPUT');
+        addMonospace(fullText, 8, 4.2);
+      } else if (sectionData) {
         const whois = sectionData.whois;
         if (whois) {
           addSectionTitle('COMPREHENSIVE WHOIS REGISTRATION DETAILS', 1);
