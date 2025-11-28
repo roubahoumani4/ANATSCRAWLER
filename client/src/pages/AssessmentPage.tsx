@@ -1596,6 +1596,20 @@ const AssessmentPage: React.FC = () => {
           addBulletList('Infrastructure Providers', business.infrastructureProviders);
           addBulletList('Related Entities', business.relatedEntities);
         }
+        // If the UI has 'sections' (used by the collapsible "Full scan output" panel),
+        // include them in the PDF as a monospace full-scan section so content shown
+        // in the collapsible is not omitted when `plainOutput` is not available.
+        if (sections && sections.length) {
+          addSectionTitle('FULL SCAN OUTPUT');
+          sections.forEach((s) => {
+            if (s.title) {
+              addSubheading(s.title);
+            }
+            if (s.content) {
+              addMonospace(s.content, 8, 4.2);
+            }
+          });
+        }
         // Include additional sections from the raw full scan output when available.
         // These are the social, email pattern, tech stack, cloud infra and live vulnerability
         // sections the scanner prints near the end of the run. We only include them when
