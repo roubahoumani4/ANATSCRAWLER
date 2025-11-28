@@ -627,7 +627,11 @@ const parseAssessmentSections = (plain: string | null, parsedExtras?: any): Sect
   const data: SectionData = {};
 
   SECTION_DEFS.forEach(({ key, title }) => {
-    const block = extractBlock(plain, title);
+    // Try exact-title extraction first, then fall back to a fuzzy/arbitrary extractor
+    let block = extractBlock(plain, title);
+    if (!block) {
+      block = extractArbitraryBlock(plain, title);
+    }
     if (!block) return;
 
     if (key === 'whois') {
@@ -808,6 +812,105 @@ const parseAssessmentSections = (plain: string | null, parsedExtras?: any): Sect
         infrastructureProviders: providers,
         relatedEntities: related,
       };
+      return;
+    }
+
+    // Social media & digital footprint
+    if (key === 'social') {
+      const profiles = [] as Array<{ platform: string; handle: string; url?: string }>;
+      const parsed = parseSocialBlock(block);
+      parsed.forEach((p) => {
+        profiles.push({ platform: p.platform, url: p.url, handle: p.url || p.status || '' });
+      });
+      const emailPatterns = parseEmailPatterns(block);
+      data.social = { profiles, emailPatterns: emailPatterns.length ? emailPatterns : undefined };
+      return;
+    }
+
+    // Technology stack / wappalyzer like output
+    if (key === 'techstack') {
+      // Try structured extraction first (lines like "Technologies detected on ...")
+      const techs = parseTechStackBlock(block);
+      const detections: TechStackSection['detections'] = [];
+      techs.forEach((t) => {
+        detections.push({ target: t.url, tech: t.technologies.join(', ') });
+      });
+      // Also collect simple bullet lines as cloud/cdn hints
+      const cdnProviders = parseCloudBlock(block);
+      data.techstack = { detections, cdnProviders, cloudProviders: cdnProviders };
+      return;
+    }
+
+    // Passive DNS
+    if (key === 'passiveDns') {
+      const lines = extractListAfterLabel(block, 'records');
+      const records = lines.map((ln) => {
+        const m = ln.match(/^([^\s]+)\s+(A|AAAA|CNAME|TXT|MX|NS)\s+(.*)$/i);
+        if (m) return { name: m[1], type: m[2], value: m[3] };
+        return { name: ln, type: 'UNKNOWN', value: '' };
+      });
+      data.passiveDns = { records };
+      return;
+    }
+
+    // IP ranges
+    if (key === 'ipRanges') {
+      const ranges = extractListAfterLabel(block, 'ranges').map((r) => ({ cidr: r }));
+      data.ipRanges = { ranges };
+      return;
+    }
+
+    // Vulnerabilities (summary / list)
+    if (key === 'vulnerabilities') {
+      // parse short bullet findings and also detailed vulnerability blocks
+      const bullets = sanitizeList(block);
+      const shortEntries = bullets
+        .filter((b) => /CRITICAL|HIGH|MEDIUM|LOW|CVE-/i.test(b))
+        .map((b) => ({ title: b, severity: undefined as any, cve: [] as string[] }));
+      const detailed = parseVulnDetailsBlock(block).map((d: any) => ({ id: undefined as any, title: d.title || d.description || '', severity: d.severity, cve: d.cves ? d.cves.split(',').map((c: string) => c.trim()) : [], description: d.description }));
+      data.vulnerabilities = { entries: [...detailed, ...shortEntries] };
+      return;
+    }
+
+    // Threat intelligence
+    if (key === 'threatIntel') {
+      const indicators: ThreatIntelSection['indicators'] = [];
+      const lines = sanitizeList(block);
+      lines.forEach((ln) => {
+        const m = ln.match(/([a-zA-Z0-9\.:@\-_/]+)\s*-\s*(IP|DOMAIN|URL|HASH)?\s*-?\s*(.+)?/i);
+        if (m) {
+          indicators.push({ indicator: m[1], type: (m[2] || 'unknown').toLowerCase(), reputation: (m[3] || 'unknown'), source: undefined });
+        } else {
+          indicators.push({ indicator: ln, type: 'unknown', reputation: 'unknown' });
+        }
+      });
+      data.threatIntel = { indicators };
+      return;
+    }
+
+    // Email security
+    if (key === 'email') {
+      const spf = extractKeyValue(block, 'SPF') || extractKeyValue(block, 'SPF Record') || extractKeyValue(block, 'SPF Record:');
+      const dmarc = extractKeyValue(block, 'DMARC');
+      const dkim = extractKeyValue(block, 'DKIM');
+      data.email = { spf, dmarc, dkim, policyAssessment: undefined };
+      return;
+    }
+
+    // Mobile / API enumeration
+    if (key === 'mobile') {
+      const appsLines = extractListAfterLabel(block, 'apps');
+      const apps = appsLines.map((a) => ({ name: a }));
+      const apiEndpoints = extractListAfterLabel(block, 'apiEndpoints');
+      data.mobile = { apps, apiEndpoints };
+      return;
+    }
+
+    // Documents
+    if (key === 'documents') {
+      const files = sanitizeList(block).map((f) => ({ path: f, findings: [] as string[] }));
+      data.documents = { files };
+      return;
     }
   });
 
