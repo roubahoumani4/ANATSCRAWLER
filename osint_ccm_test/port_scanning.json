@@ -1,0 +1,190 @@
+{
+  "target": "80.77.182.18",
+  "scan_time": "2025-11-28T13:38:14.816027",
+  "open_ports": [
+    {
+      "ip": "193.227.179.246",
+      "port": 25,
+      "service": "SMTP",
+      "banner": "220 Gateway.cl.com.lb ESMTP Smtpd; Fri, 28 Nov 2025 13:38:14 +0200\r\n250-Gateway.cl.com.lb Hello [178.135.23.62], pleased to meet you\r\n250-ENHANCEDSTATUSCODES\r\n250-PIPELINING\r\n250-8BITMIME\r\n250-SIZE 21340160\r\n250-STARTTLS\r\n250-DELIVERBY\r\n250 HELP",
+      "protocol": "tcp",
+      "detected_service": null
+    },
+    {
+      "ip": "80.77.182.18",
+      "port": 25,
+      "service": "SMTP",
+      "banner": "220 mail.idmlb.com ESMTP MailEnable Service, Version: 10.51-- ready at 11/28/25 13:38:34",
+      "protocol": "tcp",
+      "detected_service": "MailEnable 10.51"
+    },
+    {
+      "ip": "80.77.182.18",
+      "port": 53,
+      "service": "DNS",
+      "banner": "",
+      "protocol": "tcp"
+    },
+    {
+      "ip": "193.227.179.246",
+      "port": 80,
+      "service": "HTTP",
+      "banner": "HTTP/1.1 200 OK\r\nAccept-Ranges: bytes\r\nContent-Type: text/html\r\nETag: \"bc2473a18e003bdb249eba5ce893033f:1760028122.592274\"\r\nLast-Modified: Thu, 09 Oct 2025 16:42:02 GMT\r\nVary: Accept-Encoding\r\nCache-Control: max-age=86000\r\nDate: Fri, 28 Nov 2025 11:23:54 GMT\r\nConnection: close\r\nAge: 861",
+      "protocol": "tcp",
+      "detected_service": null
+    },
+    {
+      "ip": "80.77.182.18",
+      "port": 80,
+      "service": "HTTP",
+      "banner": "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nLast-Modified: Thu, 09 Apr 2020 16:26:59 GMT\r\nAccept-Ranges: bytes\r\nETag: \"e2d0bab18bed61:0\"\r\nServer: Microsoft-IIS/10.0\r\nX-XSS-Protection: 0\r\nX-Frame-Options: http://*.example.com\r\nX-Powered-By: ASP.NET\r\nDate: Fri, 28 Nov 2025 11:38:35 GMT\r\nConnection: close\r\nContent-Length: 1330",
+      "protocol": "tcp",
+      "detected_service": "IIS 10.0"
+    },
+    {
+      "ip": "80.77.182.18",
+      "port": 110,
+      "service": "POP3",
+      "banner": "+OK Welcome to MailEnable POP3 Server",
+      "protocol": "tcp",
+      "detected_service": "MailEnable Unknown"
+    },
+    {
+      "ip": "80.77.182.18",
+      "port": 143,
+      "service": "IMAP",
+      "banner": "* OK IMAP4rev1 server ready at 11/28/25 13:38:34",
+      "protocol": "tcp",
+      "detected_service": null
+    },
+    {
+      "ip": "193.227.179.246",
+      "port": 443,
+      "service": "HTTPS",
+      "banner": "",
+      "protocol": "tcp"
+    },
+    {
+      "ip": "80.77.182.18",
+      "port": 443,
+      "service": "HTTPS",
+      "banner": "",
+      "protocol": "tcp"
+    },
+    {
+      "ip": "193.227.179.246",
+      "port": 465,
+      "service": "SMTPS",
+      "banner": "",
+      "protocol": "tcp"
+    },
+    {
+      "ip": "80.77.182.18",
+      "port": 465,
+      "service": "SMTPS",
+      "banner": "",
+      "protocol": "tcp"
+    },
+    {
+      "ip": "193.227.179.246",
+      "port": 587,
+      "service": "SMTP-Submission",
+      "banner": "",
+      "protocol": "tcp"
+    },
+    {
+      "ip": "80.77.182.18",
+      "port": 587,
+      "service": "SMTP-Submission",
+      "banner": "220 mail.idmlb.com ESMTP MailEnable Service, Version: 10.51-- ready at 11/28/25 13:38:34",
+      "protocol": "tcp",
+      "detected_service": "MailEnable 10.51"
+    },
+    {
+      "ip": "80.77.182.18",
+      "port": 995,
+      "service": "POP3S",
+      "banner": "",
+      "protocol": "tcp"
+    },
+    {
+      "ip": "193.227.179.246",
+      "port": 3306,
+      "service": "MySQL",
+      "banner": "",
+      "protocol": "tcp"
+    },
+    {
+      "ip": "80.77.182.18",
+      "port": 5432,
+      "service": "PostgreSQL",
+      "banner": "",
+      "protocol": "tcp"
+    },
+    {
+      "ip": "80.77.182.18",
+      "port": 8000,
+      "service": "HTTP-Alt",
+      "banner": "",
+      "protocol": "tcp"
+    },
+    {
+      "ip": "193.227.179.246",
+      "port": 8080,
+      "service": "HTTP-Proxy",
+      "banner": "",
+      "protocol": "tcp"
+    },
+    {
+      "ip": "80.77.182.18",
+      "port": 8080,
+      "service": "HTTP-Proxy",
+      "banner": "",
+      "protocol": "tcp"
+    },
+    {
+      "ip": "193.227.179.246",
+      "port": 8100,
+      "service": "HTTP-Alt2",
+      "banner": "",
+      "protocol": "tcp"
+    },
+    {
+      "ip": "193.227.179.246",
+      "port": 8101,
+      "service": "HTTP-Alt3",
+      "banner": "",
+      "protocol": "tcp"
+    },
+    {
+      "ip": "193.227.179.246",
+      "port": 9443,
+      "service": "HTTPS-Service",
+      "banner": "",
+      "protocol": "tcp"
+    },
+    {
+      "ip": "193.227.179.246",
+      "port": 10443,
+      "service": "HTTPS-Alt2",
+      "banner": "",
+      "protocol": "tcp"
+    },
+    {
+      "ip": "193.227.179.246",
+      "port": 11443,
+      "service": "HTTPS-Alt3",
+      "banner": "",
+      "protocol": "tcp"
+    },
+    {
+      "ip": "80.77.182.18",
+      "port": 12443,
+      "service": "HTTPS-Alt4",
+      "banner": "",
+      "protocol": "tcp"
+    }
+  ],
+  "services": {},
+  "vulnerabilities": []
+}

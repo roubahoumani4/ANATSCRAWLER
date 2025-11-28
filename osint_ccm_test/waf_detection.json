@@ -1,0 +1,44 @@
+{
+  "https://ccm.com.lb": {
+    "detected": false,
+    "waf": null,
+    "headers": {
+      "Cache-Control": "private",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Encoding": "gzip",
+      "Vary": "Accept-Encoding",
+      "Server": "Microsoft-IIS/10.0",
+      "X-XSS-Protection": "0",
+      "X-Frame-Options": "https://*.www.ccm.com.lb",
+      "X-AspNet-Version": "4.0.30319",
+      "X-Powered-By": "ASP.NET",
+      "X-Powered-By-Plesk": "PleskWin",
+      "MicrosoftOfficeWebServer": "5.0_Pub",
+      "MS-Author-Via": "MS-FP/4.0",
+      "Date": "Fri, 28 Nov 2025 11:39:34 GMT",
+      "Content-Length": "58491"
+    },
+    "status_code": 200
+  },
+  "http://ccm.com.lb": {
+    "detected": false,
+    "waf": null,
+    "headers": {
+      "Cache-Control": "private",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Encoding": "gzip",
+      "Vary": "Accept-Encoding",
+      "Server": "Microsoft-IIS/10.0",
+      "X-XSS-Protection": "0",
+      "X-Frame-Options": "https://*.www.ccm.com.lb",
+      "X-AspNet-Version": "4.0.30319",
+      "X-Powered-By": "ASP.NET",
+      "X-Powered-By-Plesk": "PleskWin",
+      "MicrosoftOfficeWebServer": "5.0_Pub",
+      "MS-Author-Via": "MS-FP/4.0",
+      "Date": "Fri, 28 Nov 2025 11:39:36 GMT",
+      "Content-Length": "58491"
+    },
+    "status_code": 200
+  }
+}

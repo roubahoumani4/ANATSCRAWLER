@@ -1,0 +1,18 @@
+{
+  "categories": {
+    "CMS": [
+      "magento"
+    ],
+    "Web Servers": [
+      "iis"
+    ],
+    "Analytics": [
+      "google_analytics",
+      "google_tag_manager"
+    ]
+  },
+  "confidence_scores": {},
+  "versions": {
+    "jquery": "1.6.1"
+  }
+}

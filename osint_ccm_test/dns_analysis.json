@@ -1,0 +1,39 @@
+{
+  "records": {
+    "A": [
+      "80.77.182.18"
+    ],
+    "MX": [
+      "5 gateway.creditlibanais.com.lb.",
+      "10 etrn.idm.net.lb.",
+      "20 mail.ccm.com.lb."
+    ],
+    "NS": [
+      "sf.idm.net.lb.",
+      "adonis.idm.net.lb.",
+      "ns0.idm.net.lb."
+    ],
+    "TXT": [
+      "\"v=spf1 ip4:193.188.135.30/24 ip4:194.126.4.56/29 ip4:80.77.182.18/24 +a +mx +a:onyx.idm.net.lb +a:panel.idm.net.lb +a:bce.idm.net.lb +a:rspamdou15.idm.net.lb ~all\""
+    ],
+    "SOA": [
+      "ns0.idm.net.lb. plesk.idmlb.com. 1651813864 10800 3600 604800 10800"
+    ]
+  },
+  "analysis": {
+    "mail_servers": [
+      "5 gateway.creditlibanais.com.lb.",
+      "10 etrn.idm.net.lb.",
+      "20 mail.ccm.com.lb."
+    ],
+    "spf_record": "\"v=spf1 ip4:193.188.135.30/24 ip4:194.126.4.56/29 ip4:80.77.182.18/24 +a +mx +a:onyx.idm.net.lb +a:panel.idm.net.lb +a:bce.idm.net.lb +a:rspamdou15.idm.net.lb ~all\"",
+    "spf_analysis": {
+      "policy_strength": "MODERATE",
+      "risk": "MEDIUM",
+      "description": "SPF uses ~all (softfail)"
+    }
+  },
+  "security": {
+    "dnssec": false
+  }
+}

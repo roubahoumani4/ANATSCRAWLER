@@ -1,0 +1,118 @@
+{
+  "analyzed_urls": [
+    {
+      "url": "https://ccm.com.lb",
+      "final_url": "https://www.ccm.com.lb/Default.aspx?pageid=149",
+      "status_code": 200,
+      "headers": {
+        "Cache-Control": "private",
+        "Content-Type": "text/html; charset=utf-8",
+        "Content-Encoding": "gzip",
+        "Vary": "Accept-Encoding",
+        "Server": "Microsoft-IIS/10.0",
+        "X-XSS-Protection": "0",
+        "X-Frame-Options": "https://*.www.ccm.com.lb",
+        "X-AspNet-Version": "4.0.30319",
+        "X-Powered-By": "ASP.NET",
+        "X-Powered-By-Plesk": "PleskWin",
+        "MicrosoftOfficeWebServer": "5.0_Pub",
+        "MS-Author-Via": "MS-FP/4.0",
+        "Date": "Fri, 28 Nov 2025 11:39:13 GMT",
+        "Content-Length": "58491"
+      },
+      "technologies": [
+        "Server: Microsoft-IIS/10.0",
+        "Powered-By: ASP.NET",
+        "jQuery",
+        "ASP.NET",
+        "Google Analytics",
+        "Telerik"
+      ],
+      "security_issues": [
+        "Strict-Transport-Security",
+        "Content-Security-Policy",
+        "X-Content-Type-Options",
+        "X-XSS-Protection is disabled",
+        "Referrer-Policy",
+        "Permissions-Policy"
+      ]
+    },
+    {
+      "url": "http://ccm.com.lb",
+      "final_url": "https://www.ccm.com.lb/Default.aspx?pageid=149",
+      "status_code": 200,
+      "headers": {
+        "Cache-Control": "private",
+        "Content-Type": "text/html; charset=utf-8",
+        "Content-Encoding": "gzip",
+        "Vary": "Accept-Encoding",
+        "Server": "Microsoft-IIS/10.0",
+        "X-XSS-Protection": "0",
+        "X-Frame-Options": "https://*.www.ccm.com.lb",
+        "X-AspNet-Version": "4.0.30319",
+        "X-Powered-By": "ASP.NET",
+        "X-Powered-By-Plesk": "PleskWin",
+        "MicrosoftOfficeWebServer": "5.0_Pub",
+        "MS-Author-Via": "MS-FP/4.0",
+        "Date": "Fri, 28 Nov 2025 11:39:16 GMT",
+        "Content-Length": "58491"
+      },
+      "technologies": [
+        "Server: Microsoft-IIS/10.0",
+        "Powered-By: ASP.NET",
+        "jQuery",
+        "ASP.NET",
+        "Google Analytics",
+        "Telerik"
+      ],
+      "security_issues": [
+        "Strict-Transport-Security",
+        "Content-Security-Policy",
+        "X-Content-Type-Options",
+        "X-XSS-Protection is disabled",
+        "Referrer-Policy",
+        "Permissions-Policy"
+      ]
+    },
+    {
+      "url": "https://ccm.com.lb",
+      "final_url": "https://www.ccm.com.lb/Default.aspx?pageid=149",
+      "status_code": 200,
+      "headers": {
+        "Cache-Control": "private",
+        "Content-Type": "text/html; charset=utf-8",
+        "Content-Encoding": "gzip",
+        "Vary": "Accept-Encoding",
+        "Server": "Microsoft-IIS/10.0",
+        "X-XSS-Protection": "0",
+        "X-Frame-Options": "https://*.www.ccm.com.lb",
+        "X-AspNet-Version": "4.0.30319",
+        "X-Powered-By": "ASP.NET",
+        "X-Powered-By-Plesk": "PleskWin",
+        "MicrosoftOfficeWebServer": "5.0_Pub",
+        "MS-Author-Via": "MS-FP/4.0",
+        "Date": "Fri, 28 Nov 2025 11:39:29 GMT",
+        "Content-Length": "58491"
+      },
+      "technologies": [
+        "Server: Microsoft-IIS/10.0",
+        "Powered-By: ASP.NET",
+        "jQuery",
+        "ASP.NET",
+        "Google Analytics",
+        "Telerik"
+      ],
+      "security_issues": [
+        "Strict-Transport-Security",
+        "Content-Security-Policy",
+        "X-Content-Type-Options",
+        "X-XSS-Protection is disabled",
+        "Referrer-Policy",
+        "Permissions-Policy"
+      ]
+    }
+  ],
+  "technologies": {},
+  "security_headers": {},
+  "vulnerabilities": []
+}

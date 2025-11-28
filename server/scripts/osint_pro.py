@@ -570,6 +570,9 @@ class ProfessionalOSINT:
                         live_vulns = self.check_software_against_nvd(software, version, {"service": f"Web: {tech_type}"})
                         live_vulns_found += len(live_vulns)
         
+        # end live_vulnerability_scan processing
+        # (Reporting content for markdown moved to _build_markdown_report)
+        
         self.results["live_vulnerability_checks"]["nvd_checked"] = True
         self.results["live_vulnerability_checks"]["vulnerabilities_found"] = live_vulns_found
         
@@ -2232,6 +2235,134 @@ All investigation modules completed with detailed output and live vulnerability 
 ## Investigation Details
 Full technical details available in the JSON output files in the investigation directory.
 """
+        # -----------------------------------------------------------------
+        # Include enhanced sections (Business Intelligence, Social Media)
+        # -----------------------------------------------------------------
+        # 10. Business Intelligence & Context Analysis
+        biz = self.results.get("business_intelligence", {})
+        report += "\n## 10. BUSINESS INTELLIGENCE & CONTEXT ANALYSIS\n"
+        if biz and any(v for v in biz.values() if v):
+            company = biz.get("company_profile", {})
+            if company:
+                name = company.get("name_candidate") or company.get("name")
+                report += f"- **Company Candidate:** {name}\n" if name else ""
+            services = biz.get("services_identified", [])
+            if services:
+                report += "- **Identified Services:**\n"
+                for s in services:
+                    report += f"  - {s}\n"
+            infra = biz.get("infrastructure_providers", [])
+            if infra:
+                report += "- **Infrastructure Providers / Registrars:**\n"
+                for r in infra:
+                    report += f"  - {r}\n"
+            related = biz.get("related_entities", [])
+            if related:
+                report += "- **Related Entities / Domains:**\n"
+                for d in related:
+                    report += f"  - {d}\n"
+        else:
+            report += "- No business intelligence extracted.\n"
+
+        # 11. Social Media & Digital Footprint Analysis
+        social = self.results.get("social_media", {})
+        report += "\n## 11. SOCIAL MEDIA & DIGITAL FOOTPRINT ANALYSIS\n"
+        if social:
+            for platform, info in social.items():
+                status = info.get("status", "UNKNOWN")
+                url = info.get("url", "N/A")
+                if status == 'FOUND':
+                    report += f"- **{platform.capitalize()}:** {url} (FOUND, HTTP {info.get('status_code', 'N/A')})\n"
+                elif status == 'NOT_FOUND':
+                    report += f"- **{platform.capitalize()}:** Not found (HTTP {info.get('status_code', 'N/A')})\n"
+                else:
+                    err = info.get('error')
+                    report += f"- **{platform.capitalize()}:** Error ({err}) - attempted URL: {url}\n"
+        else:
+            report += "- No social media accounts discovered or enumeration not performed.\n"
+        # 12. Email Pattern Discovery
+        report += "\n## 12. EMAIL PATTERN DISCOVERY\n"
+        email_patterns = self.results.get("contact_info", {}).get("email_patterns", {})
+        if email_patterns:
+            generated = email_patterns.get("generated_emails", [])
+            report += f"- **Generated Patterns:** {len(generated)} examples\n"
+            for e in generated[:10]:
+                report += f"  - {e}\n"
+        else:
+            report += "- No email patterns generated.\n"
+
+        # 13. Advanced Technology Stack Analysis
+        report += "\n## 13. ADVANCED TECHNOLOGY STACK ANALYSIS\n"
+        tech = self.results.get('web_technologies', {}).get('advanced_detection') or self.results.get('web_technologies', {})
+        if tech:
+            categories = tech.get('categories', {}) if isinstance(tech, dict) else {}
+            if categories:
+                for cat, items in categories.items():
+                    report += f"- **{cat}:** {', '.join(items)}\n"
+            versions = tech.get('versions', {}) if isinstance(tech, dict) else {}
+            if versions:
+                report += "- **Detected Versions:**\n"
+                for k, v in versions.items():
+                    report += f"  - {k}: {v}\n"
+        else:
+            report += "- No technologies detected.\n"
+
+        # 14. Cloud Infrastructure Analysis
+        report += "\n## 14. CLOUD INFRASTRUCTURE ANALYSIS\n"
+        cloud = self.results.get('cloud_infrastructure', {})
+        if cloud and cloud.get('providers'):
+            for provider, records in cloud.get('providers', {}).items():
+                report += f"- **{provider.upper()}:** {len(records)} indicators\n"
+                for r in records[:5]:
+                    report += f"  - {r.get('record_type')}: {r.get('value')}\n"
+        else:
+            report += "- No clear cloud infrastructure indicators detected.\n"
+
+        # LIVE VULNERABILITY SCANNING - NVD & CVE DATABASES
+        report += "\n## LIVE VULNERABILITY SCANNING - NVD & CVE DATABASES\n"
+        live = self.results.get('live_vulnerability_checks', {})
+        if live:
+            nvd_checked = live.get('nvd_checked', False)
+            vulns_found = live.get('vulnerabilities_found', 0)
+            report += f"- **NVD Checked:** {nvd_checked}\n"
+            report += f"- **Vulnerabilities Found (live checks):** {vulns_found}\n"
+        else:
+            report += "- Live vulnerability scanning was not performed.\n"
+
+        # VULNERABILITY DETAILS - COMPREHENSIVE LIST
+        report += "\n## VULNERABILITY DETAILS - COMPREHENSIVE LIST\n"
+        vulns = self.results.get('vulnerabilities', [])
+        if vulns:
+            for v in vulns:
+                report += f"- **{v.get('severity','UNKNOWN')}:** {v.get('type','Vulnerability')}\n"
+                if v.get('description'):
+                    report += f"  - Description: {v.get('description')}\n"
+                if v.get('service'):
+                    report += f"  - Location: {v.get('service')}\n"
+                if v.get('ip'):
+                    report += f"  - IP: {v.get('ip')}\n"
+                if v.get('software'):
+                    report += f"  - Software: {v.get('software')}\n"
+                if v.get('cves'):
+                    report += f"  - CVEs: {', '.join(v.get('cves'))}\n"
+                if v.get('recommendation'):
+                    report += f"  - Recommendation: {v.get('recommendation')}\n"
+                report += "\n"
+        else:
+            report += "- No vulnerabilities recorded in the results.\n"
+
+        # ENHANCED SCAN COMPLETE! summary
+        report += "\n## ENHANCED SCAN COMPLETE!\n"
+        report += f"- Modules completed: {len([m for m in self.results.get('modules_completed', [])]) if self.results.get('modules_completed') else 'N/A'}\n"
+        report += f"- IPs Discovered: {len(self.discovered_ips)}\n"
+        report += f"- Subdomains Found: {len(self.discovered_subdomains)}\n"
+        report += f"- Open Ports: {len(self.results.get('port_scanning', {}).get('open_ports', []))}\n"
+        report += f"- Critical Vulnerabilities: {len([v for v in vulns if v.get('severity')=='CRITICAL'])}\n"
+        report += f"- Total Vulnerabilities: {len(vulns)}\n"
+        report += f"- Breached Accounts: {len(self.breached_accounts)}\n"
+        report += f"- Live NVD Checks: {live.get('vulnerabilities_found', 0) if isinstance(live, dict) else 0}\n"
+        report += f"- Risk Level: {self.results.get('executive_summary', {}).get('risk_level', 'N/A')}\n"
+
         return report
 
     def run_comprehensive_assessment(self):

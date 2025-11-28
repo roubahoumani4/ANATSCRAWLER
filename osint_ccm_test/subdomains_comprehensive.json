@@ -1,0 +1,51 @@
+{
+  "common_subdomains": [
+    {
+      "subdomain": "www.ccm.com.lb",
+      "ip": "80.77.182.18",
+      "source": "common_wordlist"
+    },
+    {
+      "subdomain": "mail.ccm.com.lb",
+      "ip": "80.77.182.18",
+      "source": "common_wordlist"
+    },
+    {
+      "subdomain": "webmail.ccm.com.lb",
+      "ip": "80.77.182.18",
+      "source": "common_wordlist"
+    },
+    {
+      "subdomain": "ftp.ccm.com.lb",
+      "ip": "80.77.182.18",
+      "source": "common_wordlist"
+    },
+    {
+      "subdomain": "ns.ccm.com.lb",
+      "ip": "80.77.182.18",
+      "source": "common_wordlist"
+    },
+    {
+      "subdomain": "demo.ccm.com.lb",
+      "ip": "80.77.182.18",
+      "source": "common_wordlist"
+    },
+    {
+      "subdomain": "gateway.ccm.com.lb",
+      "ip": "193.227.179.246",
+      "source": "common_wordlist"
+    }
+  ],
+  "certificate_transparency": [
+    {
+      "subdomain": "www.ccm.com.lb",
+      "source": "certificate_transparency"
+    },
+    {
+      "subdomain": "ccm.com.lb",
+      "source": "certificate_transparency"
+    }
+  ],
+  "dns_bruteforce": [],
+  "total_discovered": 8
+}

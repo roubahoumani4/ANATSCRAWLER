@@ -1,0 +1,32 @@
+{
+  "linkedin": {
+    "url": "https://linkedin.com/company/ccm",
+    "status": "NOT_FOUND",
+    "status_code": 999
+  },
+  "twitter": {
+    "url": "https://twitter.com/ccm",
+    "status": "FOUND",
+    "status_code": 301
+  },
+  "facebook": {
+    "url": "https://facebook.com/ccm",
+    "status": "FOUND",
+    "status_code": 301
+  },
+  "instagram": {
+    "url": "https://instagram.com/ccm",
+    "status": "FOUND",
+    "status_code": 301
+  },
+  "github": {
+    "url": "https://github.com/ccm",
+    "status": "FOUND",
+    "status_code": 200
+  },
+  "youtube": {
+    "url": "https://youtube.com/@ccm",
+    "status": "FOUND",
+    "status_code": 301
+  }
+}
