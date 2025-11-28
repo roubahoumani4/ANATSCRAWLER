@@ -1333,6 +1333,82 @@ const AssessmentPage: React.FC = () => {
         yPosition += 6;
       };
 
+      // Specialized vulnerability table with colored severity column
+      const addVulnerabilityTable = (
+        title: string | null,
+        columns: Array<{ header: string; width?: number }>,
+        rows: string[][]
+      ) => {
+        if (!rows.length) return;
+
+        if (title) addSubheading(title);
+
+        const baseWidths = columns.map((col) => col.width || maxWidth / columns.length);
+        const totalWidth = baseWidths.reduce((sum, width) => sum + width, 0);
+        const scale = totalWidth > maxWidth ? maxWidth / totalWidth : 1;
+        const widths = baseWidths.map((width) => width * scale);
+        const tableWidth = widths.reduce((sum, width) => sum + width, 0);
+
+        checkNewPage(baseLineHeight + 8);
+        // header
+        doc.setFillColor(236, 239, 244);
+        doc.setDrawColor(200, 200, 200);
+        doc.rect(margin, yPosition, tableWidth, baseLineHeight + 4, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        let cursorX = margin;
+        columns.forEach((col, idx) => {
+          doc.text(col.header, cursorX + 2, yPosition + baseLineHeight + 1);
+          cursorX += widths[idx];
+        });
+        yPosition += baseLineHeight + 4;
+
+        rows.forEach((row) => {
+          const cellLines = row.map((cell, idx) => doc.splitTextToSize(cell || '—', widths[idx] - 4));
+          const rowHeight = Math.max(...cellLines.map((lines) => Math.max(1, lines.length))) * baseLineHeight + 3;
+          checkNewPage(rowHeight + 2);
+          let cellX = margin;
+          // Draw cells; color first cell based on severity
+          columns.forEach((col, idx) => {
+            const severity = idx === 0 ? (row[0] || '').toString().toUpperCase() : undefined;
+            if (idx === 0) {
+              // severity color mapping
+              let fill: [number, number, number] = [210, 210, 210];
+              if (/CRITICAL/i.test(severity || '')) fill = [220, 38, 38]; // red
+              else if (/HIGH/i.test(severity || '')) fill = [245, 158, 11]; // orange
+              else if (/MEDIUM/i.test(severity || '')) fill = [245, 158, 11]; // orange/yellow
+              else if (/LOW/i.test(severity || '')) fill = [34, 197, 94]; // green
+              else fill = [160, 160, 160];
+              doc.setFillColor(fill[0], fill[1], fill[2]);
+              doc.rect(cellX, yPosition, widths[idx], rowHeight, 'F');
+              doc.setDrawColor(200, 200, 200);
+              doc.rect(cellX, yPosition, widths[idx], rowHeight);
+              // text in contrasting color
+              doc.setTextColor(255, 255, 255);
+              doc.setFont('helvetica', 'bold');
+              const lines = cellLines[idx].length ? cellLines[idx] : ['—'];
+              lines.forEach((line: string, lineIdx: number) => {
+                doc.text(line, cellX + 2, yPosition + 4 + lineIdx * baseLineHeight);
+              });
+              // restore text color
+              doc.setTextColor(40, 40, 40);
+              doc.setFont('helvetica', 'normal');
+            } else {
+              doc.rect(cellX, yPosition, widths[idx], rowHeight);
+              const lines = cellLines[idx].length ? cellLines[idx] : ['—'];
+              doc.setFont('helvetica', 'normal');
+              doc.setFontSize(8.5);
+              lines.forEach((line: string, lineIdx: number) => {
+                doc.text(line, cellX + 2, yPosition + 4 + lineIdx * baseLineHeight);
+              });
+            }
+            cellX += widths[idx];
+          });
+          yPosition += rowHeight;
+        });
+        yPosition += 6;
+      };
+
       // monospace rendering helper for full plain output (preserve formatting)
       const addMonospace = (text: string, fontSize = 8, lineHeight = 4.2) => {
         doc.setFont('courier', 'normal');
@@ -1581,7 +1657,7 @@ const AssessmentPage: React.FC = () => {
           const vulnDetails = parseVulnDetailsBlock(vulnBlock);
           if (vulnDetails.length) {
             addSectionTitle('VULNERABILITY DETAILS - COMPREHENSIVE LIST');
-            addTable(null, [
+            addVulnerabilityTable(null, [
               { header: 'Severity', width: 30 },
               { header: 'Title', width: maxWidth * 0.35 },
               { header: 'Location', width: maxWidth * 0.2 },
