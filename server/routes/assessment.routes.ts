@@ -447,23 +447,33 @@ router.get('/download/:jobId', async (req: Request, res: Response) => {
   try {
     const { jobId } = req.params;
     
-    // Try to get from in-memory jobs first, then fall back to database
-    let job = jobs.get(jobId);
-    let reportLocation: string | undefined;
-    
-    if (job && job.result && job.result.parsed && job.result.parsed.reportLocation) {
-      reportLocation = job.result.parsed.reportLocation;
-    } else {
-      // Fall back to database
-      const scan = await Scan.findOne({ jobId }).lean();
-      if (!scan || !scan.parsed || !scan.parsed.reportLocation) {
-        return res.status(404).json({ error: 'Report not found for this job' });
-      }
-      reportLocation = scan.parsed.reportLocation;
+    // Try to get scan data from database
+    const scan = await Scan.findOne({ jobId }).lean();
+    if (!scan) {
+      return res.status(404).json({ error: 'Scan not found' });
     }
     
-    if (!reportLocation) {
-      return res.status(404).json({ error: 'Report location not found' });
+    // Check if there's a report file location
+    let reportLocation: string | undefined = scan.parsed?.reportLocation;
+    
+    // If no report location, generate a simple text report from scan data
+    if (!reportLocation || !scan.parsed?.plainOutput) {
+      const reportContent = `
+ANAT SECURITY - Assessment Report
+=====================================
+Job ID: ${jobId}
+Target: ${scan.target}
+Status: ${scan.status}
+Start Time: ${scan.startTime ? new Date(scan.startTime).toLocaleString() : 'N/A'}
+End Time: ${scan.endTime ? new Date(scan.endTime).toLocaleString() : 'N/A'}
+
+${scan.stdout || 'No output available'}
+=====================================
+`;
+      
+      res.setHeader('Content-Type', 'text/plain');
+      res.setHeader('Content-Disposition', `attachment; filename="assessment_${jobId}.txt"`);
+      return res.send(reportContent);
     }
 
     const rawLocation: string = reportLocation;
