@@ -353,6 +353,44 @@ router.get('/status/:jobId', async (req: Request, res: Response) => {
   }
 });
 
+  // GET /scans - list scans for authenticated user (paginated)
+  router.get('/scans', async (req: Request, res: Response) => {
+    try {
+      const ownerId = (req as any).user && (req as any).user._id ? (req as any).user._id : null;
+      if (!ownerId) return res.status(401).json({ error: 'User not authenticated' });
+
+      const page = Math.max(1, Number(req.query.page) || 1);
+      const limit = Math.min(100, Number(req.query.limit) || 20);
+      const skip = (page - 1) * limit;
+
+      const total = await Scan.countDocuments({ owner: ownerId });
+      const scans = await Scan.find({ owner: ownerId }).sort({ startTime: -1 }).skip(skip).limit(limit).lean();
+
+      return res.json({ total, page, limit, scans });
+    } catch (err) {
+      console.error('Failed to list scans:', err);
+      return res.status(500).json({ error: (err as Error).message || 'Failed to list scans' });
+    }
+  });
+
+  // GET /scans/:jobId - fetch a single scan (owner only)
+  router.get('/scans/:jobId', async (req: Request, res: Response) => {
+    try {
+      const ownerId = (req as any).user && (req as any).user._id ? (req as any).user._id : null;
+      if (!ownerId) return res.status(401).json({ error: 'User not authenticated' });
+
+      const { jobId } = req.params;
+      const scan = await Scan.findOne({ jobId }).lean();
+      if (!scan) return res.status(404).json({ error: 'Scan not found' });
+      if (scan.owner.toString() !== ownerId.toString()) return res.status(403).json({ error: 'Not allowed' });
+
+      return res.json(scan);
+    } catch (err) {
+      console.error('Failed to fetch scan:', err);
+      return res.status(500).json({ error: (err as Error).message || 'Failed to fetch scan' });
+    }
+  });
+
 // Cleanup old jobs (remove after 1 hour)
 setInterval(() => {
   const now = Date.now();
