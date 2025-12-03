@@ -2134,19 +2134,72 @@ const AssessmentPage: React.FC = () => {
             disabled={running}
           />
 
-          <p className="mt-4 text-xs text-gray-400">
-            💡 <strong>Full Comprehensive Scan:</strong> This will run a complete OSINT analysis including deep DNS brute-forcing and data breach checks. This may take 3-5 minutes.
-          </p>
+          {/* Scan Type Info Card */}
+          <div className="mt-4 bg-gradient-to-br from-blue-900/30 via-purple-900/20 to-blue-900/30 border border-blue-500/30 rounded-xl p-4 shadow-lg">
+            <div className="flex items-start space-x-3">
+              <div className="flex-shrink-0 mt-1">
+                <Zap className="w-5 h-5 text-blue-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-blue-300 flex items-center">
+                  Full Comprehensive Scan
+                  <span className="ml-2 px-2 py-0.5 bg-blue-500/20 text-blue-300 text-xs rounded-full">Advanced</span>
+                </h3>
+                <p className="text-xs text-gray-300 mt-1.5 leading-relaxed">
+                  Complete OSINT analysis including deep DNS brute-forcing, port scanning, SSL analysis, and data breach checks.
+                </p>
+                <div className="mt-2 flex items-center space-x-2 text-xs text-gray-400">
+                  <ActivityIcon className="w-3.5 h-3.5" />
+                  <span>Estimated time: 3-5 minutes</span>
+                </div>
+              </div>
+            </div>
+          </div>
 
-          {/* Small animated professional explanation */}
-          <div className="mt-4 p-4 rounded-lg border border-gray-800 bg-gradient-to-r from-slate-800/40 to-slate-900/30">
-            <h3 className="text-sm font-semibold text-white">What this assessment does</h3>
-            <p className="text-xs text-gray-300 mt-2">We perform a staged automated assessment combining passive and active techniques to discover infrastructure, open services, SSL issues, web technologies, and known vulnerabilities. Progress is logged live and visualized on the map while the scan runs.</p>
-            <ul className="mt-3 text-xs text-gray-300 space-y-1">
-              <li>• Passive reconnaissance (WHOIS, DNS, tech stack)</li>
-              <li>• Active probing (port scans, service banners)</li>
-              <li>• Live vulnerability checks and report generation</li>
-            </ul>
+          {/* Assessment Details Card */}
+          <div className="mt-4 bg-gradient-to-br from-slate-800/60 via-gray-900/40 to-slate-800/60 border border-gray-700/50 rounded-xl p-5 shadow-lg">
+            <div className="flex items-center space-x-2 mb-3">
+              <Radar className="w-5 h-5 text-emerald-400" />
+              <h3 className="text-sm font-bold text-white">What This Assessment Does</h3>
+            </div>
+            <p className="text-xs text-gray-300 leading-relaxed">
+              We perform a staged automated assessment combining passive and active techniques to discover infrastructure, open services, SSL issues, web technologies, and known vulnerabilities. Progress is logged live and visualized on the map while the scan runs.
+            </p>
+            
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+              {/* Passive Recon Card */}
+              <div className="bg-gradient-to-br from-cyan-900/20 to-cyan-800/10 border border-cyan-500/20 rounded-lg p-3">
+                <div className="flex items-center space-x-2 mb-2">
+                  <Globe className="w-4 h-4 text-cyan-400" />
+                  <h4 className="text-xs font-semibold text-cyan-300">Passive Recon</h4>
+                </div>
+                <p className="text-xs text-gray-400 leading-relaxed">
+                  WHOIS, DNS records, tech stack detection, subdomain enumeration
+                </p>
+              </div>
+
+              {/* Active Probing Card */}
+              <div className="bg-gradient-to-br from-orange-900/20 to-orange-800/10 border border-orange-500/20 rounded-lg p-3">
+                <div className="flex items-center space-x-2 mb-2">
+                  <Server className="w-4 h-4 text-orange-400" />
+                  <h4 className="text-xs font-semibold text-orange-300">Active Probing</h4>
+                </div>
+                <p className="text-xs text-gray-400 leading-relaxed">
+                  Port scanning, service detection, banner grabbing, WAF detection
+                </p>
+              </div>
+
+              {/* Security Analysis Card */}
+              <div className="bg-gradient-to-br from-red-900/20 to-red-800/10 border border-red-500/20 rounded-lg p-3">
+                <div className="flex items-center space-x-2 mb-2">
+                  <Shield className="w-4 h-4 text-red-400" />
+                  <h4 className="text-xs font-semibold text-red-300">Security Analysis</h4>
+                </div>
+                <p className="text-xs text-gray-400 leading-relaxed">
+                  SSL/TLS checks, vulnerability scanning, breach database lookup
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Animated map visualization while running */}
