@@ -1,8 +1,11 @@
 import mongoose from 'mongoose';
+import scansConnection from '../services/mongodbScans.service';
 
-const scanSchema = new mongoose.Schema({
+const { Schema } = mongoose;
+
+const scanSchema = new Schema({
   jobId: { type: String, required: true, unique: true },
-  owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  owner: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   target: { type: String, required: true },
   status: { type: String, enum: ['pending', 'running', 'completed', 'failed'], default: 'pending' },
   startTime: { type: Date, default: Date.now },
@@ -11,7 +14,7 @@ const scanSchema = new mongoose.Schema({
   exitCode: { type: Number },
   stdout: { type: String },
   stderr: { type: String },
-  parsed: { type: mongoose.Schema.Types.Mixed },
+  parsed: { type: Schema.Types.Mixed },
   reportLocation: { type: String },
   error: { type: String },
   createdAt: { type: Date, default: Date.now },
@@ -41,4 +44,5 @@ export interface IScan extends mongoose.Document {
   error?: string;
 }
 
-export const Scan = mongoose.model<IScan>('Scan', scanSchema, 'scans');
+// Use the dedicated scans connection so documents are stored in the `assessment_scans` DB
+export const Scan = scansConnection.model<IScan>('Scan', scanSchema, 'scans');
