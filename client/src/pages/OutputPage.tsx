@@ -213,7 +213,27 @@ const OutputPage: React.FC = () => {
           throw new Error(err.error || `HTTP ${res.status}`);
         }
         const data = await res.json();
-        setScan(data.result || data.scan || null);
+        
+        // Use scan metadata from data.scan (contains status, startTime, endTime)
+        // and result data from data.result (contains parsed output)
+        const scanInfo = data.scan || {};
+        const resultData = data.result || {};
+        
+        // Merge scan metadata with result data
+        const fullScan = {
+          ...resultData,
+          status: scanInfo.status || data.status || 'unknown',
+          startTime: scanInfo.startTime || scanInfo.createdAt,
+          endTime: scanInfo.endTime || scanInfo.updatedAt,
+          target: scanInfo.target || resultData.target,
+          jobId: scanInfo.jobId || data.jobId,
+          parsed: resultData.parsed || scanInfo.parsed,
+          stdout: resultData.stdout || scanInfo.stdout,
+          stderr: resultData.stderr || scanInfo.stderr,
+        };
+        
+        console.log('Fetched scan data:', { scan: scanInfo, result: resultData, merged: fullScan });
+        setScan(fullScan);
       } catch (e: any) {
         setError(e.message || 'Failed to fetch scan');
       } finally {
