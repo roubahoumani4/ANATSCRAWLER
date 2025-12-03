@@ -2220,7 +2220,6 @@ const AssessmentPage: React.FC = () => {
             </div>
             <p className="text-xs text-gray-300 leading-relaxed">
               We perform a staged automated assessment combining passive and active techniques to discover infrastructure, open services, SSL issues, web technologies, and known vulnerabilities.
-              {running && <span className="text-emerald-400 font-semibold"> Scan in progress...</span>}
             </p>
             
             <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -2362,8 +2361,28 @@ const AssessmentPage: React.FC = () => {
             </button>
           </div>
 
-          {statusMessage && (
-            <div className="mt-4 text-sm text-blue-400 animate-pulse">{statusMessage}</div>
+          {running && (
+            <div className="mt-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-emerald-400">Scan in progress</span>
+                <span className="text-xs text-gray-400">{elapsedSeconds}s elapsed</span>
+              </div>
+              <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-emerald-500 via-green-400 to-emerald-500 rounded-full transition-all duration-300 animate-pulse"
+                  style={{ 
+                    width: `${Math.min(
+                      Math.max(passiveReconProgress, activeProbingProgress, securityAnalysisProgress),
+                      100
+                    )}%` 
+                  }}
+                />
+              </div>
+            </div>
+          )}
+          
+          {!running && statusMessage && (
+            <div className="mt-4 text-sm text-blue-400">{statusMessage}</div>
           )}
 
           {/* Navigation buttons shown when we have scan results */}

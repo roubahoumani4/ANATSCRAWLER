@@ -402,8 +402,25 @@ router.get('/status/:jobId', async (req: Request, res: Response) => {
       if (!scan) return res.status(404).json({ error: 'Scan not found' });
       if (scan.owner.toString() !== ownerId.toString()) return res.status(403).json({ error: 'Not allowed' });
 
+      // If the scan is running, mark it as aborted instead of deleting
+      if (scan.status === 'running') {
+        await Scan.updateOne({ jobId }, { 
+          status: 'aborted',
+          endTime: new Date()
+        });
+        
+        // Also abort the in-memory job if it exists
+        const job = jobs.get(jobId);
+        if (job) {
+          job.status = 'aborted';
+        }
+        
+        return res.json({ success: true, message: 'Scan aborted', status: 'aborted' });
+      }
+
+      // For finished/failed/aborted scans, delete them
       await Scan.deleteOne({ jobId });
-      return res.json({ success: true, message: 'Scan cleared' });
+      return res.json({ success: true, message: 'Scan deleted' });
     } catch (err) {
       console.error('Failed to delete scan:', err);
       return res.status(500).json({ error: (err as Error).message || 'Failed to delete scan' });

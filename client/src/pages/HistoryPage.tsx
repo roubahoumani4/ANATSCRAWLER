@@ -41,8 +41,9 @@ const HistoryPage: React.FC = () => {
     }
   };
 
-  const deleteScan = async (jobId: string, target: string) => {
-    if (!confirm(`Are you sure you want to delete the scan for "${target}"?\n\nJob ID: ${jobId.slice(0, 16)}...\n\nThis action cannot be undone.`)) {
+  const deleteScan = async (jobId: string, target: string, status: string) => {
+    const action = status === 'running' ? 'abort' : 'delete';
+    if (!confirm(`Are you sure you want to ${action} the scan for "${target}"?\n\nJob ID: ${jobId.slice(0, 16)}...\n\nThis action cannot be undone.`)) {
       return;
     }
 
@@ -61,13 +62,22 @@ const HistoryPage: React.FC = () => {
       
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to delete scan');
+        throw new Error(errorData.error || `Failed to ${action} scan`);
       }
       
-      // Remove the scan from the list
-      setScans(prevScans => prevScans.filter(scan => scan.jobId !== jobId));
+      const result = await res.json();
+      
+      // If aborted, update the scan status instead of removing it
+      if (result.status === 'aborted') {
+        setScans(prevScans => prevScans.map(scan => 
+          scan.jobId === jobId ? { ...scan, status: 'aborted' } : scan
+        ));
+      } else {
+        // Remove the scan from the list if deleted
+        setScans(prevScans => prevScans.filter(scan => scan.jobId !== jobId));
+      }
     } catch (e: any) {
-      setError(e.message || 'Failed to delete scan');
+      setError(e.message || `Failed to ${action} scan`);
     } finally {
       setDeleting(null);
     }
@@ -220,7 +230,7 @@ const HistoryPage: React.FC = () => {
                         </button>
                         <button 
                           className="px-3 py-1.5 rounded bg-red-600 hover:bg-red-500 text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          onClick={() => deleteScan(scan.jobId, scan.target)}
+                          onClick={() => deleteScan(scan.jobId, scan.target, scan.status)}
                           disabled={deleting === scan.jobId}
                         >
                           {deleting === scan.jobId ? (
@@ -228,7 +238,7 @@ const HistoryPage: React.FC = () => {
                           ) : (
                             <Trash2 size={14} />
                           )}
-                          Delete
+                          {scan.status === 'running' ? 'Abort' : 'Delete'}
                         </button>
                       </div>
                     </td>
