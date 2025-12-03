@@ -3,6 +3,7 @@ import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import { exec } from 'child_process';
+import { Scan } from '../models/Scan';
 
 const router = Router();
 
@@ -35,6 +36,13 @@ function runAssessmentBackground(jobId: string, target: string) {
   if (!job) return;
 
   job.status = 'running';
+
+  // Update DB scan status to running
+  try {
+    Scan.findOneAndUpdate({ jobId }, { status: 'running' }).catch(() => {});
+  } catch (e) {
+    // ignore
+  }
 
   const scriptsDir = process.env.SCRIPTS_DIR || '/var/www/anatscrawler/scripts';
   const scriptPath = path.join(scriptsDir, 'osint_pro.py');
@@ -178,12 +186,36 @@ function runAssessmentBackground(jobId: string, target: string) {
       stderr,
       parsed,
     };
+
+    // Persist final scan result to DB
+    try {
+      Scan.findOneAndUpdate(
+        { jobId },
+        {
+          status: 'completed',
+          endTime: new Date(),
+          exitCode: code,
+          stdout,
+          stderr,
+          parsed,
+          reportLocation: parsed.reportLocation || null,
+        },
+        { upsert: true }
+      ).catch(() => {});
+    } catch (e) {
+      // ignore
+    }
   });
 
   child.on('error', (err) => {
     clearTimeout(timer);
     job.status = 'failed';
     job.error = String(err);
+    try {
+      Scan.findOneAndUpdate({ jobId }, { status: 'failed', endTime: new Date(), error: String(err) }).catch(() => {});
+    } catch (e) {
+      // ignore
+    }
   });
 }
 
@@ -204,6 +236,17 @@ router.post('/run', async (req: Request, res: Response) => {
     };
 
     jobs.set(jobId, job);
+
+    // Persist a scan document for this user
+    try {
+      const ownerId = (req as any).user && (req as any).user._id ? (req as any).user._id : null;
+      if (ownerId) {
+        await Scan.create({ jobId, owner: ownerId, target, status: 'pending', startTime: new Date() });
+      }
+    } catch (e) {
+      // ignore persistence errors to not block job start
+      console.error('Failed to persist scan record:', e);
+    }
 
     // Start the assessment in the background (non-blocking)
     setImmediate(() => {
@@ -232,6 +275,20 @@ router.get('/status/:jobId', async (req: Request, res: Response) => {
     }
 
     if (job.status === 'completed') {
+      // Optionally include DB-persisted scan info if available
+      try {
+        const scanDoc = await Scan.findOne({ jobId: jobId }).lean();
+        if (scanDoc) {
+          return res.json({
+            jobId,
+            status: 'completed',
+            result: job.result,
+            scan: scanDoc,
+          });
+        }
+      } catch (e) {
+        // ignore
+      }
       return res.json({
         jobId,
         status: 'completed',
@@ -240,6 +297,14 @@ router.get('/status/:jobId', async (req: Request, res: Response) => {
     }
 
     if (job.status === 'failed') {
+      try {
+        const scanDoc = await Scan.findOne({ jobId: jobId }).lean();
+        if (scanDoc) {
+          return res.status(500).json({ jobId, status: 'failed', error: job.error, scan: scanDoc });
+        }
+      } catch (e) {
+        // ignore
+      }
       return res.status(500).json({
         jobId,
         status: 'failed',
