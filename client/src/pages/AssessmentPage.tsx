@@ -936,6 +936,11 @@ const AssessmentPage: React.FC = () => {
   const [passiveReconComplete, setPassiveReconComplete] = useState(false);
   const [activeProbingComplete, setActiveProbingComplete] = useState(false);
   const [securityAnalysisComplete, setSecurityAnalysisComplete] = useState(false);
+  
+  // Track progressive fill percentages (0-100)
+  const [passiveReconProgress, setPassiveReconProgress] = useState(0);
+  const [activeProbingProgress, setActiveProbingProgress] = useState(0);
+  const [securityAnalysisProgress, setSecurityAnalysisProgress] = useState(0);
 
   // Load persisted state from localStorage on component mount
   useEffect(() => {
@@ -2027,23 +2032,62 @@ const AssessmentPage: React.FC = () => {
 
       const resp = await res.json();
 
-      // Check for partial results to update phase completion
+      // Check for partial results to update phase progress proportionally
       if (resp.result && resp.result.parsed) {
         const parsed = resp.result.parsed;
         
-        // Phase 1: Passive Recon (WHOIS, DNS, Subdomains)
-        if ((parsed.whoisData || parsed.dnsRecords || parsed.subdomains) && !passiveReconComplete) {
-          setPassiveReconComplete(true);
+        // Phase 1: Passive Recon - calculate progress based on data availability
+        const whoisPresent = parsed.whoisData ? 1 : 0;
+        const dnsPresent = parsed.dnsRecords ? 1 : 0;
+        const subdomainsPresent = parsed.subdomains ? 1 : 0;
+        const passiveScore = ((whoisPresent + dnsPresent + subdomainsPresent) / 3) * 100;
+        
+        if (passiveScore > 0) {
+          setPassiveReconProgress(Math.min(passiveScore, 100));
+          if (passiveScore >= 100) {
+            setPassiveReconComplete(true);
+          }
         }
         
-        // Phase 2: Active Probing (Ports, Services)
-        if (parsed.openPorts && !activeProbingComplete) {
-          setActiveProbingComplete(true);
+        // Phase 2: Active Probing - starts filling after passive has some data
+        if (passiveScore > 30 && parsed.openPorts) {
+          const portsPresent = parsed.openPorts ? 1 : 0;
+          const servicesPresent = parsed.serviceInfo ? 1 : 0;
+          const activeScore = ((portsPresent + servicesPresent) / 2) * 100;
+          setActiveProbingProgress(Math.min(activeScore, 100));
+          if (activeScore >= 100) {
+            setActiveProbingComplete(true);
+          }
         }
         
-        // Phase 3: Security Analysis (SSL, Vulnerabilities, Breaches)
-        if ((parsed.sslInfo || parsed.vulnerabilities || parsed.breachData) && !securityAnalysisComplete) {
-          setSecurityAnalysisComplete(true);
+        // Phase 3: Security Analysis - starts after active probing has data
+        if (activeProbingProgress > 30 && (parsed.sslInfo || parsed.vulnerabilities || parsed.breachData)) {
+          const sslPresent = parsed.sslInfo ? 1 : 0;
+          const vulnPresent = parsed.vulnerabilities ? 1 : 0;
+          const breachPresent = parsed.breachData ? 1 : 0;
+          const securityScore = ((sslPresent + vulnPresent + breachPresent) / 3) * 100;
+          setSecurityAnalysisProgress(Math.min(securityScore, 100));
+          if (securityScore >= 100) {
+            setSecurityAnalysisComplete(true);
+          }
+        }
+      } else if (running && resp.status === 'running') {
+        // If no parsed data yet but scan is running, simulate initial progress
+        const elapsed = resp.elapsedSeconds || 0;
+        
+        // Phase 1 starts immediately and grows over first 60s
+        if (elapsed < 60) {
+          setPassiveReconProgress(Math.min((elapsed / 60) * 70, 70));
+        }
+        
+        // Phase 2 starts after 30s
+        if (elapsed > 30 && elapsed < 120) {
+          setActiveProbingProgress(Math.min(((elapsed - 30) / 90) * 70, 70));
+        }
+        
+        // Phase 3 starts after 90s
+        if (elapsed > 90 && elapsed < 180) {
+          setSecurityAnalysisProgress(Math.min(((elapsed - 90) / 90) * 70, 70));
         }
       }
 
@@ -2070,6 +2114,9 @@ const AssessmentPage: React.FC = () => {
         setPassiveReconComplete(true);
         setActiveProbingComplete(true);
         setSecurityAnalysisComplete(true);
+        setPassiveReconProgress(100);
+        setActiveProbingProgress(100);
+        setSecurityAnalysisProgress(100);
         
         setStatusMessage(`✅ Assessment completed in ${resp.elapsedSeconds}s`);
         return true; // Stop polling
@@ -2105,6 +2152,9 @@ const AssessmentPage: React.FC = () => {
     setPassiveReconComplete(false);
     setActiveProbingComplete(false);
     setSecurityAnalysisComplete(false);
+    setPassiveReconProgress(0);
+    setActiveProbingProgress(0);
+    setSecurityAnalysisProgress(0);
     
     if (!target) return setError('Please provide a target (domain, URL or IP)');
     setRunning(true);
@@ -2207,22 +2257,25 @@ const AssessmentPage: React.FC = () => {
             <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
               {/* Passive Recon Card - Phase 1 */}
               <div className="relative overflow-hidden bg-gradient-to-br from-cyan-900/20 to-cyan-800/10 border border-cyan-500/20 rounded-lg p-3 transition-all duration-500">
-                {/* Filling overlay - shows when phase is complete */}
+                {/* Progressive filling overlay based on progress */}
                 <div 
-                  className="absolute inset-0 bg-gradient-to-t from-cyan-500/40 via-cyan-500/25 to-transparent transition-all duration-1000"
+                  className="absolute inset-0 bg-gradient-to-t from-cyan-500/40 via-cyan-500/25 to-transparent transition-all duration-700 ease-out"
                   style={{
-                    transform: passiveReconComplete ? 'scaleY(1)' : 'scaleY(0)',
+                    transform: `scaleY(${passiveReconProgress / 100})`,
                     transformOrigin: 'bottom',
-                    opacity: passiveReconComplete ? 1 : 0
+                    opacity: passiveReconProgress > 0 ? 0.7 + (passiveReconProgress / 100) * 0.3 : 0
                   }}
                 />
                 <div className="relative z-10">
                   <div className="flex items-center space-x-2 mb-2">
                     <Globe className={`w-4 h-4 transition-all ${
-                      passiveReconComplete ? 'text-cyan-200' : running ? 'text-cyan-300 animate-pulse' : 'text-cyan-400'
+                      passiveReconComplete ? 'text-cyan-200' : passiveReconProgress > 0 ? 'text-cyan-300 animate-pulse' : 'text-cyan-400'
                     }`} />
                     <h4 className="text-xs font-semibold text-cyan-300">Passive Recon</h4>
                     {passiveReconComplete && <span className="text-[10px] text-cyan-300">✓</span>}
+                    {!passiveReconComplete && passiveReconProgress > 0 && (
+                      <span className="text-[9px] text-cyan-400 font-medium">{Math.round(passiveReconProgress)}%</span>
+                    )}
                   </div>
                   <p className="text-xs text-gray-400 leading-relaxed">
                     WHOIS, DNS records, tech stack detection, subdomain enumeration
@@ -2232,22 +2285,25 @@ const AssessmentPage: React.FC = () => {
 
               {/* Active Probing Card - Phase 2 */}
               <div className="relative overflow-hidden bg-gradient-to-br from-orange-900/20 to-orange-800/10 border border-orange-500/20 rounded-lg p-3 transition-all duration-500">
-                {/* Filling overlay - shows when phase is complete */}
+                {/* Progressive filling overlay based on progress */}
                 <div 
-                  className="absolute inset-0 bg-gradient-to-t from-orange-500/40 via-orange-500/25 to-transparent transition-all duration-1000"
+                  className="absolute inset-0 bg-gradient-to-t from-orange-500/40 via-orange-500/25 to-transparent transition-all duration-700 ease-out"
                   style={{
-                    transform: activeProbingComplete ? 'scaleY(1)' : 'scaleY(0)',
+                    transform: `scaleY(${activeProbingProgress / 100})`,
                     transformOrigin: 'bottom',
-                    opacity: activeProbingComplete ? 1 : 0
+                    opacity: activeProbingProgress > 0 ? 0.7 + (activeProbingProgress / 100) * 0.3 : 0
                   }}
                 />
                 <div className="relative z-10">
                   <div className="flex items-center space-x-2 mb-2">
                     <Server className={`w-4 h-4 transition-all ${
-                      activeProbingComplete ? 'text-orange-200' : passiveReconComplete && running ? 'text-orange-300 animate-pulse' : 'text-orange-400'
+                      activeProbingComplete ? 'text-orange-200' : activeProbingProgress > 0 ? 'text-orange-300 animate-pulse' : 'text-orange-400'
                     }`} />
                     <h4 className="text-xs font-semibold text-orange-300">Active Probing</h4>
                     {activeProbingComplete && <span className="text-[10px] text-orange-300">✓</span>}
+                    {!activeProbingComplete && activeProbingProgress > 0 && (
+                      <span className="text-[9px] text-orange-400 font-medium">{Math.round(activeProbingProgress)}%</span>
+                    )}
                   </div>
                   <p className="text-xs text-gray-400 leading-relaxed">
                     Port scanning, service detection, banner grabbing, WAF detection
@@ -2257,22 +2313,25 @@ const AssessmentPage: React.FC = () => {
 
               {/* Security Analysis Card - Phase 3 */}
               <div className="relative overflow-hidden bg-gradient-to-br from-red-900/20 to-red-800/10 border border-red-500/20 rounded-lg p-3 transition-all duration-500">
-                {/* Filling overlay - shows when phase is complete */}
+                {/* Progressive filling overlay based on progress */}
                 <div 
-                  className="absolute inset-0 bg-gradient-to-t from-red-500/40 via-red-500/25 to-transparent transition-all duration-1000"
+                  className="absolute inset-0 bg-gradient-to-t from-red-500/40 via-red-500/25 to-transparent transition-all duration-700 ease-out"
                   style={{
-                    transform: securityAnalysisComplete ? 'scaleY(1)' : 'scaleY(0)',
+                    transform: `scaleY(${securityAnalysisProgress / 100})`,
                     transformOrigin: 'bottom',
-                    opacity: securityAnalysisComplete ? 1 : 0
+                    opacity: securityAnalysisProgress > 0 ? 0.7 + (securityAnalysisProgress / 100) * 0.3 : 0
                   }}
                 />
                 <div className="relative z-10">
                   <div className="flex items-center space-x-2 mb-2">
                     <Shield className={`w-4 h-4 transition-all ${
-                      securityAnalysisComplete ? 'text-red-200' : activeProbingComplete && running ? 'text-red-300 animate-pulse' : 'text-red-400'
+                      securityAnalysisComplete ? 'text-red-200' : securityAnalysisProgress > 0 ? 'text-red-300 animate-pulse' : 'text-red-400'
                     }`} />
                     <h4 className="text-xs font-semibold text-red-300">Security Analysis</h4>
                     {securityAnalysisComplete && <span className="text-[10px] text-red-300">✓</span>}
+                    {!securityAnalysisComplete && securityAnalysisProgress > 0 && (
+                      <span className="text-[9px] text-red-400 font-medium">{Math.round(securityAnalysisProgress)}%</span>
+                    )}
                   </div>
                   <p className="text-xs text-gray-400 leading-relaxed">
                     SSL/TLS checks, vulnerability scanning, breach database lookup
