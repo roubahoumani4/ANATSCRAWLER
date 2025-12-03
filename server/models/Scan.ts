@@ -7,7 +7,8 @@ const scanSchema = new Schema({
   jobId: { type: String, required: true, unique: true },
   owner: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   target: { type: String, required: true },
-  status: { type: String, enum: ['pending', 'running', 'completed', 'failed'], default: 'pending' },
+  // status values: pending, running, finished, failed, aborted
+  status: { type: String, enum: ['pending', 'running', 'finished', 'failed', 'aborted'], default: 'pending' },
   startTime: { type: Date, default: Date.now },
   endTime: { type: Date },
   elapsedSeconds: { type: Number },

@@ -11,7 +11,7 @@ const router = Router();
 interface JobStatus {
   id: string;
   target: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: 'pending' | 'running' | 'finished' | 'failed' | 'aborted';
   startTime: number;
   result?: {
     target: string;
@@ -178,7 +178,7 @@ function runAssessmentBackground(jobId: string, target: string) {
       // parsing best-effort
     }
 
-    job.status = 'completed';
+  job.status = 'finished';
     job.result = {
       target,
       exitCode: code,
@@ -192,7 +192,7 @@ function runAssessmentBackground(jobId: string, target: string) {
       Scan.findOneAndUpdate(
         { jobId },
         {
-          status: 'completed',
+          status: 'finished',
           endTime: new Date(),
           exitCode: code,
           stdout,
@@ -274,7 +274,7 @@ router.get('/status/:jobId', async (req: Request, res: Response) => {
       try {
         const scanDoc = await Scan.findOne({ jobId }).lean();
         if (scanDoc) {
-          if (scanDoc.status === 'completed') {
+          if (scanDoc.status === 'finished') {
             const result = {
               target: scanDoc.target,
               exitCode: scanDoc.exitCode ?? null,
@@ -282,7 +282,7 @@ router.get('/status/:jobId', async (req: Request, res: Response) => {
               stderr: scanDoc.stderr || '',
               parsed: scanDoc.parsed || null,
             };
-            return res.json({ jobId, status: 'completed', result, scan: scanDoc });
+            return res.json({ jobId, status: 'finished', result, scan: scanDoc });
           }
 
           if (scanDoc.status === 'failed') {
@@ -302,14 +302,14 @@ router.get('/status/:jobId', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Job not found' });
     }
 
-    if (job.status === 'completed') {
+    if (job.status === 'finished') {
       // Optionally include DB-persisted scan info if available
       try {
         const scanDoc = await Scan.findOne({ jobId: jobId }).lean();
         if (scanDoc) {
           return res.json({
             jobId,
-            status: 'completed',
+            status: 'finished',
             result: job.result,
             scan: scanDoc,
           });
@@ -319,7 +319,7 @@ router.get('/status/:jobId', async (req: Request, res: Response) => {
       }
       return res.json({
         jobId,
-        status: 'completed',
+        status: 'finished',
         result: job.result,
       });
     }
@@ -415,7 +415,7 @@ setInterval(() => {
   const now = Date.now();
   const maxAge = 60 * 60 * 1000; // 1 hour
   for (const [jobId, job] of jobs.entries()) {
-    if (job.status === 'completed' || job.status === 'failed') {
+    if (job.status === 'finished' || job.status === 'failed' || job.status === 'aborted') {
       if (now - job.startTime > maxAge) {
         jobs.delete(jobId);
       }

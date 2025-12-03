@@ -10,6 +10,8 @@ import LandingPage from '@/pages/LandingPage';
 import NotFoundPage from '@/pages/NotFoundPage';
 import SignupPage from '@/pages/SignupPage';
 import AssessmentPage from '@/pages/AssessmentPage';
+import OutputPage from '@/pages/OutputPage';
+import HistoryPage from '@/pages/HistoryPage';
 
 // Layout Component
 import Layout from '@/components/layout/Layout';
@@ -46,6 +48,8 @@ export default function AppContent() {
         {/* Protected Routes */}
   <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
   <Route path="/osint/assessment" element={<ProtectedRoute><AssessmentPage /></ProtectedRoute>} />
+  <Route path="/osint/assessment/output" element={<ProtectedRoute><OutputPage /></ProtectedRoute>} />
+  <Route path="/osint/assessment/history" element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><GeneralSettingsPage /></ProtectedRoute>} />
         
         {/* Fallback Route */}
