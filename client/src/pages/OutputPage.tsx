@@ -286,7 +286,7 @@ const OutputPage: React.FC = () => {
                 </p>
                 <button 
                   className="w-full px-6 py-3 rounded-lg bg-purple-600 hover:bg-purple-500 font-semibold transition-colors duration-200 shadow-lg hover:shadow-purple-500/50"
-                  onClick={() => navigate('/osint/history')}
+                  onClick={() => navigate('/osint/assessment/history')}
                 >
                   Go to History Page
                 </button>
