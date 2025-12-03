@@ -16,8 +16,25 @@ const OutputPage: React.FC = () => {
   const [outputExpanded, setOutputExpanded] = useState(false);
 
   // Compute visualization data from scan.parsed
+  // Note: scan.parsed from MongoDB doesn't have structured sections (whois, dns, etc.)
+  // It only has plainOutput, summaryLines, etc. We need structured data for visualizations.
   const visualization = useMemo(() => {
-    if (!scan?.parsed) return null;
+    if (!scan?.parsed) {
+      console.log('No scan.parsed data available');
+      return null;
+    }
+    
+    console.log('Scan.parsed structure:', Object.keys(scan.parsed));
+    
+    // Check if we have structured data (whois, dns, subdomains, etc.)
+    const hasStructuredData = scan.parsed.whois || scan.parsed.dns || scan.parsed.subdomains;
+    
+    if (!hasStructuredData) {
+      console.log('No structured data found in scan.parsed. Available keys:', Object.keys(scan.parsed));
+      console.log('This means the data needs to be parsed from plainOutput first');
+      return null;
+    }
+    
     const sectionData = scan.parsed;
 
     // WHOIS Pie
@@ -160,7 +177,11 @@ const OutputPage: React.FC = () => {
           throw new Error(err.error || `HTTP ${res.status}`);
         }
         const data = await res.json();
-        setScan(data.result || data.scan || null);
+        console.log('API Response:', data);
+        const scanData = data.result || data.scan || null;
+        console.log('Scan Data:', scanData);
+        console.log('Parsed Data:', scanData?.parsed);
+        setScan(scanData);
       } catch (e: any) {
         setError(e.message || 'Failed to fetch scan');
       } finally {
