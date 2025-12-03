@@ -245,18 +245,54 @@ const OutputPage: React.FC = () => {
   if (!jobId) {
     return (
       <div className="p-8 min-h-screen bg-jetBlack text-coolWhite">
-        <div className="max-w-2xl mx-auto text-center mt-20">
-          <FileText className="mx-auto mb-4 text-gray-500" size={64} />
-          <h2 className="text-2xl font-semibold mb-4">No Scan Output Available</h2>
-          <p className="text-gray-400 mb-8">
-            Please initiate a scan from the Assessment page to view outputs and results.
-          </p>
-          <button 
-            className="px-6 py-3 rounded-lg bg-sky-600 hover:bg-sky-500 font-semibold"
-            onClick={() => navigate('/osint/assessment')}
-          >
-            Go to Assessment Page
-          </button>
+        <div className="max-w-5xl mx-auto mt-20">
+          <div className="text-center mb-12">
+            <FileText className="mx-auto mb-4 text-gray-500" size={64} />
+            <h2 className="text-3xl font-bold mb-2">No Scan Output Available</h2>
+            <p className="text-gray-400">Choose an option below to view scan results</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Start New Scan Card */}
+            <div className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-sky-900/40 via-sky-800/30 to-sky-900/40 border border-sky-700/50 hover:border-sky-500/70 transition-all duration-300 hover:shadow-lg hover:shadow-sky-500/20">
+              <div className="absolute inset-0 bg-gradient-to-br from-sky-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="relative p-8 flex flex-col items-center text-center h-full">
+                <div className="w-16 h-16 rounded-full bg-sky-600/20 flex items-center justify-center mb-4 group-hover:bg-sky-600/30 transition-colors">
+                  <Shield className="text-sky-400" size={32} />
+                </div>
+                <h3 className="text-xl font-semibold mb-3 text-sky-300">Start New Scan</h3>
+                <p className="text-gray-300 mb-6 flex-grow">
+                  Initiate a comprehensive security assessment from the Assessment page to view detailed outputs and results.
+                </p>
+                <button 
+                  className="w-full px-6 py-3 rounded-lg bg-sky-600 hover:bg-sky-500 font-semibold transition-colors duration-200 shadow-lg hover:shadow-sky-500/50"
+                  onClick={() => navigate('/osint/assessment')}
+                >
+                  Go to Assessment Page
+                </button>
+              </div>
+            </div>
+
+            {/* View History Card */}
+            <div className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-purple-900/40 via-purple-800/30 to-purple-900/40 border border-purple-700/50 hover:border-purple-500/70 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/20">
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="relative p-8 flex flex-col items-center text-center h-full">
+                <div className="w-16 h-16 rounded-full bg-purple-600/20 flex items-center justify-center mb-4 group-hover:bg-purple-600/30 transition-colors">
+                  <HistoryIcon className="text-purple-400" size={32} />
+                </div>
+                <h3 className="text-xl font-semibold mb-3 text-purple-300">View Previous Scans</h3>
+                <p className="text-gray-300 mb-6 flex-grow">
+                  Browse your scan history to review previous assessment results and download detailed reports.
+                </p>
+                <button 
+                  className="w-full px-6 py-3 rounded-lg bg-purple-600 hover:bg-purple-500 font-semibold transition-colors duration-200 shadow-lg hover:shadow-purple-500/50"
+                  onClick={() => navigate('/osint/history')}
+                >
+                  Go to History Page
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );

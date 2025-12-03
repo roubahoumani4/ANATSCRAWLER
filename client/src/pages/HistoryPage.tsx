@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { API_BASE_URL } from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
-import { History, RefreshCw, Eye, Clock, CheckCircle2, XCircle, Loader } from 'lucide-react';
+import { History, RefreshCw, Eye, Clock, CheckCircle2, XCircle, Loader, Trash2 } from 'lucide-react';
 
 interface Scan {
   jobId: string;
@@ -16,6 +16,7 @@ const HistoryPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [scans, setScans] = useState<Scan[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const fetchScans = async () => {
@@ -37,6 +38,38 @@ const HistoryPage: React.FC = () => {
       setError(e.message || 'Failed to load scans');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const deleteScan = async (jobId: string, target: string) => {
+    if (!confirm(`Are you sure you want to delete the scan for "${target}"?\n\nJob ID: ${jobId.slice(0, 16)}...\n\nThis action cannot be undone.`)) {
+      return;
+    }
+
+    setDeleting(jobId);
+    setError(null);
+    try {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const res = await fetch(`${API_BASE_URL}/api/v1/assessment/scans/${jobId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: 'include',
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to delete scan');
+      }
+      
+      // Remove the scan from the list
+      setScans(prevScans => prevScans.filter(scan => scan.jobId !== jobId));
+    } catch (e: any) {
+      setError(e.message || 'Failed to delete scan');
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -177,13 +210,27 @@ const HistoryPage: React.FC = () => {
                       </span>
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <button 
-                        className="px-3 py-1.5 rounded bg-sky-600 hover:bg-sky-500 text-xs font-medium flex items-center gap-1.5 ml-auto transition-colors"
-                        onClick={() => navigate(`/osint/assessment/output?jobId=${encodeURIComponent(scan.jobId)}`)}
-                      >
-                        <Eye size={14} />
-                        View Details
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button 
+                          className="px-3 py-1.5 rounded bg-sky-600 hover:bg-sky-500 text-xs font-medium flex items-center gap-1.5 transition-colors"
+                          onClick={() => navigate(`/osint/assessment/output?jobId=${encodeURIComponent(scan.jobId)}`)}
+                        >
+                          <Eye size={14} />
+                          View
+                        </button>
+                        <button 
+                          className="px-3 py-1.5 rounded bg-red-600 hover:bg-red-500 text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          onClick={() => deleteScan(scan.jobId, scan.target)}
+                          disabled={deleting === scan.jobId}
+                        >
+                          {deleting === scan.jobId ? (
+                            <Loader size={14} className="animate-spin" />
+                          ) : (
+                            <Trash2 size={14} />
+                          )}
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
