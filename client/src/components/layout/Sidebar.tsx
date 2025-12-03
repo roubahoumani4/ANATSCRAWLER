@@ -76,8 +76,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
       features: [
           { path: "/osint/assessment", label: "Assessment", icon: <Zap size={16} />, color: "text-emerald-400" },
           { path: "/osint/assessment/output", label: "Output", icon: <FileText size={16} />, color: "text-sky-400" },
-          { path: "/osint/assessment/history", label: "History", icon: <HistoryIcon size={16} />, color: "text-purple-400" },
-          { path: "/osint", label: "Advanced Search", icon: <Eye size={16} />, color: "text-indigo-400" }
+          { path: "/osint/assessment/history", label: "History", icon: <HistoryIcon size={16} />, color: "text-purple-400" }
       ]
     },
     {
