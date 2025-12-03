@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '@/lib/api';
 import VulnerabilityGraphs from '@/components/VulnerabilityGraphs';
-import { ChevronDown, ChevronUp, Download, FileText, History } from 'lucide-react';
+import { ChevronDown, ChevronUp, Download, FileText, History as HistoryIcon } from 'lucide-react';
 
 const OutputPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -76,7 +76,7 @@ const OutputPage: React.FC = () => {
             className="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600 flex items-center gap-2"
             onClick={() => navigate('/osint/assessment/history')}
           >
-            <History size={16} />
+            <HistoryIcon size={16} />
             History
           </button>
           <button 
