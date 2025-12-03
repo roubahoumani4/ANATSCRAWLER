@@ -2032,7 +2032,30 @@ const AssessmentPage: React.FC = () => {
 
       const resp = await res.json();
 
-      // Check for partial results to update phase progress proportionally
+      // First, use time-based progress for immediate visual feedback
+      if (running || resp.status === 'running') {
+        const elapsed = resp.elapsedSeconds || elapsedSeconds || 0;
+        
+        // Phase 1: Passive Recon - starts immediately, grows over first 60s
+        if (elapsed <= 60) {
+          const timeProgress = Math.min((elapsed / 60) * 80, 80);
+          setPassiveReconProgress(Math.max(passiveReconProgress, timeProgress));
+        }
+        
+        // Phase 2: Active Probing - starts after 20s
+        if (elapsed > 20 && elapsed <= 120) {
+          const timeProgress = Math.min(((elapsed - 20) / 100) * 80, 80);
+          setActiveProbingProgress(Math.max(activeProbingProgress, timeProgress));
+        }
+        
+        // Phase 3: Security Analysis - starts after 60s
+        if (elapsed > 60 && elapsed <= 180) {
+          const timeProgress = Math.min(((elapsed - 60) / 120) * 80, 80);
+          setSecurityAnalysisProgress(Math.max(securityAnalysisProgress, timeProgress));
+        }
+      }
+
+      // Then, override with actual data-based progress if available
       if (resp.result && resp.result.parsed) {
         const parsed = resp.result.parsed;
         
@@ -2043,51 +2066,33 @@ const AssessmentPage: React.FC = () => {
         const passiveScore = ((whoisPresent + dnsPresent + subdomainsPresent) / 3) * 100;
         
         if (passiveScore > 0) {
-          setPassiveReconProgress(Math.min(passiveScore, 100));
+          setPassiveReconProgress(Math.max(passiveReconProgress, passiveScore));
           if (passiveScore >= 100) {
             setPassiveReconComplete(true);
           }
         }
         
-        // Phase 2: Active Probing - starts filling after passive has some data
-        if (passiveScore > 30 && parsed.openPorts) {
+        // Phase 2: Active Probing
+        if (parsed.openPorts) {
           const portsPresent = parsed.openPorts ? 1 : 0;
           const servicesPresent = parsed.serviceInfo ? 1 : 0;
           const activeScore = ((portsPresent + servicesPresent) / 2) * 100;
-          setActiveProbingProgress(Math.min(activeScore, 100));
+          setActiveProbingProgress(Math.max(activeProbingProgress, activeScore));
           if (activeScore >= 100) {
             setActiveProbingComplete(true);
           }
         }
         
-        // Phase 3: Security Analysis - starts after active probing has data
-        if (activeProbingProgress > 30 && (parsed.sslInfo || parsed.vulnerabilities || parsed.breachData)) {
+        // Phase 3: Security Analysis
+        if (parsed.sslInfo || parsed.vulnerabilities || parsed.breachData) {
           const sslPresent = parsed.sslInfo ? 1 : 0;
           const vulnPresent = parsed.vulnerabilities ? 1 : 0;
           const breachPresent = parsed.breachData ? 1 : 0;
           const securityScore = ((sslPresent + vulnPresent + breachPresent) / 3) * 100;
-          setSecurityAnalysisProgress(Math.min(securityScore, 100));
+          setSecurityAnalysisProgress(Math.max(securityAnalysisProgress, securityScore));
           if (securityScore >= 100) {
             setSecurityAnalysisComplete(true);
           }
-        }
-      } else if (running && resp.status === 'running') {
-        // If no parsed data yet but scan is running, simulate initial progress
-        const elapsed = resp.elapsedSeconds || 0;
-        
-        // Phase 1 starts immediately and grows over first 60s
-        if (elapsed < 60) {
-          setPassiveReconProgress(Math.min((elapsed / 60) * 70, 70));
-        }
-        
-        // Phase 2 starts after 30s
-        if (elapsed > 30 && elapsed < 120) {
-          setActiveProbingProgress(Math.min(((elapsed - 30) / 90) * 70, 70));
-        }
-        
-        // Phase 3 starts after 90s
-        if (elapsed > 90 && elapsed < 180) {
-          setSecurityAnalysisProgress(Math.min(((elapsed - 90) / 90) * 70, 70));
         }
       }
 
