@@ -964,6 +964,48 @@ const AssessmentPage: React.FC = () => {
         console.error('Failed to load persisted assessment state:', error);
       }
     }
+    else {
+      // No local state persisted: try fetching the most recent scan for this user
+      (async () => {
+        try {
+          const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+          const res = await fetch(`${API_BASE_URL}/api/v1/assessment/scans?limit=1`, {
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            credentials: 'include',
+          });
+          if (!res.ok) return; // no scans or not authenticated
+          const data = await res.json();
+          const scans = data.scans || data || [];
+          if (scans.length) {
+            const scan = scans[0];
+            setTarget(scan.target || '');
+            setJobId(scan.jobId || null);
+            setStatusMessage(scan.status === 'running' ? '⏳ Resuming assessment...' : (`Status: ${scan.status}`));
+            setRunning(scan.status === 'running');
+            setLastJobId(scan.status === 'completed' ? scan.jobId : null);
+            setElapsedSeconds(scan.elapsedSeconds || 0);
+            setOutput(scan.stdout ? JSON.stringify({ stdout: scan.stdout, parsed: scan.parsed }, null, 2) : null);
+            setPlainOutput(scan.parsed?.plainOutput || null);
+            setSections(scan.parsed?.sections || []);
+            setSectionData(scan.parsed ? parseAssessmentSections(scan.parsed.plainOutput || '', scan.parsed) : null);
+
+            // If running, resume polling
+            if (scan.status === 'running' && scan.jobId) {
+              const pollInterval = setInterval(async () => {
+                const done = await pollJobStatus(scan.jobId);
+                if (done) clearInterval(pollInterval);
+              }, 2000);
+              pollJobStatus(scan.jobId);
+            }
+          }
+        } catch (e) {
+          // ignore - user may be unauthenticated or endpoint unavailable
+        }
+      })();
+    }
   }, []);
 
   // Save state to localStorage whenever it changes
