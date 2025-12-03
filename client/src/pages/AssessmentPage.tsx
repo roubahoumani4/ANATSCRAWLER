@@ -2234,8 +2234,8 @@ const AssessmentPage: React.FC = () => {
             <div className="mt-4 text-sm text-blue-400 animate-pulse">{statusMessage}</div>
           )}
 
-          {/* Navigation buttons shown after scan completion */}
-          {status === 'completed' && (lastJobId || jobId) && (
+          {/* Navigation buttons shown when we have scan results */}
+          {(lastJobId || jobId) && (
             <div className="mt-8 flex items-center justify-center space-x-4">
               <button
                 onClick={() => {
