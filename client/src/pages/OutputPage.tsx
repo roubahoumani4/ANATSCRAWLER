@@ -54,8 +54,13 @@ const OutputPage: React.FC = () => {
       hasPorts: !!sectionData.ports,
       whoisData: sectionData.whois,
       dnsData: sectionData.dns,
-      subdomainsCount: sectionData.subdomains?.entries?.length,
-      portsCount: sectionData.ports?.entries?.length,
+      subdomainsData: sectionData.subdomains,
+      portsData: sectionData.ports,
+      sslData: sectionData.ssl,
+      webData: sectionData.web,
+      breachData: sectionData.breach,
+      geoData: sectionData.geo,
+      businessData: sectionData.business,
     });
     const parseDate = (value?: string) => (value ? new Date(value) : null);
     const msToDays = (ms: number) => Math.max(ms / (1000 * 60 * 60 * 24), 0);
@@ -315,7 +320,7 @@ const OutputPage: React.FC = () => {
             </div>
 
             {/* Comprehensive Visualization Cards */}
-            {visualization && scan.parsed && (
+            {visualization && scan.parsed && sectionData && (
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                 {/* 1. WHOIS */}
                 <div className="bg-gray-900/60 border border-emerald-500/20 rounded-2xl p-6">
@@ -325,19 +330,19 @@ const OutputPage: React.FC = () => {
                         1. COMPREHENSIVE WHOIS REGISTRATION DETAILS
                       </p>
                       <h3 className="text-xl font-semibold text-white">
-                        {scan.parsed.whois?.domain || scan.target || 'WHOIS Insights'}
+                        {sectionData.whois?.domain || scan.target || 'WHOIS Insights'}
                       </h3>
                       <p className="text-sm text-gray-400">
-                        Registrar: {scan.parsed.whois?.registrar || 'Unknown'}
+                        Registrar: {sectionData.whois?.registrar || 'Unknown'}
                       </p>
                     </div>
                     <Shield className="text-emerald-400 w-8 h-8" />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 text-sm text-gray-300">
                     <div className="space-y-2">
-                      <p>Created: <span className="text-white">{scan.parsed.whois?.creationDate || 'N/A'}</span></p>
-                      <p>Expires: <span className="text-white">{scan.parsed.whois?.expirationDate || 'N/A'}</span></p>
-                      <p>Contacts: <span className="text-white">{scan.parsed.whois?.contactEmails?.length || 0}</span></p>
+                      <p>Created: <span className="text-white">{sectionData.whois?.creationDate || 'N/A'}</span></p>
+                      <p>Expires: <span className="text-white">{sectionData.whois?.expirationDate || 'N/A'}</span></p>
+                      <p>Contacts: <span className="text-white">{sectionData.whois?.contactEmails?.length || 0}</span></p>
                     </div>
                     <div className="h-40">
                       {visualization.whoisPie.length ? (
@@ -359,16 +364,16 @@ const OutputPage: React.FC = () => {
                     <div>
                       <p className="text-gray-400 uppercase tracking-wide mb-1">Name Servers</p>
                       <ul className="space-y-1">
-                        {scan.parsed.whois?.nameServers?.length
-                          ? scan.parsed.whois.nameServers.map((ns: string) => <li key={ns}>{ns}</li>)
+                        {sectionData.whois?.nameServers?.length
+                          ? sectionData.whois.nameServers.map((ns: string) => <li key={ns}>{ns}</li>)
                           : <li>Not reported</li>}
                       </ul>
                     </div>
                     <div>
                       <p className="text-gray-400 uppercase tracking-wide mb-1">Contact Emails</p>
                       <ul className="space-y-1">
-                        {scan.parsed.whois?.contactEmails?.length
-                          ? scan.parsed.whois.contactEmails.map((mail: string) => <li key={mail}>{mail}</li>)
+                        {sectionData.whois?.contactEmails?.length
+                          ? sectionData.whois.contactEmails.map((mail: string) => <li key={mail}>{mail}</li>)
                           : <li>Not reported</li>}
                       </ul>
                     </div>
@@ -384,7 +389,7 @@ const OutputPage: React.FC = () => {
                       </p>
                       <h3 className="text-xl font-semibold text-white">DNS Surface</h3>
                       <p className="text-sm text-gray-400">
-                        DNSSEC: {scan.parsed.dns?.dnssecEnabled ? 'Enabled' : 'Not enabled'}
+                        DNSSEC: {sectionData.dns?.dnssecEnabled ? 'Enabled' : 'Not enabled'}
                       </p>
                     </div>
                     <Radar className="text-cyan-400 w-8 h-8" />
@@ -405,9 +410,9 @@ const OutputPage: React.FC = () => {
                     )}
                   </div>
                   <div className="mt-4 text-xs text-gray-300 space-y-2">
-                    <p><span className="text-gray-400">A Records:</span> {scan.parsed.dns?.aRecords.join(', ') || 'N/A'}</p>
-                    <p><span className="text-gray-400">MX Records:</span> {scan.parsed.dns?.mxRecords.join(', ') || 'N/A'}</p>
-                    <p><span className="text-gray-400">SPF:</span> {scan.parsed.dns?.spfRecord || 'Not published'}</p>
+                    <p><span className="text-gray-400">A Records:</span> {sectionData.dns?.aRecords.join(', ') || 'N/A'}</p>
+                    <p><span className="text-gray-400">MX Records:</span> {sectionData.dns?.mxRecords.join(', ') || 'N/A'}</p>
+                    <p><span className="text-gray-400">SPF:</span> {sectionData.dns?.spfRecord || 'Not published'}</p>
                   </div>
                 </div>
 
@@ -419,7 +424,7 @@ const OutputPage: React.FC = () => {
                         3. COMPREHENSIVE SUBDOMAIN ENUMERATION
                       </p>
                       <h3 className="text-xl font-semibold text-white">
-                        {scan.parsed.subdomains?.total || scan.parsed.subdomains?.entries.length || 0} Subdomains
+                        {sectionData.subdomains?.total || sectionData.subdomains?.entries.length || 0} Subdomains
                       </h3>
                       <p className="text-sm text-gray-400">Top resolved hosts with IP visibility</p>
                     </div>
@@ -450,7 +455,7 @@ const OutputPage: React.FC = () => {
                         4. ADVANCED PORT SCANNING & SERVICE DETECTION
                       </p>
                       <h3 className="text-xl font-semibold text-white">
-                        {scan.parsed.ports?.total || scan.parsed.ports?.entries.length || 0} Open Ports
+                        {sectionData.ports?.total || sectionData.ports?.entries.length || 0} Open Ports
                       </h3>
                       <p className="text-sm text-gray-400">Most common exposed services</p>
                     </div>
@@ -472,7 +477,7 @@ const OutputPage: React.FC = () => {
                     )}
                   </div>
                   <div className="mt-4 text-xs text-gray-300 max-h-32 overflow-y-auto">
-                    {scan.parsed.ports?.entries?.slice(0, 8).map((entry: any) => (
+                    {sectionData.ports?.entries?.slice(0, 8).map((entry: any) => (
                       <p key={`${entry.ip}-${entry.port}`}>
                         {entry.ip}:{entry.port} • {entry.service} ({entry.status})
                       </p>
@@ -488,7 +493,7 @@ const OutputPage: React.FC = () => {
                         5. SSL/TLS CERTIFICATE ANALYSIS
                       </p>
                       <h3 className="text-xl font-semibold text-white">Certificate Posture</h3>
-                      <p className="text-sm text-gray-400">{scan.parsed.ssl?.issuer || 'Issuer unknown'}</p>
+                      <p className="text-sm text-gray-400">{sectionData.ssl?.issuer || 'Issuer unknown'}</p>
                     </div>
                     <Lock className="text-blue-400 w-8 h-8" />
                   </div>
@@ -508,10 +513,10 @@ const OutputPage: React.FC = () => {
                     )}
                   </div>
                   <div className="mt-4 text-xs text-gray-300 space-y-1">
-                    <p><span className="text-gray-400">Subject:</span> {scan.parsed.ssl?.subject || 'N/A'}</p>
-                    <p><span className="text-gray-400">Valid From:</span> {scan.parsed.ssl?.validFrom || 'N/A'}</p>
-                    <p><span className="text-gray-400">Valid Until:</span> {scan.parsed.ssl?.validUntil || 'N/A'}</p>
-                    <p><span className="text-gray-400">Signature:</span> {scan.parsed.ssl?.signatureAlgorithm || 'N/A'}</p>
+                    <p><span className="text-gray-400">Subject:</span> {sectionData.ssl?.subject || 'N/A'}</p>
+                    <p><span className="text-gray-400">Valid From:</span> {sectionData.ssl?.validFrom || 'N/A'}</p>
+                    <p><span className="text-gray-400">Valid Until:</span> {sectionData.ssl?.validUntil || 'N/A'}</p>
+                    <p><span className="text-gray-400">Signature:</span> {sectionData.ssl?.signatureAlgorithm || 'N/A'}</p>
                   </div>
                 </div>
 
@@ -524,7 +529,7 @@ const OutputPage: React.FC = () => {
                       </p>
                       <h3 className="text-xl font-semibold text-white">Security Headers & Tech Stack</h3>
                       <p className="text-sm text-gray-400">
-                        {scan.parsed.web?.analyses?.length || 0} endpoints inspected
+                        {sectionData.web?.analyses?.length || 0} endpoints inspected
                       </p>
                     </div>
                     <ActivityIcon className="text-pink-400 w-8 h-8" />
@@ -562,7 +567,7 @@ const OutputPage: React.FC = () => {
                     </div>
                   </div>
                   <div className="mt-4 text-xs text-red-300 space-y-1 max-h-24 overflow-y-auto">
-                    {scan.parsed.web?.analyses?.flatMap((analysis: any) =>
+                    {sectionData.web?.analyses?.flatMap((analysis: any) =>
                       analysis.criticalFindings.map((finding: string) => (
                         <p key={`${analysis.target}-${finding}`}>
                           {analysis.target}: {finding}
@@ -581,7 +586,7 @@ const OutputPage: React.FC = () => {
                       </p>
                       <h3 className="text-xl font-semibold text-white">Breached Accounts</h3>
                       <p className="text-sm text-gray-400">
-                        HIBP Checks: {scan.parsed.breach?.results?.length || 0}
+                        HIBP Checks: {sectionData.breach?.results?.length || 0}
                       </p>
                     </div>
                     <AlertTriangle className="text-red-400 w-8 h-8" />
@@ -602,8 +607,8 @@ const OutputPage: React.FC = () => {
                     )}
                   </div>
                   <div className="mt-4 text-xs text-gray-300 space-y-1 max-h-24 overflow-y-auto">
-                    {scan.parsed.breach?.results?.length
-                      ? scan.parsed.breach.results.map((entry: any) => (
+                    {sectionData.breach?.results?.length
+                      ? sectionData.breach.results.map((entry: any) => (
                           <p key={entry.email}>
                             {entry.email}: {entry.message}
                           </p>
@@ -625,8 +630,8 @@ const OutputPage: React.FC = () => {
                     <Shield className="text-indigo-400 w-8 h-8" />
                   </div>
                   <div className="mt-4 text-xs text-gray-300 space-y-2">
-                    {scan.parsed.waf?.detections.length
-                      ? scan.parsed.waf.detections.map((det: any) => (
+                    {sectionData.waf?.detections.length
+                      ? sectionData.waf.detections.map((det: any) => (
                           <p key={det.target}>
                             {det.message} • {det.target}
                           </p>
@@ -644,7 +649,7 @@ const OutputPage: React.FC = () => {
                       </p>
                       <h3 className="text-xl font-semibold text-white">Global Footprint</h3>
                       <p className="text-sm text-gray-400">
-                        {scan.parsed.geo?.locations?.length || 0} network assets
+                        {sectionData.geo?.locations?.length || 0} network assets
                       </p>
                     </div>
                     <Globe2 className="text-green-400 w-8 h-8" />
@@ -665,7 +670,7 @@ const OutputPage: React.FC = () => {
                     )}
                   </div>
                   <div className="mt-4 text-xs text-gray-300 space-y-1 max-h-24 overflow-y-auto">
-                    {scan.parsed.geo?.locations?.map((loc: any) => (
+                    {sectionData.geo?.locations?.map((loc: any) => (
                       <p key={loc.ip}>
                         {loc.ip} • {loc.organization || 'Unknown'} ({loc.country || '??'})
                       </p>
@@ -701,9 +706,9 @@ const OutputPage: React.FC = () => {
                     )}
                   </div>
                   <div className="mt-4 text-xs text-gray-300 space-y-1">
-                    <p><span className="text-gray-400">Providers:</span> {scan.parsed.business?.infrastructureProviders?.join(', ') || 'N/A'}</p>
-                    <p><span className="text-gray-400">Related Entities:</span> {scan.parsed.business?.relatedEntities?.join(', ') || 'N/A'}</p>
-                    <p><span className="text-gray-400">Profile:</span> {JSON.stringify(scan.parsed.business?.companyProfile || {})}</p>
+                    <p><span className="text-gray-400">Providers:</span> {sectionData.business?.infrastructureProviders?.join(', ') || 'N/A'}</p>
+                    <p><span className="text-gray-400">Related Entities:</span> {sectionData.business?.relatedEntities?.join(', ') || 'N/A'}</p>
+                    <p><span className="text-gray-400">Profile:</span> {JSON.stringify(sectionData.business?.companyProfile || {})}</p>
                   </div>
                 </div>
 
