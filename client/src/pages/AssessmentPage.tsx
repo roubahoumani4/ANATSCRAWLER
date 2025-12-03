@@ -919,6 +919,7 @@ const parseAssessmentSections = (plain: string | null, parsedExtras?: any): Sect
 };
 
 const AssessmentPage: React.FC = () => {
+  const navigate = useNavigate();
   const [target, setTarget] = useState('');
   const [running, setRunning] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -2636,14 +2637,14 @@ const AssessmentPage: React.FC = () => {
                         onClick={() => {
                           // navigate to output page for last finished job or current job
                           const id = lastJobId || jobId;
-                          if (id) window.location.href = `${window.location.origin}/osint/assessment/output?jobId=${encodeURIComponent(id)}`;
+                          if (id) navigate(`/osint/assessment/output?jobId=${encodeURIComponent(id)}`);
                         }}
                         className="px-5 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-semibold"
                       >
                         ✅ Scan finished — click for details
                       </button>
                       <button
-                        onClick={() => { window.location.href = `${window.location.origin}/osint/assessment/history`; }}
+                        onClick={() => navigate('/osint/assessment/history')}
                         className="px-5 py-3 rounded-lg bg-sky-600 hover:bg-sky-500 font-semibold"
                       >
                         📜 View scan history
@@ -2652,7 +2653,7 @@ const AssessmentPage: React.FC = () => {
                   ) : (
                     <>
                       <button
-                        onClick={() => { window.location.href = `${window.location.origin}/osint/assessment/history`; }}
+                        onClick={() => navigate('/osint/assessment/history')}
                         className="px-5 py-3 rounded-lg bg-sky-600 hover:bg-sky-500 font-semibold"
                       >
                         📜 Go to history
