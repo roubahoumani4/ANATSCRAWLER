@@ -960,6 +960,44 @@ const AssessmentPage: React.FC = () => {
           // Check status immediately
           pollJobStatus(state.jobId);
         }
+        // Even if we loaded persisted state, reconcile with DB in case server cleaned the in-memory job
+        if (state.jobId) {
+          (async () => {
+            try {
+              const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+              const r = await fetch(`${API_BASE_URL}/api/v1/assessment/scans/${state.jobId}`, {
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                credentials: 'include',
+              });
+              if (!r.ok) return;
+              const scan = await r.json();
+              if (scan) {
+                setTarget(scan.target || (state.target || ''));
+                setStatusMessage(scan.status === 'running' ? '⏳ Resuming assessment...' : (`Status: ${scan.status}`));
+                setRunning(scan.status === 'running');
+                setLastJobId(scan.status === 'completed' ? scan.jobId : state.lastJobId || null);
+                setElapsedSeconds(scan.elapsedSeconds || state.elapsedSeconds || 0);
+                setOutput(scan.stdout ? JSON.stringify({ stdout: scan.stdout, parsed: scan.parsed }, null, 2) : state.output || null);
+                setPlainOutput(scan.parsed?.plainOutput || state.plainOutput || null);
+                setSections(scan.parsed?.sections || state.sections || []);
+                setSectionData(scan.parsed ? parseAssessmentSections(scan.parsed.plainOutput || '', scan.parsed) : state.sectionData || null);
+
+                if (scan.status === 'running' && scan.jobId) {
+                  const pollInterval2 = setInterval(async () => {
+                    const done = await pollJobStatus(scan.jobId);
+                    if (done) clearInterval(pollInterval2);
+                  }, 2000);
+                  pollJobStatus(scan.jobId);
+                }
+              }
+            } catch (e) {
+              // ignore
+            }
+          })();
+        }
       } catch (error) {
         console.error('Failed to load persisted assessment state:', error);
       }
@@ -2108,7 +2146,25 @@ const AssessmentPage: React.FC = () => {
               </button>
             <button
               className="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-50"
-              onClick={() => {
+              onClick={async () => {
+                // If there's a jobId or lastJobId, request server to delete the scan so it's truly cleared
+                const idToClear = jobId || lastJobId || null;
+                if (idToClear) {
+                  try {
+                    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+                    await fetch(`${API_BASE_URL}/api/v1/assessment/scans/${idToClear}`, {
+                      method: 'DELETE',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                      },
+                      credentials: 'include',
+                    });
+                  } catch (e) {
+                    // ignore delete errors, continue clearing client state
+                  }
+                }
+
                 setTarget('');
                 setOutput(null);
                 setError(null);
