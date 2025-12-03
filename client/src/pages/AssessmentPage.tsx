@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Shield, Radar, Globe, Server, Activity as ActivityIcon, Lock, AlertTriangle, Globe2, Building2, Zap } from 'lucide-react';
 import { API_BASE_URL } from '@/lib/api';
 import { ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
@@ -929,6 +929,60 @@ const AssessmentPage: React.FC = () => {
   const [plainOutput, setPlainOutput] = useState<string | null>(null);
   const [sections, setSections] = useState<Array<{ title: string; content: string }>>([]);
   const [sectionData, setSectionData] = useState<SectionData | null>(null);
+
+  // Load persisted state from localStorage on component mount
+  useEffect(() => {
+    const persistedState = localStorage.getItem('assessmentState');
+    if (persistedState) {
+      try {
+        const state = JSON.parse(persistedState);
+        setTarget(state.target || '');
+        setRunning(state.running || false);
+        setJobId(state.jobId || null);
+        setLastJobId(state.lastJobId || null);
+        setStatusMessage(state.statusMessage || null);
+        setElapsedSeconds(state.elapsedSeconds || 0);
+        setOutput(state.output || null);
+        setError(state.error || null);
+        setPlainOutput(state.plainOutput || null);
+        setSections(state.sections || []);
+        setSectionData(state.sectionData || null);
+
+        // If scan was running, resume polling
+        if (state.running && state.jobId) {
+          setStatusMessage('⏳ Resuming assessment...');
+          const pollInterval = setInterval(async () => {
+            const done = await pollJobStatus(state.jobId);
+            if (done) {
+              clearInterval(pollInterval);
+            }
+          }, 2000);
+          // Check status immediately
+          pollJobStatus(state.jobId);
+        }
+      } catch (error) {
+        console.error('Failed to load persisted assessment state:', error);
+      }
+    }
+  }, []);
+
+  // Save state to localStorage whenever it changes
+  useEffect(() => {
+    const state = {
+      target,
+      running,
+      jobId,
+      lastJobId,
+      statusMessage,
+      elapsedSeconds,
+      output,
+      error,
+      plainOutput,
+      sections,
+      sectionData,
+    };
+    localStorage.setItem('assessmentState', JSON.stringify(state));
+  }, [target, running, jobId, lastJobId, statusMessage, elapsedSeconds, output, error, plainOutput, sections, sectionData]);
 
   const visualization = useMemo(() => {
     if (!sectionData) return null;
@@ -2020,6 +2074,11 @@ const AssessmentPage: React.FC = () => {
                 setSections([]);
                 setSectionData(null);
                 setStatusMessage(null);
+                setRunning(false);
+                setJobId(null);
+                setLastJobId(null);
+                setElapsedSeconds(0);
+                localStorage.removeItem('assessmentState');
               }}
               disabled={running}
             >
