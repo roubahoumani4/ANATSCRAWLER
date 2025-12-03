@@ -822,10 +822,51 @@ const OutputPage: React.FC = () => {
                   Download PDF Report
                 </a>
                 <button 
-                  className="px-5 py-3 rounded-lg bg-gray-700 hover:bg-gray-600 font-semibold transition-colors"
-                  onClick={() => window.location.reload()}
+                  className="px-5 py-3 rounded-lg bg-gray-700 hover:bg-gray-600 font-semibold transition-colors flex items-center gap-2"
+                  onClick={async () => {
+                    setLoading(true);
+                    setError(null);
+                    try {
+                      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+                      const res = await fetch(`${API_BASE_URL}/api/v1/assessment/status/${jobId}`, {
+                        headers: {
+                          'Content-Type': 'application/json',
+                          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                        },
+                        credentials: 'include',
+                      });
+                      if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.error || `HTTP ${res.status}`);
+                      }
+                      const data = await res.json();
+                      
+                      const scanInfo = data.scan || {};
+                      const resultData = data.result || {};
+                      
+                      const fullScan = {
+                        ...resultData,
+                        status: scanInfo.status || data.status || 'unknown',
+                        startTime: scanInfo.startTime || scanInfo.createdAt,
+                        endTime: scanInfo.endTime || scanInfo.updatedAt,
+                        target: scanInfo.target || resultData.target,
+                        jobId: scanInfo.jobId || data.jobId,
+                        parsed: resultData.parsed || scanInfo.parsed,
+                        stdout: resultData.stdout || scanInfo.stdout,
+                        stderr: resultData.stderr || scanInfo.stderr,
+                      };
+                      
+                      setScan(fullScan);
+                    } catch (e: any) {
+                      setError(e.message || 'Failed to refresh data');
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  disabled={loading}
                 >
-                  Refresh Data
+                  <Download size={16} className={loading ? 'animate-spin' : ''} />
+                  {loading ? 'Refreshing...' : 'Refresh Data'}
                 </button>
               </div>
             </div>

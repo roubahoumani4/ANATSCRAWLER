@@ -446,12 +446,27 @@ export default router;
 router.get('/download/:jobId', async (req: Request, res: Response) => {
   try {
     const { jobId } = req.params;
-    const job = jobs.get(jobId);
-    if (!job || !job.result || !job.result.parsed || !job.result.parsed.reportLocation) {
-      return res.status(404).json({ error: 'Report not found for this job' });
+    
+    // Try to get from in-memory jobs first, then fall back to database
+    let job = jobs.get(jobId);
+    let reportLocation: string | undefined;
+    
+    if (job && job.result && job.result.parsed && job.result.parsed.reportLocation) {
+      reportLocation = job.result.parsed.reportLocation;
+    } else {
+      // Fall back to database
+      const scan = await Scan.findOne({ jobId }).lean();
+      if (!scan || !scan.parsed || !scan.parsed.reportLocation) {
+        return res.status(404).json({ error: 'Report not found for this job' });
+      }
+      reportLocation = scan.parsed.reportLocation;
+    }
+    
+    if (!reportLocation) {
+      return res.status(404).json({ error: 'Report location not found' });
     }
 
-    const rawLocation: string = job.result.parsed.reportLocation;
+    const rawLocation: string = reportLocation;
     const scriptsDir = process.env.SCRIPTS_DIR || '/var/www/anatscrawler/scripts';
 
     // If report path is relative, resolve it under the scripts dir; otherwise use as-is
