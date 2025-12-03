@@ -2163,77 +2163,97 @@ const AssessmentPage: React.FC = () => {
               <h3 className="text-sm font-bold text-white">What This Assessment Does</h3>
             </div>
             <p className="text-xs text-gray-300 leading-relaxed">
-              We perform a staged automated assessment combining passive and active techniques to discover infrastructure, open services, SSL issues, web technologies, and known vulnerabilities. Progress is logged live and visualized on the map while the scan runs.
+              We perform a staged automated assessment combining passive and active techniques to discover infrastructure, open services, SSL issues, web technologies, and known vulnerabilities.
+              {running && <span className="text-emerald-400 font-semibold"> Scan in progress...</span>}
             </p>
             
             <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
               {/* Passive Recon Card */}
-              <div className="bg-gradient-to-br from-cyan-900/20 to-cyan-800/10 border border-cyan-500/20 rounded-lg p-3">
-                <div className="flex items-center space-x-2 mb-2">
-                  <Globe className="w-4 h-4 text-cyan-400" />
-                  <h4 className="text-xs font-semibold text-cyan-300">Passive Recon</h4>
+              <div className="relative overflow-hidden bg-gradient-to-br from-cyan-900/20 to-cyan-800/10 border border-cyan-500/20 rounded-lg p-3">
+                {/* Filling animation when running */}
+                {running && (
+                  <div 
+                    className="absolute inset-0 bg-gradient-to-t from-cyan-500/30 via-cyan-500/20 to-transparent"
+                    style={{
+                      animation: 'fillUp 5s ease-in-out forwards',
+                      transformOrigin: 'bottom'
+                    }}
+                  />
+                )}
+                <div className="relative z-10">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Globe className={`w-4 h-4 ${running ? 'text-cyan-300 animate-pulse' : 'text-cyan-400'}`} />
+                    <h4 className="text-xs font-semibold text-cyan-300">Passive Recon</h4>
+                  </div>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    WHOIS, DNS records, tech stack detection, subdomain enumeration
+                  </p>
                 </div>
-                <p className="text-xs text-gray-400 leading-relaxed">
-                  WHOIS, DNS records, tech stack detection, subdomain enumeration
-                </p>
               </div>
 
               {/* Active Probing Card */}
-              <div className="bg-gradient-to-br from-orange-900/20 to-orange-800/10 border border-orange-500/20 rounded-lg p-3">
-                <div className="flex items-center space-x-2 mb-2">
-                  <Server className="w-4 h-4 text-orange-400" />
-                  <h4 className="text-xs font-semibold text-orange-300">Active Probing</h4>
+              <div className="relative overflow-hidden bg-gradient-to-br from-orange-900/20 to-orange-800/10 border border-orange-500/20 rounded-lg p-3">
+                {/* Filling animation when running - starts after first card */}
+                {running && (
+                  <div 
+                    className="absolute inset-0 bg-gradient-to-t from-orange-500/30 via-orange-500/20 to-transparent"
+                    style={{
+                      animation: 'fillUp 5s ease-in-out 5s forwards',
+                      transformOrigin: 'bottom',
+                      transform: 'scaleY(0)'
+                    }}
+                  />
+                )}
+                <div className="relative z-10">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Server className={`w-4 h-4 ${running ? 'text-orange-300 animate-pulse' : 'text-orange-400'}`} style={{ animationDelay: '5s' }} />
+                    <h4 className="text-xs font-semibold text-orange-300">Active Probing</h4>
+                  </div>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    Port scanning, service detection, banner grabbing, WAF detection
+                  </p>
                 </div>
-                <p className="text-xs text-gray-400 leading-relaxed">
-                  Port scanning, service detection, banner grabbing, WAF detection
-                </p>
               </div>
 
               {/* Security Analysis Card */}
-              <div className="bg-gradient-to-br from-red-900/20 to-red-800/10 border border-red-500/20 rounded-lg p-3">
-                <div className="flex items-center space-x-2 mb-2">
-                  <Shield className="w-4 h-4 text-red-400" />
-                  <h4 className="text-xs font-semibold text-red-300">Security Analysis</h4>
+              <div className="relative overflow-hidden bg-gradient-to-br from-red-900/20 to-red-800/10 border border-red-500/20 rounded-lg p-3">
+                {/* Filling animation when running - starts after second card */}
+                {running && (
+                  <div 
+                    className="absolute inset-0 bg-gradient-to-t from-red-500/30 via-red-500/20 to-transparent"
+                    style={{
+                      animation: 'fillUp 5s ease-in-out 10s forwards',
+                      transformOrigin: 'bottom',
+                      transform: 'scaleY(0)'
+                    }}
+                  />
+                )}
+                <div className="relative z-10">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Shield className={`w-4 h-4 ${running ? 'text-red-300 animate-pulse' : 'text-red-400'}`} style={{ animationDelay: '10s' }} />
+                    <h4 className="text-xs font-semibold text-red-300">Security Analysis</h4>
+                  </div>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    SSL/TLS checks, vulnerability scanning, breach database lookup
+                  </p>
                 </div>
-                <p className="text-xs text-gray-400 leading-relaxed">
-                  SSL/TLS checks, vulnerability scanning, breach database lookup
-                </p>
               </div>
             </div>
           </div>
 
-          {/* Animated map visualization while running */}
-          {running && (
-            <div className="mt-4 flex items-center space-x-4">
-              <div className="w-48 h-32 bg-transparent rounded-md flex items-center justify-center">
-                <svg viewBox="0 0 100 60" className="w-full h-full">
-                  <defs>
-                    <linearGradient id="g1" x1="0%" x2="100%">
-                      <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.6" />
-                      <stop offset="100%" stopColor="#34d399" stopOpacity="0.6" />
-                    </linearGradient>
-                  </defs>
-                  <rect x="0" y="0" width="100" height="60" rx="6" fill="#0b1220" />
-                  <g transform="translate(10,8)">
-                    <circle cx="20" cy="18" r="3" fill="#06b6d4">
-                      <animate attributeName="r" values="3;6;3" dur="1.6s" repeatCount="indefinite" />
-                    </circle>
-                    <circle cx="45" cy="8" r="2.8" fill="#34d399">
-                      <animate attributeName="r" values="2.8;5;2.8" dur="1.8s" repeatCount="indefinite" />
-                    </circle>
-                    <circle cx="70" cy="26" r="2.6" fill="#60a5fa">
-                      <animate attributeName="r" values="2.6;5.2;2.6" dur="2s" repeatCount="indefinite" />
-                    </circle>
-                    <path d="M0 28 Q25 4 50 28 T100 28" stroke="url(#g1)" strokeWidth="0.8" fill="none" strokeOpacity="0.5" />
-                  </g>
-                </svg>
-              </div>
-              <div className="text-xs text-gray-300">
-                <div className="font-semibold">Live scan progress</div>
-                <div className="text-gray-400">Events discovered appear as pulsing markers. The full log and generated report will be available when finished.</div>
-              </div>
-            </div>
-          )}
+          {/* CSS for fill animation */}
+          <style>{`
+            @keyframes fillUp {
+              from {
+                transform: scaleY(0);
+              }
+              to {
+                transform: scaleY(1);
+              }
+            }
+          `}</style>
+
+
 
           <div className="mt-6 flex items-center gap-3 flex-wrap">
               <button
