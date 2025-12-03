@@ -813,14 +813,42 @@ const OutputPage: React.FC = () => {
             <div className="bg-gray-900/60 border border-gray-800 rounded-lg p-6">
               <h2 className="text-lg font-semibold mb-4">Download Reports</h2>
               <div className="flex gap-3 flex-wrap">
-                <a
-                  className="px-5 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-semibold flex items-center gap-2 transition-colors"
-                  href={`${API_BASE_URL}/api/v1/assessment/download/${encodeURIComponent(jobId)}`}
-                  download
+                <button
+                  className="px-5 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-semibold flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={async () => {
+                    try {
+                      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+                      const response = await fetch(`${API_BASE_URL}/api/v1/assessment/download/${encodeURIComponent(jobId)}`, {
+                        headers: {
+                          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                        },
+                        credentials: 'include',
+                      });
+                      
+                      if (!response.ok) {
+                        const error = await response.json().catch(() => ({}));
+                        throw new Error(error.error || 'Failed to download report');
+                      }
+                      
+                      // Get the blob and create a download link
+                      const blob = await response.blob();
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `assessment_${jobId}.pdf`;
+                      document.body.appendChild(a);
+                      a.click();
+                      window.URL.revokeObjectURL(url);
+                      document.body.removeChild(a);
+                    } catch (e: any) {
+                      setError(e.message || 'Failed to download report');
+                    }
+                  }}
+                  disabled={loading}
                 >
                   <Download size={16} />
                   Download PDF Report
-                </a>
+                </button>
                 <button 
                   className="px-5 py-3 rounded-lg bg-gray-700 hover:bg-gray-600 font-semibold transition-colors flex items-center gap-2"
                   onClick={async () => {
