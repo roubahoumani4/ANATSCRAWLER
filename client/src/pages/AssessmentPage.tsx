@@ -931,6 +931,11 @@ const AssessmentPage: React.FC = () => {
   const [plainOutput, setPlainOutput] = useState<string | null>(null);
   const [sections, setSections] = useState<Array<{ title: string; content: string }>>([]);
   const [sectionData, setSectionData] = useState<SectionData | null>(null);
+  
+  // Track scan phase completion
+  const [passiveReconComplete, setPassiveReconComplete] = useState(false);
+  const [activeProbingComplete, setActiveProbingComplete] = useState(false);
+  const [securityAnalysisComplete, setSecurityAnalysisComplete] = useState(false);
 
   // Load persisted state from localStorage on component mount
   useEffect(() => {
@@ -2022,6 +2027,26 @@ const AssessmentPage: React.FC = () => {
 
       const resp = await res.json();
 
+      // Check for partial results to update phase completion
+      if (resp.result && resp.result.parsed) {
+        const parsed = resp.result.parsed;
+        
+        // Phase 1: Passive Recon (WHOIS, DNS, Subdomains)
+        if ((parsed.whoisData || parsed.dnsRecords || parsed.subdomains) && !passiveReconComplete) {
+          setPassiveReconComplete(true);
+        }
+        
+        // Phase 2: Active Probing (Ports, Services)
+        if (parsed.openPorts && !activeProbingComplete) {
+          setActiveProbingComplete(true);
+        }
+        
+        // Phase 3: Security Analysis (SSL, Vulnerabilities, Breaches)
+        if ((parsed.sslInfo || parsed.vulnerabilities || parsed.breachData) && !securityAnalysisComplete) {
+          setSecurityAnalysisComplete(true);
+        }
+      }
+
       if (resp.status === 'finished' && resp.result) {
         setRunning(false);
         // keep jobId for download reference
@@ -2040,6 +2065,12 @@ const AssessmentPage: React.FC = () => {
           setSections([]);
           setSectionData(parseAssessmentSections(clean, resp.result.parsed));
         }
+        
+        // Mark all phases complete when scan finishes
+        setPassiveReconComplete(true);
+        setActiveProbingComplete(true);
+        setSecurityAnalysisComplete(true);
+        
         setStatusMessage(`✅ Assessment completed in ${resp.elapsedSeconds}s`);
         return true; // Stop polling
       }
@@ -2069,6 +2100,12 @@ const AssessmentPage: React.FC = () => {
     setSectionData(null);
     setStatusMessage(null);
     setElapsedSeconds(0);
+    
+    // Reset phase completion states
+    setPassiveReconComplete(false);
+    setActiveProbingComplete(false);
+    setSecurityAnalysisComplete(false);
+    
     if (!target) return setError('Please provide a target (domain, URL or IP)');
     setRunning(true);
 
@@ -2168,22 +2205,24 @@ const AssessmentPage: React.FC = () => {
             </p>
             
             <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-              {/* Passive Recon Card */}
-              <div className="relative overflow-hidden bg-gradient-to-br from-cyan-900/20 to-cyan-800/10 border border-cyan-500/20 rounded-lg p-3">
-                {/* Filling animation when running */}
-                {running && (
-                  <div 
-                    className="absolute inset-0 bg-gradient-to-t from-cyan-500/30 via-cyan-500/20 to-transparent"
-                    style={{
-                      animation: 'fillUp 5s ease-in-out forwards',
-                      transformOrigin: 'bottom'
-                    }}
-                  />
-                )}
+              {/* Passive Recon Card - Phase 1 */}
+              <div className="relative overflow-hidden bg-gradient-to-br from-cyan-900/20 to-cyan-800/10 border border-cyan-500/20 rounded-lg p-3 transition-all duration-500">
+                {/* Filling overlay - shows when phase is complete */}
+                <div 
+                  className="absolute inset-0 bg-gradient-to-t from-cyan-500/40 via-cyan-500/25 to-transparent transition-all duration-1000"
+                  style={{
+                    transform: passiveReconComplete ? 'scaleY(1)' : 'scaleY(0)',
+                    transformOrigin: 'bottom',
+                    opacity: passiveReconComplete ? 1 : 0
+                  }}
+                />
                 <div className="relative z-10">
                   <div className="flex items-center space-x-2 mb-2">
-                    <Globe className={`w-4 h-4 ${running ? 'text-cyan-300 animate-pulse' : 'text-cyan-400'}`} />
+                    <Globe className={`w-4 h-4 transition-all ${
+                      passiveReconComplete ? 'text-cyan-200' : running ? 'text-cyan-300 animate-pulse' : 'text-cyan-400'
+                    }`} />
                     <h4 className="text-xs font-semibold text-cyan-300">Passive Recon</h4>
+                    {passiveReconComplete && <span className="text-[10px] text-cyan-300">✓</span>}
                   </div>
                   <p className="text-xs text-gray-400 leading-relaxed">
                     WHOIS, DNS records, tech stack detection, subdomain enumeration
@@ -2191,23 +2230,24 @@ const AssessmentPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Active Probing Card */}
-              <div className="relative overflow-hidden bg-gradient-to-br from-orange-900/20 to-orange-800/10 border border-orange-500/20 rounded-lg p-3">
-                {/* Filling animation when running - starts after first card */}
-                {running && (
-                  <div 
-                    className="absolute inset-0 bg-gradient-to-t from-orange-500/30 via-orange-500/20 to-transparent"
-                    style={{
-                      animation: 'fillUp 5s ease-in-out 5s forwards',
-                      transformOrigin: 'bottom',
-                      transform: 'scaleY(0)'
-                    }}
-                  />
-                )}
+              {/* Active Probing Card - Phase 2 */}
+              <div className="relative overflow-hidden bg-gradient-to-br from-orange-900/20 to-orange-800/10 border border-orange-500/20 rounded-lg p-3 transition-all duration-500">
+                {/* Filling overlay - shows when phase is complete */}
+                <div 
+                  className="absolute inset-0 bg-gradient-to-t from-orange-500/40 via-orange-500/25 to-transparent transition-all duration-1000"
+                  style={{
+                    transform: activeProbingComplete ? 'scaleY(1)' : 'scaleY(0)',
+                    transformOrigin: 'bottom',
+                    opacity: activeProbingComplete ? 1 : 0
+                  }}
+                />
                 <div className="relative z-10">
                   <div className="flex items-center space-x-2 mb-2">
-                    <Server className={`w-4 h-4 ${running ? 'text-orange-300 animate-pulse' : 'text-orange-400'}`} style={{ animationDelay: '5s' }} />
+                    <Server className={`w-4 h-4 transition-all ${
+                      activeProbingComplete ? 'text-orange-200' : passiveReconComplete && running ? 'text-orange-300 animate-pulse' : 'text-orange-400'
+                    }`} />
                     <h4 className="text-xs font-semibold text-orange-300">Active Probing</h4>
+                    {activeProbingComplete && <span className="text-[10px] text-orange-300">✓</span>}
                   </div>
                   <p className="text-xs text-gray-400 leading-relaxed">
                     Port scanning, service detection, banner grabbing, WAF detection
@@ -2215,23 +2255,24 @@ const AssessmentPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Security Analysis Card */}
-              <div className="relative overflow-hidden bg-gradient-to-br from-red-900/20 to-red-800/10 border border-red-500/20 rounded-lg p-3">
-                {/* Filling animation when running - starts after second card */}
-                {running && (
-                  <div 
-                    className="absolute inset-0 bg-gradient-to-t from-red-500/30 via-red-500/20 to-transparent"
-                    style={{
-                      animation: 'fillUp 5s ease-in-out 10s forwards',
-                      transformOrigin: 'bottom',
-                      transform: 'scaleY(0)'
-                    }}
-                  />
-                )}
+              {/* Security Analysis Card - Phase 3 */}
+              <div className="relative overflow-hidden bg-gradient-to-br from-red-900/20 to-red-800/10 border border-red-500/20 rounded-lg p-3 transition-all duration-500">
+                {/* Filling overlay - shows when phase is complete */}
+                <div 
+                  className="absolute inset-0 bg-gradient-to-t from-red-500/40 via-red-500/25 to-transparent transition-all duration-1000"
+                  style={{
+                    transform: securityAnalysisComplete ? 'scaleY(1)' : 'scaleY(0)',
+                    transformOrigin: 'bottom',
+                    opacity: securityAnalysisComplete ? 1 : 0
+                  }}
+                />
                 <div className="relative z-10">
                   <div className="flex items-center space-x-2 mb-2">
-                    <Shield className={`w-4 h-4 ${running ? 'text-red-300 animate-pulse' : 'text-red-400'}`} style={{ animationDelay: '10s' }} />
+                    <Shield className={`w-4 h-4 transition-all ${
+                      securityAnalysisComplete ? 'text-red-200' : activeProbingComplete && running ? 'text-red-300 animate-pulse' : 'text-red-400'
+                    }`} />
                     <h4 className="text-xs font-semibold text-red-300">Security Analysis</h4>
+                    {securityAnalysisComplete && <span className="text-[10px] text-red-300">✓</span>}
                   </div>
                   <p className="text-xs text-gray-400 leading-relaxed">
                     SSL/TLS checks, vulnerability scanning, breach database lookup
@@ -2241,17 +2282,7 @@ const AssessmentPage: React.FC = () => {
             </div>
           </div>
 
-          {/* CSS for fill animation */}
-          <style>{`
-            @keyframes fillUp {
-              from {
-                transform: scaleY(0);
-              }
-              to {
-                transform: scaleY(1);
-              }
-            }
-          `}</style>
+
 
 
 
