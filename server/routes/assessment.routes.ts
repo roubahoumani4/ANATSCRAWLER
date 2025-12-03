@@ -269,8 +269,36 @@ router.get('/status/:jobId', async (req: Request, res: Response) => {
   try {
     const { jobId } = req.params;
     const job = jobs.get(jobId);
-
     if (!job) {
+      // If the in-memory job is gone, try to find a persisted Scan document
+      try {
+        const scanDoc = await Scan.findOne({ jobId }).lean();
+        if (scanDoc) {
+          if (scanDoc.status === 'completed') {
+            const result = {
+              target: scanDoc.target,
+              exitCode: scanDoc.exitCode ?? null,
+              stdout: scanDoc.stdout || '',
+              stderr: scanDoc.stderr || '',
+              parsed: scanDoc.parsed || null,
+            };
+            return res.json({ jobId, status: 'completed', result, scan: scanDoc });
+          }
+
+          if (scanDoc.status === 'failed') {
+            return res.status(500).json({ jobId, status: 'failed', error: scanDoc.error || 'Scan failed', scan: scanDoc });
+          }
+
+          // pending or running
+          const start = scanDoc.startTime ? new Date(scanDoc.startTime).getTime() : Date.now();
+          const elapsedSecs = Math.floor((Date.now() - start) / 1000);
+          return res.json({ jobId, status: scanDoc.status || 'pending', elapsedSeconds: elapsedSecs, scan: scanDoc });
+        }
+      } catch (e) {
+        // ignore DB lookup errors and fallthrough to 404
+        console.error('Error looking up persisted scan for status:', e);
+      }
+
       return res.status(404).json({ error: 'Job not found' });
     }
 
