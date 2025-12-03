@@ -18,14 +18,45 @@ const OutputPage: React.FC = () => {
 
   // Parse section data first (same as AssessmentPage)
   const sectionData = useMemo(() => {
-    if (!scan?.parsed) return null;
+    if (!scan?.parsed) {
+      console.log('No scan.parsed available');
+      return null;
+    }
+    console.log('Raw scan.parsed:', scan.parsed);
+    console.log('plainOutput available:', !!scan.parsed.plainOutput);
+    console.log('stdout available:', !!scan.stdout);
+    
+    const plainText = scan.parsed.plainOutput || scan.stdout || '';
+    console.log('Plain text length:', plainText.length);
+    console.log('First 500 chars:', plainText.substring(0, 500));
+    
     // Parse structured sections from plainOutput (same as AssessmentPage)
-    return parseAssessmentSections(scan.parsed.plainOutput || scan.stdout || '', scan.parsed);
+    const parsed = parseAssessmentSections(plainText, scan.parsed);
+    console.log('Parsed sectionData:', parsed);
+    console.log('Has whois:', !!parsed?.whois);
+    console.log('Has dns:', !!parsed?.dns);
+    console.log('Has subdomains:', !!parsed?.subdomains);
+    console.log('Has ports:', !!parsed?.ports);
+    
+    return parsed;
   }, [scan]);
 
   // Compute visualization data (EXACT COPY from AssessmentPage)
   const visualization = useMemo(() => {
-    if (!sectionData) return null;
+    if (!sectionData) {
+      console.log('No sectionData for visualization');
+      return null;
+    }
+    console.log('Computing visualization from sectionData:', {
+      hasWhois: !!sectionData.whois,
+      hasDns: !!sectionData.dns,
+      hasSubdomains: !!sectionData.subdomains,
+      hasPorts: !!sectionData.ports,
+      whoisData: sectionData.whois,
+      dnsData: sectionData.dns,
+      subdomainsCount: sectionData.subdomains?.entries?.length,
+      portsCount: sectionData.ports?.entries?.length,
+    });
     const parseDate = (value?: string) => (value ? new Date(value) : null);
     const msToDays = (ms: number) => Math.max(ms / (1000 * 60 * 60 * 24), 0);
 
