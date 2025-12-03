@@ -942,120 +942,84 @@ const AssessmentPage: React.FC = () => {
   const [activeProbingProgress, setActiveProbingProgress] = useState(0);
   const [securityAnalysisProgress, setSecurityAnalysisProgress] = useState(0);
 
-  // Load persisted state from localStorage on component mount
+  // Load persisted state from localStorage on component mount and always check for running scans
   useEffect(() => {
-    const persistedState = localStorage.getItem('assessmentState');
-    if (persistedState) {
+    // ALWAYS check for running scans from the API first
+    (async () => {
       try {
-        const state = JSON.parse(persistedState);
-        setTarget(state.target || '');
-        setRunning(state.running || false);
-        setJobId(state.jobId || null);
-        setLastJobId(state.lastJobId || null);
-        setStatusMessage(state.statusMessage || null);
-        setElapsedSeconds(state.elapsedSeconds || 0);
-        setOutput(state.output || null);
-        setError(state.error || null);
-        setPlainOutput(state.plainOutput || null);
-        setSections(state.sections || []);
-        setSectionData(state.sectionData || null);
-
-        // If scan was running, resume polling
-        if (state.running && state.jobId) {
-          setStatusMessage('⏳ Resuming assessment...');
-          const pollInterval = setInterval(async () => {
-            const done = await pollJobStatus(state.jobId);
-            if (done) {
-              clearInterval(pollInterval);
-            }
-          }, 2000);
-          // Check status immediately
-          pollJobStatus(state.jobId);
-        }
-        // Even if we loaded persisted state, reconcile with DB in case server cleaned the in-memory job
-        if (state.jobId) {
-          (async () => {
-            try {
-              const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-              const r = await fetch(`${API_BASE_URL}/api/v1/assessment/scans/${state.jobId}`, {
-                headers: {
-                  'Content-Type': 'application/json',
-                  ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-                credentials: 'include',
-              });
-              if (!r.ok) return;
-              const scan = await r.json();
-              if (scan) {
-                setTarget(scan.target || (state.target || ''));
-                setStatusMessage(scan.status === 'running' ? '⏳ Resuming assessment...' : (`Status: ${scan.status}`));
-                setRunning(scan.status === 'running');
-                setLastJobId(scan.status === 'finished' ? scan.jobId : state.lastJobId || null);
-                setElapsedSeconds(scan.elapsedSeconds || state.elapsedSeconds || 0);
-                setOutput(scan.stdout ? JSON.stringify({ stdout: scan.stdout, parsed: scan.parsed }, null, 2) : state.output || null);
-                setPlainOutput(scan.parsed?.plainOutput || state.plainOutput || null);
-                setSections(scan.parsed?.sections || state.sections || []);
-                setSectionData(scan.parsed ? parseAssessmentSections(scan.parsed.plainOutput || '', scan.parsed) : state.sectionData || null);
-
-                if (scan.status === 'running' && scan.jobId) {
-                  const pollInterval2 = setInterval(async () => {
-                    const done = await pollJobStatus(scan.jobId);
-                    if (done) clearInterval(pollInterval2);
-                  }, 2000);
-                  pollJobStatus(scan.jobId);
-                }
-              }
-            } catch (e) {
-              // ignore
-            }
-          })();
-        }
-      } catch (error) {
-        console.error('Failed to load persisted assessment state:', error);
-      }
-    }
-    else {
-      // No local state persisted: try fetching the most recent scan for this user
-      (async () => {
-        try {
-          const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-          const res = await fetch(`${API_BASE_URL}/api/v1/assessment/scans?limit=1`, {
-            headers: {
-              'Content-Type': 'application/json',
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-            credentials: 'include',
-          });
-          if (!res.ok) return; // no scans or not authenticated
-          const data = await res.json();
-          const scans = data.scans || data || [];
-          if (scans.length) {
-            const scan = scans[0];
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const res = await fetch(`${API_BASE_URL}/api/v1/assessment/scans?limit=1`, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          credentials: 'include',
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const scans = data.scans || data || [];
+        if (scans.length) {
+          const scan = scans[0];
+          // If there's a running scan, use it regardless of localStorage
+          if (scan.status === 'running') {
             setTarget(scan.target || '');
             setJobId(scan.jobId || null);
-            setStatusMessage(scan.status === 'running' ? '⏳ Resuming assessment...' : (`Status: ${scan.status}`));
-            setRunning(scan.status === 'running');
-            setLastJobId(scan.status === 'finished' ? scan.jobId : null);
+            setStatusMessage('⏳ Resuming assessment...');
+            setRunning(true);
+            setLastJobId(null);
             setElapsedSeconds(scan.elapsedSeconds || 0);
             setOutput(scan.stdout ? JSON.stringify({ stdout: scan.stdout, parsed: scan.parsed }, null, 2) : null);
             setPlainOutput(scan.parsed?.plainOutput || null);
             setSections(scan.parsed?.sections || []);
             setSectionData(scan.parsed ? parseAssessmentSections(scan.parsed.plainOutput || '', scan.parsed) : null);
 
-            // If running, resume polling
-            if (scan.status === 'running' && scan.jobId) {
-              const pollInterval = setInterval(async () => {
-                const done = await pollJobStatus(scan.jobId);
-                if (done) clearInterval(pollInterval);
-              }, 2000);
-              pollJobStatus(scan.jobId);
-            }
+            // Resume polling
+            const pollInterval = setInterval(async () => {
+              const done = await pollJobStatus(scan.jobId);
+              if (done) clearInterval(pollInterval);
+            }, 2000);
+            pollJobStatus(scan.jobId);
+            return; // Don't load localStorage if we found a running scan
+          } else if (scan.status === 'finished') {
+            // Load the most recent completed scan
+            setTarget(scan.target || '');
+            setJobId(null);
+            setLastJobId(scan.jobId);
+            setStatusMessage(`Status: ${scan.status}`);
+            setRunning(false);
+            setElapsedSeconds(scan.elapsedSeconds || 0);
+            setOutput(scan.stdout ? JSON.stringify({ stdout: scan.stdout, parsed: scan.parsed }, null, 2) : null);
+            setPlainOutput(scan.parsed?.plainOutput || null);
+            setSections(scan.parsed?.sections || []);
+            setSectionData(scan.parsed ? parseAssessmentSections(scan.parsed.plainOutput || '', scan.parsed) : null);
+            return; // Don't load localStorage if we found a completed scan
           }
-        } catch (e) {
-          // ignore - user may be unauthenticated or endpoint unavailable
         }
-      })();
-    }
+      } catch (e) {
+        console.error('Failed to check for running scans:', e);
+      }
+
+      // If no running scan found, try loading from localStorage
+      const persistedState = localStorage.getItem('assessmentState');
+      if (persistedState) {
+        try {
+          const state = JSON.parse(persistedState);
+          setTarget(state.target || '');
+          setRunning(false); // Always set to false since we checked API already
+          setJobId(null);
+          setLastJobId(state.lastJobId || null);
+          setStatusMessage(state.statusMessage || null);
+          setElapsedSeconds(state.elapsedSeconds || 0);
+          setOutput(state.output || null);
+          setError(state.error || null);
+          setPlainOutput(state.plainOutput || null);
+          setSections(state.sections || []);
+          setSectionData(state.sectionData || null);
+        } catch (error) {
+          console.error('Failed to load persisted assessment state:', error);
+        }
+      }
+    })();
   }, []);
 
   // Save state to localStorage whenever it changes
