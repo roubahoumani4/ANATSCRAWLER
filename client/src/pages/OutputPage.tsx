@@ -4,6 +4,7 @@ import { API_BASE_URL } from '@/lib/api';
 import VulnerabilityGraphs from '@/components/VulnerabilityGraphs';
 import { ChevronDown, ChevronUp, Download, FileText, History as HistoryIcon, Shield, Radar, Globe, Server, Activity as ActivityIcon, Lock, AlertTriangle, Globe2, Building2 } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import { parseAssessmentSections } from './AssessmentPage';
 
 const OutputPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -15,27 +16,13 @@ const OutputPage: React.FC = () => {
   const [scan, setScan] = useState<any | null>(null);
   const [outputExpanded, setOutputExpanded] = useState(false);
 
-  // Compute visualization data from scan.parsed
-  // Note: scan.parsed from MongoDB doesn't have structured sections (whois, dns, etc.)
-  // It only has plainOutput, summaryLines, etc. We need structured data for visualizations.
+  // Compute visualization data from scan.parsed - parse sections from plainOutput like AssessmentPage does
   const visualization = useMemo(() => {
-    if (!scan?.parsed) {
-      console.log('No scan.parsed data available');
-      return null;
-    }
+    if (!scan?.parsed) return null;
     
-    console.log('Scan.parsed structure:', Object.keys(scan.parsed));
-    
-    // Check if we have structured data (whois, dns, subdomains, etc.)
-    const hasStructuredData = scan.parsed.whois || scan.parsed.dns || scan.parsed.subdomains;
-    
-    if (!hasStructuredData) {
-      console.log('No structured data found in scan.parsed. Available keys:', Object.keys(scan.parsed));
-      console.log('This means the data needs to be parsed from plainOutput first');
-      return null;
-    }
-    
-    const sectionData = scan.parsed;
+    // Parse structured sections from plainOutput (same as AssessmentPage)
+    const sectionData = parseAssessmentSections(scan.parsed.plainOutput || scan.stdout || '', scan.parsed);
+    if (!sectionData) return null;
 
     // WHOIS Pie
     const whoisPie = [];
@@ -177,11 +164,7 @@ const OutputPage: React.FC = () => {
           throw new Error(err.error || `HTTP ${res.status}`);
         }
         const data = await res.json();
-        console.log('API Response:', data);
-        const scanData = data.result || data.scan || null;
-        console.log('Scan Data:', scanData);
-        console.log('Parsed Data:', scanData?.parsed);
-        setScan(scanData);
+        setScan(data.result || data.scan || null);
       } catch (e: any) {
         setError(e.message || 'Failed to fetch scan');
       } finally {

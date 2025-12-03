@@ -2675,3 +2675,7 @@ const AssessmentPage: React.FC = () => {
 };
 
 export default AssessmentPage;
+
+// Export the parsing function and types so OutputPage can use them
+export { parseAssessmentSections };
+export type { SectionData };
