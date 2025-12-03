@@ -16,121 +16,134 @@ const OutputPage: React.FC = () => {
   const [scan, setScan] = useState<any | null>(null);
   const [outputExpanded, setOutputExpanded] = useState(false);
 
-  // Compute visualization data from scan.parsed - parse sections from plainOutput like AssessmentPage does
-  const visualization = useMemo(() => {
+  // Parse section data first (same as AssessmentPage)
+  const sectionData = useMemo(() => {
     if (!scan?.parsed) return null;
-    
     // Parse structured sections from plainOutput (same as AssessmentPage)
-    const sectionData = parseAssessmentSections(scan.parsed.plainOutput || scan.stdout || '', scan.parsed);
-    if (!sectionData) return null;
+    return parseAssessmentSections(scan.parsed.plainOutput || scan.stdout || '', scan.parsed);
+  }, [scan]);
 
-    // WHOIS Pie
-    const whoisPie = [];
-    if (sectionData.whois?.creationDate && sectionData.whois?.expirationDate) {
-      const created = new Date(sectionData.whois.creationDate).getTime();
-      const expires = new Date(sectionData.whois.expirationDate).getTime();
-      const now = Date.now();
-      const total = expires - created;
-      const elapsed = now - created;
-      whoisPie.push({ name: 'Elapsed', value: Math.max(0, elapsed) });
-      whoisPie.push({ name: 'Remaining', value: Math.max(0, total - elapsed) });
+  // Compute visualization data (EXACT COPY from AssessmentPage)
+  const visualization = useMemo(() => {
+    if (!sectionData) return null;
+    const parseDate = (value?: string) => (value ? new Date(value) : null);
+    const msToDays = (ms: number) => Math.max(ms / (1000 * 60 * 60 * 24), 0);
+
+    const whois = sectionData.whois;
+    let whoisPie: Array<{ name: string; value: number }> = [];
+    if (whois?.creationDate && whois?.expirationDate) {
+      const creation = parseDate(whois.creationDate);
+      const expiration = parseDate(whois.expirationDate);
+      if (creation && expiration && expiration > creation) {
+        const total = expiration.getTime() - creation.getTime();
+        const elapsed = Date.now() - creation.getTime();
+        const remaining = expiration.getTime() - Date.now();
+        whoisPie = [
+          { name: 'Elapsed', value: Number(msToDays(elapsed).toFixed(2)) },
+          { name: 'Remaining', value: Number(msToDays(remaining).toFixed(2)) },
+        ];
+      }
     }
 
-    // DNS Counts
-    const dnsCounts = [
-      { type: 'A', count: sectionData.dns?.aRecords?.length || 0 },
-      { type: 'MX', count: sectionData.dns?.mxRecords?.length || 0 },
-      { type: 'NS', count: sectionData.dns?.nsRecords?.length || 0 },
-      { type: 'TXT', count: sectionData.dns?.txtRecords?.length || 0 },
-    ];
+    const dnsCounts = sectionData.dns
+      ? [
+          { type: 'A', count: sectionData.dns.aRecords.length },
+          { type: 'MX', count: sectionData.dns.mxRecords.length },
+          { type: 'NS', count: sectionData.dns.nsRecords.length },
+          { type: 'TXT', count: sectionData.dns.txtRecords.length },
+        ]
+      : [];
 
-    // Subdomain Bars
-    const subdomainBars = (sectionData.subdomains?.entries || []).slice(0, 4).map((sub: any) => ({
-      name: sub.subdomain,
-      value: 1,
-      ip: sub.ip || 'Unknown',
+    const subdomainBars = (sectionData.subdomains?.entries || []).slice(0, 8).map((entry: any, idx: number) => ({
+      name: entry.subdomain,
+      value: entry.ip ? 2 : 1,
+      ip: entry.ip || `Listed #${idx + 1}`,
     }));
 
-    // Port Service Bars
-    const portServiceBars: any[] = [];
-    const svcMap = new Map<string, number>();
-    (sectionData.ports?.entries || []).forEach((p: any) => {
-      const svc = p.service || 'unknown';
-      svcMap.set(svc, (svcMap.get(svc) || 0) + 1);
-    });
-    for (const [service, cnt] of svcMap) {
-      portServiceBars.push({ service, value: cnt });
-    }
-
-    // SSL Pie
-    const sslPie = [];
-    if (sectionData.ssl?.validFrom && sectionData.ssl?.validUntil) {
-      const vf = new Date(sectionData.ssl.validFrom).getTime();
-      const vu = new Date(sectionData.ssl.validUntil).getTime();
-      const now = Date.now();
-      const total = vu - vf;
-      const elapsed = now - vf;
-      sslPie.push({ name: 'Elapsed', value: Math.max(0, elapsed) });
-      sslPie.push({ name: 'Remaining', value: Math.max(0, total - elapsed) });
-    }
-
-    // Header Breakdown
-    const headerBreakdown = [
-      { name: 'Present', value: 0 },
-      { name: 'Missing', value: 0 },
-    ];
-    (sectionData.web?.analyses || []).forEach((analysis: any) => {
-      analysis.headers?.forEach((hdr: any) => {
-        if (hdr.status === 'present') headerBreakdown[0].value++;
-        else headerBreakdown[1].value++;
+    const portServiceBars = (() => {
+      const counts: Record<string, number> = {};
+      (sectionData.ports?.entries || []).forEach((entry: any) => {
+        const key = entry.service?.toUpperCase() || 'UNKNOWN';
+        counts[key] = (counts[key] || 0) + 1;
       });
-    });
+      return Object.keys(counts)
+        .map((service) => ({ service, value: counts[service] }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 8);
+    })();
 
-    // Technology Counts
-    const technologyCounts: any[] = [];
-    const techMap = new Map<string, number>();
-    (sectionData.web?.analyses || []).forEach((analysis: any) => {
-      analysis.technologies?.forEach((tech: string) => {
-        techMap.set(tech, (techMap.get(tech) || 0) + 1);
+    const sslPie = (() => {
+      if (!sectionData.ssl?.validFrom || !sectionData.ssl?.validUntil) return [];
+      const start = parseDate(sectionData.ssl.validFrom);
+      const end = parseDate(sectionData.ssl.validUntil);
+      if (!start || !end || end <= start) return [];
+      const total = end.getTime() - start.getTime();
+      const elapsed = Date.now() - start.getTime();
+      const remaining = end.getTime() - Date.now();
+      return [
+        { name: 'Valid', value: Number(msToDays(Math.min(elapsed, total)).toFixed(2)) },
+        { name: 'Days left', value: Number(msToDays(Math.max(remaining, 0)).toFixed(2)) },
+      ];
+    })();
+
+    const headerBreakdown = (() => {
+      let present = 0;
+      let missing = 0;
+      (sectionData.web?.analyses || []).forEach((analysis: any) => {
+        analysis.headers.forEach((header: any) => {
+          if (header.status === 'present') present += 1;
+          else missing += 1;
+        });
       });
-    });
-    for (const [tech, cnt] of techMap) {
-      technologyCounts.push({ tech, value: cnt });
-    }
+      return [
+        { name: 'Present', value: present },
+        { name: 'Missing', value: missing },
+      ];
+    })();
 
-    // Breach Pie
-    const breachPie = [
-      { name: 'Breached', value: 0 },
-      { name: 'Clean', value: 0 },
-    ];
-    (sectionData.breach?.results || []).forEach((entry: any) => {
-      if (entry.message?.toLowerCase().includes('error') || entry.message?.toLowerCase().includes('401')) {
-        // error case, we still note the attempt
-      } else {
-        breachPie[0].value++;
-      }
-    });
-    if (breachPie[0].value === 0 && sectionData.breach?.results?.length) {
-      breachPie[1].value = sectionData.breach.results.length;
-    }
+    const technologyCounts = (() => {
+      const counts: Record<string, number> = {};
+      (sectionData.web?.analyses || []).forEach((analysis: any) => {
+        analysis.technologies.forEach((tech: string) => {
+          counts[tech] = (counts[tech] || 0) + 1;
+        });
+      });
+      return Object.keys(counts).map((tech) => ({ tech, value: counts[tech] }));
+    })();
 
-    // Geo Bars
-    const geoBars: any[] = [];
-    const geoMap = new Map<string, number>();
-    (sectionData.geo?.locations || []).forEach((loc: any) => {
-      const country = loc.country || 'Unknown';
-      geoMap.set(country, (geoMap.get(country) || 0) + 1);
-    });
-    for (const [country, cnt] of geoMap) {
-      geoBars.push({ country, value: cnt });
-    }
+    const breachPie = (() => {
+      const summary = { clean: 0, error: 0 };
+      (sectionData.breach?.results || []).forEach((result: any) => {
+        if (result.status === 'clean') summary.clean += 1;
+        else summary.error += 1;
+      });
+      return [
+        { name: 'No Breaches', value: summary.clean },
+        { name: 'Errors', value: summary.error },
+      ];
+    })();
 
-    // Business Bars
-    const businessBars = [
-      { name: 'Infrastructure', value: sectionData.business?.infrastructureProviders?.length || 0 },
-      { name: 'Related Entities', value: sectionData.business?.relatedEntities?.length || 0 },
-      { name: 'Profile Fields', value: Object.keys(sectionData.business?.companyProfile || {}).length },
-    ];
+    const geoBars = (() => {
+      const counts: Record<string, number> = {};
+      (sectionData.geo?.locations || []).forEach((loc: any) => {
+        const country = loc.country || 'Unknown';
+        counts[country] = (counts[country] || 0) + 1;
+      });
+      return Object.keys(counts).map((country) => ({ country, value: counts[country] }));
+    })();
+
+    const businessBars = (() => {
+      const infra = sectionData.business?.infrastructureProviders?.length || 0;
+      const related = sectionData.business?.relatedEntities?.length || 0;
+      const profile = sectionData.business?.companyProfile
+        ? Object.keys(sectionData.business.companyProfile).length
+        : 0;
+      return [
+        { name: 'Infrastructure', value: infra },
+        { name: 'Related Entities', value: related },
+        { name: 'Profile Fields', value: profile },
+      ];
+    })();
 
     return {
       whoisPie,
@@ -144,7 +157,7 @@ const OutputPage: React.FC = () => {
       geoBars,
       businessBars,
     };
-  }, [scan]);
+  }, [sectionData]);
 
   useEffect(() => {
     if (!jobId) return;
