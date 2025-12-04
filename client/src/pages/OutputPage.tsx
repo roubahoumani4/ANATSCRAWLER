@@ -6,6 +6,30 @@ import { ChevronDown, ChevronUp, Download, FileText, History as HistoryIcon, Shi
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { parseAssessmentSections } from './AssessmentPage';
 
+// Helper function to clean unwanted footer lines from scan output
+const cleanScanOutput = (output: string): string => {
+  const lines = output.split('\n');
+  const filtered = lines.filter(line => {
+    const trimmed = line.trim();
+    // Remove lines related to report generation footer
+    if (trimmed === 'GENERATING COMPREHENSIVE OSINT REPORT') return false;
+    if (trimmed.startsWith('[+] Professional report generated:')) return false;
+    if (trimmed.startsWith('Report Location:')) return false;
+    if (trimmed === 'Enhanced scan completed successfully!' || trimmed === 'ENHANCED SCAN COMPLETE!') return false;
+    if (trimmed.startsWith("Check the '") && trimmed.includes("' directory for complete results")) return false;
+    if (trimmed.startsWith("Enhanced scan completed successfully!")) return false;
+    // Remove standalone separator lines at the end
+    if (/^={3,}$/.test(trimmed)) {
+      const lineIndex = lines.indexOf(line);
+      const remainingLines = lines.slice(lineIndex + 1).filter(l => l.trim() !== '');
+      // Only remove if it's one of the last few separators
+      if (remainingLines.length < 3) return false;
+    }
+    return true;
+  });
+  return filtered.join('\n').trim();
+};
+
 const OutputPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -795,13 +819,13 @@ const OutputPage: React.FC = () => {
                             {s.title}
                           </div>
                           <pre className="text-xs text-gray-300 whitespace-pre-wrap font-mono">
-                            {s.content}
+                            {cleanScanOutput(s.content)}
                           </pre>
                         </div>
                       ))
                     ) : (
                       <pre className="text-xs text-gray-300 whitespace-pre-wrap font-mono">
-                        {scan.stdout || scan.parsed?.plainOutput || 'No output available'}
+                        {cleanScanOutput(scan.stdout || scan.parsed?.plainOutput || 'No output available')}
                       </pre>
                     )}
                   </div>
