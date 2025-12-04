@@ -816,6 +816,8 @@ const OutputPage: React.FC = () => {
                 <button
                   className="px-5 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-semibold flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={async () => {
+                    setLoading(true);
+                    setError(null);
                     try {
                       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
                       const response = await fetch(`${API_BASE_URL}/api/v1/assessment/download/${encodeURIComponent(jobId)}`, {
@@ -835,19 +837,33 @@ const OutputPage: React.FC = () => {
                       const url = window.URL.createObjectURL(blob);
                       const a = document.createElement('a');
                       a.href = url;
-                      a.download = `assessment_${jobId}.pdf`;
+                      
+                      // Get filename from Content-Disposition header or use default
+                      const contentDisposition = response.headers.get('Content-Disposition');
+                      let filename = `assessment_${scan.target}_${jobId.slice(0, 8)}.txt`;
+                      if (contentDisposition) {
+                        const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+                        if (filenameMatch) filename = filenameMatch[1];
+                      }
+                      
+                      a.download = filename;
                       document.body.appendChild(a);
                       a.click();
                       window.URL.revokeObjectURL(url);
                       document.body.removeChild(a);
+                      
+                      // Show success message (you can use a toast notification if available)
+                      console.log('Report downloaded successfully:', filename);
                     } catch (e: any) {
                       setError(e.message || 'Failed to download report');
+                    } finally {
+                      setLoading(false);
                     }
                   }}
                   disabled={loading}
                 >
-                  <Download size={16} />
-                  Download PDF Report
+                  <Download size={16} className={loading ? 'animate-spin' : ''} />
+                  {loading ? 'Downloading...' : 'Download Report'}
                 </button>
                 <button 
                   className="px-5 py-3 rounded-lg bg-gray-700 hover:bg-gray-600 font-semibold transition-colors flex items-center gap-2"
