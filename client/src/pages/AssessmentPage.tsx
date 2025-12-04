@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Radar, Globe, Server, Activity as ActivityIcon, Lock, AlertTriangle, Globe2, Building2, Zap } from 'lucide-react';
+import { Shield, Radar, Globe, Server, Activity as ActivityIcon, Lock, AlertTriangle, Globe2, Building2, Zap, FileText, History } from 'lucide-react';
 import { API_BASE_URL } from '@/lib/api';
 import { ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import jsPDF from 'jspdf';
@@ -2393,15 +2393,17 @@ const AssessmentPage: React.FC = () => {
                   const id = lastJobId || jobId;
                   if (id) navigate(`/osint/assessment/output?jobId=${encodeURIComponent(id)}`);
                 }}
-                className="px-5 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-semibold"
+                className="px-5 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-semibold flex items-center gap-2 transition-colors"
               >
-                📊 View Output
+                <FileText size={20} />
+                View Output
               </button>
               <button
                 onClick={() => navigate('/osint/assessment/history')}
-                className="px-5 py-3 rounded-lg bg-sky-600 hover:bg-sky-500 font-semibold"
+                className="px-5 py-3 rounded-lg bg-sky-600 hover:bg-sky-500 font-semibold flex items-center gap-2 transition-colors"
               >
-                📜 View History
+                <History size={20} />
+                View History
               </button>
             </div>
           )}
