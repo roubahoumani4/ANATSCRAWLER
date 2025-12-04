@@ -702,8 +702,80 @@ ${scan.parsed?.plainOutput || scan.stdout || 'No output available'}
       return res.status(400).json({ error: 'Invalid report path' });
     }
 
+    // If report file doesn't exist, generate report from scan data instead
     if (!fs.existsSync(real)) {
-      return res.status(404).json({ error: 'Report file not found on disk' });
+      console.log(`Report file not found at ${real}, generating from scan data instead`);
+      
+      // Generate comprehensive report content
+      let reportContent = `
+================================================================================
+                    ANAT SECURITY - OSINT Assessment Report
+================================================================================
+
+SCAN INFORMATION
+================================================================================
+Job ID:         ${jobId}
+Target:         ${scan.target}
+Status:         ${scan.status.toUpperCase()}
+Start Time:     ${scan.startTime ? new Date(scan.startTime).toLocaleString() : 'N/A'}
+End Time:       ${scan.endTime ? new Date(scan.endTime).toLocaleString() : 'N/A'}
+Duration:       ${scan.startTime && scan.endTime ? 
+                  Math.round((new Date(scan.endTime).getTime() - new Date(scan.startTime).getTime()) / 1000) + ' seconds' : 
+                  'N/A'}
+
+`;
+
+      // Add summary metrics if available
+      if (scan.parsed) {
+        reportContent += `
+ASSESSMENT SUMMARY
+================================================================================
+`;
+        if (scan.parsed.ipsDiscovered != null) reportContent += `IPs Discovered:          ${scan.parsed.ipsDiscovered}\n`;
+        if (scan.parsed.subdomainsFound != null) reportContent += `Subdomains Found:        ${scan.parsed.subdomainsFound}\n`;
+        if (scan.parsed.openPorts != null) reportContent += `Open Ports:              ${scan.parsed.openPorts}\n`;
+        if (scan.parsed.totalVulnerabilities != null) reportContent += `Total Vulnerabilities:   ${scan.parsed.totalVulnerabilities}\n`;
+        if (scan.parsed.criticalVulnerabilities != null) reportContent += `Critical Vulnerabilities: ${scan.parsed.criticalVulnerabilities}\n`;
+        if (scan.parsed.riskLevel) reportContent += `Risk Level:              ${scan.parsed.riskLevel}\n`;
+        reportContent += '\n';
+      }
+
+      // Add full scan output sections
+      if (scan.parsed?.sections && scan.parsed.sections.length > 0) {
+        reportContent += `
+DETAILED SCAN OUTPUT
+================================================================================
+
+`;
+        scan.parsed.sections.forEach((section: any) => {
+          reportContent += `
+${section.title}
+${'='.repeat(section.title.length)}
+
+${section.content}
+
+`;
+        });
+      } else {
+        // Fallback to plain output if sections not available
+        reportContent += `
+FULL SCAN OUTPUT
+================================================================================
+
+${scan.parsed?.plainOutput || scan.stdout || 'No output available'}
+
+`;
+      }
+
+      reportContent += `
+================================================================================
+                        End of Assessment Report
+================================================================================
+`;
+      
+      res.setHeader('Content-Type', 'text/plain');
+      res.setHeader('Content-Disposition', `attachment; filename="assessment_${scan.target}_${jobId.slice(0, 8)}.txt"`);
+      return res.send(reportContent);
     }
 
     // Convert markdown to PDF and send
