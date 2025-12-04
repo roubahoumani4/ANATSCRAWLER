@@ -427,6 +427,163 @@ router.get('/status/:jobId', async (req: Request, res: Response) => {
     }
   });
 
+// GET /dashboard/stats - Get aggregated dashboard statistics for the authenticated user
+router.get('/dashboard/stats', async (req: Request, res: Response) => {
+  try {
+    const ownerId = (req as any).user && (req as any).user._id ? (req as any).user._id : null;
+    if (!ownerId) return res.status(401).json({ error: 'User not authenticated' });
+
+    // Fetch all scans for this user
+    const allScans = await Scan.find({ owner: ownerId }).lean();
+
+    // Calculate basic metrics
+    const totalScans = allScans.length;
+    const completedScans = allScans.filter(s => s.status === 'finished').length;
+    const runningScans = allScans.filter(s => s.status === 'running').length;
+    const failedScans = allScans.filter(s => s.status === 'failed').length;
+    const uniqueTargets = new Set(allScans.map(s => s.target)).size;
+
+    // Calculate total vulnerabilities
+    let totalVulnerabilities = 0;
+    let criticalVulnerabilities = 0;
+    allScans.forEach(scan => {
+      if (scan.parsed?.totalVulnerabilities) {
+        totalVulnerabilities += scan.parsed.totalVulnerabilities;
+      }
+      if (scan.parsed?.criticalVulnerabilities) {
+        criticalVulnerabilities += scan.parsed.criticalVulnerabilities;
+      }
+    });
+
+    // Calculate average scan duration (in seconds)
+    let totalDuration = 0;
+    let durationCount = 0;
+    allScans.forEach(scan => {
+      if (scan.startTime && scan.endTime) {
+        const duration = (new Date(scan.endTime).getTime() - new Date(scan.startTime).getTime()) / 1000;
+        totalDuration += duration;
+        durationCount++;
+      }
+    });
+    const avgScanDuration = durationCount > 0 ? Math.round(totalDuration / durationCount) : 0;
+
+    // Status distribution
+    const statusCounts: Record<string, number> = {};
+    allScans.forEach(scan => {
+      statusCounts[scan.status] = (statusCounts[scan.status] || 0) + 1;
+    });
+    const statusDistribution = Object.entries(statusCounts).map(([name, value]) => ({
+      name: name.charAt(0).toUpperCase() + name.slice(1),
+      value,
+      color: name === 'finished' ? '#10b981' : 
+             name === 'running' ? '#f59e0b' : 
+             name === 'failed' ? '#ef4444' : 
+             name === 'aborted' ? '#8b5cf6' : '#6b7280'
+    }));
+
+    // Scans over time (last 30 days)
+    const scansOverTime: Array<{ date: string; count: number }> = [];
+    const today = new Date();
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      const count = allScans.filter(scan => {
+        if (!scan.startTime) return false;
+        const scanDate = new Date(scan.startTime).toISOString().split('T')[0];
+        return scanDate === dateStr;
+      }).length;
+      scansOverTime.push({ 
+        date: `${date.getMonth() + 1}/${date.getDate()}`, 
+        count 
+      });
+    }
+
+    // Risk levels distribution
+    const riskCounts: Record<string, number> = {};
+    allScans.forEach(scan => {
+      if (scan.parsed?.riskLevel) {
+        const level = scan.parsed.riskLevel;
+        riskCounts[level] = (riskCounts[level] || 0) + 1;
+      }
+    });
+    const riskLevels = Object.entries(riskCounts).map(([level, count]) => ({ level, count }));
+
+    // Top targets
+    const targetCounts: Record<string, { count: number; lastScan: Date | string }> = {};
+    allScans.forEach(scan => {
+      if (!targetCounts[scan.target]) {
+        targetCounts[scan.target] = { count: 0, lastScan: scan.startTime || '' };
+      }
+      targetCounts[scan.target].count++;
+      if (scan.startTime) {
+        const currentLast = targetCounts[scan.target].lastScan;
+        if (!currentLast || new Date(scan.startTime).getTime() > new Date(currentLast).getTime()) {
+          targetCounts[scan.target].lastScan = scan.startTime;
+        }
+      }
+    });
+    const topTargets = Object.entries(targetCounts)
+      .map(([target, data]) => ({ target, scans: data.count, lastScan: data.lastScan.toString() }))
+      .sort((a, b) => b.scans - a.scans)
+      .slice(0, 5);
+
+    // Vulnerability trends (last 10 scans with vulnerabilities)
+    const scansWithVulns = allScans
+      .filter(s => s.parsed?.totalVulnerabilities && s.startTime)
+      .sort((a, b) => new Date(b.startTime!).getTime() - new Date(a.startTime!).getTime())
+      .slice(0, 10)
+      .reverse();
+    
+    const vulnerabilityTrends = scansWithVulns.map(scan => {
+      const date = new Date(scan.startTime!).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      return {
+        date,
+        critical: scan.parsed?.criticalVulnerabilities || 0,
+        high: scan.parsed?.highVulnerabilities || 0,
+        medium: scan.parsed?.mediumVulnerabilities || 0,
+        low: scan.parsed?.lowVulnerabilities || 0,
+      };
+    });
+
+    // Recent activity (last 10 scans)
+    const recentActivity = allScans
+      .sort((a, b) => {
+        const aTime = a.startTime ? new Date(a.startTime).getTime() : 0;
+        const bTime = b.startTime ? new Date(b.startTime).getTime() : 0;
+        return bTime - aTime;
+      })
+      .slice(0, 10)
+      .map(scan => ({
+        jobId: scan.jobId,
+        target: scan.target,
+        status: scan.status,
+        startTime: scan.startTime || '',
+        vulnerabilities: scan.parsed?.totalVulnerabilities
+      }));
+
+    return res.json({
+      totalScans,
+      completedScans,
+      runningScans,
+      failedScans,
+      totalTargets: uniqueTargets,
+      totalVulnerabilities,
+      criticalVulnerabilities,
+      avgScanDuration,
+      scansOverTime,
+      statusDistribution,
+      riskLevels,
+      topTargets,
+      vulnerabilityTrends,
+      recentActivity,
+    });
+  } catch (err) {
+    console.error('Failed to fetch dashboard stats:', err);
+    return res.status(500).json({ error: (err as Error).message || 'Failed to fetch dashboard stats' });
+  }
+});
+
 // Cleanup old jobs (remove after 1 hour)
 setInterval(() => {
   const now = Date.now();

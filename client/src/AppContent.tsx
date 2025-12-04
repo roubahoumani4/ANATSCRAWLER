@@ -12,6 +12,7 @@ import SignupPage from '@/pages/SignupPage';
 import AssessmentPage from '@/pages/AssessmentPage';
 import OutputPage from '@/pages/OutputPage';
 import HistoryPage from '@/pages/HistoryPage';
+import OsintPlatformPage from '@/pages/OsintPlatformPage';
 
 // Layout Component
 import Layout from '@/components/layout/Layout';
@@ -47,6 +48,7 @@ export default function AppContent() {
         
         {/* Protected Routes */}
   <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+  <Route path="/osint" element={<ProtectedRoute><OsintPlatformPage /></ProtectedRoute>} />
   <Route path="/osint/assessment" element={<ProtectedRoute><AssessmentPage /></ProtectedRoute>} />
   <Route path="/osint/assessment/output" element={<ProtectedRoute><OutputPage /></ProtectedRoute>} />
   <Route path="/osint/assessment/history" element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
