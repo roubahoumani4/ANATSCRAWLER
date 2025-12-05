@@ -24,6 +24,11 @@ class LinkedInScraperService {
 
   constructor() {
     this.sessionCookie = process.env.LINKEDIN_SESSION_COOKIE || '';
+    console.log('LinkedIn Service Constructor - Cookie status:', {
+      exists: !!this.sessionCookie,
+      length: this.sessionCookie.length,
+      preview: this.sessionCookie.substring(0, 30) + '...'
+    });
   }
 
   /**
