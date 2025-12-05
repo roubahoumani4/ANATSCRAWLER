@@ -81,22 +81,15 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
       ]
     },
     {
-      path: "/discovery",
-      icon: <Shield size={20} />,
-      label: "Discovery",
-      color: "text-red-400",
-      hasSubmenu: true,
-      features: [
-        { path: "/discovery/linkedin", label: "LinkedIn Scraper", icon: <Linkedin size={16} />, color: "text-blue-400" }
-      ]
-    },
-    {
       path: "/analytics",
       icon: <Activity size={20} />,
       label: "Dark Web Monitoring",
       color: "text-cyan-400",
       hasSubmenu: true,
       features: [
+        { path: "/discovery", label: "Discovery", icon: <Shield size={16} />, color: "text-red-400", hasSubmenu: true, subFeatures: [
+          { path: "/discovery/linkedin", label: "LinkedIn Scraper", icon: <Linkedin size={16} />, color: "text-blue-400" }
+        ]},
         { path: "/analytics/network", label: "Infrastructure Mapping", icon: <Globe size={16} />, color: "text-blue-400" },
         { path: "/analytics/vulnerabilities", label: "Security Exposures", icon: <Bug size={16} />, color: "text-orange-400" }
       ]
@@ -185,19 +178,41 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
               {/* Submenu Items - Always Visible, Navigate to Parent Page */}
               {item.hasSubmenu && !collapsed && (
                 <div className="space-y-1 mb-2" style={{ marginLeft: '1.5rem' }}>
-                  {item.features?.map((feature) => (
-                    <Link key={feature.path} to={feature.path} className="no-underline">
-                      <div className={`flex items-center px-3 py-2 text-sm cursor-pointer rounded-lg transition-colors duration-200 
-                        ${location.pathname === feature.path 
-                          ? 'bg-gradient-to-r from-cyan-600/20 to-purple-600/20 border border-cyan-400/30 text-coolWhite' 
-                          : 'text-coolWhite hover:bg-darkGray hover:border hover:border-gray-700/50'
-                        }`}>
-                        <span className={feature.color || "text-gray-400"}>
-                          {feature.icon}
-                        </span>
-                        <span className="ml-3">{feature.label}</span>
-                      </div>
-                    </Link>
+                  {item.features?.map((feature: any) => (
+                    <div key={feature.path}>
+                      <Link to={feature.path} className="no-underline">
+                        <div className={`flex items-center px-3 py-2 text-sm cursor-pointer rounded-lg transition-colors duration-200 
+                          ${location.pathname === feature.path 
+                            ? 'bg-gradient-to-r from-cyan-600/20 to-purple-600/20 border border-cyan-400/30 text-coolWhite' 
+                            : 'text-coolWhite hover:bg-darkGray hover:border hover:border-gray-700/50'
+                          }`}>
+                          <span className={feature.color || "text-gray-400"}>
+                            {feature.icon}
+                          </span>
+                          <span className="ml-3">{feature.label}</span>
+                        </div>
+                      </Link>
+                      
+                      {/* Nested submenu for Discovery */}
+                      {feature.hasSubmenu && feature.subFeatures && (
+                        <div className="space-y-1 mt-1" style={{ marginLeft: '1.5rem' }}>
+                          {feature.subFeatures.map((subFeature: any) => (
+                            <Link key={subFeature.path} to={subFeature.path} className="no-underline">
+                              <div className={`flex items-center px-3 py-2 text-xs cursor-pointer rounded-lg transition-colors duration-200 
+                                ${location.pathname === subFeature.path 
+                                  ? 'bg-gradient-to-r from-cyan-600/20 to-purple-600/20 border border-cyan-400/30 text-coolWhite' 
+                                  : 'text-coolWhite hover:bg-darkGray hover:border hover:border-gray-700/50'
+                                }`}>
+                                <span className={subFeature.color || "text-gray-400"}>
+                                  {subFeature.icon}
+                                </span>
+                                <span className="ml-3">{subFeature.label}</span>
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               )}
