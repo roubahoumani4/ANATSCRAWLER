@@ -171,6 +171,21 @@ jobs:
               fi
             fi
 
+            echo "Installing Chromium dependencies for Puppeteer (LinkedIn scraper)"
+            if command -v sudo >/dev/null 2>&1; then
+              sudo apt-get update -y && sudo apt-get install -y \
+                gconf-service libasound2 libatk1.0-0 libc6 libcairo2 libcups2 \
+                libdbus-1-3 libexpat1 libfontconfig1 libgcc1 libgconf-2-4 \
+                libgdk-pixbuf2.0-0 libglib2.0-0 libgtk-3-0 libnspr4 libpango-1.0-0 \
+                libpangocairo-1.0-0 libstdc++6 libx11-6 libx11-xcb1 libxcb1 \
+                libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 \
+                libxrandr2 libxrender1 libxss1 libxtst6 ca-certificates \
+                fonts-liberation libnss3 lsb-release xdg-utils wget \
+                || echo "Warning: Failed to install some Chromium dependencies"
+            else
+              echo "Warning: sudo not available, cannot install Chromium dependencies"
+            fi
+
             echo "Installing runtime dependencies (prod only)..."
             if [ -f package-lock.json ]; then
               npm ci --omit=dev --no-audit --no-fund
@@ -241,7 +256,7 @@ jobs:
 
             echo "Writing .env with production secrets..."
             # Create .env file for runtime
-            cat > .env << 'EOF'
+            cat > .env << EOF
             NODE_ENV=production
             HOST=0.0.0.0
             PORT=5000
@@ -253,7 +268,7 @@ jobs:
             JWT_SECRET=${JWT_SECRET}
             COOKIE_SECRET=${COOKIE_SECRET}
             # LinkedIn Scraper
-            LINKEDIN_SESSION_COOKIE=${LINKEDIN_SESSION_COOKIE:-}
+            LINKEDIN_SESSION_COOKIE=${LINKEDIN_SESSION_COOKIE}
             # Optional MISP Integration
             MISP_URL=${MISP_URL:-}
             MISP_API_KEY=${MISP_API_KEY:-}
