@@ -147,6 +147,15 @@ async function startServer() {
       mongodb = { connect: async () => true }; // Mock MongoDB client
     }
 
+    // Initialize Mongoose connection for models (LinkedIn scraper, etc.)
+    try {
+      const { mongoDBService } = await import('./services/mongodb.service');
+      await mongoDBService.connect();
+      console.log('✅ Mongoose connected successfully');
+    } catch (error) {
+      console.warn('⚠️ Mongoose connection failed:', error instanceof Error ? error.message : 'Unknown error');
+    }
+
     // Create HTTP server
     httpServer = createServer(app);
 
