@@ -52,6 +52,25 @@ class LinkedInScraperService {
   }
 
   /**
+   * Normalize LinkedIn profile URL
+   * Removes spaces, ensures proper format
+   */
+  private normalizeLinkedInUrl(url: string): string {
+    // Remove spaces and replace with nothing (LinkedIn usernames don't have spaces)
+    let normalized = url.trim().replace(/\s+/g, '');
+    
+    // Ensure it starts with https://
+    if (!normalized.startsWith('http')) {
+      normalized = 'https://www.linkedin.com/in/' + normalized;
+    }
+    
+    // Remove trailing slash
+    normalized = normalized.replace(/\/$/, '');
+    
+    return normalized;
+  }
+
+  /**
    * Scrape a LinkedIn profile
    */
   async scrapeProfile(profileUrl: string, userId?: string): Promise<any> {
@@ -60,12 +79,14 @@ class LinkedInScraperService {
     }
 
     try {
-      console.log(`Scraping LinkedIn profile: ${profileUrl}`);
+      // Normalize the URL before scraping
+      const normalizedUrl = this.normalizeLinkedInUrl(profileUrl);
+      console.log(`Scraping LinkedIn profile: ${normalizedUrl}`);
       
-      const result: ScraperResult = await this.scraper.run(profileUrl);
+      const result: ScraperResult = await this.scraper.run(normalizedUrl);
       
-      // Save to database
-      const savedProfile = await this.saveProfile(profileUrl, result, userId);
+      // Save to database using normalized URL
+      const savedProfile = await this.saveProfile(normalizedUrl, result, userId);
       
       return {
         success: true,
