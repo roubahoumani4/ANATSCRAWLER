@@ -72,6 +72,7 @@
     "input-otp": "^1.4.2",
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^3.0.4",
+    "linkedin-profile-scraper": "^2.3.1",
     "lucide-react": "^0.453.0",
     "memorystore": "^1.6.7",
     "moment-timezone": "^0.5.48",
