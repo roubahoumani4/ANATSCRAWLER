@@ -85,13 +85,19 @@ const LinkedInScraperPage: React.FC = () => {
         credentials: 'include'
       });
 
-      if (!res.ok) throw new Error('Failed to fetch profiles');
+      if (!res.ok) {
+        // Don't show error for empty profiles, just log it
+        console.warn('Could not fetch profiles:', res.status);
+        setProfiles([]);
+        return;
+      }
 
       const data = await res.json();
       setProfiles(data.data.profiles || []);
     } catch (err: any) {
       console.error('Error fetching profiles:', err);
-      setError(err.message);
+      // Don't display error to user on initial load, just set empty array
+      setProfiles([]);
     }
   };
 
