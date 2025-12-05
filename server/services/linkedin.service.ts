@@ -38,9 +38,12 @@ class LinkedInScraperService {
       // Dynamically import the scraper (will be installed via npm)
       const { LinkedInProfileScraper } = await import('linkedin-profile-scraper');
       
+      console.log('Initializing LinkedIn scraper with cookie:', this.sessionCookie.substring(0, 20) + '...');
+      
       this.scraper = new LinkedInProfileScraper({
         sessionCookieValue: this.sessionCookie,
-        keepAlive: true // Keep alive for faster recurring scrapes
+        keepAlive: false, // Don't keep alive to ensure fresh session each time
+        timeout: 30000
       });
 
       await this.scraper.setup();
@@ -74,9 +77,9 @@ class LinkedInScraperService {
    * Scrape a LinkedIn profile
    */
   async scrapeProfile(profileUrl: string, userId?: string): Promise<any> {
-    if (!this.scraper) {
-      await this.initialize();
-    }
+    // Always reinitialize for each scrape to ensure fresh session
+    this.scraper = null;
+    await this.initialize();
 
     try {
       // Normalize the URL before scraping
@@ -88,6 +91,12 @@ class LinkedInScraperService {
       // Save to database using normalized URL
       const savedProfile = await this.saveProfile(normalizedUrl, result, userId);
       
+      // Clean up after scraping
+      if (this.scraper && this.scraper.close) {
+        await this.scraper.close();
+      }
+      this.scraper = null;
+      
       return {
         success: true,
         data: savedProfile,
@@ -95,6 +104,16 @@ class LinkedInScraperService {
       };
     } catch (error: any) {
       console.error('Error scraping LinkedIn profile:', error);
+      
+      // Clean up on error
+      if (this.scraper && this.scraper.close) {
+        try {
+          await this.scraper.close();
+        } catch (e) {
+          console.error('Error closing scraper:', e);
+        }
+      }
+      this.scraper = null;
       
       // Check if session expired
       if (error.name === 'SessionExpired') {
