@@ -82,13 +82,13 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
     {
       path: "/analytics",
       icon: <Activity size={20} />,
-      label: "Threat Analytics",
+      label: "Dark Web Monitoring",
       color: "text-cyan-400",
       hasSubmenu: true,
       features: [
-        { path: "/analytics/threats", label: "Threat Intelligence", icon: <Shield size={16} />, color: "text-red-400" },
-        { path: "/analytics/network", label: "Network Analysis", icon: <Globe size={16} />, color: "text-blue-400" },
-        { path: "/analytics/vulnerabilities", label: "Vulnerabilities", icon: <Bug size={16} />, color: "text-orange-400" }
+        { path: "/analytics/threats", label: "Discovery", icon: <Shield size={16} />, color: "text-red-400" },
+        { path: "/analytics/network", label: "Infrastructure Mapping", icon: <Globe size={16} />, color: "text-blue-400" },
+        { path: "/analytics/vulnerabilities", label: "Security Exposures", icon: <Bug size={16} />, color: "text-orange-400" }
       ]
     },
     {
