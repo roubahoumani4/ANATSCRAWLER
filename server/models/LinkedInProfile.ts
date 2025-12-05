@@ -7,7 +7,7 @@ export interface ILocation {
 }
 
 export interface IUserProfile {
-  fullName: string;
+  fullName?: string;
   title?: string;
   location?: ILocation;
   photo?: string;
@@ -71,7 +71,7 @@ const LocationSchema = new Schema({
 }, { _id: false });
 
 const UserProfileSchema = new Schema({
-  fullName: { type: String, required: true },
+  fullName: { type: String, required: false },
   title: { type: String },
   location: LocationSchema,
   photo: { type: String },
