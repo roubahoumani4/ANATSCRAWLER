@@ -30,42 +30,56 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
     // Only search the 'darkweb_structured' index
     const indexName = 'darkweb_structured';
     
+    // Normalize query: lowercase and remove extra spaces
+    const normalizedQuery = query.trim().toLowerCase().replace(/\s+/g, ' ');
+    
     // Split query into individual terms for multi-word searches
-    const queryTerms = query.trim().split(/\s+/);
+    const queryTerms = normalizedQuery.split(/\s+/);
     const searchFields = ["content", "fileName", "source", "context", "name", "first_name", "last_name", "phone", "email", "location", "link", "fileType", "extractionConfidence"];
     
-    // Build search clauses
-    const shouldClauses: any[] = [];
+    // Build search clauses - require ALL terms to match
+    const mustClauses: any[] = [];
     
-    // Add wildcard search for full query (exact phrase matching)
-    searchFields.forEach(field => {
-      shouldClauses.push({
-        wildcard: {
-          [field]: {
-            value: `*${query}*`,
-            case_insensitive: true,
-            boost: 3.0 // Higher boost for full phrase match
+    // For each term, create a should clause that matches across any field
+    queryTerms.forEach(term => {
+      const termShouldClauses: any[] = [];
+      
+      searchFields.forEach(field => {
+        // Exact substring match for this term
+        termShouldClauses.push({
+          wildcard: {
+            [field]: {
+              value: `*${term}*`,
+              case_insensitive: true
+            }
           }
-        }
+        });
       });
-    });
-    
-    // Add wildcard search for individual terms (for multi-word queries)
-    if (queryTerms.length > 1) {
-      queryTerms.forEach(term => {
+      
+      // Also check for the term without spaces (e.g., "roubaibrahim")
+      const queryWithoutSpaces = queryTerms.join('');
+      if (queryTerms.length > 1) {
         searchFields.forEach(field => {
-          shouldClauses.push({
+          termShouldClauses.push({
             wildcard: {
               [field]: {
-                value: `*${term}*`,
+                value: `*${queryWithoutSpaces}*`,
                 case_insensitive: true,
-                boost: 1.5 // Lower boost for individual terms
+                boost: 2.0 // Boost concatenated matches
               }
             }
           });
         });
+      }
+      
+      // Each term must match at least one field
+      mustClauses.push({
+        bool: {
+          should: termShouldClauses,
+          minimum_should_match: 1
+        }
       });
-    }
+    });
     
     const searchResponse = await fetch(`${elasticsearchUri}/${indexName}/_search`, {
       method: 'POST',
@@ -75,8 +89,7 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
       body: JSON.stringify({
         query: {
           bool: {
-            should: shouldClauses,
-            minimum_should_match: queryTerms.length > 1 ? queryTerms.length : 1 // All terms must match for multi-word queries
+            must: mustClauses // ALL terms must match (AND logic)
           }
         },
         highlight: {
