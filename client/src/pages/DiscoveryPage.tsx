@@ -65,36 +65,38 @@ const DiscoveryPage: React.FC = () => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen bg-jetBlack text-coolWhite p-6"
+      className="p-8 min-h-screen bg-jetBlack text-coolWhite"
     >
-      <div className="max-w-7xl mx-auto">
+      <div className="w-full">
         {/* Header Section */}
         <motion.div
-          className="mb-8"
+          className="mb-6"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
-          <div className="flex items-center mb-4">
-            <Shield className="w-10 h-10 mr-3 text-red-400" />
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-red-400 to-orange-500 bg-clip-text text-transparent">
-              Discovery - Dark Web Intelligence
-            </h1>
+          <div className="flex items-center space-x-4 mb-4">
+            <div className="p-3 rounded bg-red-700/10 text-red-400">
+              <Shield size={28} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-semibold">Discovery - Dark Web Intelligence</h1>
+              <p className="text-sm text-gray-400">
+                Search and discover compromised credentials and data from dark web sources
+              </p>
+            </div>
           </div>
-          <p className="text-gray-400 text-lg ml-13">
-            Search and discover compromised credentials and data from dark web sources
-          </p>
         </motion.div>
 
         {/* Search Section */}
         <motion.div
-          className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 border-2 border-red-400/20 rounded-2xl p-8 mb-8 backdrop-blur-sm"
+          className="mt-6 bg-gray-850 rounded-lg p-8 border border-gray-800 w-full"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
         >
           <motion.h3 
-            className="text-2xl font-bold text-red-400 mb-6 flex items-center"
+            className="text-lg font-semibold text-red-400 mb-6 flex items-center"
             animate={{
               textShadow: [
                 "0 0 20px rgba(248, 113, 113, 0.5)",
@@ -108,25 +110,25 @@ const DiscoveryPage: React.FC = () => {
             DARK WEB INTELLIGENCE SEARCH
           </motion.h3>
 
-          <div className="flex items-center space-x-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyPress={handleSearchKeyPress}
                 placeholder="Enter search terms for dark web reconnaissance..."
-                className="w-full pl-12 pr-4 py-4 bg-gray-800/50 border-2 border-red-400/20 rounded-xl text-white placeholder-gray-400 font-mono text-lg focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400/20 transition-all duration-300"
+                className="w-full pl-10 pr-4 py-2 bg-gray-800 text-white rounded disabled:opacity-50"
                 disabled={isSearching}
               />
               {isSearching && (
                 <motion.div
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2"
                   animate={{ rotate: 360 }}
                   transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                 >
-                  <Loader className="w-5 h-5 text-red-400" />
+                  <Loader className="w-4 h-4 text-red-400" />
                 </motion.div>
               )}
             </div>
@@ -134,24 +136,24 @@ const DiscoveryPage: React.FC = () => {
             <motion.button
               onClick={handleDarkWebSearch}
               disabled={isSearching || !searchQuery.trim()}
-              className="px-8 py-4 bg-gradient-to-r from-red-600 to-orange-700 text-white font-black rounded-xl border-2 border-red-400/50 hover:border-red-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg shadow-red-500/20"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white font-semibold rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
             >
               {isSearching ? (
-                <span className="flex items-center">
-                  <Loader className="w-5 h-5 mr-2 animate-spin" />
-                  SEARCHING...
+                <span className="flex items-center justify-center">
+                  <Loader className="w-4 h-4 mr-2 animate-spin" />
+                  Searching...
                 </span>
               ) : (
-                "SEARCH"
+                "Search"
               )}
             </motion.button>
           </div>
 
           {/* Status Indicators */}
           <motion.div
-            className="flex items-center justify-start space-x-6 mt-6"
+            className="flex items-center justify-start space-x-6 mt-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.8, delay: 0.4 }}
@@ -162,7 +164,7 @@ const DiscoveryPage: React.FC = () => {
             ].map((status, idx) => (
               <motion.div
                 key={idx}
-                className="flex items-center space-x-2 text-sm font-mono"
+                className="flex items-center space-x-2 text-xs"
                 animate={{
                   opacity: [0.7, 1, 0.7],
                 }}
@@ -172,7 +174,7 @@ const DiscoveryPage: React.FC = () => {
                   repeat: Infinity,
                 }}
               >
-                <status.icon className={`w-4 h-4 ${status.color}`} />
+                <status.icon className={`w-3 h-3 ${status.color}`} />
                 <span className="text-gray-400">{status.label}:</span>
                 <span className={status.color}>{status.status}</span>
               </motion.div>
@@ -183,25 +185,26 @@ const DiscoveryPage: React.FC = () => {
         {/* Search Results Section */}
         {showResults && (
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
+            className="mt-6"
           >
-            <div className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 border-2 border-red-400/20 rounded-2xl p-6 backdrop-blur-sm">
-              <h4 className="text-2xl font-black text-red-400 mb-6 flex items-center">
-                <Eye className="w-6 h-6 mr-2" />
-                RECONNAISSANCE RESULTS ({searchResults.length})
+            <div className="bg-gray-850 rounded-lg p-8 border border-gray-800 w-full">
+              <h4 className="text-lg font-semibold text-red-400 mb-6 flex items-center">
+                <Eye className="w-5 h-5 mr-2" />
+                Search Results ({searchResults.length})
               </h4>
               
               {searchResults.length === 0 ? (
                 <motion.div
-                  className="text-center py-12"
+                  className="text-center py-8"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ duration: 0.5 }}
                 >
-                  <Shield className="w-16 h-16 text-gray-500 mx-auto mb-4" />
-                  <p className="text-gray-400 text-lg">No results found for your search query.</p>
+                  <Shield className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+                  <p className="text-gray-400">No results found for your search query.</p>
                   <p className="text-gray-500 text-sm mt-2">Try different search terms or refine your query.</p>
                 </motion.div>
               ) : (
@@ -218,13 +221,13 @@ const DiscoveryPage: React.FC = () => {
         {/* Info Section - When no search performed yet */}
         {!showResults && !isSearching && (
           <motion.div
-            className="bg-gradient-to-br from-gray-800/20 to-gray-900/20 border-2 border-gray-700/30 rounded-2xl p-8"
+            className="mt-6 bg-gray-850 rounded-lg p-8 border border-gray-800 w-full"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
           >
-            <h3 className="text-xl font-bold text-gray-300 mb-4">Search Guidelines</h3>
-            <ul className="space-y-3 text-gray-400">
+            <h3 className="text-lg font-semibold text-gray-300 mb-4">Search Guidelines</h3>
+            <ul className="space-y-2 text-sm text-gray-400">
               <li className="flex items-start">
                 <span className="text-red-400 mr-2">•</span>
                 <span>Enter usernames, email addresses, phone numbers, or other identifiers</span>
