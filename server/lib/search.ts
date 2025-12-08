@@ -29,6 +29,44 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
   try {
     // Only search the 'darkweb_structured' index
     const indexName = 'darkweb_structured';
+    
+    // Split query into individual terms for multi-word searches
+    const queryTerms = query.trim().split(/\s+/);
+    const searchFields = ["content", "fileName", "source", "context", "name", "first_name", "last_name", "phone", "email", "location", "link", "fileType", "extractionConfidence"];
+    
+    // Build search clauses
+    const shouldClauses: any[] = [];
+    
+    // Add wildcard search for full query (exact phrase matching)
+    searchFields.forEach(field => {
+      shouldClauses.push({
+        wildcard: {
+          [field]: {
+            value: `*${query}*`,
+            case_insensitive: true,
+            boost: 3.0 // Higher boost for full phrase match
+          }
+        }
+      });
+    });
+    
+    // Add wildcard search for individual terms (for multi-word queries)
+    if (queryTerms.length > 1) {
+      queryTerms.forEach(term => {
+        searchFields.forEach(field => {
+          shouldClauses.push({
+            wildcard: {
+              [field]: {
+                value: `*${term}*`,
+                case_insensitive: true,
+                boost: 1.5 // Lower boost for individual terms
+              }
+            }
+          });
+        });
+      });
+    }
+    
     const searchResponse = await fetch(`${elasticsearchUri}/${indexName}/_search`, {
       method: 'POST',
       headers: {
@@ -37,19 +75,8 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
       body: JSON.stringify({
         query: {
           bool: {
-            should: [
-              // Only use wildcard queries for strict substring matching on all relevant fields
-              ...["content", "fileName", "source", "context", "name", "first_name", "last_name", "phone", "email", "location", "link", "fileType", "extractionConfidence"].map(field => ({
-                wildcard: {
-                  [field]: {
-                    value: `*${query}*`,
-                    case_insensitive: true,
-                    boost: 2.0
-                  }
-                }
-              }))
-            ],
-            minimum_should_match: 1
+            should: shouldClauses,
+            minimum_should_match: queryTerms.length > 1 ? queryTerms.length : 1 // All terms must match for multi-word queries
           }
         },
         highlight: {
