@@ -45,12 +45,57 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
       const termShouldClauses: any[] = [];
       
       searchFields.forEach(field => {
-        // Exact substring match for this term
+        // Use match query with operator AND for word-based matching
+        termShouldClauses.push({
+          match: {
+            [field]: {
+              query: term,
+              operator: "and",
+              fuzziness: "0" // No fuzzy matching, exact word only
+            }
+          }
+        });
+        
+        // Also add wildcard with word boundaries for fields that might have the term
         termShouldClauses.push({
           wildcard: {
             [field]: {
-              value: `*${term}*`,
-              case_insensitive: true
+              value: `${term}`,
+              case_insensitive: true,
+              boost: 2.0 // Boost exact matches
+            }
+          }
+        });
+        
+        // Add wildcard with space before and after for word boundary matching
+        termShouldClauses.push({
+          wildcard: {
+            [field]: {
+              value: `* ${term} *`,
+              case_insensitive: true,
+              boost: 1.8
+            }
+          }
+        });
+        
+        // Add wildcard for start of field
+        termShouldClauses.push({
+          wildcard: {
+            [field]: {
+              value: `${term} *`,
+              case_insensitive: true,
+              boost: 1.8
+            }
+          }
+        });
+        
+        // Add wildcard for end of field
+        termShouldClauses.push({
+          wildcard: {
+            [field]: {
+              value: `* ${term}`,
+              case_insensitive: true,
+              boost: 1.8
             }
           }
         });
@@ -61,11 +106,21 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
       if (queryTerms.length > 1) {
         searchFields.forEach(field => {
           termShouldClauses.push({
+            match: {
+              [field]: {
+                query: queryWithoutSpaces,
+                operator: "and",
+                fuzziness: "0"
+              }
+            }
+          });
+          
+          termShouldClauses.push({
             wildcard: {
               [field]: {
-                value: `*${queryWithoutSpaces}*`,
+                value: `${queryWithoutSpaces}`,
                 case_insensitive: true,
-                boost: 2.0 // Boost concatenated matches
+                boost: 2.5
               }
             }
           });
