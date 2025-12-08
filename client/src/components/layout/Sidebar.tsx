@@ -30,7 +30,6 @@ import {
   LogOut,
   FileText,
   History as HistoryIcon,
-  Linkedin,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -87,9 +86,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
       color: "text-cyan-400",
       hasSubmenu: true,
       features: [
-        { path: "/discovery", label: "Discovery", icon: <Shield size={16} />, color: "text-red-400", hasSubmenu: true, subFeatures: [
-          { path: "/discovery/linkedin", label: "LinkedIn Scraper", icon: <Linkedin size={16} />, color: "text-blue-400" }
-        ]},
+        { path: "/discovery", label: "Discovery", icon: <Shield size={16} />, color: "text-red-400" },
         { path: "/analytics/network", label: "Infrastructure Mapping", icon: <Globe size={16} />, color: "text-blue-400" },
         { path: "/analytics/vulnerabilities", label: "Security Exposures", icon: <Bug size={16} />, color: "text-orange-400" }
       ]
