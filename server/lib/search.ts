@@ -111,6 +111,32 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
     for (const line of lines) {
       const lineLower = line.toLowerCase();
       if (lineLower.includes(queryLower)) {
+        // First, try to parse the line as JSON
+        try {
+          let cleanedLine = line.trim();
+          if (cleanedLine.endsWith(',')) {
+            cleanedLine = cleanedLine.slice(0, -1);
+          }
+          const lineJson = JSON.parse(cleanedLine);
+          
+          // Extract email and hash from the parsed JSON line
+          const email = lineJson.email || lineJson.username || '';
+          const hash = lineJson.hash || lineJson.password || '';
+          
+          if (email || hash) {
+            console.log(`[ES Search] Extracted from JSON line - email: "${email}", hash: "${hash}"`);
+            matches.push({
+              username: email,
+              password: hash,
+              content: `${email}:${hash}`,
+              context: cleanedLine
+            });
+            continue;
+          }
+        } catch (jsonError) {
+          // Line is not JSON, continue with regex matching
+        }
+        
         // Try to extract email:password pattern
         const emailPasswordMatch = line.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}):(.+)/);
         if (emailPasswordMatch) {
