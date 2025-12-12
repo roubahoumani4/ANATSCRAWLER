@@ -84,25 +84,41 @@ const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
 
   // Extract email and password from context
   const extractCredentials = (result: SearchResult) => {
-    let email = result.email || result.name || '';
-    let password = result.password || '';
+    let email = '';
+    let password = '';
     
-    // Try to parse from context if it's JSON
+    // First, try to parse from context if it's JSON
     if (result.context) {
       const parsed = parseContext(result.context);
       if (parsed) {
         // Prioritize 'email' field for Email/Username column
-        email = parsed.email || parsed.username || result.email || result.name || '';
+        email = parsed.email || parsed.username || '';
         // Prioritize 'hash' field, then 'password' for Password column
-        password = parsed.hash || parsed.password || result.password || '';
+        password = parsed.hash || parsed.password || '';
+      }
+    }
+    
+    // If still empty, fall back to result fields (but avoid stringified JSON)
+    if (!email) {
+      // Check if result.email or result.name look like JSON strings
+      const emailCandidate = result.email || result.name || '';
+      if (emailCandidate && !emailCandidate.startsWith('{') && !emailCandidate.startsWith('[')) {
+        email = emailCandidate;
+      }
+    }
+    
+    if (!password) {
+      const passwordCandidate = result.password || '';
+      if (passwordCandidate && !passwordCandidate.startsWith('{') && !passwordCandidate.startsWith('[')) {
+        password = passwordCandidate;
       }
     }
     
     // Fallback to content field if available
-    if (!email && result.content) {
+    if (!email && result.content && !result.content.startsWith('{')) {
       email = result.content.split(':')[0] || '';
     }
-    if (!password && result.content && result.content.includes(':')) {
+    if (!password && result.content && result.content.includes(':') && !result.content.startsWith('{')) {
       password = result.content.split(':')[1] || '';
     }
     
