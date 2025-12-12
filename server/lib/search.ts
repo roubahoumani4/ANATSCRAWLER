@@ -39,6 +39,8 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
   const matches: MatchedEntry[] = [];
   const queryLower = query.toLowerCase();
   
+  console.log(`[ES Search] extractMatchingEntries called with content:`, content.substring(0, 200));
+  
   try {
     // Clean the content: remove trailing commas
     let cleanedContent = content.trim();
@@ -49,11 +51,16 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
     // Remove trailing commas before closing braces/brackets
     cleanedContent = cleanedContent.replace(/,(\s*[}\]])/g, '$1');
     
+    console.log(`[ES Search] Cleaned content:`, cleanedContent.substring(0, 200));
+    
     // Try to parse as JSON first
     const parsed = JSON.parse(cleanedContent);
     
+    console.log(`[ES Search] Successfully parsed JSON:`, parsed);
+    
     // Check if it has a content array (structured format)
     if (parsed.content && Array.isArray(parsed.content)) {
+      console.log(`[ES Search] Found content array with ${parsed.content.length} entries`);
       parsed.content.forEach((entry: any) => {
         // Extract all possible fields - prioritize email over username, hash over password
         const email = entry.email || entry.username || '';
@@ -94,8 +101,11 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
           context: JSON.stringify(parsed)
         });
       }
+    } else {
+      console.log(`[ES Search] Parsed JSON but no email/username field found:`, parsed);
     }
   } catch (e) {
+    console.log(`[ES Search] JSON parsing failed, falling back to text extraction:`, e);
     // If not JSON, try to extract email:password patterns from plain text
     const lines = content.split('\n');
     for (const line of lines) {
