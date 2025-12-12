@@ -379,7 +379,7 @@ router.get("/health", async (_req: Request, res: Response) => {
 });
 
 /**
- * Darkweb search endpoint - searches Elasticsearch darkweb_structured index
+ * Darkweb search endpoint - searches Elasticsearch darkweb_structured and files_index indices
  */
 router.post("/darkweb-search", async (req: Request, res: Response) => {
   try {
@@ -394,7 +394,7 @@ router.post("/darkweb-search", async (req: Request, res: Response) => {
 
     console.log(`[Darkweb Search] Searching Elasticsearch for: "${query}" at ${ELASTICSEARCH_URI}`);
     
-    // Use Elasticsearch to search darkweb_structured index
+    // Use Elasticsearch to search both darkweb_structured and files_index indices
     const results = await performElasticsearchSearch(query, ELASTICSEARCH_URI);
     
     // Apply limit
@@ -405,7 +405,7 @@ router.post("/darkweb-search", async (req: Request, res: Response) => {
       query,
       searchType: 'darkweb',
       elasticsearchUri: ELASTICSEARCH_URI,
-      index: 'darkweb_structured',
+      indices: ['darkweb_structured', 'files_index'],
       totalResults: results.length,
       limitedResults: limitedResults.length,
       limit: limit || null,

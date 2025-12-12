@@ -198,10 +198,18 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
       });
 
       const searchData = await searchResponse.json() as any;
+      console.log(`[ES Search] ${indexName} response status: ${searchResponse.status}`);
+      console.log(`[ES Search] ${indexName} hits:`, searchData.hits?.total?.value || 0);
+      
       if (searchResponse.ok && searchData.hits && searchData.hits.hits) {
+        console.log(`[ES Search] Adding ${searchData.hits.hits.length} results from ${indexName}`);
         allResults.push(...searchData.hits.hits);
+      } else {
+        console.log(`[ES Search] No results from ${indexName}:`, searchData.error || 'Unknown error');
       }
     } // End of for loop
+    
+    console.log(`[ES Search] Total results from all indices: ${allResults.length}`);
     
     // Sort all results by score
     allResults.sort((a, b) => b._score - a._score);
@@ -211,6 +219,8 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
 
     // Process results and extract individual matches from files_index
     const processedResults: any[] = [];
+    
+    console.log(`[ES Search] Processing ${topResults.length} top results`);
     
     for (const hit of topResults) {
       // If this is from files_index, parse the content and extract matching entries
@@ -293,9 +303,10 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
       }
     }
 
+    console.log(`[ES Search] Final processed results: ${processedResults.length}`);
     return processedResults.slice(0, 100);
   } catch (error) {
-    console.error('Search error:', error);
+    console.error('[ES Search] Error:', error);
     throw error;
   }
 }
