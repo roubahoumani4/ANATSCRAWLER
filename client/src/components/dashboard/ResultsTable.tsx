@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useLanguage } from "@/context/LanguageContext";
+import { useState } from "react";
 
 interface SearchResult {
   id?: string;
@@ -48,6 +49,105 @@ const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
   // Helper function to clean and format highlights
   const formatHighlight = (highlight: string) => {
     return highlight.replace(/<\/?mark>/g, '');
+  };
+
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  const toggleExpand = (id: string) => {
+    setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      // optionally show a toast
+    } catch (e) {
+      console.error('copy failed', e);
+    }
+  };
+
+  const renderContextContent = (result: SearchResult) => {
+    const ctx = result.context;
+    const highlights = result.highlights || [];
+
+    // If highlights exist, prefer showing them
+    if (highlights.length > 0) {
+      return (
+        <div className="space-y-2">
+          {highlights.map((h, i) => (
+            <div key={i} className="text-xs md:text-sm bg-coolWhite/6 rounded p-2 break-words" dangerouslySetInnerHTML={{ __html: h }} />
+          ))}
+        </div>
+      );
+    }
+
+    // Try parse JSON-like content
+    try {
+      const parsed = typeof ctx === 'string' ? JSON.parse(ctx) : ctx;
+
+      // If parsed is an array of objects (common for files_index content)
+      if (Array.isArray(parsed)) {
+        return (
+          <div className="space-y-2">
+            {parsed.slice(0, 6).map((entry: any, idx: number) => (
+              <div key={idx} className="p-2 bg-coolWhite/6 rounded break-words">
+                {typeof entry === 'object' ? (
+                  <div className="grid grid-cols-2 gap-2 text-xs md:text-sm">
+                    {Object.entries(entry).map(([k, v]) => (
+                      <div key={k} className="flex items-start gap-2">
+                        <span className="font-mono text-xxs text-cyan-200">{k}:</span>
+                        <span className="break-all">{String(v)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm">{String(entry)}</div>
+                )}
+              </div>
+            ))}
+            {parsed.length > 6 && (
+              <div className="text-xs text-gray-400">+{parsed.length - 6} more entries</div>
+            )}
+          </div>
+        );
+      }
+
+      // If parsed is an object, render key/value pairs nicely
+      if (typeof parsed === 'object' && parsed !== null) {
+        return (
+          <div className="p-2 bg-coolWhite/6 rounded break-words text-xs md:text-sm">
+            <div className="grid grid-cols-2 gap-2">
+              {Object.entries(parsed).map(([k, v]) => (
+                <div key={k} className="flex items-start gap-2">
+                  <span className="font-mono text-xxs text-cyan-200 w-28">{k}:</span>
+                  <span className="break-all">{String(v)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      }
+    } catch (e) {
+      // Not JSON
+    }
+
+    // Fallback: show text with truncation and toggle
+    const short = String(ctx || result.highlights?.[0] || '-');
+    const id = result.id || String(Math.random());
+    const isExp = !!expanded[id];
+    const truncated = short.length > 240 ? `${short.slice(0, 240)}...` : short;
+
+    return (
+      <div className="space-y-2">
+        <div className="text-xs md:text-sm bg-coolWhite/6 rounded p-2 break-words">{isExp ? short : truncated}</div>
+        {short.length > 240 && (
+          <div className="flex gap-2">
+            <button onClick={() => toggleExpand(id)} className="text-xs text-blue-300 underline">{isExp ? 'Show less' : 'Show more'}</button>
+            <button onClick={() => copyToClipboard(short)} className="text-xs text-green-300 underline">Copy</button>
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -115,18 +215,8 @@ const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
                         ))}
                       </div>
                     </td>
-                    <td className="p-3 border-b border-coolWhite">
-                      <div className="space-y-2">
-                        {result.highlights?.length > 0 ? (
-                          result.highlights.map((highlight, i) => (
-                            <div key={i} className="text-xs md:text-sm bg-coolWhite/10 rounded p-2" dangerouslySetInnerHTML={{ 
-                              __html: highlight 
-                            }} />
-                          ))
-                        ) : (
-                          <div className="text-xs md:text-sm bg-coolWhite/10 rounded p-2">{result.context}</div>
-                        )}
-                      </div>
+                    <td className="p-3 border-b border-coolWhite align-top">
+                      {renderContextContent(result)}
                     </td>
                   </motion.tr>
                 ))}
