@@ -241,6 +241,12 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
         
         // Create a separate result for each matching entry (up to 10 per file)
         matches.slice(0, 10).forEach((match, index) => {
+          console.log(`[ES Search] Match extracted:`, {
+            username: match.username,
+            password: match.password,
+            context: match.context
+          });
+          
           processedResults.push({
             id: `${hit._id}_${index}`,
             score: hit._score,
