@@ -46,17 +46,23 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
     // Check if it has a content array (structured format)
     if (parsed.content && Array.isArray(parsed.content)) {
       parsed.content.forEach((entry: any) => {
+        // Extract all possible fields
         const username = entry.username || '';
         const password = entry.password || '';
-        const combined = `${username}:${password}`.toLowerCase();
+        const email = entry.email || username;
+        const hash = entry.hash || password;
         
-        // Check if the query matches the username or password
-        if (combined.includes(queryLower) || username.toLowerCase().includes(queryLower)) {
+        const combined = `${email}:${hash}`.toLowerCase();
+        
+        // Check if the query matches any field
+        if (combined.includes(queryLower) || 
+            email.toLowerCase().includes(queryLower) ||
+            hash.toLowerCase().includes(queryLower)) {
           matches.push({
-            username,
-            password,
-            content: `${username}:${password}`,
-            context: `Email: ${username}, Password: ${password}`
+            username: email,
+            password: hash,
+            content: `${email}:${hash}`,
+            context: JSON.stringify(entry) // Pass the full entry as JSON context
           });
         }
       });
