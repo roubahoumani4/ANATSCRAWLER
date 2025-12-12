@@ -49,11 +49,9 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
     // Check if it has a content array (structured format)
     if (parsed.content && Array.isArray(parsed.content)) {
       parsed.content.forEach((entry: any) => {
-        // Extract all possible fields
-        const username = entry.username || '';
-        const password = entry.password || '';
-        const email = entry.email || username;
-        const hash = entry.hash || password;
+        // Extract all possible fields - prioritize email over username, hash over password
+        const email = entry.email || entry.username || '';
+        const hash = entry.hash || entry.password || '';
         
         const combined = `${email}:${hash}`.toLowerCase();
         
