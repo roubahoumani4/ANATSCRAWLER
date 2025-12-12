@@ -66,6 +66,24 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
           });
         }
       });
+    } else if (parsed.email || parsed.username) {
+      // Handle single JSON object (not an array)
+      const email = parsed.email || parsed.username || '';
+      const hash = parsed.hash || parsed.password || '';
+      
+      const combined = `${email}:${hash}`.toLowerCase();
+      
+      // Check if the query matches any field
+      if (combined.includes(queryLower) || 
+          email.toLowerCase().includes(queryLower) ||
+          hash.toLowerCase().includes(queryLower)) {
+        matches.push({
+          username: email,
+          password: hash,
+          content: `${email}:${hash}`,
+          context: JSON.stringify(parsed)
+        });
+      }
     }
   } catch (e) {
     // If not JSON, try to extract email:password patterns from plain text
