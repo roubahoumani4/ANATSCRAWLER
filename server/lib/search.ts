@@ -27,8 +27,8 @@ interface ElasticsearchHit {
 
 export async function performElasticsearchSearch(query: string, elasticsearchUri: string): Promise<SearchResult[]> {
   try {
-    // Only search the 'darkweb_structured' index
-    const indexName = 'darkweb_structured';
+    // Search both 'darkweb_structured' and 'files_index' indices
+    const indices = ['darkweb_structured', 'files_index'];
     
     // Normalize query: lowercase and remove extra spaces
     const normalizedQuery = query.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -136,6 +136,54 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
       });
     });
     
+    // Search both indices
+    const allResults: any[] = [];
+    
+    for (const indexName of indices) {
+      // For files_index, we want to search the content field primarily
+      const fieldsToSearch = indexName === 'files_index' 
+        ? ["content", "file_name"] 
+        : searchFields;
+      
+      // Rebuild must clauses for this specific index
+      const indexMustClauses: any[] = [];
+      
+      queryTerms.forEach(term => {
+        const termShouldClauses: any[] = [];
+        
+        fieldsToSearch.forEach(field => {
+          // Use match query with operator AND for word-based matching
+          termShouldClauses.push({
+            match: {
+              [field]: {
+                query: term,
+                operator: "and",
+                fuzziness: "0" // No fuzzy matching, exact word only
+              }
+            }
+          });
+          
+          // Also add wildcard with word boundaries for fields that might have the term
+          termShouldClauses.push({
+            wildcard: {
+              [field]: {
+                value: `*${term}*`,
+                case_insensitive: true,
+                boost: 2.0 // Boost exact matches
+              }
+            }
+          });
+        });
+        
+        // Each term must match at least one field
+        indexMustClauses.push({
+          bool: {
+            should: termShouldClauses,
+            minimum_should_match: 1
+          }
+        });
+      });
+    
     const searchResponse = await fetch(`${elasticsearchUri}/${indexName}/_search`, {
       method: 'POST',
       headers: {
@@ -144,7 +192,7 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
       body: JSON.stringify({
         query: {
           bool: {
-            must: mustClauses // ALL terms must match (AND logic)
+            must: indexMustClauses // ALL terms must match (AND logic)
           }
         },
         highlight: {
@@ -157,7 +205,9 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
             }
           }
         },
-        _source: [
+        _source: indexName === 'files_index' 
+          ? ["content", "file_name", "file_path", "file_type", "file_size"]
+          : [
           "content",
           "fileName",
           "timestamp",
@@ -184,20 +234,31 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
         ],
         size: 100,
         sort: [
-          { _score: "desc" },
-          { timestamp: { order: "desc" }}
+          { _score: "desc" }
         ]
       })
     });
 
     const searchData = await searchResponse.json() as any;
-    if (!searchResponse.ok) {
-      throw new Error(searchData.error?.reason || 'Search failed');
+    if (searchResponse.ok && searchData.hits && searchData.hits.hits) {
+      allResults.push(...searchData.hits.hits);
     }
+    } // End of for loop
+    
+    // Sort all results by score
+    allResults.sort((a, b) => b._score - a._score);
+    
+    // Take top 100 results
+    const topResults = allResults.slice(0, 100);
 
-    return searchData.hits.hits.map((hit: any) => ({
+    return topResults.map((hit: any) => ({
       id: hit._id,
       score: hit._score,
+      source: hit._source.source || hit._source.file_path || hit._index,
+      fileName: hit._source.fileName || hit._source.file_name || '',
+      content: hit._source.content || '',
+      timestamp: hit._source.timestamp || '',
+      collection: hit._index,
       matchedTerms: hit.matchedTerms || [],
       highlights: hit.highlight?.content || [],
       context: hit._source.context || '',
@@ -217,9 +278,11 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
       link2: hit._source.link2 || '',
       protocol: hit._source.protocol || '',
       social_link: hit._source.social_link || '',
-      fileType: hit._source.fileType || '',
+      fileType: hit._source.fileType || hit._source.file_type || '',
       extractionConfidence: hit._source.extractionConfidence || '',
       exposed: hit._source.exposed || [],
+      file_size: hit._source.file_size || 0,
+      file_path: hit._source.file_path || '',
     }));
   } catch (error) {
     console.error('Search error:', error);
