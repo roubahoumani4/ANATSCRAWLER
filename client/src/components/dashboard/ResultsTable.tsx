@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useLanguage } from "@/context/LanguageContext";
+import { Copy, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 
 interface SearchResult {
@@ -16,6 +17,9 @@ interface SearchResult {
   phone?: string;
   location?: string;
   link?: string;
+  email?: string;
+  password?: string;
+  content?: string;
 }
 
 interface ResultsTableProps {
@@ -26,6 +30,8 @@ interface ResultsTableProps {
 
 const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
   const { translate } = useLanguage();
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   const tableVariants = {
     hidden: { opacity: 0 },
@@ -46,108 +52,51 @@ const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
     }
   };
 
-  // Helper function to clean and format highlights
-  const formatHighlight = (highlight: string) => {
-    return highlight.replace(/<\/?mark>/g, '');
+  const toggleRow = (index: number) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(index)) {
+      newExpanded.delete(index);
+    } else {
+      newExpanded.add(index);
+    }
+    setExpandedRows(newExpanded);
   };
 
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-
-  const toggleExpand = (id: string) => {
-    setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  const copyToClipboard = async (text: string) => {
+  const copyToClipboard = async (text: string, index: number) => {
     try {
       await navigator.clipboard.writeText(text);
-      // optionally show a toast
-    } catch (e) {
-      console.error('copy failed', e);
+      setCopiedIndex(index);
+      setTimeout(() => setCopiedIndex(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
     }
   };
 
-  const renderContextContent = (result: SearchResult) => {
-    const ctx = result.context;
-    const highlights = result.highlights || [];
-
-    // If highlights exist, prefer showing them
-    if (highlights.length > 0) {
-      return (
-        <div className="space-y-2">
-          {highlights.map((h, i) => (
-            <div key={i} className="text-xs md:text-sm bg-coolWhite/6 rounded p-2 break-words" dangerouslySetInnerHTML={{ __html: h }} />
-          ))}
-        </div>
-      );
-    }
-
-    // Try parse JSON-like content
+  // Parse context to extract key-value pairs
+  const parseContext = (context: string) => {
     try {
-      const parsed = typeof ctx === 'string' ? JSON.parse(ctx) : ctx;
-
-      // If parsed is an array of objects (common for files_index content)
-      if (Array.isArray(parsed)) {
-        return (
-          <div className="space-y-2">
-            {parsed.slice(0, 6).map((entry: any, idx: number) => (
-              <div key={idx} className="p-2 bg-coolWhite/6 rounded break-words">
-                {typeof entry === 'object' ? (
-                  <div className="grid grid-cols-2 gap-2 text-xs md:text-sm">
-                    {Object.entries(entry).map(([k, v]) => (
-                      <div key={k} className="flex items-start gap-2">
-                        <span className="font-mono text-xxs text-cyan-200">{k}:</span>
-                        <span className="break-all">{String(v)}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-sm">{String(entry)}</div>
-                )}
-              </div>
-            ))}
-            {parsed.length > 6 && (
-              <div className="text-xs text-gray-400">+{parsed.length - 6} more entries</div>
-            )}
-          </div>
-        );
-      }
-
-      // If parsed is an object, render key/value pairs nicely
-      if (typeof parsed === 'object' && parsed !== null) {
-        return (
-          <div className="p-2 bg-coolWhite/6 rounded break-words text-xs md:text-sm">
-            <div className="grid grid-cols-2 gap-2">
-              {Object.entries(parsed).map(([k, v]) => (
-                <div key={k} className="flex items-start gap-2">
-                  <span className="font-mono text-xxs text-cyan-200 w-28">{k}:</span>
-                  <span className="break-all">{String(v)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      }
-    } catch (e) {
-      // Not JSON
+      const parsed = JSON.parse(context);
+      return parsed;
+    } catch {
+      return null;
     }
+  };
 
-    // Fallback: show text with truncation and toggle
-    const short = String(ctx || result.highlights?.[0] || '-');
-    const id = result.id || String(Math.random());
-    const isExp = !!expanded[id];
-    const truncated = short.length > 240 ? `${short.slice(0, 240)}...` : short;
-
-    return (
-      <div className="space-y-2">
-        <div className="text-xs md:text-sm bg-coolWhite/6 rounded p-2 break-words">{isExp ? short : truncated}</div>
-        {short.length > 240 && (
-          <div className="flex gap-2">
-            <button onClick={() => toggleExpand(id)} className="text-xs text-blue-300 underline">{isExp ? 'Show less' : 'Show more'}</button>
-            <button onClick={() => copyToClipboard(short)} className="text-xs text-green-300 underline">Copy</button>
-          </div>
-        )}
-      </div>
-    );
+  // Extract email and password from context
+  const extractCredentials = (result: SearchResult) => {
+    let email = result.email || result.name || '';
+    let password = result.password || '';
+    
+    // Try to parse from context if it's JSON
+    if (result.context) {
+      const parsed = parseContext(result.context);
+      if (parsed) {
+        email = parsed.username || parsed.email || email;
+        password = parsed.password || password;
+      }
+    }
+    
+    return { email, password };
   };
 
   return (
@@ -157,69 +106,162 @@ const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5, delay: 0.2 }}
     >
-      <div className="w-full max-w-6xl">
-        <div className="results-container max-h-[500px] overflow-auto border border-coolWhite rounded-lg shadow-lg bg-gradient-to-br from-[#181c24] to-[#23272f]">
+      <div className="w-full max-w-7xl">
+        <div className="results-container max-h-[600px] overflow-auto border border-coolWhite rounded-lg shadow-2xl bg-gradient-to-br from-[#181c24] to-[#23272f]">
           <motion.table 
-            className="results-table w-full border-collapse text-coolWhite text-sm md:text-base"
+            className="results-table w-full border-collapse text-coolWhite text-sm"
             variants={tableVariants}
             initial="hidden"
             animate="visible"
           >
             <thead>
-              <tr>
-                <th className="p-3 border-b border-coolWhite bg-gradient-to-r from-[#23272f] to-[#181c24] sticky top-0 z-10 text-left font-semibold tracking-wide">#</th>
-                <th className="p-3 border-b border-coolWhite bg-gradient-to-r from-[#23272f] to-[#181c24] sticky top-0 z-10 text-left font-semibold tracking-wide">Score</th>
-                <th className="p-3 border-b border-coolWhite bg-gradient-to-r from-[#23272f] to-[#181c24] sticky top-0 z-10 text-left font-semibold tracking-wide">Name</th>
-                <th className="p-3 border-b border-coolWhite bg-gradient-to-r from-[#23272f] to-[#181c24] sticky top-0 z-10 text-left font-semibold tracking-wide">Phone</th>
-                <th className="p-3 border-b border-coolWhite bg-gradient-to-r from-[#23272f] to-[#181c24] sticky top-0 z-10 text-left font-semibold tracking-wide">Location</th>
-                <th className="p-3 border-b border-coolWhite bg-gradient-to-r from-[#23272f] to-[#181c24] sticky top-0 z-10 text-left font-semibold tracking-wide">Link</th>
-                <th className="p-3 border-b border-coolWhite bg-gradient-to-r from-[#23272f] to-[#181c24] sticky top-0 z-10 text-left font-semibold tracking-wide">Matched Terms</th>
-                <th className="p-3 border-b border-coolWhite bg-gradient-to-r from-[#23272f] to-[#181c24] sticky top-0 z-10 text-left font-semibold tracking-wide">Context</th>
+              <tr className="bg-gradient-to-r from-[#23272f] to-[#181c24] sticky top-0 z-10">
+                <th className="p-3 border-b border-coolWhite text-left font-semibold tracking-wide w-12">#</th>
+                <th className="p-3 border-b border-coolWhite text-left font-semibold tracking-wide w-20">Score</th>
+                <th className="p-3 border-b border-coolWhite text-left font-semibold tracking-wide">Email/Username</th>
+                <th className="p-3 border-b border-coolWhite text-left font-semibold tracking-wide">Password</th>
+                <th className="p-3 border-b border-coolWhite text-left font-semibold tracking-wide">Source</th>
+                <th className="p-3 border-b border-coolWhite text-left font-semibold tracking-wide w-24">Actions</th>
               </tr>
             </thead>
             <tbody>
               <AnimatePresence>
-                {results.map((result, index) => (
-                  <motion.tr 
-                    key={result.id || index}
-                    className="hover:bg-crimsonRed/80 hover:text-coolWhite transition-colors duration-200 group"
-                    variants={rowVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.3 }}
-                    layoutId={`result-${result.id || index}`}
-                  >
-                    <td className="p-3 border-b border-coolWhite font-mono text-xs md:text-base">{index + 1}</td>
-                    <td className="p-3 border-b border-coolWhite">
-                      <span className="inline-block px-2 py-1 rounded bg-gradient-to-r from-green-500 to-green-700 text-black font-bold text-xs md:text-sm">
-                        {result.score.toFixed(2)}
-                      </span>
-                    </td>
-                    <td className="p-3 border-b border-coolWhite font-semibold text-cyan-300 group-hover:text-white transition-colors">{result.name || [result.first_name, result.last_name].filter(Boolean).join(' ') || '-'}</td>
-                    <td className="p-3 border-b border-coolWhite font-mono text-yellow-200 group-hover:text-white transition-colors">{result.phone || '-'}</td>
-                    <td className="p-3 border-b border-coolWhite text-purple-200 group-hover:text-white transition-colors">{result.location || '-'}</td>
-                    <td className="p-3 border-b border-coolWhite">
-                      {result.link ? (
-                        <a href={result.link.startsWith('http') ? result.link : `https://${result.link}`} target="_blank" rel="noopener noreferrer" className="underline text-blue-400 hover:text-blue-200 break-all">
-                          {result.link}
-                        </a>
-                      ) : '-'}
-                    </td>
-                    <td className="p-3 border-b border-coolWhite">
-                      <div className="flex flex-wrap gap-1">
-                        {result.matchedTerms.map((term, i) => (
-                          <span key={i} className="bg-crimsonRed/40 px-2 py-1 rounded text-xs font-mono text-white">
-                            {term}
+                {results.map((result, index) => {
+                  const { email, password } = extractCredentials(result);
+                  const isExpanded = expandedRows.has(index);
+                  const parsed = parseContext(result.context);
+                  
+                  return (
+                    <>
+                      <motion.tr 
+                        key={result.id || index}
+                        className="hover:bg-crimsonRed/20 transition-colors duration-200 border-b border-coolWhite/30"
+                        variants={rowVariants}
+                        initial="hidden"
+                        animate="visible"
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.3 }}
+                        layoutId={`result-${result.id || index}`}
+                      >
+                        <td className="p-3 font-mono text-xs text-gray-400">{index + 1}</td>
+                        <td className="p-3">
+                          <span className="inline-block px-2 py-1 rounded-md bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold text-xs shadow-md">
+                            {result.score.toFixed(2)}
                           </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="p-3 border-b border-coolWhite align-top">
-                      {renderContextContent(result)}
-                    </td>
-                  </motion.tr>
-                ))}
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <code className="bg-blue-900/30 px-2 py-1 rounded text-blue-300 font-mono text-xs break-all">
+                              {email || '-'}
+                            </code>
+                            {email && (
+                              <button
+                                onClick={() => copyToClipboard(email, index * 2)}
+                                className="p-1 hover:bg-white/10 rounded transition-colors"
+                                title="Copy email"
+                              >
+                                {copiedIndex === index * 2 ? (
+                                  <span className="text-green-400 text-xs">✓</span>
+                                ) : (
+                                  <Copy size={14} className="text-gray-400" />
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <code className="bg-red-900/30 px-2 py-1 rounded text-red-300 font-mono text-xs break-all max-w-xs overflow-hidden text-ellipsis">
+                              {password || '-'}
+                            </code>
+                            {password && (
+                              <button
+                                onClick={() => copyToClipboard(password, index * 2 + 1)}
+                                className="p-1 hover:bg-white/10 rounded transition-colors"
+                                title="Copy password"
+                              >
+                                {copiedIndex === index * 2 + 1 ? (
+                                  <span className="text-green-400 text-xs">✓</span>
+                                ) : (
+                                  <Copy size={14} className="text-gray-400" />
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <div className="text-xs text-gray-400 max-w-xs truncate" title={result.source}>
+                            {result.source?.split('/').pop() || result.index}
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <button
+                            onClick={() => toggleRow(index)}
+                            className="flex items-center gap-1 px-2 py-1 bg-purple-900/30 hover:bg-purple-900/50 rounded text-purple-300 text-xs font-semibold transition-colors"
+                          >
+                            {isExpanded ? (
+                              <>
+                                <EyeOff size={14} />
+                                Hide
+                              </>
+                            ) : (
+                              <>
+                                <Eye size={14} />
+                                View
+                              </>
+                            )}
+                          </button>
+                        </td>
+                      </motion.tr>
+                      
+                      {isExpanded && (
+                        <motion.tr
+                          key={`${result.id || index}-expanded`}
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="bg-[#1a1e26]"
+                        >
+                          <td colSpan={6} className="p-4 border-b border-coolWhite/30">
+                            <div className="space-y-3">
+                              <h4 className="text-sm font-bold text-cyan-400 mb-2">Full Details</h4>
+                              
+                              {parsed ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  {Object.entries(parsed).map(([key, value]) => (
+                                    <div key={key} className="bg-black/30 p-2 rounded">
+                                      <div className="text-xs text-gray-400 font-semibold mb-1">{key}</div>
+                                      <code className="text-xs text-white break-all">{String(value)}</code>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="bg-black/40 p-3 rounded font-mono text-xs text-gray-300 overflow-x-auto">
+                                  {result.context || result.content || 'No additional data'}
+                                </div>
+                              )}
+                              
+                              {result.highlights && result.highlights.length > 0 && (
+                                <div className="mt-3">
+                                  <h5 className="text-xs font-semibold text-yellow-400 mb-2">Matched Content</h5>
+                                  <div className="space-y-1">
+                                    {result.highlights.map((highlight, i) => (
+                                      <div 
+                                        key={i} 
+                                        className="bg-yellow-900/20 border border-yellow-600/30 p-2 rounded text-xs"
+                                        dangerouslySetInnerHTML={{ __html: highlight }}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </motion.tr>
+                      )}
+                    </>
+                  );
+                })}
               </AnimatePresence>
             </tbody>
           </motion.table>
