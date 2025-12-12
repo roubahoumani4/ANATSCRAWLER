@@ -99,169 +99,51 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
     // Search both 'darkweb_structured' and 'files_index' indices
     const indices = ['darkweb_structured', 'files_index'];
     
-    // Normalize query: lowercase and remove extra spaces
-    const normalizedQuery = query.trim().toLowerCase().replace(/\s+/g, ' ');
+    // Normalize query: trim whitespace
+    const normalizedQuery = query.trim();
     
-    // Split query into individual terms for multi-word searches
-    const queryTerms = normalizedQuery.split(/\s+/);
-    const searchFields = ["content", "fileName", "source", "context", "name", "first_name", "last_name", "phone", "email", "location", "link", "fileType", "extractionConfidence"];
-    
-    // Build search clauses - require ALL terms to match
-    const mustClauses: any[] = [];
-    
-    // For each term, create a should clause that matches across any field
-    queryTerms.forEach(term => {
-      const termShouldClauses: any[] = [];
-      
-      searchFields.forEach(field => {
-        // Use match query with operator AND for word-based matching
-        termShouldClauses.push({
-          match: {
-            [field]: {
-              query: term,
-              operator: "and",
-              fuzziness: "0" // No fuzzy matching, exact word only
-            }
-          }
-        });
-        
-        // Also add wildcard with word boundaries for fields that might have the term
-        termShouldClauses.push({
-          wildcard: {
-            [field]: {
-              value: `${term}`,
-              case_insensitive: true,
-              boost: 2.0 // Boost exact matches
-            }
-          }
-        });
-        
-        // Add wildcard with space before and after for word boundary matching
-        termShouldClauses.push({
-          wildcard: {
-            [field]: {
-              value: `* ${term} *`,
-              case_insensitive: true,
-              boost: 1.8
-            }
-          }
-        });
-        
-        // Add wildcard for start of field
-        termShouldClauses.push({
-          wildcard: {
-            [field]: {
-              value: `${term} *`,
-              case_insensitive: true,
-              boost: 1.8
-            }
-          }
-        });
-        
-        // Add wildcard for end of field
-        termShouldClauses.push({
-          wildcard: {
-            [field]: {
-              value: `* ${term}`,
-              case_insensitive: true,
-              boost: 1.8
-            }
-          }
-        });
-      });
-      
-      // Also check for the term without spaces (e.g., "roubaibrahim")
-      const queryWithoutSpaces = queryTerms.join('');
-      if (queryTerms.length > 1) {
-        searchFields.forEach(field => {
-          termShouldClauses.push({
-            match: {
-              [field]: {
-                query: queryWithoutSpaces,
-                operator: "and",
-                fuzziness: "0"
-              }
-            }
-          });
-          
-          termShouldClauses.push({
-            wildcard: {
-              [field]: {
-                value: `${queryWithoutSpaces}`,
-                case_insensitive: true,
-                boost: 2.5
-              }
-            }
-          });
-        });
-      }
-      
-      // Each term must match at least one field
-      mustClauses.push({
-        bool: {
-          should: termShouldClauses,
-          minimum_should_match: 1
-        }
-      });
-    });
+    console.log(`[ES Search] Normalized query: "${normalizedQuery}"`);
     
     // Search both indices
     const allResults: any[] = [];
     
     for (const indexName of indices) {
-      // For files_index, we want to search the content field primarily
-      const fieldsToSearch = indexName === 'files_index' 
-        ? ["content", "file_name"] 
-        : searchFields;
+      console.log(`[ES Search] Searching index: ${indexName}`);
       
-      // Rebuild must clauses for this specific index
-      const indexMustClauses: any[] = [];
-      
-      queryTerms.forEach(term => {
-        const termShouldClauses: any[] = [];
-        
-        fieldsToSearch.forEach(field => {
-          // Use match query with operator AND for word-based matching
-          termShouldClauses.push({
-            match: {
-              [field]: {
-                query: term,
-                operator: "and",
-                fuzziness: "0" // No fuzzy matching, exact word only
-              }
-            }
-          });
-          
-          // Also add wildcard with word boundaries for fields that might have the term
-          termShouldClauses.push({
-            wildcard: {
-              [field]: {
-                value: `*${term}*`,
-                case_insensitive: true,
-                boost: 2.0 // Boost exact matches
-              }
-            }
-          });
-        });
-        
-        // Each term must match at least one field
-        indexMustClauses.push({
-          bool: {
-            should: termShouldClauses,
-            minimum_should_match: 1
-          }
-        });
-      });
-    
-    const searchResponse = await fetch(`${elasticsearchUri}/${indexName}/_search`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
+      // Use a simple match_phrase query for exact matching (handles special characters like @ and .)
+      const searchBody = {
         query: {
           bool: {
-            must: indexMustClauses // ALL terms must match (AND logic)
+            should: [
+              // Match phrase for exact sequences
+              {
+                match_phrase: {
+                  content: {
+                    query: normalizedQuery,
+                    slop: 0
+                  }
+                }
+              },
+              // Wildcard for partial matching
+              {
+                wildcard: {
+                  content: {
+                    value: `*${normalizedQuery}*`,
+                    case_insensitive: true
+                  }
+                }
+              },
+              // Regular match for token-based search
+              {
+                match: {
+                  content: {
+                    query: normalizedQuery,
+                    operator: "or"
+                  }
+                }
+              }
+            ],
+            minimum_should_match: 1
           }
         },
         highlight: {
@@ -301,17 +183,24 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
           "extractionConfidence",
           "exposed"
         ],
-        size: 100,
+        size: 50,
         sort: [
           { _score: "desc" }
         ]
-      })
-    });
+      };
+      
+      const searchResponse = await fetch(`${elasticsearchUri}/${indexName}/_search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(searchBody)
+      });
 
-    const searchData = await searchResponse.json() as any;
-    if (searchResponse.ok && searchData.hits && searchData.hits.hits) {
-      allResults.push(...searchData.hits.hits);
-    }
+      const searchData = await searchResponse.json() as any;
+      if (searchResponse.ok && searchData.hits && searchData.hits.hits) {
+        allResults.push(...searchData.hits.hits);
+      }
     } // End of for loop
     
     // Sort all results by score
