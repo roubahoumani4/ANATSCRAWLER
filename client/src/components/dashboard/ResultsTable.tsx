@@ -33,6 +33,51 @@ const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
+  const exportToCSV = () => {
+    // Create CSV header
+    const headers = ['#', 'Score', 'Email/Username', 'Password', 'Source'];
+    
+    // Create CSV rows
+    const rows = results.map((result, index) => {
+      const email = result.email || result.name || '-';
+      const password = result.password || '-';
+      const source = result.source || '-';
+      const score = result.score?.toFixed(2) || '-';
+      
+      // Escape values that contain commas or quotes
+      const escapeCSV = (value: string) => {
+        if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+          return `"${value.replace(/"/g, '""')}"`;
+        }
+        return value;
+      };
+      
+      return [
+        index + 1,
+        score,
+        escapeCSV(email),
+        escapeCSV(password),
+        escapeCSV(source)
+      ].join(',');
+    });
+    
+    // Combine headers and rows
+    const csvContent = [headers.join(','), ...rows].join('\n');
+    
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `reconnaissance_results_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const tableVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -289,25 +334,14 @@ const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
         </div>
         <div className="export-buttons flex gap-3 justify-center mt-4">
           <motion.button 
-            className="bg-coolWhite text-jetBlack border border-coolWhite py-2 px-5 rounded-md font-bold hover:bg-crimsonRed hover:text-coolWhite transition-colors"
-            onClick={onExport}
+            className="bg-crimsonRed text-coolWhite border border-crimsonRed py-2 px-5 rounded-md font-bold hover:bg-opacity-90 transition-colors"
+            onClick={exportToCSV}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             transition={{ duration: 0.2 }}
           >
-            {translate("dashboard.exportExcel")}
+            Export to CSV
           </motion.button>
-          {isExported && (
-            <motion.a
-              href="/api/download-excel"
-              className="bg-crimsonRed text-coolWhite border border-crimsonRed py-2 px-5 rounded-md font-bold hover:bg-opacity-90 transition-colors"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              {translate("dashboard.downloadExcel")}
-            </motion.a>
-          )}
         </div>
       </div>
     </motion.section>
