@@ -91,9 +91,19 @@ const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
     if (result.context) {
       const parsed = parseContext(result.context);
       if (parsed) {
-        email = parsed.username || parsed.email || email;
-        password = parsed.password || password;
+        // Prioritize 'email' field for Email/Username column
+        email = parsed.email || parsed.username || result.email || result.name || '';
+        // Prioritize 'hash' field, then 'password' for Password column
+        password = parsed.hash || parsed.password || result.password || '';
       }
+    }
+    
+    // Fallback to content field if available
+    if (!email && result.content) {
+      email = result.content.split(':')[0] || '';
+    }
+    if (!password && result.content && result.content.includes(':')) {
+      password = result.content.split(':')[1] || '';
     }
     
     return { email, password };
