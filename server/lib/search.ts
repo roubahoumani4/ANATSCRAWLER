@@ -111,7 +111,7 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
       console.log(`[ES Search] Searching index: ${indexName}`);
       
       // Use a simple match_phrase query for exact matching (handles special characters like @ and .)
-      const searchBody = {
+      const searchBody: any = {
         query: {
           bool: {
             should: [
@@ -146,7 +146,43 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
             minimum_should_match: 1
           }
         },
-        highlight: {
+        _source: indexName === 'files_index'
+          ? ["content", "file_name", "file_path", "file_type", "file_size"]
+          : [
+            "content",
+            "fileName",
+            "timestamp",
+            "source",
+            "context",
+            "name",
+            "first_name",
+            "last_name",
+            "phone",
+            "email",
+            "birthdate",
+            "gender",
+            "locale",
+            "city",
+            "location",
+            "location2",
+            "link",
+            "link2",
+            "protocol",
+            "social_link",
+            "fileType",
+            "extractionConfidence",
+            "exposed"
+          ],
+        size: 50,
+        sort: [
+          { _score: "desc" }
+        ]
+      };
+
+      // Only enable highlighting for the structured index to avoid hitting
+      // index.highlight.max_analyzed_offset limits on very large file contents.
+      if (indexName !== 'files_index') {
+        searchBody.highlight = {
           fields: {
             content: {
               pre_tags: ["<em>"],
@@ -155,39 +191,8 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
               number_of_fragments: 3
             }
           }
-        },
-        _source: indexName === 'files_index' 
-          ? ["content", "file_name", "file_path", "file_type", "file_size"]
-          : [
-          "content",
-          "fileName",
-          "timestamp",
-          "source",
-          "context",
-          "name",
-          "first_name",
-          "last_name",
-          "phone",
-          "email",
-          "birthdate",
-          "gender",
-          "locale",
-          "city",
-          "location",
-          "location2",
-          "link",
-          "link2",
-          "protocol",
-          "social_link",
-          "fileType",
-          "extractionConfidence",
-          "exposed"
-        ],
-        size: 50,
-        sort: [
-          { _score: "desc" }
-        ]
-      };
+        };
+      }
       
       const searchResponse = await fetch(`${elasticsearchUri}/${indexName}/_search`, {
         method: 'POST',
