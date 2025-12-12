@@ -78,12 +78,15 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
       const email = parsed.email || parsed.username || '';
       const hash = parsed.hash || parsed.password || '';
       
+      console.log(`[ES Search] Parsed JSON object:`, { email, hash, parsed });
+      
       const combined = `${email}:${hash}`.toLowerCase();
       
       // Check if the query matches any field
       if (combined.includes(queryLower) || 
           email.toLowerCase().includes(queryLower) ||
           hash.toLowerCase().includes(queryLower)) {
+        console.log(`[ES Search] Adding match with email="${email}" and hash="${hash}"`);
         matches.push({
           username: email,
           password: hash,
