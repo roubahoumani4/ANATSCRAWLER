@@ -253,13 +253,8 @@ const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
                               <h4 className="text-sm font-bold text-cyan-400 mb-2">Full Details</h4>
                               
                               {parsed ? (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                  {Object.entries(parsed).map(([key, value]) => (
-                                    <div key={key} className="bg-black/30 p-2 rounded">
-                                      <div className="text-xs text-gray-400 font-semibold mb-1">{key}</div>
-                                      <code className="text-xs text-white break-all">{String(value)}</code>
-                                    </div>
-                                  ))}
+                                <div className="bg-black/40 p-3 rounded font-mono text-xs text-gray-300 overflow-x-auto">
+                                  {Object.entries(parsed).map(([key, value]) => String(value)).join(':')}
                                 </div>
                               ) : (
                                 <div className="bg-black/40 p-3 rounded font-mono text-xs text-gray-300 overflow-x-auto">
