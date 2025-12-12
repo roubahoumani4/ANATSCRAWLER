@@ -40,8 +40,14 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
   const queryLower = query.toLowerCase();
   
   try {
-    // Clean the content: remove trailing commas before closing braces/brackets
-    const cleanedContent = content.replace(/,(\s*[}\]])/g, '$1');
+    // Clean the content: remove trailing commas
+    let cleanedContent = content.trim();
+    // Remove trailing comma at the end
+    if (cleanedContent.endsWith(',')) {
+      cleanedContent = cleanedContent.slice(0, -1);
+    }
+    // Remove trailing commas before closing braces/brackets
+    cleanedContent = cleanedContent.replace(/,(\s*[}\]])/g, '$1');
     
     // Try to parse as JSON first
     const parsed = JSON.parse(cleanedContent);
