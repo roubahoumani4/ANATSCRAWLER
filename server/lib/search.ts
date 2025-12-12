@@ -40,8 +40,11 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
   const queryLower = query.toLowerCase();
   
   try {
+    // Clean the content: remove trailing commas before closing braces/brackets
+    const cleanedContent = content.replace(/,(\s*[}\]])/g, '$1');
+    
     // Try to parse as JSON first
-    const parsed = JSON.parse(content);
+    const parsed = JSON.parse(cleanedContent);
     
     // Check if it has a content array (structured format)
     if (parsed.content && Array.isArray(parsed.content)) {
