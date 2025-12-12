@@ -35,14 +35,27 @@ const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
 
   const exportToCSV = () => {
     // Create CSV header
-    const headers = ['#', 'Score', 'Email/Username', 'Password', 'Source'];
+    const headers = ['#', 'Score', 'Email/Username', 'Password', 'Full Details', 'Matched Content'];
     
     // Create CSV rows
     const rows = results.map((result, index) => {
       const email = result.email || result.name || '-';
       const password = result.password || '-';
-      const source = result.source || '-';
       const score = result.score?.toFixed(2) || '-';
+      
+      // Get Full Details (context)
+      let fullDetails = '-';
+      try {
+        const parsed = JSON.parse(result.context || '{}');
+        fullDetails = Object.entries(parsed).map(([key, value]) => String(value)).join(':');
+      } catch {
+        fullDetails = result.context || result.content || '-';
+      }
+      
+      // Get Matched Content (highlights)
+      const matchedContent = result.highlights && result.highlights.length > 0 
+        ? result.highlights.join(' | ') 
+        : '-';
       
       // Escape values that contain commas or quotes
       const escapeCSV = (value: string) => {
@@ -57,7 +70,8 @@ const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
         score,
         escapeCSV(email),
         escapeCSV(password),
-        escapeCSV(source)
+        escapeCSV(fullDetails),
+        escapeCSV(matchedContent)
       ].join(',');
     });
     
