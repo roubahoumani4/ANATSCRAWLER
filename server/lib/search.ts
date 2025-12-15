@@ -33,6 +33,37 @@ interface MatchedEntry {
 }
 
 /**
+ * Infer database source from file path or database_source field
+ */
+function inferDatabaseSource(filePath: string | undefined, databaseSource: string | undefined): string {
+  // If database_source is explicitly set in Elasticsearch, use it
+  if (databaseSource) {
+    return databaseSource;
+  }
+  
+  // Otherwise, try to infer from file path
+  if (!filePath) {
+    return 'Unknown';
+  }
+  
+  const pathLower = filePath.toLowerCase();
+  
+  // Check for database indicators in the path
+  if (pathLower.includes('naz.api') || pathLower.includes('nazapi') || pathLower.includes('naz_api')) {
+    return 'naz.api';
+  }
+  
+  if (pathLower.includes('compilationofmanybreaches') || 
+      pathLower.includes('compilation_of_many_breaches') ||
+      pathLower.includes('compilationbreaches')) {
+    return 'CompilationOfManyBreaches';
+  }
+  
+  // If no pattern matched, return the file path as source
+  return 'Unknown';
+}
+
+/**
  * Extract individual matching email:password entries from file content
  */
 function extractMatchingEntries(content: string, query: string): MatchedEntry[] {
@@ -233,7 +264,7 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
           }
         },
         _source: indexName === 'files_index'
-          ? ["content", "file_name", "file_path", "file_type", "file_size"]
+          ? ["content", "file_name", "file_path", "file_type", "file_size", "database_source"]
           : [
             "content",
             "fileName",
@@ -257,7 +288,8 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
             "social_link",
             "fileType",
             "extractionConfidence",
-            "exposed"
+            "exposed",
+            "database_source"
           ],
         size: 50,
         sort: [
@@ -314,6 +346,12 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
     console.log(`[ES Search] Processing ${topResults.length} top results`);
     
     for (const hit of topResults) {
+      // Infer database source from file path or database_source field
+      const databaseSource = inferDatabaseSource(
+        hit._source.file_path || hit._source.source,
+        hit._source.database_source
+      );
+      
       // If this is from files_index, parse the content and extract matching entries
       if (hit._index === 'files_index' && hit._source.content) {
         const content = hit._source.content;
@@ -360,6 +398,7 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
             file_size: hit._source.file_size || 0,
             file_path: hit._source.file_path || '',
             password: match.password || '',
+            database_source: databaseSource,
           });
         });
       } else {
@@ -396,6 +435,7 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
           exposed: hit._source.exposed || [],
           file_size: hit._source.file_size || 0,
           file_path: hit._source.file_path || '',
+          database_source: databaseSource,
         });
       }
     }
