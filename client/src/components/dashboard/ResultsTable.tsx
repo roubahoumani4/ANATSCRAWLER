@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useLanguage } from "@/context/LanguageContext";
-import { Copy, Eye, EyeOff } from "lucide-react";
-import { useState } from "react";
+import { Copy, Eye, EyeOff, AlertTriangle, Calendar, Database, Users } from "lucide-react";
+import { useState, useMemo } from "react";
 
 interface SearchResult {
   id?: string;
@@ -29,10 +29,64 @@ interface ResultsTableProps {
   isExported: boolean;
 }
 
+// Database breach information
+const BREACH_INFO: Record<string, {
+  name: string;
+  description: string;
+  affectedAccounts: string;
+  breachOccurred: string;
+  addedToHIBP: string;
+  compromisedData: string[];
+  whatHappened: string;
+  potentialThreats: string[];
+}> = {
+  'CompilationOfManyBreaches': {
+    name: 'Compilation of Many Breaches (COMB)',
+    description: 'A massive compilation of credentials from multiple historical data breaches',
+    affectedAccounts: '3.2 billion',
+    breachOccurred: 'February 2021',
+    addedToHIBP: '17 Jan 2024',
+    compromisedData: ['Email addresses', 'Passwords'],
+    whatHappened: 'On February 2, 2021, a user known as Singularity0x01 posted a .ZIP file on RaidForums containing billions of usernames and passwords. The data contained more than 3.2 billion unique pairs of email addresses and passwords, including approximately 200 million Gmail addresses and 450 million Yahoo! email addresses. This is a compilation of credentials from past data breaches involving Netflix, LinkedIn, Hotmail, Yahoo, Bitcoin and other companies. The leak is more than twice as large as a similar breach compilation posted in 2017.',
+    potentialThreats: [
+      'Credential stuffing attacks - automated login attempts across multiple websites',
+      'Account takeover on banking websites and major platforms',
+      'Spear-phishing campaigns targeting affected users',
+      'Password reuse exploitation (70% of global internet users potentially affected)'
+    ]
+  },
+  'naz.api': {
+    name: 'Naz.API',
+    description: 'Stealer logs and credential stuffing lists from various sources',
+    affectedAccounts: '70.8 million',
+    breachOccurred: 'September 2023',
+    addedToHIBP: '17 Jan 2024',
+    compromisedData: ['Email addresses', 'Passwords'],
+    whatHappened: 'In September 2023, over 100GB of stealer logs and credential stuffing lists titled "Naz.API" was posted to a popular hacking forum. The data contained a combination of email address and plain text password pairs alongside the service they were entered into, and standalone credential pairs obtained from unnamed sources. In total, the corpus of data included 71M unique email addresses and 100M unique passwords.',
+    potentialThreats: [
+      'Account takeover on multiple platforms',
+      'Credential stuffing attacks',
+      'Identity theft attempts',
+      'Targeted phishing campaigns'
+    ]
+  }
+};
+
 const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
   const { translate } = useLanguage();
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  // Detect which databases are present in results
+  const presentDatabases = useMemo(() => {
+    const databases = new Set<string>();
+    results.forEach(result => {
+      if (result.database_source && result.database_source !== 'Unknown') {
+        databases.add(result.database_source);
+      }
+    });
+    return Array.from(databases);
+  }, [results]);
 
   const exportToCSV = () => {
     // Create CSV header
@@ -375,6 +429,135 @@ const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
             Export to CSV
           </motion.button>
         </div>
+
+        {/* Breach Overview Section */}
+        {presentDatabases.length > 0 && (
+          <div className="mt-6 space-y-4">
+            {presentDatabases.map((dbSource) => {
+              const breachInfo = BREACH_INFO[dbSource];
+              if (!breachInfo) return null;
+
+              return (
+                <motion.div
+                  key={dbSource}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                  className="bg-gradient-to-br from-[#1a1e26] to-[#23272f] rounded-lg border border-red-900/30 overflow-hidden"
+                >
+                  {/* Header */}
+                  <div className="bg-gradient-to-r from-red-900/40 to-red-800/40 p-4 border-b border-red-900/50">
+                    <div className="flex items-center gap-3">
+                      <AlertTriangle className="w-6 h-6 text-red-400" />
+                      <h3 className="text-xl font-bold text-red-400">{breachInfo.name}</h3>
+                    </div>
+                    <p className="text-gray-400 text-sm mt-1">{breachInfo.description}</p>
+                  </div>
+
+                  {/* Content Grid */}
+                  <div className="grid md:grid-cols-2 gap-6 p-6">
+                    {/* Left Column - What Happened */}
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+                          <Database className="w-5 h-5 text-cyan-400" />
+                          What Happened
+                        </h4>
+                        <p className="text-gray-300 text-sm leading-relaxed">
+                          {breachInfo.whatHappened}
+                        </p>
+                      </div>
+
+                      <div>
+                        <h4 className="text-lg font-semibold text-white mb-3">Compromised Data</h4>
+                        <div className="space-y-2">
+                          {breachInfo.compromisedData.map((data, idx) => (
+                            <div key={idx} className="flex items-start gap-2">
+                              <span className="text-red-400 mt-1">●</span>
+                              <span className="text-gray-300 text-sm">{data}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right Column - Breach Overview & Threats */}
+                    <div className="space-y-4">
+                      <div className="bg-[#0f1218] rounded-lg p-4 border border-cyan-900/30">
+                        <h4 className="text-lg font-semibold text-cyan-400 mb-3">Breach Overview</h4>
+                        <div className="space-y-3">
+                          <div className="flex items-start gap-3">
+                            <Users className="w-5 h-5 text-cyan-400 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <div className="text-xs text-gray-500">Affected Accounts:</div>
+                              <div className="text-2xl font-bold text-white">{breachInfo.affectedAccounts}</div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-start gap-3">
+                            <Calendar className="w-5 h-5 text-cyan-400 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <div className="text-xs text-gray-500">Breach Occurred:</div>
+                              <div className="text-lg font-semibold text-white">{breachInfo.breachOccurred}</div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-start gap-3">
+                            <Calendar className="w-5 h-5 text-cyan-400 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <div className="text-xs text-gray-500">Added to HIBP:</div>
+                              <div className="text-lg font-semibold text-white">{breachInfo.addedToHIBP}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+                          <AlertTriangle className="w-5 h-5 text-yellow-400" />
+                          Recommended Actions
+                        </h4>
+                        <div className="space-y-3">
+                          <div className="bg-blue-900/20 border-l-4 border-blue-500 p-3 rounded">
+                            <div className="flex items-start gap-2">
+                              <div className="bg-blue-500 rounded-full p-1 mt-0.5">
+                                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                </svg>
+                              </div>
+                              <div>
+                                <div className="text-sm font-semibold text-blue-300">Change Your Password</div>
+                                <div className="text-xs text-gray-400 mt-1">
+                                  If you haven't already changed the password affected by this breach, do so immediately on every account where it was used.
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="bg-purple-900/20 border-l-4 border-purple-500 p-3 rounded">
+                            <div className="flex items-start gap-2">
+                              <div className="bg-purple-500 rounded-full p-1 mt-0.5">
+                                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                </svg>
+                              </div>
+                              <div>
+                                <div className="text-sm font-semibold text-purple-300">Enable Two-Factor Authentication</div>
+                                <div className="text-xs text-gray-400 mt-1">
+                                  Wherever 2FA is supported, add an extra layer of security to your account.
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </motion.section>
   );
