@@ -535,102 +535,90 @@ const DiscoveryPage: React.FC = () => {
             <div className="grid md:grid-cols-2 gap-4">
               <motion.div
                 whileHover={{ scale: 1.02 }}
-                className="bg-gradient-to-br from-red-900/20 to-red-800/10 p-5 rounded-lg border border-red-700/30 hover:border-red-500/50 transition-all shadow-lg"
+                className="bg-gradient-to-br from-red-900/20 to-red-800/10 p-4 rounded-lg border border-red-700/30 hover:border-red-500/50 transition-all shadow-lg"
               >
                 <div className="flex items-start gap-3">
                   <div className="bg-red-500/20 p-2 rounded-lg">
                     <Mail className="w-5 h-5 text-red-400" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-white mb-1">Email & Username Search</h4>
-                    <p className="text-gray-300 text-sm">
-                      Search for individual email addresses or usernames to check if they've been compromised
-                    </p>
+                    <h5 className="font-semibold text-white text-sm mb-1">Email & Username Search</h5>
+                    <p className="text-gray-300 text-xs">Search for individual email addresses or usernames to check if they've been compromised</p>
                   </div>
                 </div>
               </motion.div>
 
               <motion.div
                 whileHover={{ scale: 1.02 }}
-                className="bg-gradient-to-br from-red-900/20 to-red-800/10 p-5 rounded-lg border border-red-700/30 hover:border-red-500/50 transition-all shadow-lg"
+                className="bg-gradient-to-br from-red-900/20 to-red-800/10 p-4 rounded-lg border border-red-700/30 hover:border-red-500/50 transition-all shadow-lg"
               >
                 <div className="flex items-start gap-3">
                   <div className="bg-red-500/20 p-2 rounded-lg">
                     <Search className="w-5 h-5 text-red-400" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-white mb-1">Exact Format</h4>
-                    <p className="text-gray-300 text-sm">
-                      Use exact email format (e.g., <code className="text-cyan-400 bg-gray-800 px-1 py-0.5 rounded text-xs">user@example.com</code>) for best results
-                    </p>
+                    <h5 className="font-semibold text-white text-sm mb-1">Exact Format</h5>
+                    <p className="text-gray-300 text-xs">Use exact email format (e.g., <code className="text-cyan-400 bg-gray-800 px-1 py-0.5 rounded text-xs">user@example.com</code>) for best results</p>
                   </div>
                 </div>
               </motion.div>
 
               <motion.div
                 whileHover={{ scale: 1.02 }}
-                className="bg-gradient-to-br from-cyan-900/20 to-cyan-800/10 p-5 rounded-lg border border-cyan-700/30 hover:border-cyan-500/50 transition-all shadow-lg"
+                className="bg-gradient-to-br from-red-900/20 to-red-800/10 p-4 rounded-lg border border-red-700/30 hover:border-red-500/50 transition-all shadow-lg"
               >
                 <div className="flex items-start gap-3">
-                  <div className="bg-cyan-500/20 p-2 rounded-lg">
-                    <Shield className="w-5 h-5 text-cyan-400" />
+                  <div className="bg-red-500/20 p-2 rounded-lg">
+                    <Shield className="w-5 h-5 text-red-400" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-white mb-1">Domain Monitoring</h4>
-                    <p className="text-gray-300 text-sm">
-                      For domain-wide searches (e.g., <code className="text-cyan-400 bg-gray-800 px-1 py-0.5 rounded text-xs">@company.com</code>), use Domain Monitoring page
-                    </p>
+                    <h5 className="font-semibold text-white text-sm mb-1">Domain Monitoring</h5>
+                    <p className="text-gray-300 text-xs">For domain-wide searches (e.g., <code className="text-cyan-400 bg-gray-800 px-1 py-0.5 rounded text-xs">@company.com</code>), use Domain Monitoring page</p>
                   </div>
                 </div>
               </motion.div>
 
               <motion.div
                 whileHover={{ scale: 1.02 }}
-                className="bg-gradient-to-br from-blue-900/20 to-blue-800/10 p-5 rounded-lg border border-blue-700/30 hover:border-blue-500/50 transition-all shadow-lg"
+                className="bg-gradient-to-br from-red-900/20 to-red-800/10 p-4 rounded-lg border border-red-700/30 hover:border-red-500/50 transition-all shadow-lg"
               >
                 <div className="flex items-start gap-3">
-                  <div className="bg-blue-500/20 p-2 rounded-lg">
-                    <Database className="w-5 h-5 text-blue-400" />
+                  <div className="bg-red-500/20 p-2 rounded-lg">
+                    <Database className="w-5 h-5 text-red-400" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-white mb-1">Breach Databases</h4>
-                    <p className="text-gray-300 text-sm">
-                      Results from monitored databases: <span className="font-semibold text-white">COMB</span> (3.2B) & <span className="font-semibold text-white">Naz.API</span> (70.8M)
-                    </p>
+                    <h5 className="font-semibold text-white text-sm mb-1">Breach Databases</h5>
+                    <p className="text-gray-300 text-xs">Results from monitored breach databases</p>
                   </div>
                 </div>
               </motion.div>
 
               <motion.div
                 whileHover={{ scale: 1.02 }}
-                className="bg-gradient-to-br from-green-900/20 to-green-800/10 p-5 rounded-lg border border-green-700/30 hover:border-green-500/50 transition-all shadow-lg"
+                className="bg-gradient-to-br from-red-900/20 to-red-800/10 p-4 rounded-lg border border-red-700/30 hover:border-red-500/50 transition-all shadow-lg"
               >
                 <div className="flex items-start gap-3">
-                  <div className="bg-green-500/20 p-2 rounded-lg">
-                    <TrendingUp className="w-5 h-5 text-green-400" />
+                  <div className="bg-red-500/20 p-2 rounded-lg">
+                    <TrendingUp className="w-5 h-5 text-red-400" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-white mb-1">Result Details</h4>
-                    <p className="text-gray-300 text-sm">
-                      Each result includes password, database source, and relevance score
-                    </p>
+                    <h5 className="font-semibold text-white text-sm mb-1">Result Details</h5>
+                    <p className="text-gray-300 text-xs">Each result includes password, database source, and relevance score</p>
                   </div>
                 </div>
               </motion.div>
 
               <motion.div
                 whileHover={{ scale: 1.02 }}
-                className="bg-gradient-to-br from-purple-900/20 to-purple-800/10 p-5 rounded-lg border border-purple-700/30 hover:border-purple-500/50 transition-all shadow-lg"
+                className="bg-gradient-to-br from-red-900/20 to-red-800/10 p-4 rounded-lg border border-red-700/30 hover:border-red-500/50 transition-all shadow-lg"
               >
                 <div className="flex items-start gap-3">
-                  <div className="bg-purple-500/20 p-2 rounded-lg">
-                    <Eye className="w-5 h-5 text-purple-400" />
+                  <div className="bg-red-500/20 p-2 rounded-lg">
+                    <Eye className="w-5 h-5 text-red-400" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-white mb-1">Full Information</h4>
-                    <p className="text-gray-300 text-sm">
-                      Click <span className="font-semibold text-purple-400">Details</span> to view credential info and breach context
-                    </p>
+                    <h5 className="font-semibold text-white text-sm mb-1">Full Information</h5>
+                    <p className="text-gray-300 text-xs">Click <span className="font-semibold text-purple-400">Details</span> to view credential info and breach context</p>
                   </div>
                 </div>
               </motion.div>

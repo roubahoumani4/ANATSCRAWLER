@@ -824,7 +824,7 @@ const DomainMonitoringPage = () => {
           >
             <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
               <Shield className="w-6 h-6 text-cyan-400" />
-              About Domain Monitoring
+              Domain Monitoring
             </h3>
             <div className="grid md:grid-cols-2 gap-6 mb-8">
               <div>
