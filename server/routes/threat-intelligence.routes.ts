@@ -7,15 +7,38 @@ const router = Router();
 /**
  * Threat Intelligence Feed Routes
  * Provides real-time data from various breach and threat intelligence sources
+ * 
+ * FREE DATA SOURCES:
+ * - AlienVault OTX (configured, free)
+ * - VirusTotal (configured, 500 req/day free)
+ * - GreyNoise (configured, free tier)
+ * - Intelligence X (free tier available)
+ * - BreachDirectory (free API)
+ * - Psbdmp (free pastebin monitoring)
+ * 
+ * PAID SOURCE (optional):
+ * - HaveIBeenPwned ($3.50/month)
  */
 
-// HaveIBeenPwned API configuration
+// HaveIBeenPwned API configuration (PAID - optional)
 const HIBP_API_KEY = process.env.HIBP_API_KEY || '';
 const HIBP_BASE_URL = 'https://haveibeenpwned.com/api/v3';
 
-// VirusTotal API configuration
-const VT_API_KEY = process.env.VT_API_KEY || '';
+// VirusTotal API configuration (FREE TIER - 500 req/day)
+const VT_API_KEY = process.env.VIRUSTOTAL_API_KEY || process.env.VT_API_KEY || '';
 const VT_BASE_URL = 'https://www.virustotal.com/api/v3';
+
+// AlienVault OTX API configuration (FREE)
+const OTX_API_KEY = process.env.ALIENVAULT_API_KEY || '';
+const OTX_BASE_URL = 'https://otx.alienvault.com/api/v1';
+
+// GreyNoise API configuration (FREE TIER)
+const GREYNOISE_API_KEY = process.env.GREYNOISE_API_KEY || '';
+const GREYNOISE_BASE_URL = 'https://api.greynoise.io/v3';
+
+// Intelligence X API configuration (FREE TIER)
+const INTELX_API_KEY = process.env.INTELX_API_KEY || '';
+const INTELX_BASE_URL = 'https://2.intelx.io';
 
 /**
  * GET /api/v1/threat-intel/recent-breaches

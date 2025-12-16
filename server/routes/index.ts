@@ -9,7 +9,7 @@ import userRoutes from './auth/user.routes';
 import healthRoutes from './health/health.routes';
 import searchRoutes from './search';
 import assessmentRoutes from './assessment.routes';
-import threatIntelRoutes from './threat-intelligence.routes';
+import threatIntelRoutes from './threat-intelligence-free.routes'; // FREE version with web scraping
 
 /**
  * Register all application routes with proper organization and authentication
