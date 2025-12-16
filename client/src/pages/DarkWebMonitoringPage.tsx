@@ -69,44 +69,10 @@ const DarkWebMonitoringPage: React.FC = () => {
     searchHistory: { totalSearches: 0, successRate: 0 }
   });
 
-  // Mock data for charts - replace with real API data
-  const [activityData, setActivityData] = useState([
-    { name: "Mon", threats: 45, discoveries: 28, domains: 15 },
-    { name: "Tue", threats: 52, discoveries: 35, domains: 22 },
-    { name: "Wed", threats: 38, discoveries: 42, domains: 18 },
-    { name: "Thu", threats: 65, discoveries: 38, domains: 28 },
-    { name: "Fri", threats: 48, discoveries: 45, domains: 20 },
-    { name: "Sat", threats: 35, discoveries: 30, domains: 12 },
-    { name: "Sun", threats: 42, discoveries: 32, domains: 16 }
-  ]);
-
-  const [threatDistribution, setThreatDistribution] = useState([
-    { name: "Critical", value: 12, color: "#ef4444" },
-    { name: "High", value: 28, color: "#f97316" },
-    { name: "Medium", value: 45, color: "#eab308" },
-    { name: "Low", value: 35, color: "#3b82f6" }
-  ]);
-
-  const [searchTypeDistribution, setSearchTypeDistribution] = useState([
-    { name: "Email Discovery", value: 45, color: "#8b5cf6" },
-    { name: "Domain Monitoring", value: 35, color: "#06b6d4" },
-    { name: "Threat Intel", value: 20, color: "#f59e0b" }
-  ]);
-
-  const [securityScore, setSecurityScore] = useState([
-    { category: "Threat Detection", score: 85 },
-    { category: "Data Protection", score: 78 },
-    { category: "Monitoring Coverage", score: 92 },
-    { category: "Response Time", score: 88 },
-    { category: "Intelligence Quality", score: 80 }
-  ]);
-
-  const [recentActivity, setRecentActivity] = useState([
-    { type: "threat", title: "New threat detected", time: "2 min ago", severity: "high" },
-    { type: "discovery", title: "Email exposure found", time: "15 min ago", severity: "critical" },
-    { type: "domain", title: "Domain breach detected", time: "1 hour ago", severity: "high" },
-    { type: "search", title: "New search completed", time: "2 hours ago", severity: "info" }
-  ]);
+  // Real data from APIs - no mock data
+  const [activityData, setActivityData] = useState<any[]>([]);
+  const [searchTypeDistribution, setSearchTypeDistribution] = useState<any[]>([]);
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -116,32 +82,100 @@ const DarkWebMonitoringPage: React.FC = () => {
     try {
       setLoading(true);
       // Fetch real data from APIs
-      const [historyStats] = await Promise.all([
-        axios.get('/api/v1/history/stats').catch(() => ({ data: { data: null } }))
+      const [historyStats, recentSearches] = await Promise.all([
+        axios.get('/api/v1/history/stats').catch(() => ({ data: { data: null } })),
+        axios.get('/api/v1/history/searches', { params: { limit: 4 } }).catch(() => ({ data: { data: { searches: [] } } }))
       ]);
 
       if (historyStats.data.data) {
-        setStats(prev => ({
-          ...prev,
-          searchHistory: {
-            totalSearches: historyStats.data.data.totalSearches || 0,
-            successRate: parseFloat(historyStats.data.data.successRate || "0")
+        const statsData = historyStats.data.data;
+        
+        setStats({
+          threatIntelligence: { 
+            total: 0, // Will be populated when threat intelligence API is available
+            critical: 0, 
+            high: 0 
           },
           discovery: {
-            totalSearches: historyStats.data.data.discoverySearches || 0,
-            exposedAccounts: 0
+            totalSearches: statsData.discoverySearches || 0,
+            exposedAccounts: 0 // Calculate from discovery results when available
           },
           domainMonitoring: {
-            monitoredDomains: historyStats.data.data.domainSearches || 0,
-            totalExposures: 0
+            monitoredDomains: statsData.domainSearches || 0,
+            totalExposures: 0 // Calculate from domain monitoring results when available
+          },
+          searchHistory: {
+            totalSearches: statsData.totalSearches || 0,
+            successRate: parseFloat(statsData.successRate || "0")
           }
-        }));
+        });
+
+        // Build search type distribution from real data
+        const totalDiscovery = statsData.discoverySearches || 0;
+        const totalDomain = statsData.domainSearches || 0;
+
+        if (totalDiscovery + totalDomain > 0) {
+          setSearchTypeDistribution([
+            { 
+              name: "Email Discovery", 
+              value: totalDiscovery, 
+              color: "#8b5cf6" 
+            },
+            { 
+              name: "Domain Monitoring", 
+              value: totalDomain, 
+              color: "#06b6d4" 
+            }
+          ]);
+        }
+
+        // Process searches by day for activity chart
+        if (statsData.searchesByDay && statsData.searchesByDay.length > 0) {
+          const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+          const last7Days = statsData.searchesByDay.slice(-7).map((day: any) => {
+            const date = new Date(day._id);
+            const totalSearches = totalDiscovery + totalDomain;
+            return {
+              name: dayNames[date.getDay()],
+              threats: 0, // Will be populated when threat intelligence API is available
+              discoveries: totalSearches > 0 ? Math.floor(day.count * (totalDiscovery / totalSearches)) : 0,
+              domains: totalSearches > 0 ? Math.floor(day.count * (totalDomain / totalSearches)) : 0
+            };
+          });
+          setActivityData(last7Days);
+        }
+      }
+
+      // Process recent searches for activity feed
+      if (recentSearches.data.data && recentSearches.data.data.searches) {
+        const activities = recentSearches.data.data.searches.map((search: any) => {
+          const timeAgo = getTimeAgo(new Date(search.createdAt));
+          return {
+            type: search.searchType === 'discovery' ? 'discovery' : 'domain',
+            title: search.searchType === 'discovery' 
+              ? `Discovery search: ${search.query}` 
+              : `Domain monitoring: ${search.query}`,
+            time: timeAgo,
+            severity: search.hasResults ? (search.resultsCount > 50 ? 'high' : 'medium') : 'info'
+          };
+        });
+        setRecentActivity(activities);
       }
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper function to calculate time ago
+  const getTimeAgo = (date: Date) => {
+    const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+    
+    if (seconds < 60) return `${seconds} seconds ago`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)} hour${Math.floor(seconds / 3600) > 1 ? 's' : ''} ago`;
+    return `${Math.floor(seconds / 86400)} day${Math.floor(seconds / 86400) > 1 ? 's' : ''} ago`;
   };
 
   // Feature cards configuration
@@ -259,21 +293,28 @@ const DarkWebMonitoringPage: React.FC = () => {
     >
       {/* Header */}
       <motion.div variants={fadeIn} className="mb-8">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center">
-            <Activity className="w-10 h-10 mr-3 text-cyan-400" />
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-                Dark Web Monitoring
-              </h1>
-              <p className="text-gray-400 mt-1">
-                Comprehensive intelligence and threat monitoring dashboard
-              </p>
-            </div>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-3">
+              <Activity className="text-cyan-400" size={36} />
+              Dark Web Monitoring
+            </h1>
+            <p className="text-gray-400 mt-2">
+              Comprehensive intelligence and threat monitoring dashboard
+            </p>
           </div>
-          <div className="text-right">
-            <div className="text-sm text-gray-400">Last Updated</div>
-            <div className="text-lg font-semibold">{new Date().toLocaleTimeString()}</div>
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <div className="text-sm text-gray-400">Last Updated</div>
+              <div className="text-lg font-semibold">{new Date().toLocaleTimeString()}</div>
+            </div>
+            <button
+              onClick={fetchDashboardData}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center gap-2 transition-colors"
+            >
+              <Activity size={16} />
+              Refresh
+            </button>
           </div>
         </div>
       </motion.div>
@@ -341,59 +382,69 @@ const DarkWebMonitoringPage: React.FC = () => {
             <BarChart3 className="w-6 h-6 mr-2 text-cyan-400" />
             Weekly Activity Overview
           </h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={activityData}>
-              <defs>
-                <linearGradient id="colorThreats" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#f97316" stopOpacity={0.8}/>
-                  <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="colorDiscoveries" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8}/>
-                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="colorDomains" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.8}/>
-                  <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis dataKey="name" stroke="#9ca3af" />
-              <YAxis stroke="#9ca3af" />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: '#1f2937',
-                  border: '1px solid #374151',
-                  borderRadius: '8px'
-                }}
-              />
-              <Legend />
-              <Area
-                type="monotone"
-                dataKey="threats"
-                stroke="#f97316"
-                fillOpacity={1}
-                fill="url(#colorThreats)"
-                name="Threats"
-              />
-              <Area
-                type="monotone"
-                dataKey="discoveries"
-                stroke="#ef4444"
-                fillOpacity={1}
-                fill="url(#colorDiscoveries)"
-                name="Discoveries"
-              />
-              <Area
-                type="monotone"
-                dataKey="domains"
-                stroke="#06b6d4"
-                fillOpacity={1}
-                fill="url(#colorDomains)"
-                name="Domains"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          {activityData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={activityData}>
+                <defs>
+                  <linearGradient id="colorThreats" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f97316" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorDiscoveries" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorDomains" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis dataKey="name" stroke="#9ca3af" />
+                <YAxis stroke="#9ca3af" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#1f2937',
+                    border: '1px solid #374151',
+                    borderRadius: '8px'
+                  }}
+                />
+                <Legend />
+                <Area
+                  type="monotone"
+                  dataKey="threats"
+                  stroke="#f97316"
+                  fillOpacity={1}
+                  fill="url(#colorThreats)"
+                  name="Threats"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="discoveries"
+                  stroke="#ef4444"
+                  fillOpacity={1}
+                  fill="url(#colorDiscoveries)"
+                  name="Discoveries"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="domains"
+                  stroke="#06b6d4"
+                  fillOpacity={1}
+                  fill="url(#colorDomains)"
+                  name="Domains"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[300px] flex items-center justify-center">
+              <div className="text-center">
+                <Activity className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                <p className="text-gray-400">No activity data yet</p>
+                <p className="text-sm text-gray-500 mt-1">Start using Discovery and Domain Monitoring</p>
+              </div>
+            </div>
+          )}
         </motion.div>
 
         {/* Recent Activity */}
@@ -405,24 +456,34 @@ const DarkWebMonitoringPage: React.FC = () => {
             <Zap className="w-6 h-6 mr-2 text-yellow-400" />
             Recent Activity
           </h2>
-          <div className="space-y-4">
-            {recentActivity.map((activity, index) => (
-              <div
-                key={index}
-                className="flex items-start space-x-3 p-3 rounded-lg bg-jetBlack/50 border border-coolWhite/5 hover:border-coolWhite/10 transition-colors"
-              >
-                <div className={`p-2 rounded-lg ${getSeverityColor(activity.severity)}`}>
-                  {getActivityIcon(activity.type)}
+          {recentActivity.length > 0 ? (
+            <div className="space-y-4">
+              {recentActivity.map((activity, index) => (
+                <div
+                  key={index}
+                  className="flex items-start space-x-3 p-3 rounded-lg bg-jetBlack/50 border border-coolWhite/5 hover:border-coolWhite/10 transition-colors"
+                >
+                  <div className={`p-2 rounded-lg ${getSeverityColor(activity.severity)}`}>
+                    {getActivityIcon(activity.type)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-coolWhite truncate">
+                      {activity.title}
+                    </p>
+                    <p className="text-xs text-gray-400">{activity.time}</p>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-coolWhite truncate">
-                    {activity.title}
-                  </p>
-                  <p className="text-xs text-gray-400">{activity.time}</p>
-                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="h-full flex items-center justify-center py-12">
+              <div className="text-center">
+                <Search className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                <p className="text-gray-400">No recent activity</p>
+                <p className="text-sm text-gray-500 mt-1">Your searches will appear here</p>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </motion.div>
       </div>
 
@@ -437,25 +498,13 @@ const DarkWebMonitoringPage: React.FC = () => {
             <PieChartIcon className="w-6 h-6 mr-2 text-orange-400" />
             Threat Distribution
           </h2>
-          <ResponsiveContainer width="100%" height={250}>
-            <PieChart>
-              <Pie
-                data={threatDistribution}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {threatDistribution.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
+          <div className="h-[250px] flex items-center justify-center">
+            <div className="text-center">
+              <AlertTriangle className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+              <p className="text-gray-400 text-sm">No threat data available</p>
+              <p className="text-xs text-gray-500 mt-1">Coming soon</p>
+            </div>
+          </div>
         </motion.div>
 
         {/* Search Type Distribution */}
@@ -467,25 +516,35 @@ const DarkWebMonitoringPage: React.FC = () => {
             <Database className="w-6 h-6 mr-2 text-purple-400" />
             Search Distribution
           </h2>
-          <ResponsiveContainer width="100%" height={250}>
-            <PieChart>
-              <Pie
-                data={searchTypeDistribution}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {searchTypeDistribution.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
+          {searchTypeDistribution.length > 0 ? (
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie
+                  data={searchTypeDistribution}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {searchTypeDistribution.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[250px] flex items-center justify-center">
+              <div className="text-center">
+                <Search className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                <p className="text-gray-400 text-sm">No search data available</p>
+                <p className="text-xs text-gray-500 mt-1">Start using Discovery and Domain Monitoring</p>
+              </div>
+            </div>
+          )}
         </motion.div>
 
         {/* Security Score Radar */}
@@ -497,21 +556,13 @@ const DarkWebMonitoringPage: React.FC = () => {
             <Shield className="w-6 h-6 mr-2 text-green-400" />
             Security Score
           </h2>
-          <ResponsiveContainer width="100%" height={250}>
-            <RadarChart cx="50%" cy="50%" outerRadius="80%" data={securityScore}>
-              <PolarGrid stroke="#374151" />
-              <PolarAngleAxis dataKey="category" stroke="#9ca3af" tick={{ fontSize: 10 }} />
-              <PolarRadiusAxis stroke="#9ca3af" />
-              <Radar
-                name="Score"
-                dataKey="score"
-                stroke="#22c55e"
-                fill="#22c55e"
-                fillOpacity={0.6}
-              />
-              <Tooltip />
-            </RadarChart>
-          </ResponsiveContainer>
+          <div className="h-[250px] flex items-center justify-center">
+            <div className="text-center">
+              <Shield className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+              <p className="text-gray-400 text-sm">Security metrics coming soon</p>
+              <p className="text-xs text-gray-500 mt-1">Real-time scoring will be available</p>
+            </div>
+          </div>
         </motion.div>
       </div>
 

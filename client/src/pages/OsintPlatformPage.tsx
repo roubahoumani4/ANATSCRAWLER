@@ -166,13 +166,19 @@ const OsintPlatformPage: React.FC = () => {
               Comprehensive overview of your security assessments and intelligence gathering
             </p>
           </div>
-          <button
-            onClick={fetchDashboardStats}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center gap-2 transition-colors"
-          >
-            <Activity size={16} />
-            Refresh
-          </button>
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <div className="text-sm text-gray-400">Last Updated</div>
+              <div className="text-lg font-semibold">{new Date().toLocaleTimeString()}</div>
+            </div>
+            <button
+              onClick={fetchDashboardStats}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center gap-2 transition-colors"
+            >
+              <Activity size={16} />
+              Refresh
+            </button>
+          </div>
         </div>
       </div>
 

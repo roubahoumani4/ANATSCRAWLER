@@ -460,22 +460,47 @@ const SearchHistoryPage: React.FC = () => {
                             <p className="text-green-400 text-sm">{result.score?.toFixed(2) || 'N/A'}</p>
                           </div>
                         </div>
-                        {index < selectedSearch.results.length - 1 && (
-                          <div className="mt-3 border-t border-gray-700"></div>
-                        )}
                       </div>
                     ))}
                   </div>
                 </div>
               )}
               
-              {/* Display raw JSON for domain monitoring or fallback */}
-              {selectedSearch.results && (selectedSearch.searchType === 'domain-monitoring' || selectedSearch.searchType !== 'discovery') && (
+              {/* Display credential details for Domain Monitoring searches */}
+              {selectedSearch.results && selectedSearch.results.length > 0 && selectedSearch.searchType === 'domain-monitoring' && (
                 <div>
-                  <p className="text-sm text-gray-400 mb-2">Results Data</p>
-                  <pre className="bg-gray-800 p-4 rounded text-xs text-gray-300 overflow-x-auto max-h-96">
-                    {JSON.stringify(selectedSearch.results, null, 2)}
-                  </pre>
+                  <p className="text-sm text-gray-400 mb-3">Domain Exposure Details (First {Math.min(10, selectedSearch.results.length)} of {selectedSearch.resultsCount} results)</p>
+                  <div className="space-y-3">
+                    {selectedSearch.results.slice(0, 10).map((result: any, index: number) => (
+                      <div key={index} className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">Email Address</p>
+                            <p className="text-cyan-400 font-mono text-sm break-all">{result.email || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">Password</p>
+                            <p className="text-red-400 font-mono text-sm">{result.password || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">Database Source</p>
+                            <p className="text-purple-400 text-sm">{result.database_source || 'Unknown'}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">Relevance Score</p>
+                            <p className="text-green-400 text-sm">{result.score?.toFixed(2) || 'N/A'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {selectedSearch.resultsCount > 10 && (
+                      <div className="text-center py-2">
+                        <p className="text-sm text-gray-400">
+                          Showing 10 of {selectedSearch.resultsCount} results
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
