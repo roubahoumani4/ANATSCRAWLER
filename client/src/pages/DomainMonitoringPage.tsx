@@ -87,6 +87,40 @@ const DomainMonitoringPage = () => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [validationError, setValidationError] = useState("");
 
+  // Breach Information Database
+  const BREACH_INFO: { [key: string]: any } = {
+    'CompilationOfManyBreaches': {
+      name: 'Compilation of Many Breaches (COMB)',
+      description: 'A massive compilation of credentials from multiple historical data breaches',
+      date: 'February 2021',
+      affectedAccounts: '3.2 billion',
+      whatHappened: 'On February 2, 2021, a user known as Singularity0x01 posted a .ZIP file on RaidForums containing billions of usernames and passwords. The data contained more than 3.2 billion unique pairs of email addresses and passwords, including 450 million Gmail addresses and 450 million Yahoo! email addresses. This is a compilation of credentials from past data breaches involving Netflix, LinkedIn, Hotmail, Yahoo, Bitcoin and other platforms.',
+      dataCompromised: ['Email addresses', 'Passwords', 'Usernames'],
+      recommendations: [
+        'Immediately reset passwords for all exposed accounts',
+        'Enable two-factor authentication (2FA) on all accounts',
+        'Use unique passwords for each online service',
+        'Consider using a password manager',
+        'Monitor accounts for suspicious activity'
+      ]
+    },
+    'naz.api': {
+      name: 'Naz.API',
+      description: 'A large-scale credential database breach',
+      date: 'September 2023',
+      affectedAccounts: '70.8 million',
+      whatHappened: 'In September 2023, the Naz.API database was exposed containing over 70 million user credentials. This database appears to be a collection from various sources and contains email addresses, usernames, and passwords in plaintext format. The breach was discovered when the database was being sold on dark web marketplaces.',
+      dataCompromised: ['Email addresses', 'Passwords', 'Usernames', 'Account metadata'],
+      recommendations: [
+        'Change passwords immediately on all affected accounts',
+        'Enable multi-factor authentication (MFA) wherever possible',
+        'Review recent account activity for signs of unauthorized access',
+        'Be vigilant for phishing attempts using your exposed information',
+        'Consider credit monitoring services if financial data was exposed'
+      ]
+    }
+  };
+
   // Validate domain format
   const isValidDomain = (domain: string): boolean => {
     // Basic domain validation regex
@@ -825,6 +859,32 @@ const DomainMonitoringPage = () => {
                     <div className="text-lg text-green-400 font-bold">{selectedResult.score.toFixed(2)}</div>
                   </div>
                 </div>
+
+                {/* Breach Explanation */}
+                {BREACH_INFO[selectedResult.database_source] && (
+                  <div className="bg-gradient-to-br from-cyan-900/20 to-blue-900/20 rounded-lg p-4 border border-cyan-700/50 mt-4">
+                    <h4 className="text-cyan-400 font-semibold mb-2 flex items-center gap-2">
+                      <Eye className="w-5 h-5" />
+                      About {BREACH_INFO[selectedResult.database_source].name}
+                    </h4>
+                    <p className="text-gray-300 text-sm mb-3 leading-relaxed">
+                      {BREACH_INFO[selectedResult.database_source].whatHappened}
+                    </p>
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div className="bg-gray-900/50 p-2 rounded">
+                        <div className="text-xs text-gray-400">Breach Date</div>
+                        <div className="text-sm font-semibold text-white">{BREACH_INFO[selectedResult.database_source].date}</div>
+                      </div>
+                      <div className="bg-gray-900/50 p-2 rounded">
+                        <div className="text-xs text-gray-400">Affected Accounts</div>
+                        <div className="text-sm font-semibold text-white">{BREACH_INFO[selectedResult.database_source].affectedAccounts}</div>
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      <span className="font-semibold">Data Compromised:</span> {BREACH_INFO[selectedResult.database_source].dataCompromised.join(', ')}
+                    </div>
+                  </div>
+                )}
 
                 <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-lg p-4 mt-4">
                   <div className="flex items-start gap-2">

@@ -9,6 +9,42 @@ const DiscoveryPage: React.FC = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [validationError, setValidationError] = useState("");
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedResult, setSelectedResult] = useState<any>(null);
+
+  // Breach Information Database
+  const BREACH_INFO: { [key: string]: any } = {
+    'CompilationOfManyBreaches': {
+      name: 'Compilation of Many Breaches (COMB)',
+      description: 'A massive compilation of credentials from multiple historical data breaches',
+      date: 'February 2021',
+      affectedAccounts: '3.2 billion',
+      whatHappened: 'On February 2, 2021, a user known as Singularity0x01 posted a .ZIP file on RaidForums containing billions of usernames and passwords. The data contained more than 3.2 billion unique pairs of email addresses and passwords, including 450 million Gmail addresses and 450 million Yahoo! email addresses. This is a compilation of credentials from past data breaches involving Netflix, LinkedIn, Hotmail, Yahoo, Bitcoin and other platforms.',
+      dataCompromised: ['Email addresses', 'Passwords', 'Usernames'],
+      recommendations: [
+        'Immediately reset passwords for all exposed accounts',
+        'Enable two-factor authentication (2FA) on all accounts',
+        'Use unique passwords for each online service',
+        'Consider using a password manager',
+        'Monitor accounts for suspicious activity'
+      ]
+    },
+    'naz.api': {
+      name: 'Naz.API',
+      description: 'A large-scale credential database breach',
+      date: 'September 2023',
+      affectedAccounts: '70.8 million',
+      whatHappened: 'In September 2023, the Naz.API database was exposed containing over 70 million user credentials. This database appears to be a collection from various sources and contains email addresses, usernames, and passwords in plaintext format. The breach was discovered when the database was being sold on dark web marketplaces.',
+      dataCompromised: ['Email addresses', 'Passwords', 'Usernames', 'Account metadata'],
+      recommendations: [
+        'Change passwords immediately on all affected accounts',
+        'Enable multi-factor authentication (MFA) wherever possible',
+        'Review recent account activity for signs of unauthorized access',
+        'Be vigilant for phishing attempts using your exposed information',
+        'Consider credit monitoring services if financial data was exposed'
+      ]
+    }
+  };
 
   // Confetti Component
   const Confetti = () => {
@@ -295,11 +331,163 @@ const DiscoveryPage: React.FC = () => {
                   </div>
                 </motion.div>
               ) : (
-                <ResultsTable 
-                  results={searchResults} 
-                  onExport={handleExport} 
-                  isExported={false} 
-                />
+                <>
+                  {/* Results Table */}
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.5, delay: 0.6 }}
+                    className="mb-6"
+                  >
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-gray-700">
+                            <th className="text-left p-3 text-gray-400 font-semibold">#</th>
+                            <th className="text-left p-3 text-gray-400 font-semibold">Score</th>
+                            <th className="text-left p-3 text-gray-400 font-semibold">Email/Username</th>
+                            <th className="text-left p-3 text-gray-400 font-semibold">Password</th>
+                            <th className="text-left p-3 text-gray-400 font-semibold">Source</th>
+                            <th className="text-left p-3 text-gray-400 font-semibold">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {searchResults.map((result, index) => (
+                            <motion.tr
+                              key={index}
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: index * 0.05 }}
+                              className="border-b border-gray-800 hover:bg-gray-800/50 transition-colors"
+                            >
+                              <td className="p-3 text-gray-400">{index + 1}</td>
+                              <td className="p-3">
+                                <span className="bg-green-900/30 text-green-400 px-2 py-1 rounded text-sm font-semibold">
+                                  {result.score?.toFixed(2) || '0.00'}
+                                </span>
+                              </td>
+                              <td className="p-3">
+                                <code className="text-blue-300 font-mono text-sm">
+                                  {result.email || result.name || result.username || '-'}
+                                </code>
+                              </td>
+                              <td className="p-3">
+                                <code className="text-red-300 font-mono text-sm">
+                                  {result.password ? '••••••••' : '-'}
+                                </code>
+                              </td>
+                              <td className="p-3">
+                                <span className="text-cyan-400 font-semibold text-sm">
+                                  {result.database_source || result.index || 'Unknown'}
+                                </span>
+                              </td>
+                              <td className="p-3">
+                                <motion.button
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
+                                  onClick={() => {
+                                    setSelectedResult(result);
+                                    setShowDetailsModal(true);
+                                  }}
+                                  className="text-purple-400 hover:text-purple-300 text-sm font-semibold"
+                                >
+                                  Details
+                                </motion.button>
+                              </td>
+                            </motion.tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </motion.div>
+
+                  {/* Export Button */}
+                  <div className="flex justify-center mt-6">
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={handleExport}
+                      className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Export to CSV
+                    </motion.button>
+                  </div>
+
+                  {/* Breach Information Panels */}
+                  {searchResults.length > 0 && (
+                    <div className="mt-8 space-y-6">
+                      {[...new Set(searchResults.map(r => r.database_source).filter(Boolean))].map((dbSource) => {
+                        const breachInfo = BREACH_INFO[dbSource];
+                        if (!breachInfo) return null;
+
+                        return (
+                          <motion.div
+                            key={dbSource}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.5 }}
+                            className="bg-gradient-to-br from-red-900/20 to-pink-900/20 rounded-lg border border-red-700/50 overflow-hidden"
+                          >
+                            {/* Header */}
+                            <div className="bg-gradient-to-r from-red-900/40 to-red-800/40 p-4 border-b border-red-900/50">
+                              <div className="flex items-center gap-3">
+                                <AlertTriangle className="w-6 h-6 text-red-400" />
+                                <h3 className="text-xl font-bold text-red-400">{breachInfo.name}</h3>
+                              </div>
+                              <p className="text-gray-400 text-sm mt-1">{breachInfo.description}</p>
+                            </div>
+
+                            {/* Content */}
+                            <div className="p-6 space-y-4">
+                              <div>
+                                <h4 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+                                  <Eye className="w-5 h-5 text-red-400" />
+                                  What Happened
+                                </h4>
+                                <p className="text-gray-300 text-sm leading-relaxed">
+                                  {breachInfo.whatHappened}
+                                </p>
+                              </div>
+
+                              <div className="grid md:grid-cols-3 gap-4">
+                                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700/50">
+                                  <div className="text-gray-400 text-xs mb-1">Affected Accounts</div>
+                                  <div className="text-2xl font-bold text-white">{breachInfo.affectedAccounts}</div>
+                                </div>
+                                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700/50">
+                                  <div className="text-gray-400 text-xs mb-1">Breach Occurred</div>
+                                  <div className="text-2xl font-bold text-white">{breachInfo.date}</div>
+                                </div>
+                                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700/50">
+                                  <div className="text-gray-400 text-xs mb-1">Data Compromised</div>
+                                  <div className="text-sm font-semibold text-white">{breachInfo.dataCompromised.join(', ')}</div>
+                                </div>
+                              </div>
+
+                              <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-lg p-4">
+                                <h5 className="text-yellow-400 font-semibold mb-2 flex items-center gap-2">
+                                  <Shield className="w-5 h-5" />
+                                  Recommendations
+                                </h5>
+                                <ul className="space-y-1 text-gray-300 text-sm">
+                                  {breachInfo.recommendations.map((rec: string, i: number) => (
+                                    <li key={i} className="flex items-start gap-2">
+                                      <span className="text-yellow-400 mt-1">•</span>
+                                      <span>{rec}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </motion.div>
@@ -339,6 +527,114 @@ const DiscoveryPage: React.FC = () => {
           </motion.div>
         )}
       </div>
+
+      {/* Details Modal */}
+      <AnimatePresence>
+        {showDetailsModal && selectedResult && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowDetailsModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-gray-850 rounded-lg border border-gray-700 max-w-2xl w-full p-6 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-2xl font-bold text-white flex items-center gap-2">
+                  <Shield className="w-6 h-6 text-red-400" />
+                  Credential Details
+                </h3>
+                <button
+                  onClick={() => setShowDetailsModal(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+                  <div className="text-sm text-gray-500 mb-1">Email Address</div>
+                  <code className="text-lg text-blue-300 font-mono">
+                    {selectedResult.email || selectedResult.name || selectedResult.username || 'N/A'}
+                  </code>
+                </div>
+
+                <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+                  <div className="text-sm text-gray-500 mb-1">Password</div>
+                  <code className="text-lg text-red-300 font-mono">{selectedResult.password || 'N/A'}</code>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+                    <div className="text-sm text-gray-500 mb-1">Database Source</div>
+                    <div className="text-lg text-cyan-400 font-semibold">
+                      {selectedResult.database_source || selectedResult.index || 'Unknown'}
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+                    <div className="text-sm text-gray-500 mb-1">Relevance Score</div>
+                    <div className="text-lg text-green-400 font-bold">
+                      {selectedResult.score?.toFixed(2) || '0.00'}
+                    </div>
+                  </div>
+                </div>
+
+                {selectedResult.context && (
+                  <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+                    <div className="text-sm text-gray-500 mb-1">Full Details</div>
+                    <code className="text-sm text-gray-300 font-mono break-all">
+                      {selectedResult.context}
+                    </code>
+                  </div>
+                )}
+
+                <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-lg p-4 mt-4">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-yellow-400 font-semibold mb-1">Security Alert</div>
+                      <div className="text-sm text-gray-300">
+                        This credential has been exposed in a data breach. Immediately change the password on all accounts where it was used.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  onClick={() => setShowDetailsModal(false)}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    const credential = `${selectedResult.email || selectedResult.name || selectedResult.username}:${selectedResult.password || ''}`;
+                    navigator.clipboard.writeText(credential);
+                  }}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  Copy Credentials
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };
