@@ -249,6 +249,33 @@ const DiscoveryPage: React.FC = () => {
           </AnimatePresence>
         </motion.div>
 
+        {/* Loading Animation */}
+        <AnimatePresence>
+          {isSearching && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="mt-6 bg-gray-850 rounded-lg p-16 border border-gray-800 w-full"
+            >
+              <div className="flex flex-col items-center justify-center space-y-6">
+                <motion.div
+                  className="relative w-20 h-20"
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                >
+                  <div className="absolute inset-0 border-4 border-cyan-500/30 rounded-full"></div>
+                  <div className="absolute inset-0 border-4 border-transparent border-t-cyan-500 rounded-full"></div>
+                </motion.div>
+                <div className="text-center">
+                  <p className="text-xl text-gray-300 font-semibold mb-2">Scanning dark web databases...</p>
+                  <p className="text-sm text-gray-500">Searching for compromised credentials</p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Search Results Section */}
         {showResults && (
           <motion.div
