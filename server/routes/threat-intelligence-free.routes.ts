@@ -55,46 +55,69 @@ async function fetchOTXBreaches(): Promise<BreachData[]> {
 
     console.log(`✓ Using OTX API key: ${OTX.substring(0, 10)}...`);
 
-    // Get pulses (threat intelligence reports) from OTX
-    const response = await axios.get('https://otx.alienvault.com/api/v1/pulses/subscribed', {
-      headers: {
-        'X-OTX-API-KEY': OTX
-      },
-      params: {
-        limit: 50,
-        page: 1
-      },
-      timeout: 15000
-    });
+    // Try multiple endpoints to get more data
+    const endpoints = [
+      'https://otx.alienvault.com/api/v1/pulses/subscribed',
+      'https://otx.alienvault.com/api/v1/pulses/activity'
+    ];
 
     const breaches: BreachData[] = [];
-    const pulses = response.data.results || [];
 
-    for (const pulse of pulses.slice(0, 30)) {
-      // Extract breach-related pulses
-      if (pulse.name && (pulse.name.toLowerCase().includes('breach') || 
-                         pulse.name.toLowerCase().includes('leak') ||
-                         pulse.name.toLowerCase().includes('database'))) {
-        
-        breaches.push({
-          id: pulse.id || pulse.name.replace(/\s/g, ''),
-          name: pulse.name,
-          domain: extractDomain(pulse.name),
-          breachDate: pulse.created || new Date().toISOString(),
-          addedDate: pulse.modified || pulse.created || new Date().toISOString(),
-          pwnCount: estimatePwnCount(pulse.description || ''),
-          description: pulse.description || 'Data breach discovered and reported to threat intelligence community',
-          dataClasses: extractDataClasses(pulse.description || pulse.name),
-          isVerified: true,
-          isSensitive: true,
-          severity: calculateSeverity(estimatePwnCount(pulse.description || ''), pulse.description || ''),
-          source: 'AlienVault OTX'
+    for (const endpoint of endpoints) {
+      try {
+        const response = await axios.get(endpoint, {
+          headers: {
+            'X-OTX-API-KEY': OTX
+          },
+          params: {
+            limit: 50,
+            page: 1
+          },
+          timeout: 15000
         });
+
+        const pulses = response.data.results || [];
+        console.log(`OTX ${endpoint.split('/').pop()} returned ${pulses.length} pulses`);
+
+        for (const pulse of pulses.slice(0, 20)) {
+          // Extract breach-related and malware-related pulses
+          if (pulse.name && (
+            pulse.name.toLowerCase().includes('breach') || 
+            pulse.name.toLowerCase().includes('leak') ||
+            pulse.name.toLowerCase().includes('database') ||
+            pulse.name.toLowerCase().includes('malware') ||
+            pulse.name.toLowerCase().includes('ransomware') ||
+            pulse.name.toLowerCase().includes('apt')
+          )) {
+            
+            breaches.push({
+              id: pulse.id || pulse.name.replace(/\s/g, ''),
+              name: pulse.name,
+              domain: extractDomain(pulse.name),
+              breachDate: pulse.created || new Date().toISOString(),
+              addedDate: pulse.modified || pulse.created || new Date().toISOString(),
+              pwnCount: estimatePwnCount(pulse.description || ''),
+              description: (pulse.description || 'Security threat intelligence report').substring(0, 500),
+              dataClasses: extractDataClasses(pulse.description || pulse.name),
+              isVerified: true,
+              isSensitive: true,
+              severity: calculateSeverity(estimatePwnCount(pulse.description || ''), pulse.description || ''),
+              source: 'AlienVault OTX'
+            });
+          }
+        }
+      } catch (err: any) {
+        console.log(`OTX ${endpoint.split('/').pop()} failed:`, err.message);
       }
     }
 
-    console.log(`✓ Fetched ${breaches.length} breaches from OTX`);
-    return breaches;
+    // Remove duplicates
+    const uniqueBreaches = Array.from(
+      new Map(breaches.map(b => [b.name, b])).values()
+    );
+
+    console.log(`✓ Fetched ${uniqueBreaches.length} threat intelligence reports from OTX`);
+    return uniqueBreaches;
   } catch (error: any) {
     console.error('Error fetching OTX data:', error.message);
     return [];
@@ -106,12 +129,14 @@ async function fetchOTXBreaches(): Promise<BreachData[]> {
  */
 async function fetchThreatFoxData(): Promise<BreachData[]> {
   try {
+    // ThreatFox requires specific query format
     const response = await axios.post('https://threatfox-api.abuse.ch/api/v1/', {
-      query: 'get_recent',
-      days: 30
+      query: 'get_iocs',
+      days: 7
     }, {
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
       timeout: 10000
     });
@@ -119,34 +144,36 @@ async function fetchThreatFoxData(): Promise<BreachData[]> {
     const breaches: BreachData[] = [];
     
     if (!response.data || response.data.query_status !== 'ok') {
-      console.log('ThreatFox returned no data or error status');
+      console.log('ThreatFox: No recent threats found or API unavailable');
       return [];
     }
     
     const threats = response.data.data || [];
+    console.log(`ThreatFox returned ${threats.length} threats`);
 
     for (const threat of threats.slice(0, 20)) {
-      if (threat.threat_type && threat.malware) {
+      if (threat.threat_type && threat.malware_printable) {
         breaches.push({
           id: threat.id || `threat-${Date.now()}-${Math.random()}`,
-          name: `${threat.malware} - ${threat.threat_type}`,
+          name: `${threat.malware_printable} - ${threat.threat_type}`,
           domain: threat.ioc || 'unknown.com',
           breachDate: threat.first_seen || new Date().toISOString(),
           addedDate: threat.first_seen || new Date().toISOString(),
           pwnCount: Math.floor(Math.random() * 5000000) + 100000,
-          description: `Active ${threat.threat_type} threat detected. Malware: ${threat.malware}. ${threat.tags?.join(', ') || ''}`,
-          dataClasses: ['Credentials', 'Personal data', 'System access'],
+          description: `Active ${threat.threat_type} threat. Malware: ${threat.malware_printable}. Confidence: ${threat.confidence_level || 'unknown'}`,
+          dataClasses: ['Malware', 'System compromise', 'Credentials at risk'],
           isVerified: true,
           isSensitive: true,
-          severity: 'high',
+          severity: threat.confidence_level >= 75 ? 'critical' : 'high',
           source: 'ThreatFox/abuse.ch'
         });
       }
     }
 
+    console.log(`✓ Fetched ${breaches.length} threats from ThreatFox`);
     return breaches;
   } catch (error: any) {
-    console.error('Error fetching ThreatFox data:', error.message);
+    console.error('Error fetching ThreatFox data:', error.response?.data || error.message);
     return [];
   }
 }
@@ -156,7 +183,8 @@ async function fetchThreatFoxData(): Promise<BreachData[]> {
  */
 async function fetchURLhausData(): Promise<BreachData[]> {
   try {
-    const response = await axios.get('https://urlhaus-api.abuse.ch/v1/urls/recent/limit/30/', {
+    // URLhaus recent payloads endpoint
+    const response = await axios.get('https://urlhaus-api.abuse.ch/v1/payloads/recent/', {
       headers: {
         'Accept': 'application/json'
       },
@@ -166,40 +194,36 @@ async function fetchURLhausData(): Promise<BreachData[]> {
     const breaches: BreachData[] = [];
     
     if (!response.data || response.data.query_status !== 'ok') {
-      console.log('URLhaus returned no data or error status');
+      console.log('URLhaus: No recent payloads found or API unavailable');
       return [];
     }
     
-    const urls = response.data.urls || [];
+    const payloads = response.data.payloads || [];
+    console.log(`URLhaus returned ${payloads.length} payloads`);
 
-    for (const url of urls.slice(0, 15)) {
-      if (url.url_status === 'online' && url.threat) {
-        try {
-          const urlObj = new URL(url.url);
-          breaches.push({
-            id: url.id || `urlhaus-${Date.now()}-${Math.random()}`,
-            name: `${url.threat} Distribution Site`,
-            domain: urlObj.hostname,
-            breachDate: url.dateadded || new Date().toISOString(),
-            addedDate: url.dateadded || new Date().toISOString(),
-            pwnCount: Math.floor(Math.random() * 2000000) + 50000,
-            description: `Active malware distribution detected. Threat: ${url.threat}. Tags: ${url.tags?.join(', ') || 'malware'}`,
-            dataClasses: ['Malware', 'Credentials', 'System compromise'],
-            isVerified: true,
-            isSensitive: true,
-            severity: url.url_status === 'online' ? 'critical' : 'high',
-            source: 'URLhaus/abuse.ch'
-          });
-        } catch (e) {
-          // Skip invalid URLs
-          continue;
-        }
+    for (const payload of payloads.slice(0, 15)) {
+      if (payload.file_type && payload.signature) {
+        breaches.push({
+          id: payload.sha256_hash || `urlhaus-${Date.now()}-${Math.random()}`,
+          name: `${payload.signature} Malware Distribution`,
+          domain: 'malware-distribution.threat',
+          breachDate: payload.firstseen || new Date().toISOString(),
+          addedDate: payload.firstseen || new Date().toISOString(),
+          pwnCount: Math.floor(Math.random() * 2000000) + 50000,
+          description: `Active malware payload detected. Type: ${payload.file_type}. Signature: ${payload.signature}. File: ${payload.sha256_hash}`,
+          dataClasses: ['Malware', 'Credentials', 'System compromise'],
+          isVerified: true,
+          isSensitive: true,
+          severity: 'critical',
+          source: 'URLhaus/abuse.ch'
+        });
       }
     }
 
+    console.log(`✓ Fetched ${breaches.length} malware distributions from URLhaus`);
     return breaches;
   } catch (error: any) {
-    console.error('Error fetching URLhaus data:', error.message);
+    console.error('Error fetching URLhaus data:', error.response?.data || error.message);
     return [];
   }
 }
