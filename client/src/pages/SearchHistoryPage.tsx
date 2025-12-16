@@ -269,9 +269,9 @@ const SearchHistoryPage: React.FC = () => {
               onChange={(e) => setFilterType(e.target.value as any)}
               className="bg-gray-850 border border-gray-800 rounded px-3 py-2 text-sm text-white"
             >
-              <option value="all">All Types</option>
-              <option value="discovery">Discovery Only</option>
-              <option value="domain-monitoring">Domain Monitoring Only</option>
+              <option value="all" className="bg-gray-900 text-white">All Types</option>
+              <option value="discovery" className="bg-gray-900 text-white">Discovery Only</option>
+              <option value="domain-monitoring" className="bg-gray-900 text-white">Domain Monitoring Only</option>
             </select>
           </div>
 
@@ -280,9 +280,9 @@ const SearchHistoryPage: React.FC = () => {
             onChange={(e) => setFilterResults(e.target.value as any)}
             className="bg-gray-850 border border-gray-800 rounded px-3 py-2 text-sm text-white"
           >
-            <option value="all">All Results</option>
-            <option value="with-results">With Results</option>
-            <option value="no-results">No Results</option>
+            <option value="all" className="bg-gray-900 text-white">All Results</option>
+            <option value="with-results" className="bg-gray-900 text-white">With Results</option>
+            <option value="no-results" className="bg-gray-900 text-white">No Results</option>
           </select>
         </div>
 

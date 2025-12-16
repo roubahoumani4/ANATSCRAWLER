@@ -1,16 +1,36 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Shield, Eye, AlertTriangle, Mail, Database, TrendingUp } from "lucide-react";
+import { Search, Shield, Eye, AlertTriangle, Mail, Database, TrendingUp, X } from "lucide-react";
 import ResultsTable from "@/components/dashboard/ResultsTable";
+import axios from "axios";
 
 const DiscoveryPage: React.FC = () => {
-  const [searchQuery, setSearchQuery] = useState("");
+  // Load persisted search from localStorage
+  const [searchQuery, setSearchQuery] = useState(() => {
+    return localStorage.getItem('discoverySearchQuery') || "";
+  });
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [validationError, setValidationError] = useState("");
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedResult, setSelectedResult] = useState<any>(null);
+
+  // Persist search query to localStorage whenever it changes
+  useEffect(() => {
+    if (searchQuery) {
+      localStorage.setItem('discoverySearchQuery', searchQuery);
+    }
+  }, [searchQuery]);
+
+  // Clear search function
+  const clearSearch = () => {
+    setSearchQuery("");
+    localStorage.removeItem('discoverySearchQuery');
+    setSearchResults([]);
+    setShowResults(false);
+    setValidationError("");
+  };
 
   // Breach Information Database
   const BREACH_INFO: { [key: string]: any } = {
@@ -122,6 +142,7 @@ const DiscoveryPage: React.FC = () => {
 
     setIsSearching(true);
     setShowResults(false);
+    const searchStartTime = Date.now();
 
     try {
       const response = await fetch('/api/v1/search/darkweb-search', {
@@ -135,8 +156,29 @@ const DiscoveryPage: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setSearchResults(data.results || []);
+        const results = data.results || [];
+        setSearchResults(results);
         setShowResults(true);
+
+        // Track search in history
+        const searchDuration = Date.now() - searchStartTime;
+        try {
+          await axios.post('/api/v1/history/searches', {
+            searchType: 'discovery',
+            query: searchQuery.trim(),
+            queryType: 'dark-web-search',
+            resultsCount: results.length,
+            hasResults: results.length > 0,
+            results: results.slice(0, 10), // Store only first 10 results to avoid bloating DB
+            metadata: {
+              searchDuration
+            },
+            status: results.length > 0 ? 'success' : 'no-results'
+          });
+        } catch (historyError) {
+          console.error('Failed to track search history:', historyError);
+          // Don't fail the search if history tracking fails
+        }
       } else {
         let errorMsg = response.statusText;
         try {
@@ -149,10 +191,46 @@ const DiscoveryPage: React.FC = () => {
         } catch {}
         console.error('Search failed:', errorMsg);
         setSearchResults([]);
+
+        // Track failed search
+        try {
+          await axios.post('/api/v1/history/searches', {
+            searchType: 'discovery',
+            query: searchQuery.trim(),
+            queryType: 'dark-web-search',
+            resultsCount: 0,
+            hasResults: false,
+            metadata: {
+              searchDuration: Date.now() - searchStartTime,
+              error: errorMsg
+            },
+            status: 'failed'
+          });
+        } catch (historyError) {
+          console.error('Failed to track search history:', historyError);
+        }
       }
     } catch (error) {
       console.error('Search error:', error);
       setSearchResults([]);
+
+      // Track failed search
+      try {
+        await axios.post('/api/v1/history/searches', {
+          searchType: 'discovery',
+          query: searchQuery.trim(),
+          queryType: 'dark-web-search',
+          resultsCount: 0,
+          hasResults: false,
+          metadata: {
+            searchDuration: Date.now() - searchStartTime,
+            error: String(error)
+          },
+          status: 'failed'
+        });
+      } catch (historyError) {
+        console.error('Failed to track search history:', historyError);
+      }
     } finally {
       setIsSearching(false);
     }
@@ -208,9 +286,19 @@ const DiscoveryPage: React.FC = () => {
                   setValidationError("");
                 }}
                 placeholder="Enter email, username, or phone number..."
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-12 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-500 transition-colors"
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-12 pr-12 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-500 transition-colors"
                 disabled={isSearching}
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+                  title="Clear search"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
             </div>
             <motion.button
               type="submit"

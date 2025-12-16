@@ -13,9 +13,11 @@ import {
   Activity,
   Download,
   Eye,
-  EyeOff
+  EyeOff,
+  X
 } from "lucide-react";
 import { BarChart, Bar, PieChart as RechartsPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
+import axios from "axios";
 
 // Confetti component
 const Confetti = () => {
@@ -78,7 +80,10 @@ interface DomainStats {
 }
 
 const DomainMonitoringPage = () => {
-  const [searchDomain, setSearchDomain] = useState("");
+  // Load persisted search from localStorage
+  const [searchDomain, setSearchDomain] = useState(() => {
+    return localStorage.getItem('domainMonitoringSearchQuery') || "";
+  });
   const [isSearching, setIsSearching] = useState(false);
   const [domainStats, setDomainStats] = useState<DomainStats | null>(null);
   const [showResults, setShowResults] = useState(false);
@@ -86,6 +91,22 @@ const DomainMonitoringPage = () => {
   const [selectedResult, setSelectedResult] = useState<DomainResult | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [validationError, setValidationError] = useState("");
+
+  // Persist search query to localStorage whenever it changes
+  useEffect(() => {
+    if (searchDomain) {
+      localStorage.setItem('domainMonitoringSearchQuery', searchDomain);
+    }
+  }, [searchDomain]);
+
+  // Clear search function
+  const clearSearch = () => {
+    setSearchDomain("");
+    localStorage.removeItem('domainMonitoringSearchQuery');
+    setDomainStats(null);
+    setShowResults(false);
+    setValidationError("");
+  };
 
   // Breach Information Database
   const BREACH_INFO: { [key: string]: any } = {
@@ -133,6 +154,7 @@ const DomainMonitoringPage = () => {
   const performDomainSearch = async (domain: string) => {
     setIsSearching(true);
     setShowResults(false);
+    const searchStartTime = Date.now();
     
     try {
       // Search for all emails matching the domain pattern
@@ -199,17 +221,41 @@ const DomainMonitoringPage = () => {
       const databaseScore = Math.min(10, Object.keys(databases).length * 5);
       const riskScore = Math.min(100, accountScore + weakPasswordScore + databaseScore);
 
-      setDomainStats({
+      const stats = {
         domain,
         totalExposed: results.length,
         databases,
         results: results.slice(0, 100), // Limit display to 100 for performance
         riskScore: Math.round(riskScore),
         passwordStrength: { weak, medium, strong }
-      });
+      };
 
+      setDomainStats(stats);
       setIsSearching(false);
       setShowResults(true);
+
+      // Track search in history
+      const searchDuration = Date.now() - searchStartTime;
+      try {
+        await axios.post('/api/v1/history/searches', {
+          searchType: 'domain-monitoring',
+          query: domain.trim(),
+          queryType: 'domain-search',
+          resultsCount: results.length,
+          hasResults: results.length > 0,
+          results: results.slice(0, 10), // Store only first 10 results
+          metadata: {
+            searchDuration,
+            riskScore: stats.riskScore,
+            totalDatabases: Object.keys(databases).length,
+            passwordStrength: stats.passwordStrength
+          },
+          status: results.length > 0 ? 'success' : 'no-results'
+        });
+      } catch (historyError) {
+        console.error('Failed to track search history:', historyError);
+        // Don't fail the search if history tracking fails
+      }
     } catch (error) {
       console.error('Domain search error:', error);
       setIsSearching(false);
@@ -224,6 +270,24 @@ const DomainMonitoringPage = () => {
         passwordStrength: { weak: 0, medium: 0, strong: 0 }
       });
       setShowResults(true);
+
+      // Track failed search
+      try {
+        await axios.post('/api/v1/history/searches', {
+          searchType: 'domain-monitoring',
+          query: domain.trim(),
+          queryType: 'domain-search',
+          resultsCount: 0,
+          hasResults: false,
+          metadata: {
+            searchDuration: Date.now() - searchStartTime,
+            error: String(error)
+          },
+          status: 'failed'
+        });
+      } catch (historyError) {
+        console.error('Failed to track search history:', historyError);
+      }
     }
   };
 
@@ -339,8 +403,18 @@ const DomainMonitoringPage = () => {
                   setValidationError("");
                 }}
                 placeholder="Enter domain (e.g., company.com)"
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-12 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 transition-colors"
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-12 pr-12 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 transition-colors"
               />
+              {searchDomain && (
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+                  title="Clear search"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
             </div>
             <motion.button
               type="submit"
