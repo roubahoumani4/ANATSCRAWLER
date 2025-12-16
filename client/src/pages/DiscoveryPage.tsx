@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Shield, Terminal, Eye, Loader, AlertTriangle } from "lucide-react";
+import { Search, Shield, Eye, AlertTriangle } from "lucide-react";
 import ResultsTable from "@/components/dashboard/ResultsTable";
 
 const DiscoveryPage: React.FC = () => {
@@ -84,12 +84,6 @@ const DiscoveryPage: React.FC = () => {
     }
   };
 
-  const handleSearchKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleDarkWebSearch();
-    }
-  };
-
   const handleExport = () => {
     // Export functionality can be implemented here
     console.log('Export functionality to be implemented');
@@ -129,24 +123,9 @@ const DiscoveryPage: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
         >
-          <motion.h3 
-            className="text-lg font-semibold text-red-400 mb-6 flex items-center"
-            animate={{
-              textShadow: [
-                "0 0 20px rgba(248, 113, 113, 0.5)",
-                "0 0 30px rgba(248, 113, 113, 0.7)",
-                "0 0 20px rgba(248, 113, 113, 0.5)"
-              ]
-            }}
-            transition={{ duration: 2, repeat: Infinity }}
-          >
-            <Search className="w-6 h-6 mr-2" />
-            DARK WEB INTELLIGENCE SEARCH
-          </motion.h3>
-
-          <div className="space-y-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <form onSubmit={(e) => { e.preventDefault(); handleDarkWebSearch(); }} className="flex gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 w-5 h-5" />
               <input
                 type="text"
                 value={searchQuery}
@@ -154,87 +133,46 @@ const DiscoveryPage: React.FC = () => {
                   setSearchQuery(e.target.value);
                   setValidationError("");
                 }}
-                onKeyPress={handleSearchKeyPress}
-                placeholder="Enter search terms for dark web reconnaissance..."
-                className="w-full pl-10 pr-4 py-2 bg-gray-800 text-white rounded disabled:opacity-50"
+                placeholder="Enter email, username, or phone number..."
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-12 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-500 transition-colors"
                 disabled={isSearching}
               />
-              {isSearching && (
-                <motion.div
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                >
-                  <Loader className="w-4 h-4 text-red-400" />
-                </motion.div>
-              )}
             </div>
-
-            {/* Validation Error Message */}
-            <AnimatePresence>
-              {validationError && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="bg-red-900/20 border border-red-700/50 rounded-lg p-4 flex items-start gap-3"
-                >
-                  <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <div className="text-red-400 font-semibold">Invalid Input</div>
-                    <div className="text-sm text-gray-300 mt-1">{validationError}</div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
             <motion.button
-              onClick={handleDarkWebSearch}
+              type="submit"
               disabled={isSearching || !searchQuery.trim()}
-              className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white font-semibold rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
+              className="bg-gradient-to-r from-red-500 to-pink-600 text-white px-8 py-3 rounded-lg font-semibold hover:from-red-600 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
             >
               {isSearching ? (
-                <span className="flex items-center justify-center">
-                  <Loader className="w-4 h-4 mr-2 animate-spin" />
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                   Searching...
-                </span>
+                </div>
               ) : (
                 "Search"
               )}
             </motion.button>
-          </div>
+          </form>
 
-          {/* Status Indicators */}
-          <motion.div
-            className="flex items-center justify-start space-x-6 mt-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.8, delay: 0.4 }}
-          >
-            {[
-              { icon: Terminal, label: "TERMINAL", status: "ACTIVE", color: "text-green-400" },
-              { icon: Eye, label: "SURVEILLANCE", status: "MONITORING", color: "text-red-400" }
-            ].map((status, idx) => (
+          {/* Validation Error Message */}
+          <AnimatePresence>
+            {validationError && (
               <motion.div
-                key={idx}
-                className="flex items-center space-x-2 text-xs"
-                animate={{
-                  opacity: [0.7, 1, 0.7],
-                }}
-                transition={{
-                  duration: 2,
-                  delay: idx * 0.3,
-                  repeat: Infinity,
-                }}
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="mt-4 bg-red-900/20 border border-red-700/50 rounded-lg p-4 flex items-start gap-3"
               >
-                <status.icon className={`w-3 h-3 ${status.color}`} />
-                <span className="text-gray-400">{status.label}:</span>
-                <span className={status.color}>{status.status}</span>
+                <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <div className="text-red-400 font-semibold">Invalid Input</div>
+                  <div className="text-sm text-gray-300 mt-1">{validationError}</div>
+                </div>
               </motion.div>
-            ))}
-          </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
 
         {/* Search Results Section */}
