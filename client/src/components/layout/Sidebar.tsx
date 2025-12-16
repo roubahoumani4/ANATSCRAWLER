@@ -89,7 +89,8 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
       features: [
         { path: "/threat-intelligence", label: "Threat Intelligence", icon: <AlertTriangle size={16} />, color: "text-orange-400" },
         { path: "/discovery", label: "Discovery", icon: <Shield size={16} />, color: "text-red-400" },
-        { path: "/domain-monitoring", label: "Domain Monitoring", icon: <Globe size={16} />, color: "text-blue-400" }
+        { path: "/domain-monitoring", label: "Domain Monitoring", icon: <Globe size={16} />, color: "text-blue-400" },
+        { path: "/search-history", label: "Search History", icon: <HistoryIcon size={16} />, color: "text-purple-400" }
       ]
     },
     {

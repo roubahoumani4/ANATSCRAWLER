@@ -204,8 +204,8 @@ const ThreatIntelligencePage: React.FC = () => {
       >
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent flex items-center gap-3">
-              <Shield className="w-10 h-10 text-cyan-400" />
+            <h1 className="text-2xl font-semibold text-white flex items-center gap-3">
+              <Shield className="w-7 h-7 text-cyan-400" />
               Threat Intelligence Feed
             </h1>
             <p className="text-gray-400 mt-2">Real-time monitoring of global security breaches and threats</p>
