@@ -169,13 +169,23 @@ const DiscoveryPage: React.FC = () => {
             resultsCount: results.length
           });
           
+          // Format results to include complete credential details
+          const formattedResults = results.slice(0, 10).map((result: any) => ({
+            email: result.email || result.name || result.username || '',
+            password: result.password || '',
+            database_source: result.database_source || result.index || 'Unknown',
+            score: result.score || 0,
+            // Include any additional fields from the result
+            ...result
+          }));
+          
           const historyResponse = await axios.post('/api/v1/history/searches', {
             searchType: 'discovery',
             query: searchQuery.trim(),
             queryType: 'dark-web-search',
             resultsCount: results.length,
             hasResults: results.length > 0,
-            results: results.slice(0, 10), // Store only first 10 results to avoid bloating DB
+            results: formattedResults, // Store formatted results with complete details
             metadata: {
               searchDuration
             },
