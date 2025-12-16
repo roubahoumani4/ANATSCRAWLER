@@ -87,7 +87,7 @@ const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
 
   const exportToCSV = () => {
     // Create CSV header
-    const headers = ['#', 'Score', 'Email/Username', 'Password', 'Database Source', 'File', 'Full Details', 'Matched Content'];
+    const headers = ['#', 'Score', 'Email/Username', 'Password', 'Database Source', 'Full Details', 'Matched Content'];
     
     // Create CSV rows
     const rows = results.map((result, index) => {
@@ -95,7 +95,6 @@ const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
       const password = result.password || '-';
       const score = result.score?.toFixed(2) || '-';
       const databaseSource = result.database_source || 'Unknown';
-      const fileName = result.source?.split('/').pop() || result.index || '-';
       
       // Get Full Details (context)
       let fullDetails = '-';
@@ -125,7 +124,6 @@ const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
         escapeCSV(email),
         escapeCSV(password),
         escapeCSV(databaseSource),
-        escapeCSV(fileName),
         escapeCSV(fullDetails),
         escapeCSV(matchedContent)
       ].join(',');
@@ -331,22 +329,15 @@ const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
                           </div>
                         </td>
                         <td className="p-3">
-                          <div className="flex flex-col gap-1">
-                            {result.database_source && result.database_source !== 'Unknown' ? (
-                              <>
-                                <div className="text-sm font-semibold text-blue-400">
-                                  {result.database_source}
-                                </div>
-                                <div className="text-xs text-gray-500 max-w-xs truncate" title={result.source}>
-                                  {result.source?.split('/').pop() || result.index}
-                                </div>
-                              </>
-                            ) : (
-                              <div className="text-xs text-gray-400 max-w-xs truncate" title={result.source}>
-                                {result.source?.split('/').pop() || result.index}
-                              </div>
-                            )}
-                          </div>
+                          {result.database_source && result.database_source !== 'Unknown' ? (
+                            <div className="text-sm font-semibold text-blue-400">
+                              {result.database_source}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-gray-400">
+                              {result.index}
+                            </div>
+                          )}
                         </td>
                         <td className="p-3">
                           <button
