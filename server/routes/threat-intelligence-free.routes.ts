@@ -79,96 +79,91 @@ async function fetchOTXBreaches(): Promise<BreachData[]> {
 
     console.log(`✓ Using OTX API key: ${OTX.substring(0, 10)}...`);
 
-    // Fetch from multiple OTX endpoints for comprehensive data
-    const endpoints = [
-      { url: 'https://otx.alienvault.com/api/v1/pulses/subscribed', params: { limit: 100, page: 1 } },
-      { url: 'https://otx.alienvault.com/api/v1/pulses/activity', params: { limit: 50 } },
-      { url: 'https://otx.alienvault.com/api/v1/pulses/events', params: { limit: 50 } }
-    ];
+    // Use ONLY the most reliable endpoint with aggressive timeout
+    const url = 'https://otx.alienvault.com/api/v1/pulses/subscribed';
+    const params = { limit: 50, page: 1 }; // Reduced limit for faster response
 
     const breaches: BreachData[] = [];
     const seenIds = new Set<string>();
 
-    for (const { url, params } of endpoints) {
-      try {
-        const response = await axios.get(url, {
-          headers: {
-            'X-OTX-API-KEY': OTX
-          },
-          params,
-          timeout: 20000
+    try {
+      const response = await axios.get(url, {
+        headers: {
+          'X-OTX-API-KEY': OTX
+        },
+        params,
+        timeout: 5000 // 5 second timeout
+      });
+
+      const pulses = response.data.results || [];
+      console.log(`✓ OTX returned ${pulses.length} pulses`);
+
+      for (const pulse of pulses) {
+        if (!pulse.id || seenIds.has(pulse.id)) continue;
+        seenIds.add(pulse.id);
+        
+        // Extract comprehensive IOC data
+        const indicators = pulse.indicators || [];
+        const iocs = {
+          ips: indicators.filter((i: any) => i.type === 'IPv4' || i.type === 'IPv6').map((i: any) => i.indicator),
+          domains: indicators.filter((i: any) => i.type === 'domain' || i.type === 'hostname').map((i: any) => i.indicator),
+          urls: indicators.filter((i: any) => i.type === 'URL').map((i: any) => i.indicator),
+          hashes: indicators.filter((i: any) => i.type?.includes('hash') || i.type?.includes('MD5') || i.type?.includes('SHA')).map((i: any) => i.indicator)
+        };
+
+        // Calculate affected entities from IOCs
+        const affectedCount = indicators.length * 1000 + Math.floor(Math.random() * 50000);
+        
+        // Extract malware families and attack types
+        const tags = pulse.tags || [];
+        const malwareFamily = tags.find((t: string) => 
+          t.toLowerCase().includes('ransomware') || 
+          t.toLowerCase().includes('trojan') || 
+          t.toLowerCase().includes('malware')
+        );
+        
+        const attackType = tags.find((t: string) => 
+          t.toLowerCase().includes('apt') || 
+          t.toLowerCase().includes('phishing') || 
+          t.toLowerCase().includes('ddos') ||
+          t.toLowerCase().includes('exploit')
+        ) || 'Cyber Threat';
+
+        // Extract targeted industries
+        const industries = pulse.industries || [];
+        
+        // Extract geographic targets
+        const countries = pulse.targeted_countries || [];
+
+        breaches.push({
+          id: pulse.id,
+          name: pulse.name,
+          domain: extractDomain(pulse.name) || pulse.adversary || 'threat-actor.unknown',
+          breachDate: pulse.created || new Date().toISOString(),
+          addedDate: pulse.modified || pulse.created || new Date().toISOString(),
+          modifiedDate: pulse.modified || undefined,
+          pwnCount: affectedCount,
+          description: (pulse.description || 'Security threat intelligence report from AlienVault OTX').substring(0, 800),
+          dataClasses: extractDataClasses(pulse.description || pulse.name, indicators),
+          isVerified: true,
+          isFabricated: false,
+          isSensitive: true,
+          isRetired: false,
+          isSpamList: false,
+          isMalware: tags.some((t: string) => t.toLowerCase().includes('malware') || t.toLowerCase().includes('ransomware') || t.toLowerCase().includes('trojan')),
+          logoPath: undefined,
+          severity: calculateAdvancedSeverity(pulse, indicators.length),
+          source: 'AlienVault OTX',
+          tags: tags.slice(0, 10),
+          iocs,
+          attackType,
+          malwareFamily: malwareFamily || undefined,
+          industries: industries.length > 0 ? industries : undefined,
+          countries: countries.length > 0 ? countries : undefined
         });
-
-        const pulses = response.data.results || [];
-        console.log(`✓ OTX ${url.split('/').pop()} returned ${pulses.length} pulses`);
-
-        for (const pulse of pulses) {
-          if (!pulse.id || seenIds.has(pulse.id)) continue;
-          seenIds.add(pulse.id);
-          
-          // Extract comprehensive IOC data
-          const indicators = pulse.indicators || [];
-          const iocs = {
-            ips: indicators.filter((i: any) => i.type === 'IPv4' || i.type === 'IPv6').map((i: any) => i.indicator),
-            domains: indicators.filter((i: any) => i.type === 'domain' || i.type === 'hostname').map((i: any) => i.indicator),
-            urls: indicators.filter((i: any) => i.type === 'URL').map((i: any) => i.indicator),
-            hashes: indicators.filter((i: any) => i.type?.includes('hash') || i.type?.includes('MD5') || i.type?.includes('SHA')).map((i: any) => i.indicator)
-          };
-
-          // Calculate affected entities from IOCs
-          const affectedCount = indicators.length * 1000 + Math.floor(Math.random() * 50000);
-          
-          // Extract malware families and attack types
-          const tags = pulse.tags || [];
-          const malwareFamily = tags.find((t: string) => 
-            t.toLowerCase().includes('ransomware') || 
-            t.toLowerCase().includes('trojan') || 
-            t.toLowerCase().includes('malware')
-          );
-          
-          const attackType = tags.find((t: string) => 
-            t.toLowerCase().includes('apt') || 
-            t.toLowerCase().includes('phishing') || 
-            t.toLowerCase().includes('ddos') ||
-            t.toLowerCase().includes('exploit')
-          ) || 'Cyber Threat';
-
-          // Extract targeted industries
-          const industries = pulse.industries || [];
-          
-          // Extract geographic targets
-          const countries = pulse.targeted_countries || [];
-
-          breaches.push({
-            id: pulse.id,
-            name: pulse.name,
-            domain: extractDomain(pulse.name) || pulse.adversary || 'threat-actor.unknown',
-            breachDate: pulse.created || new Date().toISOString(),
-            addedDate: pulse.modified || pulse.created || new Date().toISOString(),
-            modifiedDate: pulse.modified || undefined,
-            pwnCount: affectedCount,
-            description: (pulse.description || 'Security threat intelligence report from AlienVault OTX').substring(0, 800),
-            dataClasses: extractDataClasses(pulse.description || pulse.name, indicators),
-            isVerified: true,
-            isFabricated: false,
-            isSensitive: true,
-            isRetired: false,
-            isSpamList: false,
-            isMalware: tags.some((t: string) => t.toLowerCase().includes('malware') || t.toLowerCase().includes('ransomware') || t.toLowerCase().includes('trojan')),
-            logoPath: undefined,
-            severity: calculateAdvancedSeverity(pulse, indicators.length),
-            source: 'AlienVault OTX',
-            tags: tags.slice(0, 10),
-            iocs,
-            attackType,
-            malwareFamily: malwareFamily || undefined,
-            industries: industries.length > 0 ? industries : undefined,
-            countries: countries.length > 0 ? countries : undefined
-          });
-        }
-      } catch (err: any) {
-        console.log(`⚠ OTX ${url.split('/').pop()} failed:`, err.message);
       }
+    } catch (err: any) {
+      console.log(`⚠ OTX request failed:`, err.message);
     }
 
     console.log(`✓ Fetched ${breaches.length} comprehensive threat intelligence reports from OTX`);
@@ -192,7 +187,7 @@ async function fetchMalwareBazaarData(): Promise<BreachData[]> {
           'Content-Type': 'application/x-www-form-urlencoded',
           'User-Agent': 'ANATSCRAWLER-ThreatIntel/1.0'
         },
-        timeout: 15000
+        timeout: 5000 // Reduced to 5 seconds
       }
     );
 
@@ -277,7 +272,7 @@ async function fetchPhishTankData(): Promise<BreachData[]> {
       headers: {
         'User-Agent': 'ANATSCRAWLER-ThreatIntel/1.0'
       },
-      timeout: 15000
+      timeout: 5000 // Reduced to 5 seconds
     });
 
     const breaches: BreachData[] = [];
@@ -373,7 +368,7 @@ async function fetchURLScanData(): Promise<BreachData[]> {
         q: 'tags:malicious OR tags:phishing OR tags:suspicious',
         size: 50
       },
-      timeout: 15000
+      timeout: 5000 // Reduced to 5 seconds
     });
 
     const breaches: BreachData[] = [];
