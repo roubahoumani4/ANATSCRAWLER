@@ -17,6 +17,7 @@ import DiscoveryPage from '@/pages/DiscoveryPage';
 import DomainMonitoringPage from '@/pages/DomainMonitoringPage';
 import ThreatIntelligenceFeedPage from '@/pages/ThreatIntelligenceFeedPage';
 import SearchHistoryPage from '@/pages/SearchHistoryPage';
+import DarkWebMonitoringPage from '@/pages/DarkWebMonitoringPage';
 
 // Layout Component
 import Layout from '@/components/layout/Layout';
@@ -52,6 +53,7 @@ export default function AppContent() {
         
         {/* Protected Routes */}
   <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+  <Route path="/analytics" element={<ProtectedRoute><DarkWebMonitoringPage /></ProtectedRoute>} />
   <Route path="/osint" element={<ProtectedRoute><OsintPlatformPage /></ProtectedRoute>} />
   <Route path="/osint/assessment" element={<ProtectedRoute><AssessmentPage /></ProtectedRoute>} />
   <Route path="/osint/assessment/output" element={<ProtectedRoute><OutputPage /></ProtectedRoute>} />
