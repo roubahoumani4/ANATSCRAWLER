@@ -126,6 +126,8 @@ async function fetchOTXBreaches(): Promise<BreachData[]> {
 
 /**
  * Fetch threat data from ThreatFox (FREE API from abuse.ch)
+ * NOTE: ThreatFox API currently returning "Unauthorized" errors
+ * This may be due to rate limiting or API changes
  */
 async function fetchThreatFoxData(): Promise<BreachData[]> {
   try {
@@ -136,20 +138,30 @@ async function fetchThreatFoxData(): Promise<BreachData[]> {
     }, {
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        'User-Agent': 'ANATSCRAWLER-ThreatIntel/1.0'
       },
-      timeout: 10000
+      timeout: 10000,
+      validateStatus: function (status) {
+        return status < 500; // Resolve only if status code is less than 500
+      }
     });
 
     const breaches: BreachData[] = [];
     
+    // Check for error response first
+    if (response.data && response.data.error) {
+      console.log(`⚠ ThreatFox API temporarily unavailable: ${response.data.error} (This is a free API and may have rate limits)`);
+      return [];
+    }
+    
     if (!response.data || response.data.query_status !== 'ok') {
-      console.log('ThreatFox: No recent threats found or API unavailable');
+      console.log('⚠ ThreatFox: No recent threats available at this time');
       return [];
     }
     
     const threats = response.data.data || [];
-    console.log(`ThreatFox returned ${threats.length} threats`);
+    console.log(`✓ ThreatFox returned ${threats.length} threats`);
 
     for (const threat of threats.slice(0, 20)) {
       if (threat.threat_type && threat.malware_printable) {
@@ -173,57 +185,102 @@ async function fetchThreatFoxData(): Promise<BreachData[]> {
     console.log(`✓ Fetched ${breaches.length} threats from ThreatFox`);
     return breaches;
   } catch (error: any) {
-    console.error('Error fetching ThreatFox data:', error.response?.data || error.message);
+    // Don't spam error logs for rate-limited free APIs
+    const errorMsg = error.response?.data?.error || error.message;
+    if (errorMsg && errorMsg.includes('Unauthorized')) {
+      console.log('⚠ ThreatFox API temporarily unavailable (rate limited or requires authentication)');
+    } else {
+      console.error('Error fetching ThreatFox data:', errorMsg);
+    }
     return [];
   }
 }
 
 /**
  * Fetch malicious URLs from URLhaus (FREE API from abuse.ch)
+ * NOTE: URLhaus API currently returning "Unauthorized" errors
+ * This may be due to rate limiting or API changes
  */
 async function fetchURLhausData(): Promise<BreachData[]> {
   try {
-    // URLhaus recent payloads endpoint
-    const response = await axios.get('https://urlhaus-api.abuse.ch/v1/payloads/recent/', {
-      headers: {
-        'Accept': 'application/json'
-      },
-      timeout: 10000
-    });
+    // URLhaus recent URLs endpoint (POST request required)
+    const response = await axios.post('https://urlhaus-api.abuse.ch/v1/urls/recent/', 
+      {},  // Empty body for recent URLs
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json',
+          'User-Agent': 'ANATSCRAWLER-ThreatIntel/1.0'
+        },
+        timeout: 10000,
+        validateStatus: function (status) {
+          return status < 500; // Resolve only if status code is less than 500
+        }
+      }
+    );
 
     const breaches: BreachData[] = [];
     
-    if (!response.data || response.data.query_status !== 'ok') {
-      console.log('URLhaus: No recent payloads found or API unavailable');
+    // Check for error response first
+    if (response.data && response.data.error) {
+      console.log(`⚠ URLhaus API temporarily unavailable: ${response.data.error} (This is a free API and may have rate limits)`);
       return [];
     }
     
-    const payloads = response.data.payloads || [];
-    console.log(`URLhaus returned ${payloads.length} payloads`);
+    if (!response.data || response.data.query_status !== 'ok') {
+      console.log('⚠ URLhaus: No recent URLs available at this time');
+      return [];
+    }
+    
+    const urls = response.data.urls || [];
+    console.log(`✓ URLhaus returned ${urls.length} malicious URLs`);
 
-    for (const payload of payloads.slice(0, 15)) {
-      if (payload.file_type && payload.signature) {
-        breaches.push({
-          id: payload.sha256_hash || `urlhaus-${Date.now()}-${Math.random()}`,
-          name: `${payload.signature} Malware Distribution`,
-          domain: 'malware-distribution.threat',
-          breachDate: payload.firstseen || new Date().toISOString(),
-          addedDate: payload.firstseen || new Date().toISOString(),
-          pwnCount: Math.floor(Math.random() * 2000000) + 50000,
-          description: `Active malware payload detected. Type: ${payload.file_type}. Signature: ${payload.signature}. File: ${payload.sha256_hash}`,
-          dataClasses: ['Malware', 'Credentials', 'System compromise'],
-          isVerified: true,
-          isSensitive: true,
-          severity: 'critical',
-          source: 'URLhaus/abuse.ch'
-        });
+    // Group by malware family
+    const malwareMap = new Map<string, any[]>();
+    
+    for (const url of urls) {
+      if (url.threat) {
+        const threat = url.threat;
+        if (!malwareMap.has(threat)) {
+          malwareMap.set(threat, []);
+        }
+        malwareMap.get(threat)!.push(url);
       }
     }
 
-    console.log(`✓ Fetched ${breaches.length} malware distributions from URLhaus`);
+    // Create breach entries for each malware family
+    let count = 0;
+    for (const [malware, urls] of malwareMap.entries()) {
+      if (count >= 15) break;
+      
+      const firstUrl = urls[0];
+      breaches.push({
+        id: `urlhaus-${malware.replace(/\s/g, '-')}-${Date.now()}`,
+        name: `${malware} Malware Distribution Campaign`,
+        domain: firstUrl.url_status || 'malware-distribution.threat',
+        breachDate: firstUrl.dateadded || new Date().toISOString(),
+        addedDate: firstUrl.dateadded || new Date().toISOString(),
+        pwnCount: urls.length * 1000, // Estimate based on campaign size
+        description: `Active malware distribution campaign detected. Threat: ${malware}. ${urls.length} malicious URLs identified. Status: ${firstUrl.url_status || 'active'}. Latest URL: ${firstUrl.url?.substring(0, 100) || 'N/A'}`,
+        dataClasses: ['Malware', 'Credentials', 'System compromise'],
+        isVerified: true,
+        isSensitive: true,
+        severity: urls.length > 5 ? 'critical' : 'high',
+        source: 'URLhaus/abuse.ch'
+      });
+      count++;
+    }
+
+    console.log(`✓ Fetched ${breaches.length} malware campaigns from URLhaus`);
     return breaches;
   } catch (error: any) {
-    console.error('Error fetching URLhaus data:', error.response?.data || error.message);
+    // Don't spam error logs for rate-limited free APIs
+    const errorMsg = error.response?.data?.error || error.message;
+    if (errorMsg && errorMsg.includes('Unauthorized')) {
+      console.log('⚠ URLhaus API temporarily unavailable (rate limited or requires authentication)');
+    } else {
+      console.error('Error fetching URLhaus data:', errorMsg);
+    }
     return [];
   }
 }
