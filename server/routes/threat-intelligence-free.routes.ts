@@ -26,11 +26,17 @@ interface BreachData {
   domain: string;
   breachDate: string;
   addedDate: string;
+  modifiedDate?: string;
   pwnCount: number;
   description: string;
   dataClasses: string[];
   isVerified: boolean;
+  isFabricated: boolean;
   isSensitive: boolean;
+  isRetired: boolean;
+  isSpamList: boolean;
+  isMalware: boolean;
+  logoPath?: string;
   severity: 'critical' | 'high' | 'medium' | 'low';
   source: string;
   tags?: string[];
@@ -139,11 +145,17 @@ async function fetchOTXBreaches(): Promise<BreachData[]> {
             domain: extractDomain(pulse.name) || pulse.adversary || 'threat-actor.unknown',
             breachDate: pulse.created || new Date().toISOString(),
             addedDate: pulse.modified || pulse.created || new Date().toISOString(),
+            modifiedDate: pulse.modified || undefined,
             pwnCount: affectedCount,
             description: (pulse.description || 'Security threat intelligence report from AlienVault OTX').substring(0, 800),
             dataClasses: extractDataClasses(pulse.description || pulse.name, indicators),
             isVerified: true,
+            isFabricated: false,
             isSensitive: true,
+            isRetired: false,
+            isSpamList: false,
+            isMalware: tags.some((t: string) => t.toLowerCase().includes('malware') || t.toLowerCase().includes('ransomware') || t.toLowerCase().includes('trojan')),
+            logoPath: undefined,
             severity: calculateAdvancedSeverity(pulse, indicators.length),
             source: 'AlienVault OTX',
             tags: tags.slice(0, 10),
@@ -222,11 +234,17 @@ async function fetchMalwareBazaarData(): Promise<BreachData[]> {
         domain: firstSample.urlhaus_download || 'malware-distribution.threat',
         breachDate: firstSample.first_seen || new Date().toISOString(),
         addedDate: firstSample.first_seen || new Date().toISOString(),
+        modifiedDate: undefined,
         pwnCount: samples.length * 5000, // Estimate impact
         description: `Active malware campaign detected. Signature: ${signature}. ${samples.length} samples identified. File types: ${fileTypes.join(', ')}. Tags: ${(firstSample.tags || []).join(', ')}. This malware family is actively being distributed and poses a significant threat.`,
         dataClasses: ['Malware', 'System Compromise', 'File Hashes', 'Credentials at Risk'],
         isVerified: true,
+        isFabricated: false,
         isSensitive: true,
+        isRetired: false,
+        isSpamList: false,
+        isMalware: true,
+        logoPath: undefined,
         severity: samples.length > 10 ? 'critical' : samples.length > 5 ? 'high' : 'medium',
         source: 'MalwareBazaar/abuse.ch',
         tags: firstSample.tags || [],
@@ -298,11 +316,17 @@ async function fetchPhishTankData(): Promise<BreachData[]> {
         domain: brand.toLowerCase().replace(/\s/g, '') + '-phishing.threat',
         breachDate: firstPhish.verification_time || new Date().toISOString(),
         addedDate: firstPhish.submission_time || new Date().toISOString(),
+        modifiedDate: undefined,
         pwnCount: phishes.length * 500, // Estimated victims per phishing URL
         description: `Active phishing campaign targeting ${brand} users. ${phishes.length} verified phishing URLs detected. These malicious sites are designed to steal credentials, personal information, and financial data from unsuspecting victims. Status: ${firstPhish.verified ? 'VERIFIED' : 'Unverified'}.`,
         dataClasses: ['Credentials', 'Email Addresses', 'Passwords', 'Personal Information', 'Financial Data'],
         isVerified: firstPhish.verified === 'yes',
+        isFabricated: false,
         isSensitive: true,
+        isRetired: false,
+        isSpamList: false,
+        isMalware: false,
+        logoPath: undefined,
         severity: phishes.length > 10 ? 'critical' : 'high',
         source: 'PhishTank',
         tags: ['Phishing', 'Social Engineering', brand],
@@ -390,11 +414,17 @@ async function fetchURLScanData(): Promise<BreachData[]> {
         domain: domain,
         breachDate: firstScan.task?.time || new Date().toISOString(),
         addedDate: firstScan.task?.time || new Date().toISOString(),
+        modifiedDate: undefined,
         pwnCount: scans.length * 1000,
         description: `Malicious domain detected through URL scanning. ${scans.length} malicious scans identified. Domain: ${domain}. ${firstScan.page?.status || 'Active'}. Technologies: ${(firstScan.page?.technologies || []).join(', ')}. This domain is flagged as malicious and may be hosting phishing pages, malware, or conducting other cyber attacks.`,
         dataClasses: ['URLs', 'Domain Names', 'IP Addresses'],
         isVerified: true,
+        isFabricated: false,
         isSensitive: true,
+        isRetired: false,
+        isSpamList: false,
+        isMalware: true,
+        logoPath: undefined,
         severity: scans.length > 5 ? 'critical' : 'high',
         source: 'URLScan.io',
         tags: ['Malicious Domain', ...(firstScan.page?.technologies || [])],
