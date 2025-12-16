@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, Shield, Eye, AlertTriangle } from "lucide-react";
 import ResultsTable from "@/components/dashboard/ResultsTable";
@@ -9,6 +9,44 @@ const DiscoveryPage: React.FC = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [validationError, setValidationError] = useState("");
+
+  // Confetti Component
+  const Confetti = () => {
+    const confettiPieces = Array.from({ length: 50 }, (_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      delay: Math.random() * 3,
+      duration: 3 + Math.random() * 2,
+      color: ['#22c55e', '#3b82f6', '#8b5cf6', '#f59e0b', '#ec4899'][Math.floor(Math.random() * 5)],
+    }));
+
+    return (
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {confettiPieces.map((piece) => (
+          <motion.div
+            key={piece.id}
+            className="absolute w-2 h-2 rounded-sm"
+            style={{
+              left: `${piece.left}%`,
+              top: '-10px',
+              backgroundColor: piece.color,
+            }}
+            animate={{
+              y: ['0vh', '120vh'],
+              rotate: [0, 360],
+              opacity: [1, 0.8, 0],
+            }}
+            transition={{
+              duration: piece.duration,
+              delay: piece.delay,
+              repeat: Infinity,
+              ease: 'linear',
+            }}
+          />
+        ))}
+      </div>
+    );
+  };
 
   // Check if input is a bare domain (for blocking)
   const isDomain = (input: string): boolean => {
@@ -191,14 +229,70 @@ const DiscoveryPage: React.FC = () => {
               
               {searchResults.length === 0 ? (
                 <motion.div
-                  className="text-center py-8"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.5 }}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="relative bg-gradient-to-br from-green-900/20 to-emerald-900/20 rounded-lg p-16 border-2 border-green-700/50 shadow-2xl text-center overflow-hidden"
                 >
-                  <Shield className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-                  <p className="text-gray-400">No results found for your search query.</p>
-                  <p className="text-gray-500 text-sm mt-2">Try different search terms or refine your query.</p>
+                  {/* Confetti Animation */}
+                  <Confetti />
+                  
+                  {/* Content */}
+                  <div className="relative z-10">
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                      className="inline-block mb-6"
+                    >
+                      <div className="relative">
+                        <motion.div
+                          animate={{
+                            boxShadow: [
+                              "0 0 20px rgba(34, 197, 94, 0.3)",
+                              "0 0 40px rgba(34, 197, 94, 0.5)",
+                              "0 0 20px rgba(34, 197, 94, 0.3)",
+                            ],
+                          }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                          className="w-32 h-32 rounded-full bg-green-500/20 flex items-center justify-center"
+                        >
+                          <Shield className="w-16 h-16 text-green-400" strokeWidth={2.5} />
+                        </motion.div>
+                      </div>
+                    </motion.div>
+
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.4 }}
+                    >
+                      <h2 className="text-5xl font-bold text-green-400 mb-4">
+                        0
+                      </h2>
+                      <h3 className="text-3xl font-bold text-white mb-4">
+                        Data Breaches
+                      </h3>
+                      <div className="max-w-2xl mx-auto">
+                        <p className="text-xl text-gray-300 mb-2">
+                          Good news — no pwnage found! This search term wasn't found in any of the data breaches loaded into the database.
+                        </p>
+                        <p className="text-lg text-gray-400 mb-6">
+                          Your search for <span className="text-cyan-400 font-semibold">{searchQuery}</span> appears to be safe from the monitored breach databases. That's great news!
+                        </p>
+                      </div>
+
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.6 }}
+                        className="mt-8 p-4 bg-green-900/30 border border-green-700/50 rounded-lg inline-block"
+                      >
+                        <p className="text-sm text-green-300">
+                          ✓ Scanned across all monitored breach databases
+                        </p>
+                      </motion.div>
+                    </motion.div>
+                  </div>
                 </motion.div>
               ) : (
                 <ResultsTable 
