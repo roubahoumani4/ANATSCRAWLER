@@ -274,10 +274,10 @@ const DiscoveryPage: React.FC = () => {
                       </h3>
                       <div className="max-w-2xl mx-auto">
                         <p className="text-xl text-gray-300 mb-2">
-                          Good news — no pwnage found! This search term wasn't found in any of the data breaches loaded into the database.
+                          Good news — no breaches found! This search term wasn't found in any of the monitored breach databases.
                         </p>
                         <p className="text-lg text-gray-400 mb-6">
-                          Your search for <span className="text-cyan-400 font-semibold">{searchQuery}</span> appears to be safe from the monitored breach databases. That's great news!
+                          Your search for <span className="text-cyan-400 font-semibold">{searchQuery}</span> appears to be safe. That's great news!
                         </p>
                       </div>
 

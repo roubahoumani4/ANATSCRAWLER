@@ -423,10 +423,10 @@ const DomainMonitoringPage = () => {
                       </h3>
                       <div className="max-w-2xl mx-auto">
                         <p className="text-xl text-gray-300 mb-2">
-                          Good news — no pwnage found! This email address wasn't found in any of the data breaches loaded into Have I Been Pwned.
+                          Good news — no breaches found! This domain wasn't found in any of the monitored breach databases.
                         </p>
                         <p className="text-lg text-gray-400 mb-6">
-                          Domain <span className="text-cyan-400 font-semibold">@{domainStats.domain}</span> appears to be safe from the monitored breach databases. That's great news!
+                          Domain <span className="text-cyan-400 font-semibold">@{domainStats.domain}</span> appears to be safe. That's great news!
                         </p>
                       </div>
 
