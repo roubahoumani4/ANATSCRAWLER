@@ -46,53 +46,102 @@ const DomainMonitoringPage = () => {
   const [showResults, setShowResults] = useState(false);
   const [expandedEmails, setExpandedEmails] = useState<Set<number>>(new Set());
 
-  // Mock data for demonstration - replace with actual API call
+  // Perform actual domain search using your API
   const performDomainSearch = async (domain: string) => {
     setIsSearching(true);
     setShowResults(false);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Mock results - in production, call your actual search API
-    const mockResults: DomainResult[] = [
-      { email: `user1@${domain}`, password: "password123", database_source: "naz.api", score: 95.5 },
-      { email: `admin@${domain}`, password: "Admin@2023", database_source: "CompilationOfManyBreaches", score: 88.2 },
-      { email: `support@${domain}`, password: "Welcome1", database_source: "naz.api", score: 92.1 },
-      { email: `sales@${domain}`, password: "Sales$ecure2024", database_source: "CompilationOfManyBreaches", score: 85.7 },
-      { email: `info@${domain}`, password: "12345678", database_source: "naz.api", score: 98.3 },
-    ];
-
-    const databases: { [key: string]: number } = {};
-    let weak = 0, medium = 0, strong = 0;
-
-    mockResults.forEach(result => {
-      databases[result.database_source] = (databases[result.database_source] || 0) + 1;
+    try {
+      // Search for all emails matching the domain pattern
+      const searchQuery = `@${domain}`;
       
-      // Simple password strength analysis
-      const pwd = result.password;
-      if (pwd.length < 8 || pwd.match(/^[0-9]+$/) || pwd.toLowerCase() === pwd) {
-        weak++;
-      } else if (pwd.length >= 12 && /[A-Z]/.test(pwd) && /[0-9]/.test(pwd) && /[^A-Za-z0-9]/.test(pwd)) {
-        strong++;
-      } else {
-        medium++;
+      const response = await fetch('/api/v1/search/darkweb-search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: searchQuery,
+          limit: 1000 // Get more results for domain analysis
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Search failed');
       }
-    });
 
-    const riskScore = Math.min(100, (mockResults.length * 15) + (weak * 5));
+      const data = await response.json();
+      
+      if (!data.success || !data.results) {
+        throw new Error('No results found');
+      }
 
-    setDomainStats({
-      domain,
-      totalExposed: mockResults.length,
-      databases,
-      results: mockResults,
-      riskScore,
-      passwordStrength: { weak, medium, strong }
-    });
+      // Process the results
+      const results: DomainResult[] = data.results
+        .filter((r: any) => r.email && r.email.toLowerCase().includes(`@${domain.toLowerCase()}`))
+        .map((r: any) => ({
+          email: r.email || r.name || '',
+          password: r.password || '',
+          database_source: r.database_source || r.index || 'Unknown',
+          score: r.score || 0
+        }));
 
-    setIsSearching(false);
-    setShowResults(true);
+      // Calculate statistics
+      const databases: { [key: string]: number } = {};
+      let weak = 0, medium = 0, strong = 0;
+
+      results.forEach(result => {
+        // Count by database
+        if (result.database_source && result.database_source !== 'Unknown') {
+          databases[result.database_source] = (databases[result.database_source] || 0) + 1;
+        }
+        
+        // Analyze password strength
+        const pwd = result.password;
+        if (!pwd) {
+          weak++;
+        } else if (pwd.length < 8 || pwd.match(/^[0-9]+$/) || pwd.toLowerCase() === pwd) {
+          weak++;
+        } else if (pwd.length >= 12 && /[A-Z]/.test(pwd) && /[0-9]/.test(pwd) && /[^A-Za-z0-9]/.test(pwd)) {
+          strong++;
+        } else {
+          medium++;
+        }
+      });
+
+      // Calculate risk score (0-100)
+      // Factors: total exposed accounts (60%), weak passwords (30%), number of databases (10%)
+      const accountScore = Math.min(60, results.length * 2);
+      const weakPasswordScore = Math.min(30, weak * 3);
+      const databaseScore = Math.min(10, Object.keys(databases).length * 5);
+      const riskScore = Math.min(100, accountScore + weakPasswordScore + databaseScore);
+
+      setDomainStats({
+        domain,
+        totalExposed: results.length,
+        databases,
+        results: results.slice(0, 100), // Limit display to 100 for performance
+        riskScore: Math.round(riskScore),
+        passwordStrength: { weak, medium, strong }
+      });
+
+      setIsSearching(false);
+      setShowResults(true);
+    } catch (error) {
+      console.error('Domain search error:', error);
+      setIsSearching(false);
+      
+      // Show error state
+      setDomainStats({
+        domain,
+        totalExposed: 0,
+        databases: {},
+        results: [],
+        riskScore: 0,
+        passwordStrength: { weak: 0, medium: 0, strong: 0 }
+      });
+      setShowResults(true);
+    }
   };
 
   const handleSearch = (e: React.FormEvent) => {
@@ -248,6 +297,25 @@ const DomainMonitoringPage = () => {
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.5 }}
             >
+              {domainStats.totalExposed === 0 ? (
+                /* No Results Found */
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-gray-850 rounded-lg p-12 border border-gray-700 shadow-2xl text-center"
+                >
+                  <Shield className="w-16 h-16 text-green-400 mx-auto mb-4" />
+                  <h3 className="text-2xl font-bold text-white mb-2">No Breaches Found!</h3>
+                  <p className="text-gray-400 text-lg mb-4">
+                    Great news! No exposed credentials found for <span className="text-cyan-400 font-semibold">@{domainStats.domain}</span>
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    This domain appears to be safe from the monitored breach databases.
+                  </p>
+                </motion.div>
+              ) : (
+                /* Results Display */
+                <>
               {/* Stats Overview */}
               <div className="grid md:grid-cols-4 gap-6 mb-8">
                 <motion.div
@@ -500,6 +568,8 @@ const DomainMonitoringPage = () => {
                   </div>
                 </div>
               </motion.div>
+                </>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
