@@ -15,6 +15,7 @@ import HistoryPage from '@/pages/HistoryPage';
 import OsintPlatformPage from '@/pages/OsintPlatformPage';
 import DiscoveryPage from '@/pages/DiscoveryPage';
 import DomainMonitoringPage from '@/pages/DomainMonitoringPage';
+import ThreatIntelligenceFeedPage from '@/pages/ThreatIntelligenceFeedPage';
 
 // Layout Component
 import Layout from '@/components/layout/Layout';
@@ -56,6 +57,7 @@ export default function AppContent() {
   <Route path="/osint/assessment/history" element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
   <Route path="/discovery" element={<ProtectedRoute><DiscoveryPage /></ProtectedRoute>} />
   <Route path="/domain-monitoring" element={<ProtectedRoute><DomainMonitoringPage /></ProtectedRoute>} />
+  <Route path="/threat-intelligence" element={<ProtectedRoute><ThreatIntelligenceFeedPage /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><GeneralSettingsPage /></ProtectedRoute>} />
         
         {/* Fallback Route */}

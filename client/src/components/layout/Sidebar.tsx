@@ -28,6 +28,7 @@ import {
   Clock,
   User,
   LogOut,
+  AlertTriangle,
   FileText,
   History as HistoryIcon,
 } from "lucide-react";
@@ -88,7 +89,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
       features: [
         { path: "/discovery", label: "Discovery", icon: <Shield size={16} />, color: "text-red-400" },
         { path: "/domain-monitoring", label: "Domain Monitoring", icon: <Globe size={16} />, color: "text-blue-400" },
-        { path: "/analytics/vulnerabilities", label: "Security Exposures", icon: <Bug size={16} />, color: "text-orange-400" }
+        { path: "/threat-intelligence", label: "Threat Intelligence", icon: <AlertTriangle size={16} />, color: "text-orange-400" }
       ]
     },
     {
