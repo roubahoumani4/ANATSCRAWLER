@@ -237,7 +237,13 @@ const DomainMonitoringPage = () => {
       // Track search in history
       const searchDuration = Date.now() - searchStartTime;
       try {
-        await axios.post('/api/v1/history/searches', {
+        console.log('Attempting to save domain search history...', {
+          searchType: 'domain-monitoring',
+          query: domain.trim(),
+          resultsCount: results.length
+        });
+        
+        const historyResponse = await axios.post('/api/v1/history/searches', {
           searchType: 'domain-monitoring',
           query: domain.trim(),
           queryType: 'domain-search',
@@ -252,8 +258,11 @@ const DomainMonitoringPage = () => {
           },
           status: results.length > 0 ? 'success' : 'no-results'
         });
-      } catch (historyError) {
+        
+        console.log('Domain search history saved successfully:', historyResponse.data);
+      } catch (historyError: any) {
         console.error('Failed to track search history:', historyError);
+        console.error('Error details:', historyError.response?.data || historyError.message);
         // Don't fail the search if history tracking fails
       }
     } catch (error) {
@@ -273,6 +282,7 @@ const DomainMonitoringPage = () => {
 
       // Track failed search
       try {
+        console.log('Tracking failed domain search...');
         await axios.post('/api/v1/history/searches', {
           searchType: 'domain-monitoring',
           query: domain.trim(),
@@ -285,8 +295,10 @@ const DomainMonitoringPage = () => {
           },
           status: 'failed'
         });
-      } catch (historyError) {
+        console.log('Failed domain search tracked successfully');
+      } catch (historyError: any) {
         console.error('Failed to track search history:', historyError);
+        console.error('Error details:', historyError.response?.data || historyError.message);
       }
     }
   };

@@ -9,6 +9,70 @@ const router = Router();
 router.use(authMiddleware);
 
 /**
+ * POST /api/v1/history/searches
+ * Create a new search history entry
+ */
+router.post('/searches', async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    const {
+      searchType,
+      query,
+      queryType,
+      resultsCount,
+      hasResults,
+      results,
+      metadata,
+      status
+    } = req.body;
+
+    // Validate required fields
+    if (!searchType || !query) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: searchType and query'
+      });
+    }
+
+    // Validate searchType
+    if (searchType !== 'discovery' && searchType !== 'domain-monitoring') {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid searchType. Must be "discovery" or "domain-monitoring"'
+      });
+    }
+
+    // Create search history entry
+    const searchHistory = new SearchHistory({
+      userId,
+      searchType,
+      query,
+      queryType,
+      resultsCount: resultsCount || 0,
+      hasResults: hasResults || false,
+      results: results || null,
+      metadata: metadata || {},
+      status: status || 'success'
+    });
+
+    await searchHistory.save();
+
+    res.status(201).json({
+      success: true,
+      data: searchHistory,
+      message: 'Search history saved successfully'
+    });
+  } catch (error: any) {
+    console.error('Error saving search history:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to save search history',
+      message: error.message
+    });
+  }
+});
+
+/**
  * GET /api/v1/history/searches
  * Get search history for the authenticated user
  */

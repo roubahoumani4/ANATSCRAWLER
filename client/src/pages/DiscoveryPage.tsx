@@ -163,7 +163,13 @@ const DiscoveryPage: React.FC = () => {
         // Track search in history
         const searchDuration = Date.now() - searchStartTime;
         try {
-          await axios.post('/api/v1/history/searches', {
+          console.log('Attempting to save search history...', {
+            searchType: 'discovery',
+            query: searchQuery.trim(),
+            resultsCount: results.length
+          });
+          
+          const historyResponse = await axios.post('/api/v1/history/searches', {
             searchType: 'discovery',
             query: searchQuery.trim(),
             queryType: 'dark-web-search',
@@ -175,8 +181,11 @@ const DiscoveryPage: React.FC = () => {
             },
             status: results.length > 0 ? 'success' : 'no-results'
           });
-        } catch (historyError) {
+          
+          console.log('Search history saved successfully:', historyResponse.data);
+        } catch (historyError: any) {
           console.error('Failed to track search history:', historyError);
+          console.error('Error details:', historyError.response?.data || historyError.message);
           // Don't fail the search if history tracking fails
         }
       } else {
@@ -194,6 +203,7 @@ const DiscoveryPage: React.FC = () => {
 
         // Track failed search
         try {
+          console.log('Tracking failed search...');
           await axios.post('/api/v1/history/searches', {
             searchType: 'discovery',
             query: searchQuery.trim(),
@@ -206,8 +216,10 @@ const DiscoveryPage: React.FC = () => {
             },
             status: 'failed'
           });
-        } catch (historyError) {
+          console.log('Failed search tracked successfully');
+        } catch (historyError: any) {
           console.error('Failed to track search history:', historyError);
+          console.error('Error details:', historyError.response?.data || historyError.message);
         }
       }
     } catch (error) {
@@ -216,6 +228,7 @@ const DiscoveryPage: React.FC = () => {
 
       // Track failed search
       try {
+        console.log('Tracking exception-based failed search...');
         await axios.post('/api/v1/history/searches', {
           searchType: 'discovery',
           query: searchQuery.trim(),
@@ -228,8 +241,10 @@ const DiscoveryPage: React.FC = () => {
           },
           status: 'failed'
         });
-      } catch (historyError) {
+        console.log('Exception-based failed search tracked successfully');
+      } catch (historyError: any) {
         console.error('Failed to track search history:', historyError);
+        console.error('Error details:', historyError.response?.data || historyError.message);
       }
     } finally {
       setIsSearching(false);
