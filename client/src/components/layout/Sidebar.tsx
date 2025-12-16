@@ -87,7 +87,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
       hasSubmenu: true,
       features: [
         { path: "/discovery", label: "Discovery", icon: <Shield size={16} />, color: "text-red-400" },
-        { path: "/analytics/network", label: "Infrastructure Mapping", icon: <Globe size={16} />, color: "text-blue-400" },
+        { path: "/domain-monitoring", label: "Domain Monitoring", icon: <Globe size={16} />, color: "text-blue-400" },
         { path: "/analytics/vulnerabilities", label: "Security Exposures", icon: <Bug size={16} />, color: "text-orange-400" }
       ]
     },
