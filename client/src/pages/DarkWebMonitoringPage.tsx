@@ -73,6 +73,8 @@ const DarkWebMonitoringPage: React.FC = () => {
   const [activityData, setActivityData] = useState<any[]>([]);
   const [searchTypeDistribution, setSearchTypeDistribution] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [threatDistribution, setThreatDistribution] = useState<any[]>([]);
+  const [securityScore, setSecurityScore] = useState<any[]>([]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -82,9 +84,11 @@ const DarkWebMonitoringPage: React.FC = () => {
     try {
       setLoading(true);
       // Fetch real data from APIs
-      const [historyStats, recentSearches] = await Promise.all([
+      const [historyStats, recentSearches, threatDist, secScore] = await Promise.all([
         axios.get('/api/v1/history/stats').catch(() => ({ data: { data: null } })),
-        axios.get('/api/v1/history/searches', { params: { limit: 4 } }).catch(() => ({ data: { data: { searches: [] } } }))
+        axios.get('/api/v1/history/searches', { params: { limit: 4 } }).catch(() => ({ data: { data: { searches: [] } } })),
+        axios.get('/api/v1/analytics/threat-distribution').catch(() => ({ data: { data: [] } })),
+        axios.get('/api/v1/analytics/security-score').catch(() => ({ data: { data: [] } }))
       ]);
 
       if (historyStats.data.data) {
@@ -160,6 +164,16 @@ const DarkWebMonitoringPage: React.FC = () => {
           };
         });
         setRecentActivity(activities);
+      }
+
+      // Process threat distribution data
+      if (threatDist.data.data && Array.isArray(threatDist.data.data)) {
+        setThreatDistribution(threatDist.data.data);
+      }
+
+      // Process security score data
+      if (secScore.data.data && Array.isArray(secScore.data.data)) {
+        setSecurityScore(secScore.data.data);
       }
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
@@ -498,13 +512,41 @@ const DarkWebMonitoringPage: React.FC = () => {
             <PieChartIcon className="w-6 h-6 mr-2 text-orange-400" />
             Threat Distribution
           </h2>
-          <div className="h-[250px] flex items-center justify-center">
-            <div className="text-center">
-              <AlertTriangle className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-              <p className="text-gray-400 text-sm">No threat data available</p>
-              <p className="text-xs text-gray-500 mt-1">Coming soon</p>
+          {threatDistribution.length > 0 ? (
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie
+                  data={threatDistribution}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {threatDistribution.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#1a1a1a', 
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '8px'
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[250px] flex items-center justify-center">
+              <div className="text-center">
+                <AlertTriangle className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                <p className="text-gray-400 text-sm">No threat data available</p>
+                <p className="text-xs text-gray-500 mt-1">Perform searches to generate threat data</p>
+              </div>
             </div>
-          </div>
+          )}
         </motion.div>
 
         {/* Search Type Distribution */}
@@ -556,13 +598,44 @@ const DarkWebMonitoringPage: React.FC = () => {
             <Shield className="w-6 h-6 mr-2 text-green-400" />
             Security Score
           </h2>
-          <div className="h-[250px] flex items-center justify-center">
-            <div className="text-center">
-              <Shield className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-              <p className="text-gray-400 text-sm">Security metrics coming soon</p>
-              <p className="text-xs text-gray-500 mt-1">Real-time scoring will be available</p>
+          {securityScore.length > 0 ? (
+            <ResponsiveContainer width="100%" height={250}>
+              <RadarChart data={securityScore}>
+                <PolarGrid stroke="#333" />
+                <PolarAngleAxis 
+                  dataKey="category" 
+                  tick={{ fill: '#9ca3af', fontSize: 11 }}
+                />
+                <PolarRadiusAxis 
+                  angle={90} 
+                  domain={[0, 100]}
+                  tick={{ fill: '#9ca3af', fontSize: 10 }}
+                />
+                <Radar
+                  name="Security Score"
+                  dataKey="score"
+                  stroke="#10b981"
+                  fill="#10b981"
+                  fillOpacity={0.5}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#1a1a1a',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '8px'
+                  }}
+                />
+              </RadarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[250px] flex items-center justify-center">
+              <div className="text-center">
+                <Shield className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                <p className="text-gray-400 text-sm">Security metrics coming soon</p>
+                <p className="text-xs text-gray-500 mt-1">Perform searches to generate security metrics</p>
+              </div>
             </div>
-          </div>
+          )}
         </motion.div>
       </div>
 

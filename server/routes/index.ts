@@ -11,6 +11,7 @@ import searchRoutes from './search';
 import assessmentRoutes from './assessment.routes';
 import threatIntelRoutes from './threat-intelligence-free.routes'; // FREE version with web scraping
 import historyRoutes from './history.routes';
+import analyticsRoutes from './analytics.routes';
 
 /**
  * Register all application routes with proper organization and authentication
@@ -47,6 +48,9 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   // History routes - authenticated users only
   app.use(`${apiV1}/history`, authenticate, historyRoutes);
+
+  // Analytics routes - authenticated users only
+  app.use(`${apiV1}/analytics`, authenticate, analyticsRoutes);
 
   // Public search endpoint for landing page - no authentication required
   app.use('/api/public-search', searchRoutes);
