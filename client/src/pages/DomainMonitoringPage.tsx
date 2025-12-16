@@ -45,6 +45,8 @@ const DomainMonitoringPage = () => {
   const [domainStats, setDomainStats] = useState<DomainStats | null>(null);
   const [showResults, setShowResults] = useState(false);
   const [expandedEmails, setExpandedEmails] = useState<Set<number>>(new Set());
+  const [selectedResult, setSelectedResult] = useState<DomainResult | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   // Perform actual domain search using your API
   const performDomainSearch = async (domain: string) => {
@@ -202,40 +204,38 @@ const DomainMonitoringPage = () => {
   const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b'];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-6">
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="max-w-7xl mx-auto"
-      >
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="p-8 min-h-screen bg-jetBlack text-coolWhite"
+    >
+      <div className="w-full">
         {/* Header */}
-        <div className="mb-8">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-            className="flex items-center gap-3 mb-4"
-          >
-            <Shield className="w-10 h-10 text-cyan-400" />
-            <h1 className="text-4xl font-bold text-white">Domain Monitoring</h1>
-          </motion.div>
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="text-gray-400 text-lg"
-          >
-            Monitor and analyze domain exposure across dark web breach databases
-          </motion.p>
-        </div>
+        <motion.div
+          className="mb-6"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+        >
+          <div className="flex items-center space-x-4 mb-4">
+            <div className="p-3 rounded bg-cyan-700/10 text-cyan-400">
+              <Shield size={28} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-semibold">Domain Monitoring</h1>
+              <p className="text-sm text-gray-400">
+                Monitor and analyze domain exposure across dark web breach databases
+              </p>
+            </div>
+          </div>
+        </motion.div>
 
         {/* Search Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.3 }}
-          className="bg-gray-850 rounded-lg p-6 border border-gray-700 shadow-2xl mb-8"
+          transition={{ duration: 0.6, delay: 0.2 }}
+          className="mt-6 bg-gray-850 rounded-lg p-8 border border-gray-800 w-full"
         >
           <form onSubmit={handleSearch} className="flex gap-4">
             <div className="flex-1 relative">
@@ -462,9 +462,9 @@ const DomainMonitoringPage = () => {
                   </div>
                 </div>
 
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
                   <table className="w-full">
-                    <thead className="bg-gray-900 border-b border-gray-700">
+                    <thead className="bg-gray-900 border-b border-gray-700 sticky top-0 z-10">
                       <tr>
                         <th className="p-4 text-left text-sm font-semibold text-gray-300">#</th>
                         <th className="p-4 text-left text-sm font-semibold text-gray-300">Email</th>
@@ -520,6 +520,10 @@ const DomainMonitoringPage = () => {
                             <motion.button
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
+                              onClick={() => {
+                                setSelectedResult(result);
+                                setShowDetailsModal(true);
+                              }}
                               className="text-purple-400 hover:text-purple-300 text-sm font-semibold"
                             >
                               Details
@@ -635,8 +639,100 @@ const DomainMonitoringPage = () => {
             </div>
           </motion.div>
         )}
-      </motion.div>
-    </div>
+      </div>
+
+      {/* Details Modal */}
+      <AnimatePresence>
+        {showDetailsModal && selectedResult && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowDetailsModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-gray-850 rounded-lg border border-gray-700 max-w-2xl w-full p-6 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-2xl font-bold text-white flex items-center gap-2">
+                  <Shield className="w-6 h-6 text-cyan-400" />
+                  Credential Details
+                </h3>
+                <button
+                  onClick={() => setShowDetailsModal(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+                  <div className="text-sm text-gray-500 mb-1">Email Address</div>
+                  <code className="text-lg text-blue-300 font-mono">{selectedResult.email}</code>
+                </div>
+
+                <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+                  <div className="text-sm text-gray-500 mb-1">Password</div>
+                  <code className="text-lg text-red-300 font-mono">{selectedResult.password || 'N/A'}</code>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+                    <div className="text-sm text-gray-500 mb-1">Database Source</div>
+                    <div className="text-lg text-cyan-400 font-semibold">{selectedResult.database_source}</div>
+                  </div>
+
+                  <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+                    <div className="text-sm text-gray-500 mb-1">Relevance Score</div>
+                    <div className="text-lg text-green-400 font-bold">{selectedResult.score.toFixed(2)}</div>
+                  </div>
+                </div>
+
+                <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-lg p-4 mt-4">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-yellow-400 font-semibold mb-1">Security Alert</div>
+                      <div className="text-sm text-gray-300">
+                        This credential has been exposed in a data breach. Immediately change the password on all accounts where it was used.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  onClick={() => setShowDetailsModal(false)}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${selectedResult.email}:${selectedResult.password}`);
+                  }}
+                  className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  Copy Credentials
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 };
 
