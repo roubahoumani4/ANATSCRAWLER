@@ -35,7 +35,6 @@ const BREACH_INFO: Record<string, {
   description: string;
   affectedAccounts: string;
   breachOccurred: string;
-  addedToHIBP: string;
   compromisedData: string[];
   whatHappened: string;
   potentialThreats: string[];
@@ -45,7 +44,6 @@ const BREACH_INFO: Record<string, {
     description: 'A massive compilation of credentials from multiple historical data breaches',
     affectedAccounts: '3.2 billion',
     breachOccurred: 'February 2021',
-    addedToHIBP: '17 Jan 2024',
     compromisedData: ['Email addresses', 'Passwords'],
     whatHappened: 'On February 2, 2021, a user known as Singularity0x01 posted a .ZIP file on RaidForums containing billions of usernames and passwords. The data contained more than 3.2 billion unique pairs of email addresses and passwords, including approximately 200 million Gmail addresses and 450 million Yahoo! email addresses. This is a compilation of credentials from past data breaches involving Netflix, LinkedIn, Hotmail, Yahoo, Bitcoin and other companies. The leak is more than twice as large as a similar breach compilation posted in 2017.',
     potentialThreats: [
@@ -60,7 +58,6 @@ const BREACH_INFO: Record<string, {
     description: 'Stealer logs and credential stuffing lists from various sources',
     affectedAccounts: '70.8 million',
     breachOccurred: 'September 2023',
-    addedToHIBP: '17 Jan 2024',
     compromisedData: ['Email addresses', 'Passwords'],
     whatHappened: 'In September 2023, over 100GB of stealer logs and credential stuffing lists titled "Naz.API" was posted to a popular hacking forum. The data contained a combination of email address and plain text password pairs alongside the service they were entered into, and standalone credential pairs obtained from unnamed sources. In total, the corpus of data included 71M unique email addresses and 100M unique passwords.',
     potentialThreats: [
@@ -499,14 +496,6 @@ const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
                             <div>
                               <div className="text-xs text-gray-500">Breach Occurred:</div>
                               <div className="text-lg font-semibold text-white">{breachInfo.breachOccurred}</div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-start gap-3">
-                            <Calendar className="w-5 h-5 text-cyan-400 mt-0.5 flex-shrink-0" />
-                            <div>
-                              <div className="text-xs text-gray-500">Added to HIBP:</div>
-                              <div className="text-lg font-semibold text-white">{breachInfo.addedToHIBP}</div>
                             </div>
                           </div>
                         </div>
