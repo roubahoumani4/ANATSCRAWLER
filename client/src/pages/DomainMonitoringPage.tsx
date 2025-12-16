@@ -820,57 +820,149 @@ const DomainMonitoringPage = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
-            className="bg-gray-850 rounded-lg p-8 border border-gray-700 shadow-xl"
+            className="bg-gradient-to-br from-gray-850 to-gray-900 rounded-lg p-8 border border-gray-700 shadow-xl"
           >
-            <h3 className="text-lg font-semibold text-gray-300 mb-4">About Domain Monitoring</h3>
-            <div className="grid md:grid-cols-2 gap-6">
+            <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+              <Shield className="w-6 h-6 text-cyan-400" />
+              About Domain Monitoring
+            </h3>
+            <div className="grid md:grid-cols-2 gap-6 mb-8">
               <div>
-                <h4 className="text-cyan-400 font-semibold mb-2 flex items-center gap-2">
+                <h4 className="text-lg font-semibold text-cyan-400 mb-4 flex items-center gap-2">
                   <Shield className="w-5 h-5" />
                   What We Monitor
                 </h4>
-                <ul className="space-y-2 text-sm text-gray-400">
-                  <li className="flex items-start gap-2">
-                    <Mail className="w-4 h-4 text-cyan-400 mt-0.5 flex-shrink-0" />
-                    <span>All email addresses associated with your domain</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Key className="w-4 h-4 text-cyan-400 mt-0.5 flex-shrink-0" />
-                    <span>Exposed passwords and credentials</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Database className="w-4 h-4 text-cyan-400 mt-0.5 flex-shrink-0" />
-                    <span>Multiple dark web breach databases (COMB, Naz.API, etc.)</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Activity className="w-4 h-4 text-cyan-400 mt-0.5 flex-shrink-0" />
-                    <span>Real-time risk assessment and scoring</span>
-                  </li>
-                </ul>
+                <div className="space-y-3">
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className="bg-gradient-to-br from-cyan-900/20 to-cyan-800/10 p-4 rounded-lg border border-cyan-700/30 hover:border-cyan-500/50 transition-all shadow-lg"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="bg-cyan-500/20 p-2 rounded-lg">
+                        <Mail className="w-5 h-5 text-cyan-400" />
+                      </div>
+                      <div>
+                        <h5 className="font-semibold text-white text-sm mb-1">Email Addresses</h5>
+                        <p className="text-gray-300 text-xs">All email addresses associated with your domain</p>
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className="bg-gradient-to-br from-cyan-900/20 to-cyan-800/10 p-4 rounded-lg border border-cyan-700/30 hover:border-cyan-500/50 transition-all shadow-lg"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="bg-cyan-500/20 p-2 rounded-lg">
+                        <Key className="w-5 h-5 text-cyan-400" />
+                      </div>
+                      <div>
+                        <h5 className="font-semibold text-white text-sm mb-1">Credentials</h5>
+                        <p className="text-gray-300 text-xs">Exposed passwords and credentials</p>
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className="bg-gradient-to-br from-cyan-900/20 to-cyan-800/10 p-4 rounded-lg border border-cyan-700/30 hover:border-cyan-500/50 transition-all shadow-lg"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="bg-cyan-500/20 p-2 rounded-lg">
+                        <Database className="w-5 h-5 text-cyan-400" />
+                      </div>
+                      <div>
+                        <h5 className="font-semibold text-white text-sm mb-1">Breach Databases</h5>
+                        <p className="text-gray-300 text-xs">
+                          <span className="font-semibold text-white">COMB</span>, <span className="font-semibold text-white">Naz.API</span>, and more
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className="bg-gradient-to-br from-cyan-900/20 to-cyan-800/10 p-4 rounded-lg border border-cyan-700/30 hover:border-cyan-500/50 transition-all shadow-lg"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="bg-cyan-500/20 p-2 rounded-lg">
+                        <Activity className="w-5 h-5 text-cyan-400" />
+                      </div>
+                      <div>
+                        <h5 className="font-semibold text-white text-sm mb-1">Risk Scoring</h5>
+                        <p className="text-gray-300 text-xs">Real-time risk assessment and scoring</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                </div>
               </div>
+
               <div>
-                <h4 className="text-cyan-400 font-semibold mb-2 flex items-center gap-2">
+                <h4 className="text-lg font-semibold text-cyan-400 mb-4 flex items-center gap-2">
                   <BarChart3 className="w-5 h-5" />
                   Analysis Features
                 </h4>
-                <ul className="space-y-2 text-sm text-gray-400">
-                  <li className="flex items-start gap-2">
-                    <PieChart className="w-4 h-4 text-cyan-400 mt-0.5 flex-shrink-0" />
-                    <span>Password strength distribution analysis</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <TrendingUp className="w-4 h-4 text-cyan-400 mt-0.5 flex-shrink-0" />
-                    <span>Risk score calculation based on exposure</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Database className="w-4 h-4 text-cyan-400 mt-0.5 flex-shrink-0" />
-                    <span>Database source tracking and visualization</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Download className="w-4 h-4 text-cyan-400 mt-0.5 flex-shrink-0" />
-                    <span>Exportable reports in CSV format</span>
-                  </li>
-                </ul>
+                <div className="space-y-3">
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className="bg-gradient-to-br from-blue-900/20 to-blue-800/10 p-4 rounded-lg border border-blue-700/30 hover:border-blue-500/50 transition-all shadow-lg"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="bg-blue-500/20 p-2 rounded-lg">
+                        <PieChart className="w-5 h-5 text-blue-400" />
+                      </div>
+                      <div>
+                        <h5 className="font-semibold text-white text-sm mb-1">Password Analysis</h5>
+                        <p className="text-gray-300 text-xs">Password strength distribution analysis</p>
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className="bg-gradient-to-br from-blue-900/20 to-blue-800/10 p-4 rounded-lg border border-blue-700/30 hover:border-blue-500/50 transition-all shadow-lg"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="bg-blue-500/20 p-2 rounded-lg">
+                        <TrendingUp className="w-5 h-5 text-blue-400" />
+                      </div>
+                      <div>
+                        <h5 className="font-semibold text-white text-sm mb-1">Risk Calculation</h5>
+                        <p className="text-gray-300 text-xs">Risk score calculation based on exposure</p>
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className="bg-gradient-to-br from-blue-900/20 to-blue-800/10 p-4 rounded-lg border border-blue-700/30 hover:border-blue-500/50 transition-all shadow-lg"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="bg-blue-500/20 p-2 rounded-lg">
+                        <Database className="w-5 h-5 text-blue-400" />
+                      </div>
+                      <div>
+                        <h5 className="font-semibold text-white text-sm mb-1">Source Tracking</h5>
+                        <p className="text-gray-300 text-xs">Database source tracking and visualization</p>
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className="bg-gradient-to-br from-blue-900/20 to-blue-800/10 p-4 rounded-lg border border-blue-700/30 hover:border-blue-500/50 transition-all shadow-lg"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="bg-blue-500/20 p-2 rounded-lg">
+                        <Download className="w-5 h-5 text-blue-400" />
+                      </div>
+                      <div>
+                        <h5 className="font-semibold text-white text-sm mb-1">Export Reports</h5>
+                        <p className="text-gray-300 text-xs">Exportable reports in CSV format</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                </div>
               </div>
             </div>
           </motion.div>

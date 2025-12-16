@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Shield, Eye, AlertTriangle } from "lucide-react";
+import { Search, Shield, Eye, AlertTriangle, Mail, Database, TrendingUp } from "lucide-react";
 import ResultsTable from "@/components/dashboard/ResultsTable";
 
 const DiscoveryPage: React.FC = () => {
@@ -523,38 +523,118 @@ const DiscoveryPage: React.FC = () => {
         {/* Info Section - When no search performed yet */}
         {!showResults && !isSearching && (
           <motion.div
-            className="mt-6 bg-gray-850 rounded-lg p-8 border border-gray-800 w-full"
+            className="mt-6 bg-gradient-to-br from-gray-850 to-gray-900 rounded-lg p-8 border border-gray-700 shadow-xl"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
           >
-            <h3 className="text-lg font-semibold text-gray-300 mb-4">Search Guidelines</h3>
-            <ul className="space-y-2 text-sm text-gray-400">
-              <li className="flex items-start">
-                <span className="text-red-400 mr-2">•</span>
-                <span>Search for individual <strong className="text-gray-300">email addresses</strong> or <strong className="text-gray-300">usernames</strong> to check if they've been compromised</span>
-              </li>
-              <li className="flex items-start">
-                <span className="text-red-400 mr-2">•</span>
-                <span>Use exact email format (e.g., user@example.com) or specific username for best results</span>
-              </li>
-              <li className="flex items-start">
-                <span className="text-red-400 mr-2">•</span>
-                <span>For domain-wide searches (e.g., @company.com), use the <strong className="text-cyan-400">Domain Monitoring</strong> page instead</span>
-              </li>
-              <li className="flex items-start">
-                <span className="text-red-400 mr-2">•</span>
-                <span>Results show exposed credentials from monitored breach databases including COMB and Naz.API</span>
-              </li>
-              <li className="flex items-start">
-                <span className="text-red-400 mr-2">•</span>
-                <span>Each result includes the password, database source, and a relevance score</span>
-              </li>
-              <li className="flex items-start">
-                <span className="text-red-400 mr-2">•</span>
-                <span>Click <strong className="text-purple-400">Details</strong> to view full credential information and breach context</span>
-              </li>
-            </ul>
+            <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+              <Search className="w-6 h-6 text-red-400" />
+              Search Guidelines
+            </h3>
+            <div className="grid md:grid-cols-2 gap-4">
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                className="bg-gradient-to-br from-red-900/20 to-red-800/10 p-5 rounded-lg border border-red-700/30 hover:border-red-500/50 transition-all shadow-lg"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="bg-red-500/20 p-2 rounded-lg">
+                    <Mail className="w-5 h-5 text-red-400" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-white mb-1">Email & Username Search</h4>
+                    <p className="text-gray-300 text-sm">
+                      Search for individual email addresses or usernames to check if they've been compromised
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                className="bg-gradient-to-br from-red-900/20 to-red-800/10 p-5 rounded-lg border border-red-700/30 hover:border-red-500/50 transition-all shadow-lg"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="bg-red-500/20 p-2 rounded-lg">
+                    <Search className="w-5 h-5 text-red-400" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-white mb-1">Exact Format</h4>
+                    <p className="text-gray-300 text-sm">
+                      Use exact email format (e.g., <code className="text-cyan-400 bg-gray-800 px-1 py-0.5 rounded text-xs">user@example.com</code>) for best results
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                className="bg-gradient-to-br from-cyan-900/20 to-cyan-800/10 p-5 rounded-lg border border-cyan-700/30 hover:border-cyan-500/50 transition-all shadow-lg"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="bg-cyan-500/20 p-2 rounded-lg">
+                    <Shield className="w-5 h-5 text-cyan-400" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-white mb-1">Domain Monitoring</h4>
+                    <p className="text-gray-300 text-sm">
+                      For domain-wide searches (e.g., <code className="text-cyan-400 bg-gray-800 px-1 py-0.5 rounded text-xs">@company.com</code>), use Domain Monitoring page
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                className="bg-gradient-to-br from-blue-900/20 to-blue-800/10 p-5 rounded-lg border border-blue-700/30 hover:border-blue-500/50 transition-all shadow-lg"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="bg-blue-500/20 p-2 rounded-lg">
+                    <Database className="w-5 h-5 text-blue-400" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-white mb-1">Breach Databases</h4>
+                    <p className="text-gray-300 text-sm">
+                      Results from monitored databases: <span className="font-semibold text-white">COMB</span> (3.2B) & <span className="font-semibold text-white">Naz.API</span> (70.8M)
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                className="bg-gradient-to-br from-green-900/20 to-green-800/10 p-5 rounded-lg border border-green-700/30 hover:border-green-500/50 transition-all shadow-lg"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="bg-green-500/20 p-2 rounded-lg">
+                    <TrendingUp className="w-5 h-5 text-green-400" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-white mb-1">Result Details</h4>
+                    <p className="text-gray-300 text-sm">
+                      Each result includes password, database source, and relevance score
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                className="bg-gradient-to-br from-purple-900/20 to-purple-800/10 p-5 rounded-lg border border-purple-700/30 hover:border-purple-500/50 transition-all shadow-lg"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="bg-purple-500/20 p-2 rounded-lg">
+                    <Eye className="w-5 h-5 text-purple-400" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-white mb-1">Full Information</h4>
+                    <p className="text-gray-300 text-sm">
+                      Click <span className="font-semibold text-purple-400">Details</span> to view credential info and breach context
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
           </motion.div>
         )}
       </div>
