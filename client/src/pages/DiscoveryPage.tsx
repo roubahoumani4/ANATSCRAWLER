@@ -532,23 +532,27 @@ const DiscoveryPage: React.FC = () => {
             <ul className="space-y-2 text-sm text-gray-400">
               <li className="flex items-start">
                 <span className="text-red-400 mr-2">•</span>
-                <span>Enter email addresses, usernames, phone numbers, or other identifiers</span>
+                <span>Search for individual <strong className="text-gray-300">email addresses</strong> or <strong className="text-gray-300">usernames</strong> to check if they've been compromised</span>
               </li>
               <li className="flex items-start">
                 <span className="text-red-400 mr-2">•</span>
-                <span>For domain-wide searches (e.g., @company.com), use the Domain Monitoring page</span>
+                <span>Use exact email format (e.g., user@example.com) or specific username for best results</span>
               </li>
               <li className="flex items-start">
                 <span className="text-red-400 mr-2">•</span>
-                <span>Search results include matched terms, context, and relevance scores</span>
+                <span>For domain-wide searches (e.g., @company.com), use the <strong className="text-cyan-400">Domain Monitoring</strong> page instead</span>
               </li>
               <li className="flex items-start">
                 <span className="text-red-400 mr-2">•</span>
-                <span>All searches are performed against indexed dark web data sources</span>
+                <span>Results show exposed credentials from monitored breach databases including COMB and Naz.API</span>
               </li>
               <li className="flex items-start">
                 <span className="text-red-400 mr-2">•</span>
-                <span>Use specific terms for more accurate results</span>
+                <span>Each result includes the password, database source, and a relevance score</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-red-400 mr-2">•</span>
+                <span>Click <strong className="text-purple-400">Details</strong> to view full credential information and breach context</span>
               </li>
             </ul>
           </motion.div>
