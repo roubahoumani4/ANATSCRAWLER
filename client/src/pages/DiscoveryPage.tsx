@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { motion } from "framer-motion";
-import { Search, Shield, Terminal, Eye, Loader } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Search, Shield, Terminal, Eye, Loader, AlertTriangle } from "lucide-react";
 import ResultsTable from "@/components/dashboard/ResultsTable";
 
 const DiscoveryPage: React.FC = () => {
@@ -8,9 +8,43 @@ const DiscoveryPage: React.FC = () => {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [validationError, setValidationError] = useState("");
+
+  // Check if input is a bare domain (for blocking)
+  const isDomain = (input: string): boolean => {
+    const trimmed = input.trim();
+    // Match bare domains like "yahoo.com", "example.org", etc.
+    // But NOT emails like "user@yahoo.com"
+    const bareDomainRegex = /^(?!.*@)([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/;
+    return bareDomainRegex.test(trimmed);
+  };
+
+  // Validate search input
+  const isValidSearchInput = (input: string): boolean => {
+    const trimmed = input.trim();
+    
+    // Check if it's a bare domain
+    if (isDomain(trimmed)) {
+      return false;
+    }
+    
+    // Allow emails, usernames, phone numbers, etc.
+    // Basically anything that's not a bare domain
+    return trimmed.length > 0;
+  };
 
   const handleDarkWebSearch = async () => {
-    if (!searchQuery.trim()) return;
+    setValidationError("");
+    
+    if (!searchQuery.trim()) {
+      setValidationError("Please enter a search term");
+      return;
+    }
+
+    if (!isValidSearchInput(searchQuery)) {
+      setValidationError("Please search for emails or usernames. For domain searches, use the Domain Monitoring page.");
+      return;
+    }
 
     setIsSearching(true);
     setShowResults(false);
@@ -116,7 +150,10 @@ const DiscoveryPage: React.FC = () => {
               <input
                 type="text"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setValidationError("");
+                }}
                 onKeyPress={handleSearchKeyPress}
                 placeholder="Enter search terms for dark web reconnaissance..."
                 className="w-full pl-10 pr-4 py-2 bg-gray-800 text-white rounded disabled:opacity-50"
@@ -132,6 +169,24 @@ const DiscoveryPage: React.FC = () => {
                 </motion.div>
               )}
             </div>
+
+            {/* Validation Error Message */}
+            <AnimatePresence>
+              {validationError && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="bg-red-900/20 border border-red-700/50 rounded-lg p-4 flex items-start gap-3"
+                >
+                  <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <div className="text-red-400 font-semibold">Invalid Input</div>
+                    <div className="text-sm text-gray-300 mt-1">{validationError}</div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <motion.button
               onClick={handleDarkWebSearch}
@@ -230,7 +285,11 @@ const DiscoveryPage: React.FC = () => {
             <ul className="space-y-2 text-sm text-gray-400">
               <li className="flex items-start">
                 <span className="text-red-400 mr-2">•</span>
-                <span>Enter usernames, email addresses, phone numbers, or other identifiers</span>
+                <span>Enter email addresses, usernames, phone numbers, or other identifiers</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-red-400 mr-2">•</span>
+                <span>For domain-wide searches (e.g., @company.com), use the Domain Monitoring page</span>
               </li>
               <li className="flex items-start">
                 <span className="text-red-400 mr-2">•</span>
