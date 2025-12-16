@@ -822,10 +822,6 @@ const DomainMonitoringPage = () => {
             transition={{ duration: 0.6, delay: 0.4 }}
             className="bg-gradient-to-br from-gray-850 to-gray-900 rounded-lg p-8 border border-gray-700 shadow-xl"
           >
-            <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-              <Shield className="w-6 h-6 text-cyan-400" />
-              Domain Monitoring
-            </h3>
             <div className="grid md:grid-cols-2 gap-6 mb-8">
               <div>
                 <h4 className="text-lg font-semibold text-cyan-400 mb-4 flex items-center gap-2">

@@ -558,7 +558,7 @@ const DiscoveryPage: React.FC = () => {
                   </div>
                   <div>
                     <h5 className="font-semibold text-white text-sm mb-1">Exact Format</h5>
-                    <p className="text-gray-300 text-xs">Use exact email format (e.g., <code className="text-cyan-400 bg-gray-800 px-1 py-0.5 rounded text-xs">user@example.com</code>) for best results</p>
+                    <p className="text-gray-300 text-xs">Use exact email format (e.g., <code className="text-gray-300 bg-gray-800 px-1 py-0.5 rounded text-xs">user@example.com</code>) for best results</p>
                   </div>
                 </div>
               </motion.div>
@@ -573,7 +573,7 @@ const DiscoveryPage: React.FC = () => {
                   </div>
                   <div>
                     <h5 className="font-semibold text-white text-sm mb-1">Domain Monitoring</h5>
-                    <p className="text-gray-300 text-xs">For domain-wide searches (e.g., <code className="text-cyan-400 bg-gray-800 px-1 py-0.5 rounded text-xs">@company.com</code>), use Domain Monitoring page</p>
+                    <p className="text-gray-300 text-xs">For domain-wide searches (e.g., <code className="text-gray-300 bg-gray-800 px-1 py-0.5 rounded text-xs">@company.com</code>), use Domain Monitoring page</p>
                   </div>
                 </div>
               </motion.div>
@@ -618,7 +618,7 @@ const DiscoveryPage: React.FC = () => {
                   </div>
                   <div>
                     <h5 className="font-semibold text-white text-sm mb-1">Full Information</h5>
-                    <p className="text-gray-300 text-xs">Click <span className="font-semibold text-red-400">Details</span> to view credential info and breach context</p>
+                    <p className="text-gray-300 text-xs">Click <span className="font-semibold text-white">Details</span> to view credential info and breach context</p>
                   </div>
                 </div>
               </motion.div>
