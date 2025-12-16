@@ -89,20 +89,37 @@ const ThreatIntelligencePage: React.FC = () => {
   const fetchThreatData = async () => {
     setLoading(true);
     try {
+      // Add timestamp to prevent caching issues
+      const timestamp = Date.now();
       const [breachesRes, timelineRes, trendingRes, geoRes, statsRes] = await Promise.all([
-        axios.get('/api/v1/threat-intel/recent-breaches'),
-        axios.get('/api/v1/threat-intel/breach-timeline?days=365'),
-        axios.get('/api/v1/threat-intel/trending-databases'),
-        axios.get('/api/v1/threat-intel/geographic-distribution'),
-        axios.get('/api/v1/threat-intel/live-stats')
+        axios.get(`/api/v1/threat-intel/recent-breaches?_t=${timestamp}`),
+        axios.get(`/api/v1/threat-intel/breach-timeline?days=365&_t=${timestamp}`),
+        axios.get(`/api/v1/threat-intel/trending-databases?_t=${timestamp}`),
+        axios.get(`/api/v1/threat-intel/geographic-distribution?_t=${timestamp}`),
+        axios.get(`/api/v1/threat-intel/live-stats?_t=${timestamp}`)
       ]);
 
-      setBreaches(breachesRes.data.data || []);
+      console.log('📊 API Responses:', {
+        breaches: breachesRes.data,
+        breachCount: breachesRes.data.data?.length || 0,
+        timeline: timelineRes.data.data?.length || 0,
+        trending: trendingRes.data.data?.length || 0,
+        geo: geoRes.data.data?.length || 0,
+        stats: statsRes.data.data
+      });
+
+      const breachesData = breachesRes.data.data || [];
+      console.log('🔍 Setting breaches state:', breachesData.length, 'items');
+      console.log('First breach:', breachesData[0]);
+
+      setBreaches(breachesData);
       setTimeline(timelineRes.data.data || []);
       setTrending(trendingRes.data.data || []);
       setGeoData(geoRes.data.data || []);
       setLiveStats(statsRes.data.data || null);
       setLastUpdate(new Date());
+      
+      console.log('✅ State updated');
     } catch (error) {
       console.error('Error fetching threat intelligence data:', error);
     } finally {
@@ -333,6 +350,27 @@ const ThreatIntelligencePage: React.FC = () => {
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="h-[600px] pr-4">
+                    {(() => {
+                      console.log('🎨 Rendering Live Feed - Breaches count:', breaches.length);
+                      console.log('🎨 Breaches array:', breaches);
+                      return null;
+                    })()}
+                    {breaches.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-full text-center p-8">
+                        <AlertTriangle className="w-16 h-16 text-gray-600 mb-4" />
+                        <h3 className="text-xl font-semibold text-gray-400 mb-2">No Breach Data Available</h3>
+                        <p className="text-sm text-gray-500 max-w-md">
+                          Unable to fetch threat intelligence data. The APIs may be rate-limited or temporarily unavailable.
+                        </p>
+                        <button
+                          onClick={fetchThreatData}
+                          className="mt-6 px-6 py-2 bg-cyan-500/20 border border-cyan-500/30 rounded-lg text-cyan-400 hover:bg-cyan-500/30 transition-all"
+                        >
+                          <RefreshCw className="w-4 h-4 inline mr-2" />
+                          Retry
+                        </button>
+                      </div>
+                    ) : (
                     <div className="space-y-4">
                       {breaches.map((breach, index) => (
                         <motion.div
@@ -400,6 +438,7 @@ const ThreatIntelligencePage: React.FC = () => {
                         </motion.div>
                       ))}
                     </div>
+                    )}
                   </ScrollArea>
                 </CardContent>
               </Card>
