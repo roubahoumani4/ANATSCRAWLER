@@ -786,43 +786,6 @@ const DomainMonitoringPage = () => {
                 </div>
               </motion.div>
 
-              {/* Recommendations */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.8 }}
-                className="mt-8 bg-gradient-to-r from-yellow-900/20 to-orange-900/20 border border-yellow-700/50 rounded-lg p-6"
-              >
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="w-6 h-6 text-yellow-400 flex-shrink-0 mt-1" />
-                  <div>
-                    <h4 className="text-lg font-bold text-yellow-400 mb-2">Security Recommendations</h4>
-                    <ul className="space-y-2 text-gray-300">
-                      <li className="flex items-start gap-2">
-                        <span className="text-yellow-400 mt-1">•</span>
-                        <span>Immediately reset passwords for all exposed accounts</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-yellow-400 mt-1">•</span>
-                        <span>Enable multi-factor authentication (MFA) across all company email accounts</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-yellow-400 mt-1">•</span>
-                        <span>Implement password complexity requirements and regular rotation policies</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-yellow-400 mt-1">•</span>
-                        <span>Monitor for suspicious login attempts and implement account lockout policies</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-yellow-400 mt-1">•</span>
-                        <span>Conduct security awareness training for all employees</span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </motion.div>
-
               {/* Breach Information Panels */}
               {domainStats.results.length > 0 && (
                 <div className="mt-8 space-y-6">

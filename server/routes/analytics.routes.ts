@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { SearchHistory } from '../models/SearchHistory';
+import { ELASTICSEARCH_URI } from '../config';
 
 const router = Router();
 
@@ -158,6 +159,59 @@ router.get('/security-score', async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: 'Failed to calculate security score',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
+ * GET /api/v1/analytics/elasticsearch-stats
+ * Get total indexed files count from Elasticsearch
+ */
+router.get('/elasticsearch-stats', async (req: Request, res: Response) => {
+  try {
+    const indices = ['darkweb_structured', 'files_index'];
+    let totalDocuments = 0;
+    const indexStats: any = {};
+
+    for (const indexName of indices) {
+      try {
+        // Use Elasticsearch _count API to get document count
+        const countResponse = await fetch(`${ELASTICSEARCH_URI}/${indexName}/_count`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (countResponse.ok) {
+          const countData = await countResponse.json() as any;
+          const count = countData.count || 0;
+          totalDocuments += count;
+          indexStats[indexName] = count;
+        } else {
+          console.error(`Failed to get count for ${indexName}:`, countResponse.statusText);
+          indexStats[indexName] = 0;
+        }
+      } catch (indexError) {
+        console.error(`Error fetching count for ${indexName}:`, indexError);
+        indexStats[indexName] = 0;
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        totalDocuments,
+        indices: indexStats,
+        lastUpdated: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching Elasticsearch stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch Elasticsearch statistics',
       error: error instanceof Error ? error.message : 'Unknown error'
     });
   }

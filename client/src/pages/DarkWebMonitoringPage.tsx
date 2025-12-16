@@ -75,6 +75,7 @@ const DarkWebMonitoringPage: React.FC = () => {
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [threatDistribution, setThreatDistribution] = useState<any[]>([]);
   const [securityScore, setSecurityScore] = useState<any[]>([]);
+  const [elasticsearchStats, setElasticsearchStats] = useState({ totalDocuments: 0, indices: {} });
 
   useEffect(() => {
     fetchDashboardData();
@@ -84,11 +85,12 @@ const DarkWebMonitoringPage: React.FC = () => {
     try {
       setLoading(true);
       // Fetch real data from APIs
-      const [historyStats, recentSearches, threatDist, secScore] = await Promise.all([
+      const [historyStats, recentSearches, threatDist, secScore, esStats] = await Promise.all([
         axios.get('/api/v1/history/stats').catch(() => ({ data: { data: null } })),
         axios.get('/api/v1/history/searches', { params: { limit: 4 } }).catch(() => ({ data: { data: { searches: [] } } })),
         axios.get('/api/v1/analytics/threat-distribution').catch(() => ({ data: { data: [] } })),
-        axios.get('/api/v1/analytics/security-score').catch(() => ({ data: { data: [] } }))
+        axios.get('/api/v1/analytics/security-score').catch(() => ({ data: { data: [] } })),
+        axios.get('/api/v1/analytics/elasticsearch-stats').catch(() => ({ data: { data: { totalDocuments: 0, indices: {} } } }))
       ]);
 
       if (historyStats.data.data) {
@@ -174,6 +176,14 @@ const DarkWebMonitoringPage: React.FC = () => {
       // Process security score data
       if (secScore.data.data && Array.isArray(secScore.data.data)) {
         setSecurityScore(secScore.data.data);
+      }
+
+      // Process Elasticsearch stats
+      if (esStats.data.data) {
+        setElasticsearchStats({
+          totalDocuments: esStats.data.data.totalDocuments || 0,
+          indices: esStats.data.data.indices || {}
+        });
       }
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
@@ -336,7 +346,7 @@ const DarkWebMonitoringPage: React.FC = () => {
       {/* Quick Stats */}
       <motion.div
         variants={staggerContainer}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8"
       >
         <motion.div variants={fadeIn} className="bg-darkGray rounded-xl p-6 border border-coolWhite/10">
           <div className="flex items-center justify-between mb-4">
@@ -382,6 +392,19 @@ const DarkWebMonitoringPage: React.FC = () => {
           </div>
           <div className="text-3xl font-bold mb-1">{stats.searchHistory.totalSearches}</div>
           <div className="text-sm text-gray-400">Total Searches</div>
+        </motion.div>
+
+        <motion.div variants={fadeIn} className="bg-darkGray rounded-xl p-6 border border-coolWhite/10">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 rounded-lg bg-cyan-500/10">
+              <Database className="w-6 h-6 text-cyan-500" />
+            </div>
+            <TrendingUp className="w-5 h-5 text-cyan-500" />
+          </div>
+          <div className="text-3xl font-bold mb-1">
+            {elasticsearchStats.totalDocuments.toLocaleString()}
+          </div>
+          <div className="text-sm text-gray-400">Indexed Files</div>
         </motion.div>
       </motion.div>
 
