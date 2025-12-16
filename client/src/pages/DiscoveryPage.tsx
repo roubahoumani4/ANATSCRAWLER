@@ -618,7 +618,7 @@ const DiscoveryPage: React.FC = () => {
                   </div>
                   <div>
                     <h5 className="font-semibold text-white text-sm mb-1">Full Information</h5>
-                    <p className="text-gray-300 text-xs">Click <span className="font-semibold text-purple-400">Details</span> to view credential info and breach context</p>
+                    <p className="text-gray-300 text-xs">Click <span className="font-semibold text-red-400">Details</span> to view credential info and breach context</p>
                   </div>
                 </div>
               </motion.div>
