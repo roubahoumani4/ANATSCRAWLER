@@ -47,6 +47,15 @@ const DomainMonitoringPage = () => {
   const [expandedEmails, setExpandedEmails] = useState<Set<number>>(new Set());
   const [selectedResult, setSelectedResult] = useState<DomainResult | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [validationError, setValidationError] = useState("");
+
+  // Validate domain format
+  const isValidDomain = (domain: string): boolean => {
+    // Basic domain validation regex
+    // Matches: example.com, sub.example.com, example.co.uk, etc.
+    const domainRegex = /^(?!:\/\/)([a-zA-Z0-9-_]+\.)*[a-zA-Z0-9][a-zA-Z0-9-_]+\.[a-zA-Z]{2,11}?$/;
+    return domainRegex.test(domain.trim());
+  };
 
   // Perform actual domain search using your API
   const performDomainSearch = async (domain: string) => {
@@ -148,9 +157,19 @@ const DomainMonitoringPage = () => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchDomain.trim()) {
-      performDomainSearch(searchDomain.trim());
+    setValidationError("");
+    
+    if (!searchDomain.trim()) {
+      setValidationError("Please enter a domain");
+      return;
     }
+    
+    if (!isValidDomain(searchDomain.trim())) {
+      setValidationError("Please enter a valid domain (e.g., company.com)");
+      return;
+    }
+    
+    performDomainSearch(searchDomain.trim());
   };
 
   const toggleEmailExpand = (index: number) => {
@@ -243,7 +262,10 @@ const DomainMonitoringPage = () => {
               <input
                 type="text"
                 value={searchDomain}
-                onChange={(e) => setSearchDomain(e.target.value)}
+                onChange={(e) => {
+                  setSearchDomain(e.target.value);
+                  setValidationError("");
+                }}
                 placeholder="Enter domain (e.g., company.com)"
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-12 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 transition-colors"
               />
@@ -265,6 +287,24 @@ const DomainMonitoringPage = () => {
               )}
             </motion.button>
           </form>
+
+          {/* Validation Error Message */}
+          <AnimatePresence>
+            {validationError && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="mt-4 bg-red-900/20 border border-red-700/50 rounded-lg p-4 flex items-start gap-3"
+              >
+                <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <div className="text-red-400 font-semibold">Invalid Input</div>
+                  <div className="text-sm text-gray-300 mt-1">{validationError}</div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
 
         {/* Loading Animation */}
