@@ -17,10 +17,6 @@ const router = Router();
  * 6. URLhaus - Free malicious URL database
  */
 
-// API Keys (all FREE)
-const OTX_API_KEY = process.env.ALIENVAULT_API_KEY || '';
-const VT_API_KEY = process.env.VIRUSTOTAL_API_KEY || '';
-
 interface BreachData {
   id: string;
   name: string;
@@ -36,26 +32,39 @@ interface BreachData {
   source: string;
 }
 
+// Helper function to get API keys (reads from env at runtime, not module load time)
+function getAPIKeys() {
+  return {
+    OTX: process.env.ALIENVAULT_API_KEY || process.env.OTX_API_KEY || '',
+    VT: process.env.VIRUSTOTAL_API_KEY || process.env.VT_API_KEY || ''
+  };
+}
+
 
 /**
  * Fetch breach data from AlienVault OTX (FREE API)
  */
 async function fetchOTXBreaches(): Promise<BreachData[]> {
   try {
-    if (!OTX_API_KEY) {
-      console.log('OTX API key not configured');
+    const { OTX } = getAPIKeys();
+    
+    if (!OTX) {
+      console.log('OTX API key not configured - checked: ALIENVAULT_API_KEY, OTX_API_KEY');
       return [];
     }
+
+    console.log(`✓ Using OTX API key: ${OTX.substring(0, 10)}...`);
 
     // Get pulses (threat intelligence reports) from OTX
     const response = await axios.get('https://otx.alienvault.com/api/v1/pulses/subscribed', {
       headers: {
-        'X-OTX-API-KEY': OTX_API_KEY
+        'X-OTX-API-KEY': OTX
       },
       params: {
         limit: 50,
         page: 1
-      }
+      },
+      timeout: 15000
     });
 
     const breaches: BreachData[] = [];
@@ -84,6 +93,7 @@ async function fetchOTXBreaches(): Promise<BreachData[]> {
       }
     }
 
+    console.log(`✓ Fetched ${breaches.length} breaches from OTX`);
     return breaches;
   } catch (error: any) {
     console.error('Error fetching OTX data:', error.message);
@@ -99,9 +109,20 @@ async function fetchThreatFoxData(): Promise<BreachData[]> {
     const response = await axios.post('https://threatfox-api.abuse.ch/api/v1/', {
       query: 'get_recent',
       days: 30
+    }, {
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      timeout: 10000
     });
 
     const breaches: BreachData[] = [];
+    
+    if (!response.data || response.data.query_status !== 'ok') {
+      console.log('ThreatFox returned no data or error status');
+      return [];
+    }
+    
     const threats = response.data.data || [];
 
     for (const threat of threats.slice(0, 20)) {
@@ -135,29 +156,44 @@ async function fetchThreatFoxData(): Promise<BreachData[]> {
  */
 async function fetchURLhausData(): Promise<BreachData[]> {
   try {
-    const response = await axios.post('https://urlhaus-api.abuse.ch/v1/urls/recent/', {
-      limit: 30
+    const response = await axios.get('https://urlhaus-api.abuse.ch/v1/urls/recent/limit/30/', {
+      headers: {
+        'Accept': 'application/json'
+      },
+      timeout: 10000
     });
 
     const breaches: BreachData[] = [];
+    
+    if (!response.data || response.data.query_status !== 'ok') {
+      console.log('URLhaus returned no data or error status');
+      return [];
+    }
+    
     const urls = response.data.urls || [];
 
     for (const url of urls.slice(0, 15)) {
       if (url.url_status === 'online' && url.threat) {
-        breaches.push({
-          id: url.id || `urlhaus-${Date.now()}-${Math.random()}`,
-          name: `${url.threat} Distribution Site`,
-          domain: new URL(url.url).hostname,
-          breachDate: url.dateadded || new Date().toISOString(),
-          addedDate: url.dateadded || new Date().toISOString(),
-          pwnCount: Math.floor(Math.random() * 2000000) + 50000,
-          description: `Active malware distribution detected. Threat: ${url.threat}. Tags: ${url.tags?.join(', ') || 'malware'}`,
-          dataClasses: ['Malware', 'Credentials', 'System compromise'],
-          isVerified: true,
-          isSensitive: true,
-          severity: url.url_status === 'online' ? 'critical' : 'high',
-          source: 'URLhaus/abuse.ch'
-        });
+        try {
+          const urlObj = new URL(url.url);
+          breaches.push({
+            id: url.id || `urlhaus-${Date.now()}-${Math.random()}`,
+            name: `${url.threat} Distribution Site`,
+            domain: urlObj.hostname,
+            breachDate: url.dateadded || new Date().toISOString(),
+            addedDate: url.dateadded || new Date().toISOString(),
+            pwnCount: Math.floor(Math.random() * 2000000) + 50000,
+            description: `Active malware distribution detected. Threat: ${url.threat}. Tags: ${url.tags?.join(', ') || 'malware'}`,
+            dataClasses: ['Malware', 'Credentials', 'System compromise'],
+            isVerified: true,
+            isSensitive: true,
+            severity: url.url_status === 'online' ? 'critical' : 'high',
+            source: 'URLhaus/abuse.ch'
+          });
+        } catch (e) {
+          // Skip invalid URLs
+          continue;
+        }
       }
     }
 
