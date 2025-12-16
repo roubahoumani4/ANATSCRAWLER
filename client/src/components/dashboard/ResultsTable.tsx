@@ -469,8 +469,8 @@ const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
                         <h4 className="text-lg font-semibold text-white mb-3">Compromised Data</h4>
                         <div className="space-y-2">
                           {breachInfo.compromisedData.map((data, idx) => (
-                            <div key={idx} className="flex items-start gap-2">
-                              <span className="text-red-400 mt-1">●</span>
+                            <div key={idx} className="flex items-center gap-2">
+                              <span className="text-red-400">●</span>
                               <span className="text-gray-300 text-sm">{data}</span>
                             </div>
                           ))}
