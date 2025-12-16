@@ -1,5 +1,23 @@
 // PM2 ecosystem configuration for production OSINT Platform
 
+// Load environment from config.env file
+const fs = require('fs');
+const path = require('path');
+const dotenv = require('dotenv');
+
+// Load config.env from server directory
+const configPath = path.resolve(__dirname, 'server', 'config.env');
+let envConfig = {};
+
+if (fs.existsSync(configPath)) {
+  console.log(`Loading environment from: ${configPath}`);
+  const configFile = fs.readFileSync(configPath, 'utf8');
+  envConfig = dotenv.parse(configFile);
+  console.log(`Loaded ${Object.keys(envConfig).length} environment variables`);
+} else {
+  console.warn(`Config file not found: ${configPath}`);
+}
+
 module.exports = {
   apps: [{
     name: 'anatscrawler',
@@ -17,7 +35,9 @@ module.exports = {
       ELASTICSEARCH_URL: process.env.ELASTICSEARCH_URL || 'http://192.168.1.110:9200',
       REDIS_URL: process.env.REDIS_URL || 'redis://192.168.1.110:6379',
       // Production optimizations
-      NODE_OPTIONS: '--max-old-space-size=2048'
+      NODE_OPTIONS: '--max-old-space-size=2048',
+      // Load all variables from config.env
+      ...envConfig
     },
     error_file: '/var/www/anatscrawler/logs/error.log',
     out_file: '/var/www/anatscrawler/logs/out.log',
