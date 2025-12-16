@@ -86,16 +86,15 @@ async function fetchOTXBreaches(): Promise<BreachData[]> {
     const breaches: BreachData[] = [];
     const seenIds = new Set<string>();
 
-    try {
-      const response = await axios.get(url, {
-        headers: {
-          'X-OTX-API-KEY': OTX
-        },
-        params,
-        timeout: 5000 // 5 second timeout
-      });
-
-      const pulses = response.data.results || [];
+      try {
+        console.log(`→ Fetching from ${url}...`);
+        const response = await axios.get(url, {
+          headers: {
+            'X-OTX-API-KEY': OTX
+          },
+          params,
+          timeout: 10000 // Increased to 10 seconds for better reliability
+        });      const pulses = response.data.results || [];
       console.log(`✓ OTX returned ${pulses.length} pulses`);
 
       for (const pulse of pulses) {
@@ -187,7 +186,7 @@ async function fetchMalwareBazaarData(): Promise<BreachData[]> {
           'Content-Type': 'application/x-www-form-urlencoded',
           'User-Agent': 'ANATSCRAWLER-ThreatIntel/1.0'
         },
-        timeout: 5000 // Reduced to 5 seconds
+        timeout: 8000 // Increased timeout
       }
     );
 
@@ -272,7 +271,7 @@ async function fetchPhishTankData(): Promise<BreachData[]> {
       headers: {
         'User-Agent': 'ANATSCRAWLER-ThreatIntel/1.0'
       },
-      timeout: 5000 // Reduced to 5 seconds
+      timeout: 8000 // Increased timeout
     });
 
     const breaches: BreachData[] = [];
@@ -368,7 +367,7 @@ async function fetchURLScanData(): Promise<BreachData[]> {
         q: 'tags:malicious OR tags:phishing OR tags:suspicious',
         size: 50
       },
-      timeout: 5000 // Reduced to 5 seconds
+      timeout: 8000 // Increased timeout
     });
 
     const breaches: BreachData[] = [];
