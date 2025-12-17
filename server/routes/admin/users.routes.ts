@@ -230,4 +230,39 @@ router.delete('/users/:id', requireAdmin, async (req: Request, res: Response) =>
   }
 });
 
+/**
+ * PATCH /users/:id/role
+ * Update user role - Admin only
+ */
+router.patch('/users/:id/role', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+
+    // Validation
+    if (!role || !['admin', 'user'].includes(role)) {
+      return res.status(400).json({ error: 'Role must be either "admin" or "user"' });
+    }
+
+    // Prevent admin from changing their own role
+    if (req.user && req.user._id === id) {
+      return res.status(400).json({ error: 'Cannot change your own role' });
+    }
+
+    const result = await mongodb.updateUser(id, { roles: [role] });
+
+    if (result.success) {
+      res.json({
+        success: true,
+        message: 'User role updated successfully'
+      });
+    } else {
+      res.status(404).json({ error: result.error || 'User not found' });
+    }
+  } catch (error) {
+    console.error('Error updating user role:', error);
+    res.status(500).json({ error: 'Failed to update user role' });
+  }
+});
+
 export default router;

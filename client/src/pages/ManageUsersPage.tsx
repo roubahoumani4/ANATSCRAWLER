@@ -7,11 +7,12 @@ import {
   faUserPlus, 
   faSearch, 
   faTrash, 
-  faShield, 
+  faUserShield, 
   faUser,
   faEnvelope,
   faLock,
-  faTimes
+  faTimes,
+  faEdit
 } from "@fortawesome/free-solid-svg-icons";
 import { useToast } from "@/hooks/use-toast";
 import BackButton from "@/components/ui/back-button";
@@ -32,6 +33,7 @@ const ManageUsersPage = () => {
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
   const [newUser, setNewUser] = useState({
     username: "",
     email: "",
@@ -117,6 +119,39 @@ const ManageUsersPage = () => {
     },
   });
 
+  // Update user role mutation
+  const updateRoleMutation = useMutation({
+    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
+      const res = await fetch(`/api/v1/admin/users/${userId}/role`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ role }),
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to update user role");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/v1/admin/users"] });
+      toast({
+        title: "Success",
+        description: "User role updated successfully",
+        variant: "default",
+      });
+      setEditingUser(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const users = usersData?.users || [];
   const filteredUsers = users.filter((user) =>
     user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -168,6 +203,12 @@ const ManageUsersPage = () => {
     }
   };
 
+  const handleUpdateRole = (user: User, newRole: string) => {
+    if (window.confirm(`Change ${user.username}'s role to ${newRole}?`)) {
+      updateRoleMutation.mutate({ userId: user._id, role: newRole });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-jetBlack text-coolWhite p-6">
       <BackButton color="grey" />
@@ -179,8 +220,16 @@ const ManageUsersPage = () => {
       >
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
-          <FontAwesomeIcon icon={faUsers} className="text-[2.5rem] text-crimsonRed drop-shadow" />
-          <h1 className="text-4xl font-extrabold text-crimsonRed tracking-wide">
+          <FontAwesomeIcon icon={faUsers} className="text-[2rem] text-[hsl(var(--crimsonRed))] drop-shadow" />
+          <h1
+            style={{
+              fontWeight: 800,
+              fontSize: '2.2rem',
+              letterSpacing: '0.04em',
+              color: 'hsl(var(--crimsonRed))',
+              textShadow: '0 2px 8px rgba(0,0,0,0.18)'
+            }}
+          >
             User Management
           </h1>
         </div>
@@ -189,7 +238,7 @@ const ManageUsersPage = () => {
         <div className="flex items-center justify-between mb-6">
           <motion.button
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-crimsonRed text-white rounded-lg font-semibold shadow-lg hover:bg-crimsonRed/85 transition"
+            className="flex items-center gap-2 px-6 py-3 bg-[hsl(var(--crimsonRed))] text-white rounded-lg font-semibold shadow hover:bg-[hsl(var(--crimsonRed),.85)] transition"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
@@ -198,7 +247,7 @@ const ManageUsersPage = () => {
           </motion.button>
 
           <div className="flex items-center bg-[#232323] rounded-lg px-4 py-2 shadow-inner">
-            <FontAwesomeIcon icon={faSearch} className="text-crimsonRed mr-3" />
+            <FontAwesomeIcon icon={faSearch} className="text-[hsl(var(--crimsonRed))] mr-3" />
             <input
               type="text"
               placeholder="Search users..."
@@ -223,12 +272,12 @@ const ManageUsersPage = () => {
             <table className="w-full">
               <thead className="bg-[#232323]">
                 <tr>
-                  <th className="text-left px-6 py-4 text-crimsonRed font-bold">Username</th>
-                  <th className="text-left px-6 py-4 text-crimsonRed font-bold">Email</th>
-                  <th className="text-left px-6 py-4 text-crimsonRed font-bold">Role</th>
-                  <th className="text-left px-6 py-4 text-crimsonRed font-bold">Created</th>
-                  <th className="text-left px-6 py-4 text-crimsonRed font-bold">Status</th>
-                  <th className="text-center px-6 py-4 text-crimsonRed font-bold">Actions</th>
+                  <th className="text-left px-6 py-4 text-gray-300 font-semibold">Username</th>
+                  <th className="text-left px-6 py-4 text-gray-300 font-semibold">Email</th>
+                  <th className="text-left px-6 py-4 text-gray-300 font-semibold">Role</th>
+                  <th className="text-left px-6 py-4 text-gray-300 font-semibold">Created</th>
+                  <th className="text-left px-6 py-4 text-gray-300 font-semibold">Status</th>
+                  <th className="text-center px-6 py-4 text-gray-300 font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -246,28 +295,47 @@ const ManageUsersPage = () => {
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
                             <FontAwesomeIcon icon={faUser} className="text-gray-400" />
-                            <span className="font-semibold">{user.username}</span>
+                            <span className="font-semibold text-white">{user.username}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4 text-gray-300">{user.email || "-"}</td>
                         <td className="px-6 py-4">
-                          <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold ${
-                            user.roles.includes('admin') 
-                              ? 'bg-purple-900/30 text-purple-400 border border-purple-500' 
-                              : 'bg-blue-900/30 text-blue-400 border border-blue-500'
-                          }`}>
-                            <FontAwesomeIcon icon={user.roles.includes('admin') ? faShield : faUser} />
-                            {user.roles.includes('admin') ? 'Admin' : 'User'}
-                          </span>
+                          {editingUser?._id === user._id ? (
+                            <select
+                              value={user.roles.includes('admin') ? 'admin' : 'user'}
+                              onChange={(e) => handleUpdateRole(user, e.target.value)}
+                              className="bg-[#232323] text-white px-3 py-1 rounded border border-gray-700 text-sm"
+                            >
+                              <option value="user">User</option>
+                              <option value="admin">Admin</option>
+                            </select>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className={`px-3 py-1 rounded text-xs font-medium ${
+                                user.roles.includes('admin') 
+                                  ? 'bg-gray-700 text-gray-200' 
+                                  : 'bg-gray-800 text-gray-400'
+                              }`}>
+                                {user.roles.includes('admin') ? 'Admin' : 'User'}
+                              </span>
+                              <button
+                                onClick={() => setEditingUser(user)}
+                                className="text-gray-400 hover:text-white transition"
+                                title="Change role"
+                              >
+                                <FontAwesomeIcon icon={faEdit} size="sm" />
+                              </button>
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-gray-400 text-sm">
                           {new Date(user.createdAt).toLocaleDateString()}
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
+                          <span className={`inline-flex px-3 py-1 rounded text-xs font-medium ${
                             user.isActive 
-                              ? 'bg-green-900/30 text-green-400' 
-                              : 'bg-red-900/30 text-red-400'
+                              ? 'bg-gray-700 text-gray-200' 
+                              : 'bg-gray-800 text-gray-500'
                           }`}>
                             {user.isActive ? 'Active' : 'Inactive'}
                           </span>
@@ -276,7 +344,7 @@ const ManageUsersPage = () => {
                           <div className="flex justify-center gap-2">
                             <motion.button
                               onClick={() => handleDeleteUser(user._id, user.username)}
-                              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+                              className="px-4 py-2 bg-[hsl(var(--crimsonRed))] text-white rounded hover:bg-[hsl(var(--crimsonRed),.85)] transition"
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
                             >
@@ -318,7 +386,7 @@ const ManageUsersPage = () => {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-crimsonRed">Create New User</h2>
+                <h2 className="text-2xl font-bold text-[hsl(var(--crimsonRed))]">Create New User</h2>
                 <button
                   onClick={() => setShowCreateModal(false)}
                   className="text-gray-400 hover:text-white transition"
@@ -330,14 +398,14 @@ const ManageUsersPage = () => {
               <form onSubmit={handleCreateUser} className="space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-300 mb-2">
-                    <FontAwesomeIcon icon={faUser} className="mr-2 text-crimsonRed" />
+                    <FontAwesomeIcon icon={faUser} className="mr-2 text-gray-400" />
                     Username
                   </label>
                   <input
                     type="text"
                     value={newUser.username}
                     onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
-                    className="w-full px-4 py-3 bg-[#232323] border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-crimsonRed transition"
+                    className="w-full px-4 py-3 bg-[#232323] border border-gray-700 rounded text-white placeholder-gray-500 focus:outline-none focus:border-gray-500 transition"
                     placeholder="Enter username"
                     required
                   />
@@ -345,14 +413,14 @@ const ManageUsersPage = () => {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-300 mb-2">
-                    <FontAwesomeIcon icon={faEnvelope} className="mr-2 text-crimsonRed" />
+                    <FontAwesomeIcon icon={faEnvelope} className="mr-2 text-gray-400" />
                     Email
                   </label>
                   <input
                     type="email"
                     value={newUser.email}
                     onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                    className="w-full px-4 py-3 bg-[#232323] border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-crimsonRed transition"
+                    className="w-full px-4 py-3 bg-[#232323] border border-gray-700 rounded text-white placeholder-gray-500 focus:outline-none focus:border-gray-500 transition"
                     placeholder="Enter email"
                     required
                   />
@@ -360,14 +428,14 @@ const ManageUsersPage = () => {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-300 mb-2">
-                    <FontAwesomeIcon icon={faLock} className="mr-2 text-crimsonRed" />
+                    <FontAwesomeIcon icon={faLock} className="mr-2 text-gray-400" />
                     Password
                   </label>
                   <input
                     type="password"
                     value={newUser.password}
                     onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                    className="w-full px-4 py-3 bg-[#232323] border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-crimsonRed transition"
+                    className="w-full px-4 py-3 bg-[#232323] border border-gray-700 rounded text-white placeholder-gray-500 focus:outline-none focus:border-gray-500 transition"
                     placeholder="Enter password"
                     required
                   />
@@ -375,14 +443,14 @@ const ManageUsersPage = () => {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-300 mb-2">
-                    <FontAwesomeIcon icon={faLock} className="mr-2 text-crimsonRed" />
+                    <FontAwesomeIcon icon={faLock} className="mr-2 text-gray-400" />
                     Confirm Password
                   </label>
                   <input
                     type="password"
                     value={newUser.confirmPassword}
                     onChange={(e) => setNewUser({ ...newUser, confirmPassword: e.target.value })}
-                    className="w-full px-4 py-3 bg-[#232323] border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-crimsonRed transition"
+                    className="w-full px-4 py-3 bg-[#232323] border border-gray-700 rounded text-white placeholder-gray-500 focus:outline-none focus:border-gray-500 transition"
                     placeholder="Confirm password"
                     required
                   />
@@ -390,13 +458,13 @@ const ManageUsersPage = () => {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-300 mb-2">
-                    <FontAwesomeIcon icon={faShield} className="mr-2 text-crimsonRed" />
+                    <FontAwesomeIcon icon={faUserShield} className="mr-2 text-gray-400" />
                     Role / Permission
                   </label>
                   <select
                     value={newUser.role}
                     onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
-                    className="w-full px-4 py-3 bg-[#232323] border border-gray-700 rounded-lg text-white focus:outline-none focus:border-crimsonRed transition"
+                    className="w-full px-4 py-3 bg-[#232323] border border-gray-700 rounded text-white focus:outline-none focus:border-gray-500 transition"
                     required
                   >
                     <option value="user">User (Normal Access)</option>
@@ -413,14 +481,14 @@ const ManageUsersPage = () => {
                   <button
                     type="button"
                     onClick={() => setShowCreateModal(false)}
-                    className="flex-1 px-6 py-3 bg-gray-700 text-white rounded-lg font-semibold hover:bg-gray-600 transition"
+                    className="flex-1 px-6 py-3 bg-gray-700 text-white rounded font-semibold hover:bg-gray-600 transition"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={createUserMutation.isPending}
-                    className="flex-1 px-6 py-3 bg-crimsonRed text-white rounded-lg font-semibold hover:bg-crimsonRed/85 transition disabled:opacity-50"
+                    className="flex-1 px-6 py-3 bg-[hsl(var(--crimsonRed))] text-white rounded font-semibold hover:bg-[hsl(var(--crimsonRed),.85)] transition disabled:opacity-50"
                   >
                     {createUserMutation.isPending ? "Creating..." : "Create User"}
                   </button>
