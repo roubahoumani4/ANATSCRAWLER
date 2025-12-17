@@ -6,6 +6,8 @@ import conditionalAuth from '../middleware/conditional-auth';
 import adminRoutes from './admin/users.routes';
 import authRoutes from './auth/auth.routes';
 import userRoutes from './auth/user.routes';
+import twoFactorRoutes from './auth/2fa.routes';
+import securityRoutes from './auth/security.routes';
 import healthRoutes from './health/health.routes';
 import searchRoutes from './search';
 import assessmentRoutes from './assessment.routes';
@@ -30,6 +32,12 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   // Authentication routes - public, no auth needed
   app.use(`${apiV1}/auth`, authRoutes);
+
+  // 2FA routes - mixed authentication (some require auth, some don't)
+  app.use(`${apiV1}/2fa`, twoFactorRoutes);
+
+  // Security settings routes - authenticated users only
+  app.use(`${apiV1}/security`, authenticate, securityRoutes);
 
   // User management routes - authenticated users only
   app.use(`${apiV1}/user`, authenticate, userRoutes);

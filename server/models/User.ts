@@ -57,6 +57,14 @@ const userSchema = new mongoose.Schema({
       type: Boolean,
       default: false
     },
+    mfaSecret: {
+      type: String,
+      default: null
+    },
+    sessionTimeout: {
+      type: Number,
+      default: 30 // minutes
+    },
     showIndexedFiles: {
       type: Boolean,
       default: true

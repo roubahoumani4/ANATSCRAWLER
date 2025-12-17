@@ -18,7 +18,7 @@ interface AuthContextProps {
   isAuthenticated: boolean;
   user: User | null;
   token: string | null;
-  login: (identifier: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string, twoFactorToken?: string) => Promise<{ requiresTwoFactor?: boolean }>;
   logout: () => Promise<void>;
   loading: boolean;
 }
@@ -78,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     validate();
   }, [navigate, location.pathname]);
 
-  const login = async (identifier: string, password: string) => {
+  const login = async (identifier: string, password: string, twoFactorToken?: string) => {
     try {
       setLoading(true);
       const response = await fetch(buildApiUrl("/api/v1/auth/login"), {
@@ -87,13 +87,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           "Content-Type": "application/json"
         },
         credentials: "include",
-        body: JSON.stringify({ username: identifier.toLowerCase(), password })
+        body: JSON.stringify({ username: identifier.toLowerCase(), password, twoFactorToken })
       });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Login failed");
-      }
+      
       const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Login failed");
+      }
+
+      // Check if 2FA is required
+      if (data.requiresTwoFactor) {
+        return { requiresTwoFactor: true };
+      }
       
       // Store the token in localStorage for API calls
       if (data.token) {
@@ -117,6 +123,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         description: `Welcome back, ${data.user.username}!`,
         variant: "default"
       });
+      
+      return {};
     } catch (error) {
       console.error("Login error:", error);
       toast({

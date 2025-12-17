@@ -20,6 +20,8 @@ export interface User {
     timezone?: string;
     autoLogoutTime?: number;
     mfaEnabled?: boolean;
+    mfaSecret?: string;
+    sessionTimeout?: number;
     showIndexedFiles?: boolean;
     showRecentSearches?: boolean;
   };

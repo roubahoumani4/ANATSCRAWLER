@@ -15,6 +15,8 @@ const EnhancedLoginPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [requires2FA, setRequires2FA] = useState(false);
+  const [twoFactorCode, setTwoFactorCode] = useState("");
 
   useEffect(() => {
     // Check if user is already authenticated
@@ -67,13 +69,26 @@ const EnhancedLoginPage = () => {
       return;
     }
 
+    if (requires2FA && !twoFactorCode.trim()) {
+      setError("Please enter your 2FA code");
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
       setError("");
-      await login(identifier, password);
+      const result = await login(identifier, password, requires2FA ? twoFactorCode : undefined);
+      
+      if (result.requiresTwoFactor) {
+        setRequires2FA(true);
+        setIsLoading(false);
+        return;
+      }
+      
       navigate("/dashboard");
-    } catch (error) {
-      setError(translations.errorMessage[language]);
+    } catch (error: any) {
+      setError(error.message || translations.errorMessage[language]);
     } finally {
       setIsLoading(false);
     }
@@ -207,6 +222,32 @@ const EnhancedLoginPage = () => {
                   </button>
                 </div>
               </div>
+
+              {/* 2FA Field - Only shown when required */}
+              {requires2FA && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    2FA CODE
+                  </label>
+                  <div className="relative">
+                    <Shield className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
+                    <input
+                      type="text"
+                      value={twoFactorCode}
+                      onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      className="w-full pl-10 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-white placeholder-gray-400 text-center text-2xl tracking-widest"
+                      placeholder="000000"
+                      maxLength={6}
+                      required
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">Enter the 6-digit code from your authenticator app</p>
+                </motion.div>
+              )}
 
               {/* Login Button */}
               <motion.button

@@ -38,7 +38,7 @@ function formatUserResponse(user: any) {
  */
 router.post('/login', async (req: Request, res: Response) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, twoFactorToken } = req.body;
 
     if (!username || !password) {
       return res.status(400).json({ error: 'Username and password are required' });
@@ -66,11 +66,40 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Generate JWT token
+    // Check if 2FA is enabled
+    if ((user.preferences as any)?.mfaEnabled && (user.preferences as any)?.mfaSecret) {
+      // If 2FA token not provided, ask for it
+      if (!twoFactorToken) {
+        return res.status(200).json({
+          success: false,
+          requiresTwoFactor: true,
+          message: '2FA token required',
+        });
+      }
+
+      // Verify 2FA token
+      const speakeasy = require('speakeasy');
+      const verified = speakeasy.totp.verify({
+        secret: (user.preferences as any).mfaSecret,
+        encoding: 'base32',
+        token: twoFactorToken,
+        window: 2,
+      });
+
+      if (!verified) {
+        return res.status(401).json({ error: 'Invalid 2FA token' });
+      }
+    }
+
+    // Calculate token expiration based on user's session timeout preference
+    const sessionTimeout = (user.preferences as any)?.sessionTimeout || 30; // minutes
+    const tokenExpiration = `${sessionTimeout}m`;
+
+    // Generate JWT token with proper options
     const token = jwt.sign(
       { _id: user._id, username: user.username, roles: user.roles || ['user'] },
       JWT_SECRET,
-      { expiresIn: TOKEN_EXPIRATION },
+      { expiresIn: tokenExpiration } as jwt.SignOptions,
     );
 
     // Set token in HTTP-only cookie
@@ -78,7 +107,7 @@ router.post('/login', async (req: Request, res: Response) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      maxAge: sessionTimeout * 60 * 1000, // Convert minutes to milliseconds
     });
 
     // Update last login
@@ -93,6 +122,7 @@ router.post('/login', async (req: Request, res: Response) => {
       success: true,
       user: userResponse,
       token,
+      sessionTimeout,
       message: 'Login successful',
     });
   } catch (error) {

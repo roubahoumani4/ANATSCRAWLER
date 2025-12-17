@@ -1,10 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Lock, Shield, Bell, Eye, EyeOff, Settings as SettingsIcon } from "lucide-react";
+import { Lock, Shield, Bell, Eye, EyeOff, QrCode, Check, X } from "lucide-react";
 
 const GeneralSettings = () => {
   const { user } = useAuth();
@@ -16,6 +16,15 @@ const GeneralSettings = () => {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  // 2FA setup states
+  const [show2FASetup, setShow2FASetup] = useState(false);
+  const [qrCode, setQrCode] = useState("");
+  const [twoFactorSecret, setTwoFactorSecret] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [disable2FAPassword, setDisable2FAPassword] = useState("");
+  const [disable2FAToken, setDisable2FAToken] = useState("");
+  const [showDisable2FA, setShowDisable2FA] = useState(false);
   
   // Security settings
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
@@ -30,6 +39,22 @@ const GeneralSettings = () => {
   // Privacy settings
   const [activityLogging, setActivityLogging] = useState(true);
   const [shareAnalytics, setShareAnalytics] = useState(false);
+
+  // Fetch security settings
+  const { data: securitySettings, refetch: refetchSecuritySettings } = useQuery({
+    queryKey: ['securitySettings'],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/v1/security/settings");
+      return response.json();
+    },
+  });
+
+  useEffect(() => {
+    if (securitySettings?.settings) {
+      setTwoFactorEnabled(securitySettings.settings.mfaEnabled);
+      setSessionTimeout(securitySettings.settings.sessionTimeout);
+    }
+  }, [securitySettings]);
 
   const passwordMutation = useMutation({
     mutationFn: async (passwordData: any) => {
@@ -54,6 +79,100 @@ const GeneralSettings = () => {
       toast({
         title: "Error",
         description: err.message || "Failed to change password.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const setup2FAMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/v1/2fa/setup");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setQrCode(data.qrCode);
+      setTwoFactorSecret(data.secret);
+      setShow2FASetup(true);
+      toast({
+        title: "2FA Setup",
+        description: "Scan the QR code with your authenticator app.",
+      });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to setup 2FA.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const verify2FAMutation = useMutation({
+    mutationFn: async (token: string) => {
+      const response = await apiRequest("POST", "/api/v1/2fa/verify", { token });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "2FA enabled successfully!",
+      });
+      setShow2FASetup(false);
+      setVerificationCode("");
+      setTwoFactorEnabled(true);
+      refetchSecuritySettings();
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Error",
+        description: err.message || "Invalid verification code.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const disable2FAMutation = useMutation({
+    mutationFn: async (data: { password: string; token: string }) => {
+      const response = await apiRequest("POST", "/api/v1/2fa/disable", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "2FA disabled successfully.",
+      });
+      setShowDisable2FA(false);
+      setDisable2FAPassword("");
+      setDisable2FAToken("");
+      setTwoFactorEnabled(false);
+      refetchSecuritySettings();
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to disable 2FA.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const sessionTimeoutMutation = useMutation({
+    mutationFn: async (timeout: number) => {
+      const response = await apiRequest("PUT", "/api/v1/security/session-timeout", { 
+        sessionTimeout: timeout 
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Session timeout updated. Will apply on next login.",
+      });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to update session timeout.",
         variant: "destructive"
       });
     }
@@ -96,14 +215,57 @@ const GeneralSettings = () => {
   };
 
   const handleSecuritySettingsSave = () => {
-    toast({
-      title: "Success",
-      description: "Security settings updated successfully.",
-      variant: "default"
+    // Save session timeout
+    sessionTimeoutMutation.mutate(sessionTimeout);
+  };
+
+  const handle2FAToggle = () => {
+    if (twoFactorEnabled) {
+      // Disable 2FA
+      setShowDisable2FA(true);
+    } else {
+      // Enable 2FA
+      setup2FAMutation.mutate();
+    }
+  };
+
+  const handleVerify2FA = () => {
+    if (!verificationCode || verificationCode.length !== 6) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid 6-digit code.",
+        variant: "destructive"
+      });
+      return;
+    }
+    verify2FAMutation.mutate(verificationCode);
+  };
+
+  const handleDisable2FA = () => {
+    if (!disable2FAPassword) {
+      toast({
+        title: "Error",
+        description: "Password is required to disable 2FA.",
+        variant: "destructive"
+      });
+      return;
+    }
+    if (!disable2FAToken || disable2FAToken.length !== 6) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid 6-digit 2FA code.",
+        variant: "destructive"
+      });
+      return;
+    }
+    disable2FAMutation.mutate({ 
+      password: disable2FAPassword, 
+      token: disable2FAToken 
     });
   };
 
   const handleNotificationSettingsSave = () => {
+    // In a real implementation, this would save to backend
     toast({
       title: "Success",
       description: "Notification preferences updated successfully.",
@@ -112,6 +274,7 @@ const GeneralSettings = () => {
   };
 
   const handlePrivacySettingsSave = () => {
+    // In a real implementation, this would save to backend
     toast({
       title: "Success",
       description: "Privacy settings updated successfully.",
@@ -254,7 +417,7 @@ const GeneralSettings = () => {
                   <input
                     type="checkbox"
                     checked={twoFactorEnabled}
-                    onChange={(e) => setTwoFactorEnabled(e.target.checked)}
+                    onChange={handle2FAToggle}
                     className="sr-only peer"
                   />
                   <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[hsl(var(--crimsonRed))]"></div>
@@ -438,6 +601,151 @@ const GeneralSettings = () => {
             </div>
           </motion.div>
         </div>
+
+        {/* 2FA Setup Modal */}
+        {show2FASetup && (
+          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+            <motion.div
+              className="bg-[#1a1a1a] rounded-lg p-8 max-w-md w-full border border-gray-800"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-semibold flex items-center gap-2">
+                  <QrCode className="text-purple-400" />
+                  Setup 2FA
+                </h2>
+                <button
+                  onClick={() => setShow2FASetup(false)}
+                  className="text-gray-400 hover:text-white transition"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="bg-white p-4 rounded flex justify-center">
+                  {qrCode && <img src={qrCode} alt="2FA QR Code" className="w-48 h-48" />}
+                </div>
+                
+                <p className="text-sm text-gray-400 text-center">
+                  Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)
+                </p>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Enter 6-digit code from your app
+                  </label>
+                  <input
+                    type="text"
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    className="w-full px-4 py-3 bg-[#232323] border border-gray-700 rounded text-white text-center text-2xl tracking-widest placeholder-gray-500 focus:outline-none focus:border-gray-500 transition"
+                    placeholder="000000"
+                    maxLength={6}
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <motion.button
+                    onClick={() => setShow2FASetup(false)}
+                    className="flex-1 px-6 py-3 bg-gray-700 text-white rounded font-semibold hover:bg-gray-600 transition"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    Cancel
+                  </motion.button>
+                  <motion.button
+                    onClick={handleVerify2FA}
+                    disabled={verify2FAMutation.isPending || verificationCode.length !== 6}
+                    className="flex-1 px-6 py-3 bg-[hsl(var(--crimsonRed))] text-white rounded font-semibold hover:bg-[hsl(var(--crimsonRed),.85)] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    {verify2FAMutation.isPending ? "Verifying..." : "Verify & Enable"}
+                  </motion.button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Disable 2FA Modal */}
+        {showDisable2FA && (
+          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+            <motion.div
+              className="bg-[#1a1a1a] rounded-lg p-8 max-w-md w-full border border-gray-800"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-semibold flex items-center gap-2">
+                  <Shield className="text-red-400" />
+                  Disable 2FA
+                </h2>
+                <button
+                  onClick={() => setShowDisable2FA(false)}
+                  className="text-gray-400 hover:text-white transition"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <p className="text-gray-400 mb-6">
+                To disable two-factor authentication, please enter your password and current 2FA code.
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Password
+                  </label>
+                  <input
+                    type="password"
+                    value={disable2FAPassword}
+                    onChange={(e) => setDisable2FAPassword(e.target.value)}
+                    className="w-full px-4 py-3 bg-[#232323] border border-gray-700 rounded text-white placeholder-gray-500 focus:outline-none focus:border-gray-500 transition"
+                    placeholder="Enter your password"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    2FA Code
+                  </label>
+                  <input
+                    type="text"
+                    value={disable2FAToken}
+                    onChange={(e) => setDisable2FAToken(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    className="w-full px-4 py-3 bg-[#232323] border border-gray-700 rounded text-white text-center text-2xl tracking-widest placeholder-gray-500 focus:outline-none focus:border-gray-500 transition"
+                    placeholder="000000"
+                    maxLength={6}
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <motion.button
+                    onClick={() => setShowDisable2FA(false)}
+                    className="flex-1 px-6 py-3 bg-gray-700 text-white rounded font-semibold hover:bg-gray-600 transition"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    Cancel
+                  </motion.button>
+                  <motion.button
+                    onClick={handleDisable2FA}
+                    disabled={disable2FAMutation.isPending}
+                    className="flex-1 px-6 py-3 bg-red-600 text-white rounded font-semibold hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    {disable2FAMutation.isPending ? "Disabling..." : "Disable 2FA"}
+                  </motion.button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </div>
     </div>
   );
