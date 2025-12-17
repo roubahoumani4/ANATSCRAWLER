@@ -377,7 +377,7 @@ const GeneralSettings = () => {
               <motion.button
                 type="submit"
                 disabled={passwordMutation.isPending}
-                className="px-6 py-3 bg-[hsl(var(--crimsonRed))] text-white rounded font-semibold hover:bg-[hsl(var(--crimsonRed),.85)] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-2 bg-gray-700 text-white rounded font-semibold hover:bg-gray-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
