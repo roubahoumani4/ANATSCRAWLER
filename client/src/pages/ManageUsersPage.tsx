@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { 
-  faUsers, 
   faUserPlus, 
   faSearch, 
   faTrash, 
@@ -14,6 +13,7 @@ import {
   faTimes,
   faEdit
 } from "@fortawesome/free-solid-svg-icons";
+import { UserCog } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface User {
@@ -216,19 +216,24 @@ const ManageUsersPage = () => {
         transition={{ duration: 0.5 }}
       >
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
+        <motion.div
+          className="mb-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+        >
+          <div className="flex items-center space-x-4 mb-4">
+            <div className="p-3 rounded bg-blue-700/10 text-blue-400">
+              <UserCog size={28} />
+            </div>
             <div>
-              <h1 className="text-3xl font-bold flex items-center gap-3">
-                <FontAwesomeIcon icon={faUsers} className="text-yellow-400" />
-                User Management
-              </h1>
-              <p className="text-gray-400 mt-2">
+              <h1 className="text-2xl font-semibold">User Management</h1>
+              <p className="text-sm text-gray-400">
                 Manage user accounts and permissions
               </p>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Actions Bar */}
         <div className="flex items-center justify-between mb-6">
