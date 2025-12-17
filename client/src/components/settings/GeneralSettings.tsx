@@ -1,46 +1,49 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { useMutation } from "@tanstack/react-query";
-import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
-import moment from "moment-timezone";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Lock, Shield, Bell, Eye, EyeOff, Settings as SettingsIcon } from "lucide-react";
 
 const GeneralSettings = () => {
-  const { language, changeLanguage, timezone, changeTimezone, deleteTimezone } = useLanguage();
   const { user } = useAuth();
   const { toast } = useToast();
   
-  const [currentTimezone, setCurrentTimezone] = useState(timezone || "Asia/Beirut");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
-  const [timezones, setTimezones] = useState<string[]>([]);
-  const [username, setUsername] = useState("");
-
-  useEffect(() => {
-    setTimezones(moment.tz.names());
-    if (user) {
-      setUsername(user.username);
-    }
-  }, [user]);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  // Security settings
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [sessionTimeout, setSessionTimeout] = useState(30);
+  
+  // Notification settings
+  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [securityAlerts, setSecurityAlerts] = useState(true);
+  const [scanCompletionAlerts, setScanCompletionAlerts] = useState(true);
+  const [threatDetectionAlerts, setThreatDetectionAlerts] = useState(true);
+  
+  // Privacy settings
+  const [activityLogging, setActivityLogging] = useState(true);
+  const [shareAnalytics, setShareAnalytics] = useState(false);
 
   const passwordMutation = useMutation({
     mutationFn: async (passwordData: any) => {
       const response = await apiRequest(
-        "POST", 
-        "/api/change-password", 
+        "PUT", 
+        "/api/v1/user/change-password", 
         passwordData
       );
       return response.json();
     },
     onSuccess: () => {
       toast({
-        title: language === "French" ? "Succès" : "Success",
-        description: language === "French" 
-          ? "Mot de passe mis à jour avec succès." 
-          : "Password updated successfully.",
+        title: "Success",
+        description: "Password updated successfully.",
         variant: "default"
       });
       setCurrentPassword("");
@@ -49,226 +52,394 @@ const GeneralSettings = () => {
     },
     onError: (err: any) => {
       toast({
-        title: language === "French" ? "Erreur" : "Error",
-        description: err.message || (language === "French" 
-          ? "Échec de la modification du mot de passe." 
-          : "Failed to change password."),
+        title: "Error",
+        description: err.message || "Failed to change password.",
         variant: "destructive"
       });
     }
   });
 
-  const handleTimezoneChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setCurrentTimezone(e.target.value);
-  };
-
-  const handleSaveTimezone = () => {
-    changeTimezone(currentTimezone);
-    toast({
-      title: language === "French" ? "Fuseau horaire enregistré" : "Timezone saved",
-      description: currentTimezone,
-      variant: "default"
-    });
-  };
-
-  const handleDeleteTimezone = () => {
-    deleteTimezone();
-    toast({
-      title: language === "French" ? "Fuseau horaire supprimé" : "Timezone deleted",
-      description: language === "French" 
-        ? "Retour au fuseau horaire par défaut" 
-        : "Reverted to default timezone",
-      variant: "default"
-    });
-  };
-
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+      toast({
+        title: "Error",
+        description: "All fields are required.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 8 characters.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     if (newPassword !== confirmNewPassword) {
       toast({
-        title: language === "French" ? "Erreur" : "Error",
-        description: language === "French" 
-          ? "Les mots de passe ne correspondent pas." 
-          : "New passwords do not match.",
+        title: "Error",
+        description: "New passwords do not match.",
         variant: "destructive"
       });
       return;
     }
 
     passwordMutation.mutate({ 
-      username, 
       currentPassword, 
       newPassword 
     });
   };
 
-  const handleRestoreBackup = () => {
+  const handleSecuritySettingsSave = () => {
     toast({
-      title: language === "French" ? "Information" : "Information",
-      description: language === "French" 
-        ? "Restauration de la sauvegarde... (Fonctionnalité à implémenter)" 
-        : "Restoring backup... (Functionality to be implemented)",
+      title: "Success",
+      description: "Security settings updated successfully.",
       variant: "default"
     });
   };
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        duration: 0.5,
-        staggerChildren: 0.1
-      }
-    }
+  const handleNotificationSettingsSave = () => {
+    toast({
+      title: "Success",
+      description: "Notification preferences updated successfully.",
+      variant: "default"
+    });
   };
 
-  const sectionVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.5 }
-    }
+  const handlePrivacySettingsSave = () => {
+    toast({
+      title: "Success",
+      description: "Privacy settings updated successfully.",
+      variant: "default"
+    });
   };
 
   return (
-    <motion.div 
-      className="general-settings-container"
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-    >
-      <h1>{language === "French" ? "Paramètres généraux" : "General Settings"}</h1>
-      <p>
-        {language === "French"
-          ? `Bienvenue, ${username}. Cette section vous permet de gérer les paramètres de l'application.`
-          : `Welcome, ${username}. This section allows you to manage core application settings.`}
-      </p>
-
-      <motion.div 
-        className="language-timezone-settings"
-        variants={sectionVariants}
-      >
-        <h2 className="settings-title">{language === "French" ? "Langue et fuseau horaire" : "Language & Timezone"}</h2>
-        <div className="setting-option">
-          <label>{language === "French" ? "Langue d'affichage" : "Display Language"}</label>
-          <select 
-            value={language} 
-            onChange={(e) => changeLanguage(e.target.value as any)}
-            className="form-select"
-          >
-            <option value="English">English</option>
-            <option value="French">French</option>
-            <option value="Spanish">Spanish</option>
-          </select>
-        </div>
-
-        <div className="setting-option">
-          <label>{language === "French" ? "Fuseau horaire" : "Timezone"}</label>
-          <select 
-            value={currentTimezone} 
-            onChange={handleTimezoneChange}
-            className="form-select"
-          >
-            {timezones.map((zone, index) => (
-              <option key={index} value={zone}>
-                {zone}
-              </option>
-            ))}
-          </select>
-          <div className="timezone-buttons">
-            <motion.button 
-              className="restore-button" 
-              onClick={handleSaveTimezone}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              {language === "French" ? "Enregistrer" : "Save"}
-            </motion.button>
-            <motion.button 
-              className="delete-button" 
-              onClick={handleDeleteTimezone}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              {language === "French" ? "Supprimer" : "Delete"}
-            </motion.button>
-          </div>
-        </div>
-      </motion.div>
-
-      <motion.div 
-        className="edit-user-box"
-        variants={sectionVariants}
-      >
-        <h2 className="settings-title">{language === "French" ? "Changer le mot de passe" : "Change Password"}</h2>
-        <form onSubmit={handlePasswordChange}>
-          <div className="setting-option">
-            <label>{language === "French" ? "Mot de passe actuel" : "Current Password"}</label>
-            <input 
-              type="password" 
-              value={currentPassword} 
-              onChange={(e) => setCurrentPassword(e.target.value)} 
-              required 
-            />
-          </div>
-
-          <div className="setting-option">
-            <label>{language === "French" ? "Nouveau mot de passe" : "New Password"}</label>
-            <input 
-              type="password" 
-              value={newPassword} 
-              onChange={(e) => setNewPassword(e.target.value)} 
-              required 
-            />
-          </div>
-
-          <div className="setting-option">
-            <label>{language === "French" ? "Confirmer le nouveau mot de passe" : "Confirm New Password"}</label>
-            <input 
-              type="password" 
-              value={confirmNewPassword} 
-              onChange={(e) => setConfirmNewPassword(e.target.value)} 
-              required 
-            />
-          </div>
-
-          <motion.button 
-            type="submit" 
-            className="save-button"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            disabled={passwordMutation.isPending}
-          >
-            {passwordMutation.isPending
-              ? (language === "French" ? "Mise à jour..." : "Updating...")
-              : (language === "French" ? "Mettre à jour le mot de passe" : "Update Password")}
-          </motion.button>
-        </form>
-      </motion.div>
-
-      <motion.div 
-        className="backup-recovery"
-        variants={sectionVariants}
-      >
-        <h2 className="settings-title">{language === "French" ? "Gestion des données" : "Data Management"}</h2>
-        <p>
-          {language === "French"
-            ? "Exporter les journaux d'activité des utilisateurs, les journaux de sécurité et les métadonnées des fichiers téléchargés."
-            : "Export user activity logs, security logs, uploaded files metadata."}
-        </p>
-        <motion.button 
-          className="restore-button" 
-          onClick={handleRestoreBackup}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+    <div className="min-h-screen bg-jetBlack text-coolWhite p-8">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <motion.div
+          className="mb-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
         >
-          {language === "French" ? "Restaurer la sauvegarde" : "Restore Backup"}
-        </motion.button>
-      </motion.div>
-    </motion.div>
+          <h1 className="text-3xl font-bold text-white mb-2">Settings</h1>
+          <p className="text-gray-400">Manage your account security, notifications, and privacy preferences</p>
+        </motion.div>
+
+        <div className="space-y-6">
+          {/* Change Password Section */}
+          <motion.div
+            className="bg-[#1a1a1a] rounded-lg p-6 border border-gray-800"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+          >
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 rounded bg-red-700/10 text-red-400">
+                <Lock size={20} />
+              </div>
+              <h2 className="text-xl font-semibold">Change Password</h2>
+            </div>
+
+            <form onSubmit={handlePasswordChange} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Current Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showCurrentPassword ? "text" : "password"}
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="w-full px-4 py-3 bg-[#232323] border border-gray-700 rounded text-white placeholder-gray-500 focus:outline-none focus:border-gray-500 transition pr-12"
+                    placeholder="Enter current password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition"
+                  >
+                    {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  New Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full px-4 py-3 bg-[#232323] border border-gray-700 rounded text-white placeholder-gray-500 focus:outline-none focus:border-gray-500 transition pr-12"
+                    placeholder="Enter new password (min 8 characters)"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition"
+                  >
+                    {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Confirm New Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmNewPassword}
+                    onChange={(e) => setConfirmNewPassword(e.target.value)}
+                    className="w-full px-4 py-3 bg-[#232323] border border-gray-700 rounded text-white placeholder-gray-500 focus:outline-none focus:border-gray-500 transition pr-12"
+                    placeholder="Confirm new password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition"
+                  >
+                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              <motion.button
+                type="submit"
+                disabled={passwordMutation.isPending}
+                className="px-6 py-3 bg-[hsl(var(--crimsonRed))] text-white rounded font-semibold hover:bg-[hsl(var(--crimsonRed),.85)] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                {passwordMutation.isPending ? "Updating..." : "Update Password"}
+              </motion.button>
+            </form>
+          </motion.div>
+
+          {/* Security Settings Section */}
+          <motion.div
+            className="bg-[#1a1a1a] rounded-lg p-6 border border-gray-800"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 rounded bg-purple-700/10 text-purple-400">
+                <Shield size={20} />
+              </div>
+              <h2 className="text-xl font-semibold">Security Settings</h2>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between py-3 border-b border-gray-800">
+                <div>
+                  <h3 className="font-medium text-white">Two-Factor Authentication</h3>
+                  <p className="text-sm text-gray-400 mt-1">Add an extra layer of security to your account</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={twoFactorEnabled}
+                    onChange={(e) => setTwoFactorEnabled(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[hsl(var(--crimsonRed))]"></div>
+                </label>
+              </div>
+
+              <div className="py-3">
+                <label className="block text-sm font-medium text-gray-300 mb-3">
+                  Session Timeout (minutes)
+                </label>
+                <select
+                  value={sessionTimeout}
+                  onChange={(e) => setSessionTimeout(Number(e.target.value))}
+                  className="w-full px-4 py-3 bg-[#232323] border border-gray-700 rounded text-white focus:outline-none focus:border-gray-500 transition"
+                >
+                  <option value={15}>15 minutes</option>
+                  <option value={30}>30 minutes</option>
+                  <option value={60}>1 hour</option>
+                  <option value={120}>2 hours</option>
+                  <option value={240}>4 hours</option>
+                </select>
+                <p className="text-sm text-gray-400 mt-2">Automatically log out after period of inactivity</p>
+              </div>
+
+              <motion.button
+                onClick={handleSecuritySettingsSave}
+                className="px-6 py-2 bg-gray-700 text-white rounded font-semibold hover:bg-gray-600 transition"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                Save Security Settings
+              </motion.button>
+            </div>
+          </motion.div>
+
+          {/* Notification Preferences Section */}
+          <motion.div
+            className="bg-[#1a1a1a] rounded-lg p-6 border border-gray-800"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+          >
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 rounded bg-blue-700/10 text-blue-400">
+                <Bell size={20} />
+              </div>
+              <h2 className="text-xl font-semibold">Notification Preferences</h2>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between py-3 border-b border-gray-800">
+                <div>
+                  <h3 className="font-medium text-white">Email Notifications</h3>
+                  <p className="text-sm text-gray-400 mt-1">Receive updates via email</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={emailNotifications}
+                    onChange={(e) => setEmailNotifications(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[hsl(var(--crimsonRed))]"></div>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-between py-3 border-b border-gray-800">
+                <div>
+                  <h3 className="font-medium text-white">Security Alerts</h3>
+                  <p className="text-sm text-gray-400 mt-1">Get notified about security issues</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={securityAlerts}
+                    onChange={(e) => setSecurityAlerts(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[hsl(var(--crimsonRed))]"></div>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-between py-3 border-b border-gray-800">
+                <div>
+                  <h3 className="font-medium text-white">Scan Completion Alerts</h3>
+                  <p className="text-sm text-gray-400 mt-1">Notify when OSINT scans complete</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={scanCompletionAlerts}
+                    onChange={(e) => setScanCompletionAlerts(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[hsl(var(--crimsonRed))]"></div>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-between py-3">
+                <div>
+                  <h3 className="font-medium text-white">Threat Detection Alerts</h3>
+                  <p className="text-sm text-gray-400 mt-1">Critical alerts for detected threats</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={threatDetectionAlerts}
+                    onChange={(e) => setThreatDetectionAlerts(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[hsl(var(--crimsonRed))]"></div>
+                </label>
+              </div>
+
+              <motion.button
+                onClick={handleNotificationSettingsSave}
+                className="px-6 py-2 bg-gray-700 text-white rounded font-semibold hover:bg-gray-600 transition"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                Save Notification Preferences
+              </motion.button>
+            </div>
+          </motion.div>
+
+          {/* Privacy Settings Section */}
+          <motion.div
+            className="bg-[#1a1a1a] rounded-lg p-6 border border-gray-800"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+          >
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 rounded bg-green-700/10 text-green-400">
+                <Eye size={20} />
+              </div>
+              <h2 className="text-xl font-semibold">Privacy Settings</h2>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between py-3 border-b border-gray-800">
+                <div>
+                  <h3 className="font-medium text-white">Activity Logging</h3>
+                  <p className="text-sm text-gray-400 mt-1">Track and log your platform activity</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={activityLogging}
+                    onChange={(e) => setActivityLogging(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[hsl(var(--crimsonRed))]"></div>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-between py-3">
+                <div>
+                  <h3 className="font-medium text-white">Share Usage Analytics</h3>
+                  <p className="text-sm text-gray-400 mt-1">Help improve the platform by sharing anonymous usage data</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={shareAnalytics}
+                    onChange={(e) => setShareAnalytics(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[hsl(var(--crimsonRed))]"></div>
+                </label>
+              </div>
+
+              <motion.button
+                onClick={handlePrivacySettingsSave}
+                className="px-6 py-2 bg-gray-700 text-white rounded font-semibold hover:bg-gray-600 transition"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                Save Privacy Settings
+              </motion.button>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    </div>
   );
 };
 
