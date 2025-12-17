@@ -61,8 +61,8 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
     setCollapsed(!collapsed);
   };
 
-  // Check if user is admin (TEMPORARY: r.houmani has admin access)
-  const isAdmin = user?.roles?.includes('admin') || user?.username === 'r.houmani';
+  // Check if user is admin
+  const isAdmin = user?.roles?.includes('admin');
 
   const menuItems = [
     {

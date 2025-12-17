@@ -50,8 +50,8 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   
-  // Check if user has admin role (TEMPORARY: r.houmani has admin access)
-  const isAdmin = user?.roles?.includes('admin') || user?.username === 'r.houmani';
+  // Check if user has admin role
+  const isAdmin = user?.roles?.includes('admin');
   if (!isAdmin) return <Navigate to="/dashboard" replace />;
   
   return <Layout>{children}</Layout>;

@@ -29,8 +29,7 @@ interface DashboardMetrics {
 const EnhancedDashboard = () => {
   const { language } = useLanguage();
   const { user } = useAuth();
-  // TEMPORARY: r.houmani has admin access
-  const isAdmin = user?.roles?.includes('admin') || user?.username === 'r.houmani';
+  const isAdmin = user?.roles?.includes('admin');
   
   const [metrics, setMetrics] = useState<DashboardMetrics>({
     totalUsers: 1247,
