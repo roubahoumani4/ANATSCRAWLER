@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Lock, Shield, Bell, Eye, EyeOff, QrCode, Check, X } from "lucide-react";
+import { Lock, Shield, Eye, EyeOff, QrCode, Check, X, Settings } from "lucide-react";
 
 const GeneralSettings = () => {
   const { user } = useAuth();
@@ -29,12 +29,6 @@ const GeneralSettings = () => {
   // Security settings
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [sessionTimeout, setSessionTimeout] = useState(30);
-  
-  // Notification settings
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [securityAlerts, setSecurityAlerts] = useState(true);
-  const [scanCompletionAlerts, setScanCompletionAlerts] = useState(true);
-  const [threatDetectionAlerts, setThreatDetectionAlerts] = useState(true);
   
   // Privacy settings
   const [activityLogging, setActivityLogging] = useState(true);
@@ -264,15 +258,6 @@ const GeneralSettings = () => {
     });
   };
 
-  const handleNotificationSettingsSave = () => {
-    // In a real implementation, this would save to backend
-    toast({
-      title: "Success",
-      description: "Notification preferences updated successfully.",
-      variant: "default"
-    });
-  };
-
   const handlePrivacySettingsSave = () => {
     // In a real implementation, this would save to backend
     toast({
@@ -284,22 +269,30 @@ const GeneralSettings = () => {
 
   return (
     <div className="min-h-screen bg-jetBlack text-coolWhite p-8">
-      <div className="max-w-4xl mx-auto">
+      <div className="w-full">
         {/* Header */}
         <motion.div
-          className="mb-8"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
-          <h1 className="text-3xl font-bold text-white mb-2">Settings</h1>
-          <p className="text-gray-400">Manage your account security, notifications, and privacy preferences</p>
+          <div className="flex items-center space-x-4 mb-4">
+            <div className="p-3 rounded bg-blue-700/10 text-blue-400">
+              <Settings size={28} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-semibold">Settings</h1>
+              <p className="text-sm text-gray-400">
+                Manage your account security and privacy preferences
+              </p>
+            </div>
+          </div>
         </motion.div>
 
-        <div className="space-y-6">
+        <div className="space-y-6 mt-6">
           {/* Change Password Section */}
           <motion.div
-            className="bg-[#1a1a1a] rounded-lg p-6 border border-gray-800"
+            className="bg-gray-850 rounded-lg p-8 border border-gray-800"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
@@ -395,7 +388,7 @@ const GeneralSettings = () => {
 
           {/* Security Settings Section */}
           <motion.div
-            className="bg-[#1a1a1a] rounded-lg p-6 border border-gray-800"
+            className="bg-gray-850 rounded-lg p-8 border border-gray-800"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
@@ -453,102 +446,12 @@ const GeneralSettings = () => {
             </div>
           </motion.div>
 
-          {/* Notification Preferences Section */}
+          {/* Privacy Settings Section */}
           <motion.div
-            className="bg-[#1a1a1a] rounded-lg p-6 border border-gray-800"
+            className="bg-gray-850 rounded-lg p-8 border border-gray-800"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.3 }}
-          >
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 rounded bg-blue-700/10 text-blue-400">
-                <Bell size={20} />
-              </div>
-              <h2 className="text-xl font-semibold">Notification Preferences</h2>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between py-3 border-b border-gray-800">
-                <div>
-                  <h3 className="font-medium text-white">Email Notifications</h3>
-                  <p className="text-sm text-gray-400 mt-1">Receive updates via email</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={emailNotifications}
-                    onChange={(e) => setEmailNotifications(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[hsl(var(--crimsonRed))]"></div>
-                </label>
-              </div>
-
-              <div className="flex items-center justify-between py-3 border-b border-gray-800">
-                <div>
-                  <h3 className="font-medium text-white">Security Alerts</h3>
-                  <p className="text-sm text-gray-400 mt-1">Get notified about security issues</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={securityAlerts}
-                    onChange={(e) => setSecurityAlerts(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[hsl(var(--crimsonRed))]"></div>
-                </label>
-              </div>
-
-              <div className="flex items-center justify-between py-3 border-b border-gray-800">
-                <div>
-                  <h3 className="font-medium text-white">Scan Completion Alerts</h3>
-                  <p className="text-sm text-gray-400 mt-1">Notify when OSINT scans complete</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={scanCompletionAlerts}
-                    onChange={(e) => setScanCompletionAlerts(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[hsl(var(--crimsonRed))]"></div>
-                </label>
-              </div>
-
-              <div className="flex items-center justify-between py-3">
-                <div>
-                  <h3 className="font-medium text-white">Threat Detection Alerts</h3>
-                  <p className="text-sm text-gray-400 mt-1">Critical alerts for detected threats</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={threatDetectionAlerts}
-                    onChange={(e) => setThreatDetectionAlerts(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[hsl(var(--crimsonRed))]"></div>
-                </label>
-              </div>
-
-              <motion.button
-                onClick={handleNotificationSettingsSave}
-                className="px-6 py-2 bg-gray-700 text-white rounded font-semibold hover:bg-gray-600 transition"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                Save Notification Preferences
-              </motion.button>
-            </div>
-          </motion.div>
-
-          {/* Privacy Settings Section */}
-          <motion.div
-            className="bg-[#1a1a1a] rounded-lg p-6 border border-gray-800"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
           >
             <div className="flex items-center gap-3 mb-6">
               <div className="p-2 rounded bg-green-700/10 text-green-400">
