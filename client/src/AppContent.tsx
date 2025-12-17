@@ -18,6 +18,7 @@ import DomainMonitoringPage from '@/pages/DomainMonitoringPage';
 import ThreatIntelligenceFeedPage from '@/pages/ThreatIntelligenceFeedPage';
 import SearchHistoryPage from '@/pages/SearchHistoryPage';
 import DarkWebMonitoringPage from '@/pages/DarkWebMonitoringPage';
+import ManageUsersPage from '@/pages/ManageUsersPage';
 
 // Layout Component
 import Layout from '@/components/layout/Layout';
@@ -33,6 +34,25 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   );
   
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+  
+  return <Layout>{children}</Layout>;
+};
+
+// Admin Route Component - Only accessible by admin users
+const AdminRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+  
+  if (loading) return (
+    <div className="h-screen w-full flex items-center justify-center bg-jetBlack text-coolWhite">
+      <div className="w-12 h-12 border-4 border-coolWhite/10 border-t-white rounded-full animate-spin"></div>
+    </div>
+  );
+  
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  
+  // Check if user has admin role
+  const isAdmin = user?.roles?.includes('admin');
+  if (!isAdmin) return <Navigate to="/dashboard" replace />;
   
   return <Layout>{children}</Layout>;
 };
@@ -63,6 +83,9 @@ export default function AppContent() {
   <Route path="/search-history" element={<ProtectedRoute><SearchHistoryPage /></ProtectedRoute>} />
   <Route path="/threat-intelligence" element={<ProtectedRoute><ThreatIntelligenceFeedPage /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><GeneralSettingsPage /></ProtectedRoute>} />
+        
+        {/* User Management Routes - Admin Only */}
+        <Route path="/users/management" element={<AdminRoute><ManageUsersPage /></AdminRoute>} />
         
         {/* Fallback Route */}
         <Route path="*" element={<ProtectedRoute><NotFoundPage /></ProtectedRoute>} />

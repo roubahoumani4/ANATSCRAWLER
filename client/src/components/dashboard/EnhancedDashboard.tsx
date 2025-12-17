@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLanguage } from "@/context/LanguageContext";
+import { useAuth } from "@/context/AuthContext";
 import { 
   Shield, Activity, Database, Search, Users, TrendingUp, 
   Eye, Skull, Globe, Terminal, Zap, AlertTriangle,
@@ -27,6 +28,9 @@ interface DashboardMetrics {
 
 const EnhancedDashboard = () => {
   const { language } = useLanguage();
+  const { user } = useAuth();
+  const isAdmin = user?.roles?.includes('admin');
+  
   const [metrics, setMetrics] = useState<DashboardMetrics>({
     totalUsers: 1247,
     activeUsers: 342,
@@ -453,7 +457,7 @@ const EnhancedDashboard = () => {
                 { label: "Run Automated OSINT", icon: Search, color: "indigo" },
                 { label: "View Dark Web Alerts", icon: Skull, color: "purple" },
                 { label: "System Diagnostics", icon: Terminal, color: "cyan" },
-                { label: "User Management", icon: Users, color: "blue" }
+                ...(isAdmin ? [{ label: "User Management", icon: Users, color: "blue" }] : [])
               ].map((action, idx) => (
                 <motion.button
                   key={idx}

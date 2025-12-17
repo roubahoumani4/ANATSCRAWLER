@@ -61,6 +61,9 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
     setCollapsed(!collapsed);
   };
 
+  // Check if user is admin
+  const isAdmin = user?.roles?.includes('admin');
+
   const menuItems = [
     {
       path: "/dashboard",
@@ -93,18 +96,17 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
         { path: "/search-history", label: "Search History", icon: <HistoryIcon size={16} />, color: "text-purple-400" }
       ]
     },
-    {
+    // User Management - Only visible for admin users
+    ...(isAdmin ? [{
       path: "/users",
       icon: <Users size={20} />,
       label: "User Management",
       color: "text-yellow-400",
       hasSubmenu: true,
       features: [
-        { path: "/users/management", label: "Manage Users", icon: <UserCog size={16} />, color: "text-blue-400" },
-        { path: "/users/permissions", label: "Permissions", icon: <Lock size={16} />, color: "text-green-400" },
-        { path: "/users/activity", label: "Activity Logs", icon: <Clock size={16} />, color: "text-purple-400" }
+        { path: "/users/management", label: "Manage Users", icon: <UserCog size={16} />, color: "text-blue-400" }
       ]
-    }
+    }] : [])
   ];
 
   const sidebarVariants = {
@@ -249,21 +251,35 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
               <div className="w-8 h-8 rounded-full bg-darkGray flex items-center justify-center text-coolWhite">
                 {user.username?.charAt(0).toUpperCase() || "U"}
               </div>
-              <div className="ml-3">
-                <p className="text-xs font-medium text-coolWhite">{user.username}</p>
-                <p className="text-xs text-gray-400">{user.email || user.jobPosition || "User"}</p>
-              </div>
+              {!collapsed && (
+                <div className="ml-3">
+                  <p className="text-xs font-medium text-coolWhite">{user.username}</p>
+                  <p className="text-xs text-gray-400">
+                    {isAdmin ? "Admin" : user.email || user.jobPosition || "User"}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
           {/* Logout Button under Settings */}
-          <div
-            className="flex items-center px-3 py-2 text-sm text-coolWhite cursor-pointer hover:bg-crimsonRed rounded-lg mt-2"
-            onClick={logout}
-          >
-            <LogOut size={20} />
-            <span className="ml-3">Logout</span>
-          </div>
+          {!collapsed && (
+            <div
+              className="flex items-center px-3 py-2 text-sm text-coolWhite cursor-pointer hover:bg-crimsonRed rounded-lg mt-2"
+              onClick={logout}
+            >
+              <LogOut size={20} />
+              <span className="ml-3">Logout</span>
+            </div>
+          )}
+          {collapsed && (
+            <div
+              className="flex items-center justify-center px-3 py-2 text-sm text-coolWhite cursor-pointer hover:bg-crimsonRed rounded-lg mt-2"
+              onClick={logout}
+            >
+              <LogOut size={20} />
+            </div>
+          )}
         </div>
       </div>
     </motion.div>
