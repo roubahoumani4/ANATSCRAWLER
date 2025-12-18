@@ -269,8 +269,9 @@ const OutputPage: React.FC = () => {
 
   if (!jobId) {
     return (
-      <div className="p-8 min-h-screen bg-jetBlack text-coolWhite">
-        <div className="max-w-5xl mx-auto mt-20">
+      <div className="p-8 min-h-screen bg-jetBlack text-coolWhite relative">
+        <MatrixBackground />
+        <div className="max-w-5xl mx-auto mt-20 relative z-10">
           <div className="text-center mb-12">
             <FileText className="mx-auto mb-4 text-gray-500" size={64} />
             <h2 className="text-3xl font-bold mb-2">No Scan Output Available</h2>
