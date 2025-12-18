@@ -102,9 +102,9 @@ const UserActivityLogsPage = () => {
   const [exporting, setExporting] = useState(false);
   
   // Filters
-  const [selectedUser, setSelectedUser] = useState('');
-  const [selectedActionType, setSelectedActionType] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('');
+  const [selectedUser, setSelectedUser] = useState('all');
+  const [selectedActionType, setSelectedActionType] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -160,9 +160,9 @@ const UserActivityLogsPage = () => {
         limit: 20,
       };
 
-      if (selectedUser) params.userId = selectedUser;
-      if (selectedActionType) params.actionType = selectedActionType;
-      if (selectedStatus) params.status = selectedStatus;
+      if (selectedUser && selectedUser !== 'all') params.userId = selectedUser;
+      if (selectedActionType && selectedActionType !== 'all') params.actionType = selectedActionType;
+      if (selectedStatus && selectedStatus !== 'all') params.status = selectedStatus;
       if (searchTerm) params.search = searchTerm;
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
@@ -210,9 +210,9 @@ const UserActivityLogsPage = () => {
       setExporting(true);
       const params: any = { format };
       
-      if (selectedUser) params.userId = selectedUser;
-      if (selectedActionType) params.actionType = selectedActionType;
-      if (selectedStatus) params.status = selectedStatus;
+      if (selectedUser && selectedUser !== 'all') params.userId = selectedUser;
+      if (selectedActionType && selectedActionType !== 'all') params.actionType = selectedActionType;
+      if (selectedStatus && selectedStatus !== 'all') params.status = selectedStatus;
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
 
@@ -490,7 +490,7 @@ const UserActivityLogsPage = () => {
                 <label className="text-sm text-gray-400 mb-2 block">User</label>
                 <Select value={selectedUser} onValueChange={(value) => {
                   setSelectedUser(value);
-                  if (value) {
+                  if (value && value !== "all") {
                     fetchUserSummary(value);
                   } else {
                     setShowUserSummary(false);
@@ -500,7 +500,7 @@ const UserActivityLogsPage = () => {
                     <SelectValue placeholder="All Users" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Users</SelectItem>
+                    <SelectItem value="all">All Users</SelectItem>
                     {users.map((user) => (
                       <SelectItem key={user._id} value={user._id}>
                         {user.username} ({user.email})
@@ -517,7 +517,7 @@ const UserActivityLogsPage = () => {
                     <SelectValue placeholder="All Types" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Types</SelectItem>
+                    <SelectItem value="all">All Types</SelectItem>
                     <SelectItem value="login">Login</SelectItem>
                     <SelectItem value="logout">Logout</SelectItem>
                     <SelectItem value="failed_login">Failed Login</SelectItem>
@@ -537,7 +537,7 @@ const UserActivityLogsPage = () => {
                     <SelectValue placeholder="All Statuses" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Statuses</SelectItem>
+                    <SelectItem value="all">All Statuses</SelectItem>
                     <SelectItem value="success">Success</SelectItem>
                     <SelectItem value="failed">Failed</SelectItem>
                     <SelectItem value="warning">Warning</SelectItem>
