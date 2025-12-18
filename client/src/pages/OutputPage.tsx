@@ -326,32 +326,33 @@ const OutputPage: React.FC = () => {
   return (
     <div className="p-8 min-h-screen bg-jetBlack text-coolWhite relative">
       <MatrixBackground />
-      <div className="flex items-center justify-between mb-6 relative z-10">
-        <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2">
-            <FileText size={28} className="text-white" />
-            Scan Output
-          </h1>
-          <p className="text-sm text-gray-400 mt-1">Detailed analysis results and generated reports</p>
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-semibold flex items-center gap-2">
+              <FileText size={28} className="text-white" />
+              Scan Output
+            </h1>
+            <p className="text-sm text-gray-400 mt-1">Detailed analysis results and generated reports</p>
+          </div>
+          <div className="flex gap-2">
+            <button 
+              className="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600 flex items-center gap-2"
+              onClick={() => navigate('/osint/assessment/history')}
+            >
+              <HistoryIcon size={16} />
+              History
+            </button>
+            <button 
+              className="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600"
+              onClick={() => navigate('/osint/assessment')}
+            >
+              Back to Assessment
+            </button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <button 
-            className="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600 flex items-center gap-2"
-            onClick={() => navigate('/osint/assessment/history')}
-          >
-            <HistoryIcon size={16} />
-            History
-          </button>
-          <button 
-            className="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600"
-            onClick={() => navigate('/osint/assessment')}
-          >
-            Back to Assessment
-          </button>
-        </div>
-      </div>
 
-      <div className="mt-6">
+        <div className="mt-6">
         {loading && (
           <div className="flex items-center justify-center py-12">
             <div className="text-gray-300 animate-pulse">Loading scan results...</div>
@@ -942,6 +943,7 @@ const OutputPage: React.FC = () => {
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   );
