@@ -31,6 +31,7 @@ import {
   AlertTriangle,
   FileText,
   History as HistoryIcon,
+  Database,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -107,6 +108,17 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
         { path: "/users/management", label: "Manage Users", icon: <UserCog size={16} />, color: "text-white" },
         { path: "/users/activity-logs", label: "Activity Logs", icon: <Activity size={16} />, color: "text-white" },
         { path: "/users/sessions", label: "Session Management", icon: <Shield size={16} />, color: "text-white" }
+      ]
+    },
+    // Index Management - Only visible for admin users
+    {
+      path: "/index",
+      icon: <Database size={20} />,
+      label: "Index Management",
+      color: "text-white",
+      hasSubmenu: true,
+      features: [
+        { path: "/index/management", label: "Manage Indices", icon: <Database size={16} />, color: "text-white" },
       ]
     }] : [])
   ];

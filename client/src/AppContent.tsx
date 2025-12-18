@@ -24,6 +24,8 @@ import ManageUsersPage from '@/pages/ManageUsersPage';
 import UserActivityLogsPage from '@/pages/UserActivityLogsPage';
 import UserActivityDashboardPage from '@/pages/UserActivityDashboardPage';
 import SessionManagementPage from '@/pages/SessionManagementPage';
+import IndexManagementPage from '@/pages/IndexManagementPage';
+import IndexDetailsPage from '@/pages/IndexDetailsPage';
 
 // Layout Component
 import Layout from '@/components/layout/Layout';
@@ -101,7 +103,10 @@ export default function AppContent() {
           <Route path="/users/activity-logs" element={<AdminRoute><UserActivityLogsPage /></AdminRoute>} />
           <Route path="/users/sessions" element={<AdminRoute><SessionManagementPage /></AdminRoute>} />
           <Route path="/users/activity/:userId" element={<AdminRoute><UserActivityDashboardPage /></AdminRoute>} />
-          <Route path="/users/activity/:userId" element={<AdminRoute><UserActivityDashboardPage /></AdminRoute>} />
+          
+          {/* Index Management Routes - Admin Only */}
+          <Route path="/index/management" element={<AdminRoute><IndexManagementPage /></AdminRoute>} />
+          <Route path="/index/details/:indexName" element={<AdminRoute><IndexDetailsPage /></AdminRoute>} />
           
           {/* Fallback Route */}
           <Route path="*" element={<ProtectedRoute><NotFoundPage /></ProtectedRoute>} />
