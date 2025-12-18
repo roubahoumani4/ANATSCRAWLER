@@ -139,7 +139,13 @@ const UserActivityLogsPage = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/admin/activity-logs/users`);
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const response = await axios.get(`${API_BASE_URL}/api/v1/admin/activity-logs/users`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        withCredentials: true
+      });
       setUsers(response.data.data);
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -161,7 +167,14 @@ const UserActivityLogsPage = () => {
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
 
-      const response = await axios.get(`${API_BASE_URL}/admin/activity-logs`, { params });
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const response = await axios.get(`${API_BASE_URL}/api/v1/admin/activity-logs`, { 
+        params,
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        withCredentials: true
+      });
       
       setLogs(response.data.data.logs);
       setTotalPages(response.data.data.pagination.pages);
@@ -178,7 +191,14 @@ const UserActivityLogsPage = () => {
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
 
-      const response = await axios.get(`${API_BASE_URL}/admin/activity-logs/stats`, { params });
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const response = await axios.get(`${API_BASE_URL}/api/v1/admin/activity-logs/stats`, { 
+        params,
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        withCredentials: true
+      });
       setStats(response.data.data);
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -196,9 +216,14 @@ const UserActivityLogsPage = () => {
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
 
-      const response = await axios.get(`${API_BASE_URL}/admin/activity-logs/export`, {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const response = await axios.get(`${API_BASE_URL}/api/v1/admin/activity-logs/export`, {
         params,
         responseType: format === 'csv' ? 'text' : 'json',
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        withCredentials: true
       });
 
       // Create download link
@@ -222,9 +247,14 @@ const UserActivityLogsPage = () => {
   const handleUserExport = async (userId: string, format: 'csv' | 'json') => {
     try {
       setExporting(true);
-      const response = await axios.get(`${API_BASE_URL}/admin/activity-logs/export/user/${userId}`, {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const response = await axios.get(`${API_BASE_URL}/api/v1/admin/activity-logs/export/user/${userId}`, {
         params: { format },
         responseType: format === 'csv' ? 'text' : 'json',
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        withCredentials: true
       });
 
       const user = users.find(u => u._id === userId);
@@ -250,7 +280,13 @@ const UserActivityLogsPage = () => {
 
   const fetchUserSummary = async (userId: string) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/admin/activity-logs/user-summary/${userId}`);
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const response = await axios.get(`${API_BASE_URL}/api/v1/admin/activity-logs/user-summary/${userId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        withCredentials: true
+      });
       setUserSummary(response.data.data);
       setShowUserSummary(true);
     } catch (error) {
