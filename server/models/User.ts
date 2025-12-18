@@ -201,9 +201,10 @@ export interface IUser extends mongoose.Document {
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
-// Export models
-export const User = mongoose.model<IUser>('User', userSchema, 'users');
-export const SearchHistory = mongoose.model('SearchHistory', searchHistorySchema, 'search_history');
-export const SearchResult = mongoose.model('SearchResult', searchResultSchema, 'search_results');
-export const UserSearchResult = mongoose.model('UserSearchResult', userSearchResultSchema, 'user_search_results');
-export const Session = mongoose.model('Session', sessionSchema, 'sessions');
+// Export models with check to prevent overwrite errors
+export const User = mongoose.models.User || mongoose.model<IUser>('User', userSchema, 'users');
+export const SearchHistory = mongoose.models.SearchHistory || mongoose.model('SearchHistory', searchHistorySchema, 'search_history');
+export const SearchResult = mongoose.models.SearchResult || mongoose.model('SearchResult', searchResultSchema, 'search_results');
+export const UserSearchResult = mongoose.models.UserSearchResult || mongoose.model('UserSearchResult', userSearchResultSchema, 'user_search_results');
+export const Session = mongoose.models.Session || mongoose.model('Session', sessionSchema, 'sessions');
+

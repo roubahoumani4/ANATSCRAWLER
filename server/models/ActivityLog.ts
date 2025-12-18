@@ -93,4 +93,5 @@ activityLogSchema.index({ userId: 1, actionType: 1, createdAt: -1 });
 // TTL index to auto-delete logs older than 90 days (optional)
 activityLogSchema.index({ createdAt: 1 }, { expireAfterSeconds: 90 * 24 * 60 * 60 });
 
-export const ActivityLog = mongoose.model<IActivityLog>('ActivityLog', activityLogSchema, 'activity_logs');
+export const ActivityLog = mongoose.models.ActivityLog || mongoose.model<IActivityLog>('ActivityLog', activityLogSchema, 'activity_logs');
+

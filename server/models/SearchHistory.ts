@@ -62,4 +62,5 @@ export interface ISearchHistory extends mongoose.Document {
   updatedAt: Date;
 }
 
-export const SearchHistory = mongoose.model<ISearchHistory>('SearchHistory', searchHistorySchema, 'search_history');
+export const SearchHistory = mongoose.models.SearchHistory || mongoose.model<ISearchHistory>('SearchHistory', searchHistorySchema, 'search_history');
+

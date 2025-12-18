@@ -46,4 +46,5 @@ export interface IScan extends mongoose.Document {
 }
 
 // Use the dedicated scans connection so documents are stored in the `assessment_scans` DB
-export const Scan = scansConnection.model<IScan>('Scan', scanSchema, 'scans');
+export const Scan = scansConnection.models.Scan || scansConnection.model<IScan>('Scan', scanSchema, 'scans');
+
