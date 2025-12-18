@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { mongodb } from '../lib/mongodb';
 import { ObjectId } from 'mongodb';
 import type { User } from '../types/User';
+import { updateSessionActivity } from '../services/session.service';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'ANAT_SECURITY_JWT_SECRET_KEY';
 
@@ -39,6 +40,14 @@ export default async function authenticate(req: Request, res: Response, next: Ne
     
     // Update last login
     await mongodb.updateUser(decoded._id, { lastLogin: new Date() });
+
+    // Update session activity
+    if (token) {
+      updateSessionActivity(token).catch(err => {
+        console.error('Error updating session activity:', err);
+        // Don't fail the request if session update fails
+      });
+    }
 
     // Attach user and token to request
     req.user = user;

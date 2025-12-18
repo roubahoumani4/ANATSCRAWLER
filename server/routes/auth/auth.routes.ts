@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import { ObjectId } from 'mongodb';
 import { mongodb } from '../../lib/mongodb';
 import { logActivity } from '../../utils/activityLogger';
+import { createSession, getIpAddress, terminateSession } from '../../services/session.service';
 
 const router = createRouter();
 
@@ -161,6 +162,23 @@ router.post('/login', async (req: Request, res: Response) => {
       req
     );
 
+    // Create session for tracking
+    try {
+      if (user._id) {
+        const ipAddress = getIpAddress(req);
+        const userAgent = req.headers['user-agent'] || 'Unknown';
+        await createSession({
+          userId: user._id.toString(),
+          token,
+          ipAddress,
+          userAgent,
+        });
+      }
+    } catch (sessionError) {
+      console.error('Error creating session:', sessionError);
+      // Don't fail login if session creation fails
+    }
+
     // Return user info (without password) and token
     const userResponse = formatUserResponse(user);
 
@@ -266,6 +284,12 @@ router.get('/validate', async (req: Request, res: Response) => {
  */
 router.post('/logout', async (req: Request, res: Response) => {
   try {
+    // Get token to terminate session
+    let token = req.header('Authorization')?.replace('Bearer ', '');
+    if (!token && req.cookies && req.cookies.token) {
+      token = req.cookies.token;
+    }
+
     // Log logout activity if user is authenticated
     const user = (req as any).user;
     if (user) {
@@ -279,6 +303,16 @@ router.post('/logout', async (req: Request, res: Response) => {
         { username: user.username },
         req
       );
+    }
+
+    // Terminate session if token exists
+    if (token) {
+      try {
+        await terminateSession(token);
+      } catch (sessionError) {
+        console.error('Error terminating session:', sessionError);
+        // Continue with logout even if session termination fails
+      }
     }
 
     // Clear the token cookie
