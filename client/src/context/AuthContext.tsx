@@ -78,6 +78,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     validate();
   }, [navigate, location.pathname]);
 
+  // Periodic session validation - check every 10 seconds if session is still valid
+  useEffect(() => {
+    if (!user || !token) return;
+
+    const checkSession = async () => {
+      try {
+        const response = await fetch(buildApiUrl("/api/v1/auth/validate"), {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          // Session was terminated by admin
+          if (data.error === 'Session terminated') {
+            setUser(null);
+            setToken(null);
+            localStorage.removeItem('token');
+            navigate("/login");
+            toast({
+              title: "Session Terminated",
+              description: "Your session has been terminated by an administrator. Please log in again.",
+              variant: "destructive",
+              duration: 5000,
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Session check error:", error);
+      }
+    };
+
+    // Check immediately
+    checkSession();
+
+    // Then check every 10 seconds
+    const intervalId = setInterval(checkSession, 10000);
+
+    return () => clearInterval(intervalId);
+  }, [user, token, navigate, toast]);
+
   const login = async (identifier: string, password: string, twoFactorToken?: string) => {
     try {
       setLoading(true);

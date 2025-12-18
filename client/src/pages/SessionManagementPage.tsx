@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { API_BASE_URL } from '@/lib/api';
-import axios from 'axios';
+import axios from '@/lib/axios';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -140,13 +140,7 @@ const SessionManagementPage = () => {
 
   const fetchUsers = async () => {
     try {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      const response = await axios.get(`${API_BASE_URL}/api/v1/admin/activity-logs/users`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        },
-        withCredentials: true
-      });
+      const response = await axios.get(`/api/v1/admin/activity-logs/users`);
       setUsers(response.data.data);
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -167,14 +161,7 @@ const SessionManagementPage = () => {
       if (searchTerm) params.search = searchTerm;
       if (showSuspicious) params.isSuspicious = true;
 
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      const response = await axios.get(`${API_BASE_URL}/api/v1/admin/sessions`, { 
-        params,
-        headers: {
-          Authorization: `Bearer ${token}`
-        },
-        withCredentials: true
-      });
+      const response = await axios.get(`/api/v1/admin/sessions`, { params });
       
       setSessions(response.data.data.sessions);
       setTotalPages(response.data.data.pagination.pages);
@@ -190,14 +177,7 @@ const SessionManagementPage = () => {
       const params: any = {};
       if (selectedUser && selectedUser !== 'all') params.userId = selectedUser;
 
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      const response = await axios.get(`${API_BASE_URL}/api/v1/admin/sessions/stats`, { 
-        params,
-        headers: {
-          Authorization: `Bearer ${token}`
-        },
-        withCredentials: true
-      });
+      const response = await axios.get(`/api/v1/admin/sessions/stats`, { params });
       setStats(response.data.data);
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -209,17 +189,7 @@ const SessionManagementPage = () => {
     
     try {
       setActionLoading(true);
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      await axios.post(
-        `${API_BASE_URL}/api/v1/admin/sessions/${selectedSession._id}/terminate`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          },
-          withCredentials: true
-        }
-      );
+      await axios.post(`/api/v1/admin/sessions/${selectedSession._id}/terminate`);
       
       setTerminateDialogOpen(false);
       setSelectedSession(null);
