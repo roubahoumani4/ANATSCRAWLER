@@ -78,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     validate();
   }, [navigate, location.pathname]);
 
-  // Periodic session validation - check every 10 seconds if session is still valid
+  // Aggressive session validation - check every 3 seconds if session is still valid
   useEffect(() => {
     if (!user || !token) return;
 
@@ -95,17 +95,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!response.ok) {
           const data = await response.json();
           // Session was terminated by admin
-          if (data.error === 'Session terminated') {
+          if (data.error === 'Session terminated' || response.status === 401) {
             setUser(null);
             setToken(null);
             localStorage.removeItem('token');
-            navigate("/login");
-            toast({
-              title: "Session Terminated",
-              description: "Your session has been terminated by an administrator. Please log in again.",
-              variant: "destructive",
-              duration: 5000,
-            });
+            
+            // Force immediate logout with alert
+            alert('⚠️ SESSION TERMINATED\n\nYour session has been terminated by an administrator.\n\nYou will be redirected to the login page.');
+            
+            // Force redirect
+            window.location.href = '/login';
           }
         }
       } catch (error) {
@@ -116,8 +115,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Check immediately
     checkSession();
 
-    // Then check every 10 seconds
-    const intervalId = setInterval(checkSession, 10000);
+    // Then check every 3 seconds for instant detection
+    const intervalId = setInterval(checkSession, 3000);
 
     return () => clearInterval(intervalId);
   }, [user, token, navigate, toast]);
