@@ -6,7 +6,7 @@
   "scripts": {
     "build": "npm run build:client && npm run build:server",
     "build:client": "NODE_ENV=production vite build --config vite.config.ts",
-    "build:server": "NODE_ENV=production esbuild server/index.ts --bundle --platform=node --target=node20 --outfile=dist/index.js --external:express --external:mongoose --external:mongodb --external:passport --external:bcryptjs --external:jsonwebtoken --external:cookie-parser --external:cors --external:helmet --external:express-rate-limit --external:express-mongo-sanitize --external:express-session --external:express-validator --external:memorystore --external:dotenv --external:fast-levenshtein --external:node-fetch --external:fs --external:path --external:child_process --external:os --external:util --external:crypto --external:events --external:sqlite3",
+    "build:server": "NODE_ENV=production esbuild server/index.ts --bundle --platform=node --target=node20 --outfile=dist/index.js --external:express --external:mongoose --external:mongodb --external:passport --external:bcryptjs --external:jsonwebtoken --external:cookie-parser --external:cors --external:helmet --external:express-rate-limit --external:express-mongo-sanitize --external:express-session --external:express-validator --external:memorystore --external:dotenv --external:fast-levenshtein --external:node-fetch --external:socket.io --external:fs --external:path --external:child_process --external:os --external:util --external:crypto --external:events --external:sqlite3",
     "start": "NODE_ENV=production node dist/index.js",
     "dev": "vite --config vite.config.ts",
     "dev:server": "NODE_ENV=development tsx watch server/index.ts",
@@ -95,6 +95,8 @@
     "react-router-dom": "^7.6.2",
     "recharts": "^2.15.2",
     "sanitize-html": "^2.17.0",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
     "speakeasy": "^2.0.0",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7",

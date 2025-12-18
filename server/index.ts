@@ -159,6 +159,15 @@ async function startServer() {
     // Create HTTP server
     httpServer = createServer(app);
 
+    // Initialize Socket.IO for real-time communication
+    try {
+      const { socketService } = await import('./services/socket.service');
+      socketService.initialize(httpServer);
+      console.log('✅ Socket.IO initialized for real-time session management');
+    } catch (error) {
+      console.warn('⚠️ Failed to initialize Socket.IO:', error instanceof Error ? error.message : 'Unknown error');
+    }
+
   // Register API routes first
     await registerRoutes(app);
     

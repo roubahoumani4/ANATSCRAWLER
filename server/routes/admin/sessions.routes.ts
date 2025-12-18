@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import { Session } from '../../models/Session';
 import { User } from '../../models/User';
+import { socketService } from '../../services/socket.service';
 
 const router = express.Router();
 
@@ -166,17 +167,29 @@ router.post('/:sessionId/terminate', async (req: Request, res: Response) => {
   try {
     const { sessionId } = req.params;
 
-    const session = await Session.findByIdAndUpdate(
-      sessionId,
-      { isActive: false },
-      { new: true }
-    );
+    const session = await Session.findById(sessionId);
 
     if (!session) {
       return res.status(404).json({
         success: false,
         error: 'Session not found',
       });
+    }
+
+    // Store the token before updating
+    const sessionToken = session.token;
+
+    // Update session to inactive
+    session.isActive = false;
+    await session.save();
+
+    // Emit real-time termination event via Socket.IO
+    try {
+      socketService.terminateSessionByToken(sessionToken);
+      console.log(`🔴 Real-time termination event sent for session ${sessionId}`);
+    } catch (socketError) {
+      console.error('Failed to emit socket event:', socketError);
+      // Continue even if socket event fails
     }
 
     res.json({
@@ -248,6 +261,15 @@ router.post('/user/:userId/terminate-all', async (req: Request, res: Response) =
       { userId, isActive: true },
       { isActive: false }
     );
+
+    // Emit real-time termination event via Socket.IO for all user sessions
+    try {
+      socketService.terminateAllUserSessions(userId);
+      console.log(`🔴 Real-time termination event sent for all sessions of user ${userId}`);
+    } catch (socketError) {
+      console.error('Failed to emit socket event:', socketError);
+      // Continue even if socket event fails
+    }
 
     res.json({
       success: true,

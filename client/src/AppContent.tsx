@@ -1,6 +1,8 @@
 import { AnimatePresence } from 'framer-motion';
 import { Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
+import { useSessionSocket } from './hooks/useSessionSocket';
+import { SessionTerminatedDialog } from './components/SessionTerminatedDialog';
 
 // Pages
 import DashboardPage from '@/pages/DashboardPage';
@@ -29,6 +31,9 @@ import Layout from '@/components/layout/Layout';
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, loading } = useAuth();
+  
+  // Initialize session socket for real-time session management
+  useSessionSocket();
   
   if (loading) return (
     <div className="h-screen w-full flex items-center justify-center bg-jetBlack text-coolWhite">
@@ -65,38 +70,43 @@ export default function AppContent() {
   const location = useLocation();
 
   return (
-    <AnimatePresence mode="wait">
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/login" element={!isAuthenticated ? <EnhancedLoginPage /> : <Navigate to="/" />} />
-        <Route path="/signup" element={!isAuthenticated ? <SignupPage /> : <Navigate to="/" />} />
-        
-        {/* Landing Page - Public but redirects if authenticated */}
-        <Route path="/" element={!isAuthenticated ? <LandingPage /> : <Navigate to="/dashboard" />} />
-        
-        {/* Protected Routes */}
-  <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-  <Route path="/analytics" element={<ProtectedRoute><DarkWebMonitoringPage /></ProtectedRoute>} />
-  <Route path="/osint" element={<ProtectedRoute><OsintPlatformPage /></ProtectedRoute>} />
-  <Route path="/osint/assessment" element={<ProtectedRoute><AssessmentPage /></ProtectedRoute>} />
-  <Route path="/osint/assessment/output" element={<ProtectedRoute><OutputPage /></ProtectedRoute>} />
-  <Route path="/osint/assessment/history" element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
-  <Route path="/discovery" element={<ProtectedRoute><DiscoveryPage /></ProtectedRoute>} />
-  <Route path="/domain-monitoring" element={<ProtectedRoute><DomainMonitoringPage /></ProtectedRoute>} />
-  <Route path="/search-history" element={<ProtectedRoute><SearchHistoryPage /></ProtectedRoute>} />
-  <Route path="/threat-intelligence" element={<ProtectedRoute><ThreatIntelligenceFeedPage /></ProtectedRoute>} />
-        <Route path="/settings" element={<ProtectedRoute><GeneralSettingsPage /></ProtectedRoute>} />
-        
-        {/* User Management Routes - Admin Only */}
-        <Route path="/users/management" element={<AdminRoute><ManageUsersPage /></AdminRoute>} />
-        <Route path="/users/activity-logs" element={<AdminRoute><UserActivityLogsPage /></AdminRoute>} />
-        <Route path="/users/sessions" element={<AdminRoute><SessionManagementPage /></AdminRoute>} />
-        <Route path="/users/activity/:userId" element={<AdminRoute><UserActivityDashboardPage /></AdminRoute>} />
-        <Route path="/users/activity/:userId" element={<AdminRoute><UserActivityDashboardPage /></AdminRoute>} />
-        
-        {/* Fallback Route */}
-        <Route path="*" element={<ProtectedRoute><NotFoundPage /></ProtectedRoute>} />
-      </Routes>
-    </AnimatePresence>
+    <>
+      {/* Session Termination Dialog - Shows when session is terminated */}
+      <SessionTerminatedDialog />
+      
+      <AnimatePresence mode="wait">
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/login" element={!isAuthenticated ? <EnhancedLoginPage /> : <Navigate to="/" />} />
+          <Route path="/signup" element={!isAuthenticated ? <SignupPage /> : <Navigate to="/" />} />
+          
+          {/* Landing Page - Public but redirects if authenticated */}
+          <Route path="/" element={!isAuthenticated ? <LandingPage /> : <Navigate to="/dashboard" />} />
+          
+          {/* Protected Routes */}
+    <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+    <Route path="/analytics" element={<ProtectedRoute><DarkWebMonitoringPage /></ProtectedRoute>} />
+    <Route path="/osint" element={<ProtectedRoute><OsintPlatformPage /></ProtectedRoute>} />
+    <Route path="/osint/assessment" element={<ProtectedRoute><AssessmentPage /></ProtectedRoute>} />
+    <Route path="/osint/assessment/output" element={<ProtectedRoute><OutputPage /></ProtectedRoute>} />
+    <Route path="/osint/assessment/history" element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
+    <Route path="/discovery" element={<ProtectedRoute><DiscoveryPage /></ProtectedRoute>} />
+    <Route path="/domain-monitoring" element={<ProtectedRoute><DomainMonitoringPage /></ProtectedRoute>} />
+    <Route path="/search-history" element={<ProtectedRoute><SearchHistoryPage /></ProtectedRoute>} />
+    <Route path="/threat-intelligence" element={<ProtectedRoute><ThreatIntelligenceFeedPage /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute><GeneralSettingsPage /></ProtectedRoute>} />
+          
+          {/* User Management Routes - Admin Only */}
+          <Route path="/users/management" element={<AdminRoute><ManageUsersPage /></AdminRoute>} />
+          <Route path="/users/activity-logs" element={<AdminRoute><UserActivityLogsPage /></AdminRoute>} />
+          <Route path="/users/sessions" element={<AdminRoute><SessionManagementPage /></AdminRoute>} />
+          <Route path="/users/activity/:userId" element={<AdminRoute><UserActivityDashboardPage /></AdminRoute>} />
+          <Route path="/users/activity/:userId" element={<AdminRoute><UserActivityDashboardPage /></AdminRoute>} />
+          
+          {/* Fallback Route */}
+          <Route path="*" element={<ProtectedRoute><NotFoundPage /></ProtectedRoute>} />
+        </Routes>
+      </AnimatePresence>
+    </>
   );
 }
