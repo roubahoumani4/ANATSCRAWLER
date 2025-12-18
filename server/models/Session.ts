@@ -155,4 +155,5 @@ SessionSchema.pre('save', async function(next) {
   next();
 });
 
-export const Session = mongoose.model<ISession>('Session', SessionSchema);
+// Export model with check to prevent overwrite error
+export const Session = mongoose.models.Session || mongoose.model<ISession>('Session', SessionSchema);
