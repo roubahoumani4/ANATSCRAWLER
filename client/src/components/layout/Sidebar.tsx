@@ -105,7 +105,8 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
       hasSubmenu: true,
       features: [
         { path: "/users/management", label: "Manage Users", icon: <UserCog size={16} />, color: "text-white" },
-        { path: "/users/activity-logs", label: "Activity Logs", icon: <Activity size={16} />, color: "text-white" }
+        { path: "/users/activity-logs", label: "Activity Logs", icon: <Activity size={16} />, color: "text-white" },
+        { path: "/users/sessions", label: "Session Management", icon: <Shield size={16} />, color: "text-white" }
       ]
     }] : [])
   ];

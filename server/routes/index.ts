@@ -5,6 +5,7 @@ import conditionalAuth from '../middleware/conditional-auth';
 // Import route modules
 import adminRoutes from './admin/users.routes';
 import activityLogsRoutes from './admin/activity-logs.routes';
+import sessionsRoutes from './admin/sessions.routes';
 import authRoutes from './auth/auth.routes';
 import userRoutes from './auth/user.routes';
 import twoFactorRoutes from './auth/2fa.routes';
@@ -48,6 +49,9 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   // Activity logs routes - admin only
   app.use(`${apiV1}/admin/activity-logs`, authenticate, activityLogsRoutes);
+
+  // Session management routes - admin only
+  app.use(`${apiV1}/admin/sessions`, authenticate, sessionsRoutes);
 
   // Search routes - authenticated users only
   app.use(`${apiV1}/search`, authenticate, searchRoutes);
