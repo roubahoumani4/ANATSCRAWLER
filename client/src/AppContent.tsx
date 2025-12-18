@@ -20,6 +20,7 @@ import SearchHistoryPage from '@/pages/SearchHistoryPage';
 import DarkWebMonitoringPage from '@/pages/DarkWebMonitoringPage';
 import ManageUsersPage from '@/pages/ManageUsersPage';
 import UserActivityLogsPage from '@/pages/UserActivityLogsPage';
+import UserActivityDashboardPage from '@/pages/UserActivityDashboardPage';
 
 // Layout Component
 import Layout from '@/components/layout/Layout';
@@ -88,6 +89,7 @@ export default function AppContent() {
         {/* User Management Routes - Admin Only */}
         <Route path="/users/management" element={<AdminRoute><ManageUsersPage /></AdminRoute>} />
         <Route path="/users/activity-logs" element={<AdminRoute><UserActivityLogsPage /></AdminRoute>} />
+        <Route path="/users/activity/:userId" element={<AdminRoute><UserActivityDashboardPage /></AdminRoute>} />
         
         {/* Fallback Route */}
         <Route path="*" element={<ProtectedRoute><NotFoundPage /></ProtectedRoute>} />

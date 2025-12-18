@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { 
   faUserPlus, 
@@ -11,7 +12,8 @@ import {
   faEnvelope,
   faLock,
   faTimes,
-  faEdit
+  faEdit,
+  faChartLine
 } from "@fortawesome/free-solid-svg-icons";
 import { UserCog } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -30,6 +32,7 @@ interface User {
 const ManageUsersPage = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -343,6 +346,15 @@ const ManageUsersPage = () => {
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex justify-center gap-2">
+                            <motion.button
+                              onClick={() => navigate(`/users/activity/${user._id}`)}
+                              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              title="View Activity Dashboard"
+                            >
+                              <FontAwesomeIcon icon={faChartLine} />
+                            </motion.button>
                             <motion.button
                               onClick={() => handleDeleteUser(user._id, user.username)}
                               className="px-4 py-2 bg-[hsl(var(--crimsonRed))] text-white rounded hover:bg-[hsl(var(--crimsonRed),.85)] transition"
