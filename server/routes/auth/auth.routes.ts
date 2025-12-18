@@ -4,6 +4,7 @@ import { Router as createRouter } from 'express';
 import jwt from 'jsonwebtoken';
 import { ObjectId } from 'mongodb';
 import { mongodb } from '../../lib/mongodb';
+import { logActivity } from '../../utils/activityLogger';
 
 const router = createRouter();
 
@@ -50,6 +51,17 @@ router.post('/login', async (req: Request, res: Response) => {
     });
 
     if (!result.success || !result.users || result.users.length === 0) {
+      // Log failed login attempt
+      await logActivity(
+        null,
+        'failed_login',
+        'Failed login attempt',
+        'Authentication',
+        `Failed login attempt for username: ${username}`,
+        'failed',
+        { username, reason: 'User not found' },
+        req
+      );
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -57,12 +69,34 @@ router.post('/login', async (req: Request, res: Response) => {
 
     // Check if user is active
     if (user.isActive === false) {
+      // Log failed login - inactive account
+      await logActivity(
+        user._id,
+        'failed_login',
+        'Failed login attempt - inactive account',
+        'Authentication',
+        `Login attempt for inactive account: ${user.username}`,
+        'failed',
+        { username: user.username, reason: 'Account deactivated' },
+        req
+      );
       return res.status(401).json({ error: 'Account is deactivated' });
     }
 
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
+      // Log failed login - invalid password
+      await logActivity(
+        user._id,
+        'failed_login',
+        'Failed login attempt - invalid password',
+        'Authentication',
+        `Invalid password for user: ${user.username}`,
+        'failed',
+        { username: user.username, reason: 'Invalid password' },
+        req
+      );
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -114,6 +148,18 @@ router.post('/login', async (req: Request, res: Response) => {
     if (user._id) {
       await mongodb.updateUser(user._id.toString(), { lastLogin: new Date() });
     }
+
+    // Log successful login activity
+    await logActivity(
+      user._id,
+      'login',
+      'User login successful',
+      'Authentication',
+      `User ${user.username} logged in`,
+      'success',
+      { username: user.username, email: user.email },
+      req
+    );
 
     // Return user info (without password) and token
     const userResponse = formatUserResponse(user);
@@ -218,10 +264,32 @@ router.get('/validate', async (req: Request, res: Response) => {
  * POST /logout
  * Clear authentication cookie
  */
-router.post('/logout', (req: Request, res: Response) => {
-  // Clear the token cookie
-  res.clearCookie('token');
-  res.json({ success: true, message: 'Logged out successfully' });
+router.post('/logout', async (req: Request, res: Response) => {
+  try {
+    // Log logout activity if user is authenticated
+    const user = (req as any).user;
+    if (user) {
+      await logActivity(
+        user._id,
+        'logout',
+        'User logout',
+        'Authentication',
+        `User ${user.username} logged out`,
+        'success',
+        { username: user.username },
+        req
+      );
+    }
+
+    // Clear the token cookie
+    res.clearCookie('token');
+    res.json({ success: true, message: 'Logged out successfully' });
+  } catch (error) {
+    console.error('Logout error:', error);
+    // Still clear cookie even if logging fails
+    res.clearCookie('token');
+    res.json({ success: true, message: 'Logged out successfully' });
+  }
 });
 
 export default router;

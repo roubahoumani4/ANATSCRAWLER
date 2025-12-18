@@ -2,6 +2,7 @@ import type { Request, Response, Router } from 'express';
 import { Router as createRouter } from 'express';
 import { mongodb } from '../../lib/mongodb';
 import authenticate from '../../middleware/auth';
+import { logActivity } from '../../utils/activityLogger';
 
 const router = createRouter();
 
@@ -27,6 +28,18 @@ router.put('/session-timeout', authenticate, async (req: Request, res: Response)
     await mongodb.updateUser(req.user._id.toString(), {
       'preferences.sessionTimeout': sessionTimeout,
     } as any);
+
+    // Log settings change activity
+    await logActivity(
+      req.user._id,
+      'settings_change',
+      'Session timeout updated',
+      'Settings',
+      `Changed session timeout to ${sessionTimeout} minutes`,
+      'success',
+      { oldValue: req.user.preferences?.sessionTimeout || 30, newValue: sessionTimeout },
+      req
+    );
 
     res.json({
       success: true,

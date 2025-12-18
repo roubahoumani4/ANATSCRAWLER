@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { SearchHistory } from '../models/SearchHistory';
 import authMiddleware from '../middleware/auth';
+import { logActivity } from '../utils/activityLogger';
 
 const router = Router();
 
@@ -56,6 +57,18 @@ router.post('/searches', async (req: Request, res: Response) => {
     });
 
     await searchHistory.save();
+
+    // Log search activity
+    await logActivity(
+      userId,
+      'search',
+      `Performed ${searchType} search`,
+      searchType === 'discovery' ? 'Discovery' : 'Domain Monitoring',
+      `Query: "${query}" - ${resultsCount} results`,
+      hasResults ? 'success' : 'warning',
+      { searchType, query, resultsCount },
+      req
+    );
 
     res.status(201).json({
       success: true,

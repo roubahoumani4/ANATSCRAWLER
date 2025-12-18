@@ -4,6 +4,7 @@ import { Router } from 'express';
 import { ObjectId } from 'mongodb';
 import sanitizeHtml from 'sanitize-html';
 import { mongodb } from '../../lib/mongodb';
+import { logActivity } from '../../utils/activityLogger';
 
 const router = Router();
 
@@ -88,6 +89,19 @@ router.put('/profile', async (req: Request, res: Response) => {
     const result = await mongodb.updateUser(req.user._id, updateData);
 
     if (result.success) {
+      // Log profile update activity
+      const changedFields = Object.keys(updateData).join(', ');
+      await logActivity(
+        req.user._id,
+        'settings_change',
+        'Profile updated',
+        'Settings',
+        `Updated profile fields: ${changedFields}`,
+        'success',
+        { updatedFields: updateData },
+        req
+      );
+
       res.json({ success: true, message: 'Profile updated successfully' });
     } else {
       res.status(500).json({ error: 'Failed to update profile' });
@@ -130,6 +144,18 @@ router.put('/password', async (req: Request, res: Response) => {
     const result = await mongodb.updateUser(req.user._id, { password: hashedPassword });
 
     if (result.success) {
+      // Log password change activity
+      await logActivity(
+        req.user._id,
+        'settings_change',
+        'Password changed',
+        'Security',
+        'User changed their password',
+        'success',
+        { action: 'password_change' },
+        req
+      );
+
       res.json({ success: true, message: 'Password changed successfully' });
     } else {
       res.status(500).json({ error: 'Failed to change password' });

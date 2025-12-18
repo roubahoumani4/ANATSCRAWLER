@@ -4,6 +4,7 @@ import speakeasy from 'speakeasy';
 import QRCode from 'qrcode';
 import { mongodb } from '../../lib/mongodb';
 import authenticate from '../../middleware/auth';
+import { logActivity } from '../../utils/activityLogger';
 
 const router = createRouter();
 
@@ -81,6 +82,18 @@ router.post('/verify', authenticate, async (req: Request, res: Response) => {
       'preferences.mfaEnabled': true,
     } as any);
 
+    // Log 2FA enabled activity
+    await logActivity(
+      req.user._id,
+      'settings_change',
+      '2FA enabled',
+      'Security',
+      'Two-factor authentication has been enabled',
+      'success',
+      { action: '2fa_enabled' },
+      req
+    );
+
     res.json({
       success: true,
       message: '2FA enabled successfully',
@@ -142,6 +155,18 @@ router.post('/disable', authenticate, async (req: Request, res: Response) => {
       'preferences.mfaEnabled': false,
       'preferences.mfaSecret': null,
     } as any);
+
+    // Log 2FA disabled activity
+    await logActivity(
+      req.user._id,
+      'settings_change',
+      '2FA disabled',
+      'Security',
+      'Two-factor authentication has been disabled',
+      'warning',
+      { action: '2fa_disabled' },
+      req
+    );
 
     res.json({
       success: true,

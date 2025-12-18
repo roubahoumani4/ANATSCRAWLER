@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { exec } from 'child_process';
 import { Scan } from '../models/Scan';
+import { logActivity } from '../utils/activityLogger';
 
 const router = Router();
 
@@ -265,6 +266,18 @@ router.post('/run', async (req: Request, res: Response) => {
       const ownerId = (req as any).user && (req as any).user._id ? (req as any).user._id : null;
       if (ownerId) {
         await Scan.create({ jobId, owner: ownerId, target, status: 'pending', startTime: new Date() });
+        
+        // Log scan activity
+        await logActivity(
+          ownerId,
+          'scan',
+          'OSINT assessment initiated',
+          'Assessment',
+          `Started assessment for target: ${target}`,
+          'success',
+          { target, jobId },
+          req
+        );
       }
     } catch (e) {
       // ignore persistence errors to not block job start
