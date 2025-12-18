@@ -6,12 +6,22 @@ const router = Router();
 
 /**
  * GET /api/v1/analytics/threat-distribution
- * Calculate threat distribution based on search results
+ * Calculate threat distribution based on search results for the authenticated user
  */
 router.get('/threat-distribution', async (req: Request, res: Response) => {
   try {
-    // Get all searches with results
+    // Get userId from authenticated user
+    const userId = (req as any).user?._id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+    }
+
+    // Get searches with results for this user only
     const searches = await SearchHistory.find({ 
+      userId,
       hasResults: true,
       results: { $exists: true, $ne: [] }
     }).select('results resultsCount searchType');
@@ -76,18 +86,29 @@ router.get('/threat-distribution', async (req: Request, res: Response) => {
 
 /**
  * GET /api/v1/analytics/security-score
- * Calculate security score based on multiple metrics
+ * Calculate security score based on multiple metrics for the authenticated user
  */
 router.get('/security-score', async (req: Request, res: Response) => {
   try {
-    const totalSearches = await SearchHistory.countDocuments();
-    const successfulSearches = await SearchHistory.countDocuments({ hasResults: true });
+    // Get userId from authenticated user
+    const userId = (req as any).user?._id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+    }
+
+    const totalSearches = await SearchHistory.countDocuments({ userId });
+    const successfulSearches = await SearchHistory.countDocuments({ userId, hasResults: true });
     const recentSearches = await SearchHistory.countDocuments({
+      userId,
       createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
     });
 
-    // Get all searches with results for analysis
+    // Get all searches with results for analysis (user-specific)
     const searchesWithResults = await SearchHistory.find({ 
+      userId,
       hasResults: true,
       results: { $exists: true, $ne: [] }
     }).select('results resultsCount searchType createdAt');
