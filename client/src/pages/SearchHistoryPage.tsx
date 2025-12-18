@@ -22,7 +22,7 @@ import axios from "axios";
 
 interface SearchHistoryItem {
   _id: string;
-  searchType: 'discovery' | 'domain-monitoring';
+  searchType?: 'discovery' | 'domain-monitoring';
   query: string;
   queryType?: string;
   resultsCount: number;
@@ -334,11 +334,11 @@ const SearchHistoryPage: React.FC = () => {
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <div className={getSearchTypeColor(search.searchType)}>
-                            {getSearchTypeIcon(search.searchType)}
+                          <div className={getSearchTypeColor(search.searchType || 'discovery')}>
+                            {getSearchTypeIcon(search.searchType || 'discovery')}
                           </div>
                           <span className="text-sm text-gray-400 capitalize">
-                            {search.searchType.replace('-', ' ')}
+                            {search.searchType?.replace('-', ' ') || 'Unknown'}
                           </span>
                           {getStatusBadge(search)}
                         </div>
@@ -428,7 +428,7 @@ const SearchHistoryPage: React.FC = () => {
               </div>
               <div>
                 <p className="text-sm text-gray-400 mb-1">Type</p>
-                <p className="text-white capitalize">{selectedSearch.searchType.replace('-', ' ')}</p>
+                <p className="text-white capitalize">{selectedSearch.searchType?.replace('-', ' ') || 'Unknown'}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-400 mb-1">Results</p>

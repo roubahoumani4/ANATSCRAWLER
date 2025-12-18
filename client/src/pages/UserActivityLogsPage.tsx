@@ -4,7 +4,6 @@ import { useAuth } from '@/context/AuthContext';
 import { API_BASE_URL } from '@/lib/api';
 import axios from 'axios';
 import Header from '@/components/layout/Header';
-import BackButton from '@/components/ui/back-button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -75,29 +74,11 @@ interface User {
   roles: string[];
 }
 
-interface UserSummary {
-  user: {
-    _id: string;
-    username: string;
-    email: string;
-    roles: string[];
-  };
-  statistics: {
-    total: number;
-    byActionType: Record<string, number>;
-    byStatus: Record<string, number>;
-  };
-  recentActivities: ActivityLog[];
-  dailyActivity: Array<{ date: string; count: number }>;
-}
-
 const UserActivityLogsPage = () => {
   const { user } = useAuth();
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<User[]>([]);
-  const [userSummary, setUserSummary] = useState<UserSummary | null>(null);
-  const [showUserSummary, setShowUserSummary] = useState(false);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   
@@ -278,22 +259,6 @@ const UserActivityLogsPage = () => {
     }
   };
 
-  const fetchUserSummary = async (userId: string) => {
-    try {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      const response = await axios.get(`${API_BASE_URL}/api/v1/admin/activity-logs/user-summary/${userId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        },
-        withCredentials: true
-      });
-      setUserSummary(response.data.data);
-      setShowUserSummary(true);
-    } catch (error) {
-      console.error('Error fetching user summary:', error);
-    }
-  };
-
   const resetFilters = () => {
     setSelectedUser('');
     setSelectedActionType('');
@@ -374,25 +339,29 @@ const UserActivityLogsPage = () => {
     <div className="min-h-screen bg-jetBlack text-coolWhite">
       <Header />
       <motion.div
-        className="p-6"
+        className="p-8"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.6 }}
       >
-        {/* Header Section */}
-        <div className="mb-8">
-          <BackButton to="/manage-users" color="red" />
-          <div className="flex items-center justify-between mt-6 mb-4">
-            <div>
-              <div className="flex items-center">
-                <Activity className="mr-3 text-red-400" size={32} />
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent">
-                  User Activity Logs
-                </h1>
+        {/* Header Section - Match Manage Users style */}
+        <motion.div
+          className="mb-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-4">
+              <div className="p-3 rounded bg-blue-700/10 text-blue-400">
+                <Activity size={28} />
               </div>
-              <p className="text-gray-400 mt-2">
-                Track and audit all user actions across the platform
-              </p>
+              <div>
+                <h1 className="text-2xl font-semibold">User Activity Logs</h1>
+                <p className="text-sm text-gray-400">
+                  Track and audit all user actions across the platform
+                </p>
+              </div>
             </div>
             <div className="flex gap-3">
               <Button
@@ -423,7 +392,7 @@ const UserActivityLogsPage = () => {
               </Button>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Stats Cards */}
         {stats && (
@@ -476,27 +445,20 @@ const UserActivityLogsPage = () => {
           </motion.div>
         )}
 
-        {/* Filters Section */}
-        <Card className="bg-jetBlack/50 border-gray-700 backdrop-blur-sm mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center text-coolWhite">
-              <Filter className="mr-3 text-blue-400" size={24} />
+        {/* Filters Section - Smaller and more compact */}
+        <Card className="bg-jetBlack/50 border-gray-700 backdrop-blur-sm mb-6">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center text-coolWhite text-lg">
+              <Filter className="mr-2 text-blue-400" size={20} />
               Filters
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <CardContent className="pt-0">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
               <div>
-                <label className="text-sm text-gray-400 mb-2 block">User</label>
-                <Select value={selectedUser} onValueChange={(value) => {
-                  setSelectedUser(value);
-                  if (value && value !== "all") {
-                    fetchUserSummary(value);
-                  } else {
-                    setShowUserSummary(false);
-                  }
-                }}>
-                  <SelectTrigger className="bg-darkGray border-gray-700 text-coolWhite">
+                <label className="text-xs text-gray-400 mb-1 block">User</label>
+                <Select value={selectedUser} onValueChange={setSelectedUser}>
+                  <SelectTrigger className="bg-darkGray border-gray-700 text-coolWhite h-9 text-sm">
                     <SelectValue placeholder="All Users" />
                   </SelectTrigger>
                   <SelectContent>
@@ -511,9 +473,9 @@ const UserActivityLogsPage = () => {
               </div>
 
               <div>
-                <label className="text-sm text-gray-400 mb-2 block">Action Type</label>
+                <label className="text-xs text-gray-400 mb-1 block">Action Type</label>
                 <Select value={selectedActionType} onValueChange={setSelectedActionType}>
-                  <SelectTrigger className="bg-darkGray border-gray-700 text-coolWhite">
+                  <SelectTrigger className="bg-darkGray border-gray-700 text-coolWhite h-9 text-sm">
                     <SelectValue placeholder="All Types" />
                   </SelectTrigger>
                   <SelectContent>
@@ -531,9 +493,9 @@ const UserActivityLogsPage = () => {
               </div>
 
               <div>
-                <label className="text-sm text-gray-400 mb-2 block">Status</label>
+                <label className="text-xs text-gray-400 mb-1 block">Status</label>
                 <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                  <SelectTrigger className="bg-darkGray border-gray-700 text-coolWhite">
+                  <SelectTrigger className="bg-darkGray border-gray-700 text-coolWhite h-9 text-sm">
                     <SelectValue placeholder="All Statuses" />
                   </SelectTrigger>
                   <SelectContent>
@@ -546,178 +508,49 @@ const UserActivityLogsPage = () => {
               </div>
 
               <div>
-                <label className="text-sm text-gray-400 mb-2 block">Start Date</label>
+                <label className="text-xs text-gray-400 mb-1 block">Start Date</label>
                 <Input
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="bg-darkGray border-gray-700 text-coolWhite"
+                  className="bg-darkGray border-gray-700 text-coolWhite h-9 text-sm"
                 />
               </div>
 
               <div>
-                <label className="text-sm text-gray-400 mb-2 block">End Date</label>
+                <label className="text-xs text-gray-400 mb-1 block">End Date</label>
                 <Input
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="bg-darkGray border-gray-700 text-coolWhite"
+                  className="bg-darkGray border-gray-700 text-coolWhite h-9 text-sm"
                 />
               </div>
 
               <div className="md:col-span-2">
-                <label className="text-sm text-gray-400 mb-2 block">Search</label>
+                <label className="text-xs text-gray-400 mb-1 block">Search</label>
                 <Input
                   type="text"
                   placeholder="Search logs..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="bg-darkGray border-gray-700 text-coolWhite"
+                  className="bg-darkGray border-gray-700 text-coolWhite h-9 text-sm"
                 />
               </div>
             </div>
 
-            <div className="flex gap-3 mt-4">
+            <div className="flex gap-2 mt-3">
               <Button
                 onClick={resetFilters}
                 variant="outline"
+                size="sm"
                 className="border-gray-700"
               >
                 Clear Filters
               </Button>
-              {selectedUser && (
-                <>
-                  <Button
-                    onClick={() => handleUserExport(selectedUser, 'csv')}
-                    disabled={exporting}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    <Download size={16} className="mr-2" />
-                    Export User CSV
-                  </Button>
-                  <Button
-                    onClick={() => handleUserExport(selectedUser, 'json')}
-                    disabled={exporting}
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    <Download size={16} className="mr-2" />
-                    Export User JSON
-                  </Button>
-                </>
-              )}
             </div>
           </CardContent>
         </Card>
-
-        {/* User Summary Section */}
-        {showUserSummary && userSummary && (
-          <Card className="bg-jetBlack/50 border-gray-700 backdrop-blur-sm mb-8">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-coolWhite">
-                  Activity Summary: {userSummary.user.username}
-                </CardTitle>
-                <Button
-                  onClick={() => setShowUserSummary(false)}
-                  variant="outline"
-                  size="sm"
-                  className="border-gray-700"
-                >
-                  Close
-                </Button>
-              </div>
-              <CardDescription className="text-gray-400">
-                {userSummary.user.email} • Roles: {userSummary.user.roles.join(', ')}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <Card className="bg-darkGray/50 border-gray-700">
-                  <CardContent className="p-4">
-                    <div className="text-2xl font-bold text-blue-400 mb-1">
-                      {userSummary.statistics.total}
-                    </div>
-                    <div className="text-sm text-gray-400">Total Activities</div>
-                  </CardContent>
-                </Card>
-                <Card className="bg-darkGray/50 border-gray-700">
-                  <CardContent className="p-4">
-                    <div className="text-2xl font-bold text-green-400 mb-1">
-                      {userSummary.statistics.byStatus.success || 0}
-                    </div>
-                    <div className="text-sm text-gray-400">Successful</div>
-                  </CardContent>
-                </Card>
-                <Card className="bg-darkGray/50 border-gray-700">
-                  <CardContent className="p-4">
-                    <div className="text-2xl font-bold text-red-400 mb-1">
-                      {userSummary.statistics.byStatus.failed || 0}
-                    </div>
-                    <div className="text-sm text-gray-400">Failed</div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Activity by Type */}
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-400 mb-3">Activity by Type</h4>
-                  <div className="space-y-2">
-                    {Object.entries(userSummary.statistics.byActionType).map(([type, count]) => (
-                      <div key={type} className="flex items-center justify-between p-2 bg-darkGray/50 rounded">
-                        <span className="text-coolWhite capitalize">{type.replace('_', ' ')}</span>
-                        <Badge variant="outline" className="border-blue-400 text-blue-400">
-                          {count as number}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Daily Activity Chart */}
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-400 mb-3">Activity Trend (Last 30 Days)</h4>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={userSummary.dailyActivity}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                      <XAxis dataKey="date" stroke="#9CA3AF" fontSize={10} />
-                      <YAxis stroke="#9CA3AF" fontSize={10} />
-                      <Tooltip 
-                        contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151' }}
-                        labelStyle={{ color: '#F3F4F6' }}
-                      />
-                      <Bar dataKey="count" fill="#3B82F6" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Recent Activities */}
-              <div className="mt-6">
-                <h4 className="text-sm font-semibold text-gray-400 mb-3">Recent Activities</h4>
-                <div className="space-y-2">
-                  {userSummary.recentActivities.slice(0, 5).map((activity) => (
-                    <div key={activity._id} className="flex items-center justify-between p-3 bg-darkGray/50 rounded">
-                      <div className="flex items-center gap-3">
-                        {getActionTypeIcon(activity.actionType)}
-                        <div>
-                          <div className="text-coolWhite font-medium">{activity.action}</div>
-                          <div className="text-xs text-gray-400">{activity.details}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {getStatusBadge(activity.status)}
-                        <span className="text-xs text-gray-400">
-                          {new Date(activity.createdAt).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Activity Logs Table */}
         <motion.div variants={containerVariants} initial="hidden" animate="visible">
