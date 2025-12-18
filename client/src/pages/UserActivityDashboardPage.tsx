@@ -3,7 +3,6 @@ import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { API_BASE_URL } from '@/lib/api';
 import axios from 'axios';
-import Header from '@/components/layout/Header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -116,8 +115,7 @@ const UserActivityDashboardPage = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-jetBlack text-coolWhite">
-        <Header />
-        <div className="p-8">
+        <div className="p-8 pt-4">
           <div className="flex items-center justify-center min-h-[60vh]">
             <div className="text-center">
               <Activity className="animate-spin mx-auto text-blue-400 mb-4" size={48} />
@@ -132,8 +130,7 @@ const UserActivityDashboardPage = () => {
   if (!userSummary) {
     return (
       <div className="min-h-screen bg-jetBlack text-coolWhite">
-        <Header />
-        <div className="p-8">
+        <div className="p-8 pt-4">
           <div className="flex items-center justify-center min-h-[60vh]">
             <div className="text-center">
               <AlertCircle className="mx-auto text-red-400 mb-4" size={48} />
@@ -152,9 +149,8 @@ const UserActivityDashboardPage = () => {
 
   return (
     <div className="min-h-screen bg-jetBlack text-coolWhite">
-      <Header />
       <motion.div
-        className="p-8"
+        className="p-8 pt-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.6 }}

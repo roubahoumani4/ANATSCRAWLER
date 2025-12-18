@@ -3,7 +3,6 @@ import { motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { API_BASE_URL } from '@/lib/api';
 import axios from 'axios';
-import Header from '@/components/layout/Header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -337,9 +336,8 @@ const UserActivityLogsPage = () => {
 
   return (
     <div className="min-h-screen bg-jetBlack text-coolWhite">
-      <Header />
       <motion.div
-        className="p-8"
+        className="p-8 pt-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.6 }}
