@@ -172,9 +172,6 @@ const UserActivityDashboardPage = () => {
             </div>
             <div>
               <h1 className="text-2xl font-semibold">{userSummary.user.username}'s Activity Dashboard</h1>
-              <p className="text-sm text-gray-400">
-                {userSummary.user.email} • Roles: {userSummary.user.roles.join(', ')}
-              </p>
             </div>
           </div>
         </motion.div>
