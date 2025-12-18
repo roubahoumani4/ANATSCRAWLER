@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { mongodb } from '../lib/mongodb';
 import { ObjectId } from 'mongodb';
 import type { User } from '../types/User';
-import { updateSessionActivity } from '../services/session.service';
+import { updateSessionActivity, isSessionValid } from '../services/session.service';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'ANAT_SECURITY_JWT_SECRET_KEY';
 
@@ -37,6 +37,17 @@ export default async function authenticate(req: Request, res: Response, next: Ne
     }
 
     const user = result.users[0] as User;
+    
+    // Check if session is still valid (not terminated by admin)
+    if (token) {
+      const sessionValid = await isSessionValid(token);
+      if (!sessionValid) {
+        return res.status(401).json({ 
+          error: 'Session terminated',
+          message: 'Your session has been terminated. Please log in again.' 
+        });
+      }
+    }
     
     // Update last login
     await mongodb.updateUser(decoded._id, { lastLogin: new Date() });

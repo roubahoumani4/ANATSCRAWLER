@@ -37,7 +37,6 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle,
-  Ban,
   Activity,
   Chrome,
   Zap,
@@ -110,7 +109,6 @@ const SessionManagementPage = () => {
 
   // Dialog states
   const [terminateDialogOpen, setTerminateDialogOpen] = useState(false);
-  const [blockDialogOpen, setBlockDialogOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -234,34 +232,6 @@ const SessionManagementPage = () => {
     }
   };
 
-  const handleBlockSession = async () => {
-    if (!selectedSession) return;
-    
-    try {
-      setActionLoading(true);
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      await axios.post(
-        `${API_BASE_URL}/api/v1/admin/sessions/${selectedSession._id}/block`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          },
-          withCredentials: true
-        }
-      );
-      
-      setBlockDialogOpen(false);
-      setSelectedSession(null);
-      fetchSessions();
-      fetchStats();
-    } catch (error) {
-      console.error('Error blocking session:', error);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   const handleTerminateAllUserSessions = async (userId: string) => {
     if (!confirm('Are you sure you want to terminate all sessions for this user?')) return;
     
@@ -315,7 +285,7 @@ const SessionManagementPage = () => {
     if (session.isBlocked) {
       return (
         <Badge className="text-red-400 bg-red-400/10 border-0">
-          <Ban size={12} className="mr-1" />
+          <XCircle size={12} className="mr-1" />
           Blocked
         </Badge>
       );
@@ -696,20 +666,6 @@ const SessionManagementPage = () => {
                             Terminate
                           </Button>
                         )}
-                        {!session.isBlocked && (
-                          <Button
-                            onClick={() => {
-                              setSelectedSession(session);
-                              setBlockDialogOpen(true);
-                            }}
-                            size="sm"
-                            variant="outline"
-                            className="border-orange-400/50 text-orange-400 hover:bg-orange-400/10"
-                          >
-                            <Ban size={14} className="mr-1" />
-                            Block
-                          </Button>
-                        )}
                       </div>
                     </div>
                   </motion.div>
@@ -813,53 +769,6 @@ const SessionManagementPage = () => {
               className="bg-red-600 hover:bg-red-700 text-white"
             >
               {actionLoading ? 'Terminating...' : 'Terminate Session'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Block Session Dialog */}
-      <Dialog open={blockDialogOpen} onOpenChange={setBlockDialogOpen}>
-        <DialogContent className="bg-jetBlack border-gray-700 text-coolWhite">
-          <DialogHeader>
-            <DialogTitle>Block Session</DialogTitle>
-            <DialogDescription className="text-gray-400">
-              Are you sure you want to block this session? This will prevent future access from this device/IP.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedSession && (
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-400">User:</span>
-                <span>{selectedSession.username || selectedSession.userId?.username}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Device Fingerprint:</span>
-                <span className="font-mono text-xs truncate">
-                  {selectedSession.deviceFingerprint.substring(0, 20)}...
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">IP Address:</span>
-                <span className="font-mono">{selectedSession.ipAddress}</span>
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setBlockDialogOpen(false)}
-              disabled={actionLoading}
-              className="border-gray-700"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleBlockSession}
-              disabled={actionLoading}
-              className="bg-orange-600 hover:bg-orange-700 text-white"
-            >
-              {actionLoading ? 'Blocking...' : 'Block Session'}
             </Button>
           </DialogFooter>
         </DialogContent>
