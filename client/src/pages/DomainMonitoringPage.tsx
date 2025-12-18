@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { BarChart, Bar, PieChart as RechartsPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import axios from "axios";
+import MatrixBackground from "@/components/ui/MatrixBackground";
 
 // Confetti component
 const Confetti = () => {
@@ -374,9 +375,10 @@ const DomainMonitoringPage = () => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="p-8 min-h-screen bg-jetBlack text-coolWhite"
+      className="p-8 min-h-screen bg-jetBlack text-coolWhite relative"
     >
-      <div className="w-full">
+      <MatrixBackground />
+      <div className="w-full relative z-10">
         {/* Header */}
         <motion.div
           className="mb-6"
@@ -385,7 +387,7 @@ const DomainMonitoringPage = () => {
           transition={{ duration: 0.6 }}
         >
           <div className="flex items-center space-x-4 mb-4">
-            <div className="p-3 rounded bg-cyan-700/10 text-cyan-400">
+            <div className="p-3 rounded bg-cyan-700/10 text-white">
               <Shield size={28} />
             </div>
             <div>

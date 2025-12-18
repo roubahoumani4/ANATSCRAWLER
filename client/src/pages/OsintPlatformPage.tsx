@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '@/lib/api';
+import MatrixBackground from '@/components/ui/MatrixBackground';
 import {
   BarChart,
   Bar,
@@ -153,13 +154,14 @@ const OsintPlatformPage: React.FC = () => {
   }
 
   return (
-    <div className="p-8 min-h-screen bg-jetBlack text-coolWhite">
+    <div className="p-8 min-h-screen bg-jetBlack text-coolWhite relative">
+      <MatrixBackground />
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-8 relative z-10">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-3">
-              <Shield className="text-sky-400" size={36} />
+              <Shield className="text-white" size={36} />
               OSINT Platform Dashboard
             </h1>
             <p className="text-gray-400 mt-2">

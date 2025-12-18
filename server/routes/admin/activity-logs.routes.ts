@@ -169,13 +169,18 @@ router.get('/export', async (req: Request, res: Response) => {
  */
 router.get('/stats', async (req: Request, res: Response) => {
   try {
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, userId } = req.query;
 
     const query: any = {};
     if (startDate || endDate) {
       query.createdAt = {};
       if (startDate) query.createdAt.$gte = new Date(startDate as string);
       if (endDate) query.createdAt.$lte = new Date(endDate as string);
+    }
+
+    // Add userId filter if provided
+    if (userId && userId !== 'all') {
+      query.userId = userId;
     }
 
     const [
@@ -305,6 +310,10 @@ router.get('/user-summary/:userId', async (req: Request, res: Response) => {
       });
     }
 
+    // Convert userId to ObjectId for aggregation
+    const mongoose = require('mongoose');
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+
     // Get activity statistics
     const [
       totalActivities,
@@ -314,23 +323,23 @@ router.get('/user-summary/:userId', async (req: Request, res: Response) => {
       dailyActivity
     ] = await Promise.all([
       // Total activities
-      ActivityLog.countDocuments({ userId }),
+      ActivityLog.countDocuments({ userId: userObjectId }),
 
       // By action type
       ActivityLog.aggregate([
-        { $match: { userId: userId as any } },
+        { $match: { userId: userObjectId } },
         { $group: { _id: '$actionType', count: { $sum: 1 } } },
         { $sort: { count: -1 } }
       ]),
 
       // By status
       ActivityLog.aggregate([
-        { $match: { userId: userId as any } },
+        { $match: { userId: userObjectId } },
         { $group: { _id: '$status', count: { $sum: 1 } } }
       ]),
 
       // Recent 10 activities
-      ActivityLog.find({ userId })
+      ActivityLog.find({ userId: userObjectId })
         .sort({ createdAt: -1 })
         .limit(10)
         .populate('userId', 'username email'),
@@ -339,7 +348,7 @@ router.get('/user-summary/:userId', async (req: Request, res: Response) => {
       ActivityLog.aggregate([
         {
           $match: {
-            userId: userId as any,
+            userId: userObjectId,
             createdAt: {
               $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
             }

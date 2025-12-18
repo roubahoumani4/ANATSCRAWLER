@@ -163,7 +163,7 @@ const UserActivityDashboardPage = () => {
           transition={{ duration: 0.6 }}
         >
           <div className="flex items-center space-x-4">
-            <div className="p-3 rounded bg-blue-700/10 text-blue-400">
+            <div className="p-3 rounded bg-blue-700/10 text-white">
               <Activity size={28} />
             </div>
             <div>

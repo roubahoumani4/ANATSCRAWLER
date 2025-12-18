@@ -37,6 +37,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import MatrixBackground from '@/components/ui/MatrixBackground';
 
 interface ActivityLog {
   _id: string;
@@ -170,6 +171,7 @@ const UserActivityLogsPage = () => {
       const params: any = {};
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
+      if (selectedUser && selectedUser !== 'all') params.userId = selectedUser;
 
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       const response = await axios.get(`${API_BASE_URL}/api/v1/admin/activity-logs/stats`, { 
@@ -335,9 +337,10 @@ const UserActivityLogsPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-jetBlack text-coolWhite">
+    <div className="min-h-screen bg-jetBlack text-coolWhite relative">
+      <MatrixBackground />
       <motion.div
-        className="p-8 pt-4"
+        className="p-8 pt-4 relative z-10"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.6 }}
@@ -351,7 +354,7 @@ const UserActivityLogsPage = () => {
         >
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-4">
-              <div className="p-3 rounded bg-blue-700/10 text-blue-400">
+              <div className="p-3 rounded bg-blue-700/10 text-white">
                 <Activity size={28} />
               </div>
               <div>
@@ -365,7 +368,7 @@ const UserActivityLogsPage = () => {
               <Button
                 onClick={() => handleExport('csv')}
                 disabled={exporting}
-                className="bg-green-600 hover:bg-green-700"
+                className="bg-[hsl(var(--crimsonRed))] hover:bg-[hsl(var(--crimsonRed),.85)] text-white"
               >
                 <Download size={16} className="mr-2" />
                 Export CSV
@@ -373,7 +376,7 @@ const UserActivityLogsPage = () => {
               <Button
                 onClick={() => handleExport('json')}
                 disabled={exporting}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-[hsl(var(--crimsonRed))] hover:bg-[hsl(var(--crimsonRed),.85)] text-white"
               >
                 <Download size={16} className="mr-2" />
                 Export JSON
@@ -383,7 +386,7 @@ const UserActivityLogsPage = () => {
                   fetchLogs();
                   fetchStats();
                 }}
-                className="bg-purple-600 hover:bg-purple-700"
+                className="bg-[hsl(var(--crimsonRed))] hover:bg-[hsl(var(--crimsonRed),.85)] text-white"
               >
                 <RefreshCw size={16} className="mr-2" />
                 Refresh

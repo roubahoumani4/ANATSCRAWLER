@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { API_BASE_URL } from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
 import { History, RefreshCw, Eye, Clock, CheckCircle2, XCircle, Loader, Trash2 } from 'lucide-react';
+import MatrixBackground from '@/components/ui/MatrixBackground';
 
 interface Scan {
   jobId: string;
@@ -131,11 +132,12 @@ const HistoryPage: React.FC = () => {
   };
 
   return (
-    <div className="p-8 min-h-screen bg-jetBlack text-coolWhite">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-8 min-h-screen bg-jetBlack text-coolWhite relative">
+      <MatrixBackground />
+      <div className="flex items-center justify-between mb-6 relative z-10">
         <div>
           <h1 className="text-2xl font-semibold flex items-center gap-2">
-            <History className="text-sky-400" size={28} />
+            <History className="text-white" size={28} />
             Scan History
           </h1>
           <p className="text-sm text-gray-400 mt-1">

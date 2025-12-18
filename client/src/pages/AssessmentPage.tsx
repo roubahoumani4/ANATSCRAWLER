@@ -6,6 +6,7 @@ import { ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, LineChart, L
 import jsPDF from 'jspdf';
 import anatLogo from '@/assets/anatlogo.png';
 import VulnerabilityGraphs from '@/components/VulnerabilityGraphs';
+import MatrixBackground from '@/components/ui/MatrixBackground';
 
 type WhoisSection = {
   domain?: string;
@@ -2168,10 +2169,11 @@ const AssessmentPage: React.FC = () => {
   };
 
   return (
-    <div className="p-8 min-h-screen bg-jetBlack text-coolWhite">
-      <div className="w-full">
+    <div className="p-8 min-h-screen bg-jetBlack text-coolWhite relative">
+      <MatrixBackground />
+      <div className="w-full relative z-10">
         <div className="flex items-center space-x-4 mb-6">
-          <div className="p-3 rounded bg-emerald-700/10 text-emerald-400">
+          <div className="p-3 rounded bg-emerald-700/10 text-white">
             <Zap size={28} />
           </div>
           <div>

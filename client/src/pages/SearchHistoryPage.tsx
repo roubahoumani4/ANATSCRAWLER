@@ -19,6 +19,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import axios from "axios";
+import MatrixBackground from "@/components/ui/MatrixBackground";
 
 interface SearchHistoryItem {
   _id: string;
@@ -179,15 +180,16 @@ const SearchHistoryPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen p-6">
+    <div className="min-h-screen p-6 relative">
+      <MatrixBackground />
       {/* Header */}
       <motion.div
+        className="relative z-10 mb-8"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
       >
         <div className="flex items-center space-x-4 mb-4">
-          <div className="p-3 rounded bg-purple-700/10 text-purple-400">
+          <div className="p-3 rounded bg-purple-700/10 text-white">
             <HistoryIcon size={28} />
           </div>
           <div>

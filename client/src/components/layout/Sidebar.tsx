@@ -69,31 +69,31 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
       path: "/dashboard",
       icon: <BarChart2 size={20} />,
       label: "Dashboard",
-      color: "text-blue-400"
+      color: "text-white"
     },
     {
       path: "/osint",
       icon: <Terminal size={20} />,
       label: "OSINT Platform",
-      color: "text-green-400",
+      color: "text-white",
       hasSubmenu: true,
       features: [
-          { path: "/osint/assessment", label: "Assessment", icon: <Zap size={16} />, color: "text-emerald-400" },
-          { path: "/osint/assessment/output", label: "Output", icon: <FileText size={16} />, color: "text-sky-400" },
-          { path: "/osint/assessment/history", label: "History", icon: <HistoryIcon size={16} />, color: "text-purple-400" }
+          { path: "/osint/assessment", label: "Assessment", icon: <Zap size={16} />, color: "text-white" },
+          { path: "/osint/assessment/output", label: "Output", icon: <FileText size={16} />, color: "text-white" },
+          { path: "/osint/assessment/history", label: "History", icon: <HistoryIcon size={16} />, color: "text-white" }
       ]
     },
     {
       path: "/analytics",
       icon: <Activity size={20} />,
       label: "Dark Web Monitoring",
-      color: "text-cyan-400",
+      color: "text-white",
       hasSubmenu: true,
       features: [
-        { path: "/threat-intelligence", label: "Threat Intelligence", icon: <AlertTriangle size={16} />, color: "text-orange-400" },
-        { path: "/discovery", label: "Discovery", icon: <Shield size={16} />, color: "text-red-400" },
-        { path: "/domain-monitoring", label: "Domain Monitoring", icon: <Globe size={16} />, color: "text-blue-400" },
-        { path: "/search-history", label: "Search History", icon: <HistoryIcon size={16} />, color: "text-purple-400" }
+        { path: "/threat-intelligence", label: "Threat Intelligence", icon: <AlertTriangle size={16} />, color: "text-white" },
+        { path: "/discovery", label: "Discovery", icon: <Shield size={16} />, color: "text-white" },
+        { path: "/domain-monitoring", label: "Domain Monitoring", icon: <Globe size={16} />, color: "text-white" },
+        { path: "/search-history", label: "Search History", icon: <HistoryIcon size={16} />, color: "text-white" }
       ]
     },
     // User Management - Only visible for admin users
@@ -101,11 +101,11 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
       path: "/users",
       icon: <Users size={20} />,
       label: "User Management",
-      color: "text-yellow-400",
+      color: "text-white",
       hasSubmenu: true,
       features: [
-        { path: "/users/management", label: "Manage Users", icon: <UserCog size={16} />, color: "text-blue-400" },
-        { path: "/users/activity-logs", label: "Activity Logs", icon: <Activity size={16} />, color: "text-red-400" }
+        { path: "/users/management", label: "Manage Users", icon: <UserCog size={16} />, color: "text-white" },
+        { path: "/users/activity-logs", label: "Activity Logs", icon: <Activity size={16} />, color: "text-white" }
       ]
     }] : [])
   ];
@@ -231,7 +231,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
                   ? 'bg-cyan-400/10 text-cyan-400 border border-cyan-400/20' 
                   : 'text-coolWhite hover:bg-darkGray hover:border hover:border-gray-700/50'
                 }`}>
-                <span className="text-gray-400">
+                <span className="text-white">
                   <Settings size={20} />
                 </span>
                 <motion.span

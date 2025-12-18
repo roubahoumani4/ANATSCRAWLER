@@ -5,6 +5,7 @@ import VulnerabilityGraphs from '@/components/VulnerabilityGraphs';
 import { ChevronDown, ChevronUp, Download, FileText, History as HistoryIcon, Shield, Radar, Globe, Server, Activity as ActivityIcon, Lock, AlertTriangle, Globe2, Building2 } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { parseAssessmentSections } from './AssessmentPage';
+import MatrixBackground from '@/components/ui/MatrixBackground';
 
 // Helper function to clean unwanted footer lines from scan output
 const cleanScanOutput = (output: string): string => {
@@ -323,11 +324,12 @@ const OutputPage: React.FC = () => {
   }
 
   return (
-    <div className="p-8 min-h-screen bg-jetBlack text-coolWhite">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-8 min-h-screen bg-jetBlack text-coolWhite relative">
+      <MatrixBackground />
+      <div className="flex items-center justify-between mb-6 relative z-10">
         <div>
           <h1 className="text-2xl font-semibold flex items-center gap-2">
-            <FileText size={28} className="text-sky-400" />
+            <FileText size={28} className="text-white" />
             Scan Output
           </h1>
           <p className="text-sm text-gray-400 mt-1">Detailed analysis results and generated reports</p>

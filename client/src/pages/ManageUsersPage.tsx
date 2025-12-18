@@ -17,6 +17,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { UserCog } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import MatrixBackground from "@/components/ui/MatrixBackground";
 
 interface User {
   _id: string;
@@ -212,11 +213,13 @@ const ManageUsersPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-jetBlack text-coolWhite p-6">
+    <div className="min-h-screen bg-jetBlack text-coolWhite p-6 relative">
+      <MatrixBackground />
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
+        className="relative z-10"
       >
         {/* Header */}
         <motion.div
@@ -226,7 +229,7 @@ const ManageUsersPage = () => {
           transition={{ duration: 0.6 }}
         >
           <div className="flex items-center space-x-4 mb-4">
-            <div className="p-3 rounded bg-blue-700/10 text-blue-400">
+            <div className="p-3 rounded bg-blue-700/10 text-white">
               <UserCog size={28} />
             </div>
             <div>

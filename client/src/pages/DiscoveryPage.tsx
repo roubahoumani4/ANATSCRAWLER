@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Search, Shield, Eye, AlertTriangle, Mail, Database, TrendingUp, X } from "lucide-react";
 import ResultsTable from "@/components/dashboard/ResultsTable";
 import axios from "axios";
+import MatrixBackground from "@/components/ui/MatrixBackground";
 
 const DiscoveryPage: React.FC = () => {
   // Load persisted search from localStorage
@@ -270,9 +271,10 @@ const DiscoveryPage: React.FC = () => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="p-8 min-h-screen bg-jetBlack text-coolWhite"
+      className="p-8 min-h-screen bg-jetBlack text-coolWhite relative"
     >
-      <div className="w-full">
+      <MatrixBackground />
+      <div className="w-full relative z-10">
         {/* Header Section */}
         <motion.div
           className="mb-6"
@@ -281,7 +283,7 @@ const DiscoveryPage: React.FC = () => {
           transition={{ duration: 0.6 }}
         >
           <div className="flex items-center space-x-4 mb-4">
-            <div className="p-3 rounded bg-red-700/10 text-red-400">
+            <div className="p-3 rounded bg-red-700/10 text-white">
               <Shield size={28} />
             </div>
             <div>

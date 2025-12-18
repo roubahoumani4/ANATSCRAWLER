@@ -22,6 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import axios from "axios";
+import MatrixBackground from "@/components/ui/MatrixBackground";
 
 interface BreachData {
   id: string;
@@ -195,17 +196,18 @@ const ThreatIntelligencePage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen p-6">
+    <div className="min-h-screen p-6 relative">
+      <MatrixBackground />
       {/* Header */}
       <motion.div
+        className="relative z-10 mb-8"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
       >
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-semibold text-white flex items-center gap-3">
-              <Shield className="w-7 h-7 text-cyan-400" />
+              <Shield className="w-7 h-7 text-white" />
               Threat Intelligence Feed
             </h1>
             <p className="text-gray-400 mt-2">Real-time monitoring of global security breaches and threats</p>
