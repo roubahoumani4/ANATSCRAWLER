@@ -1,17 +1,15 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { API_BASE_URL } from '@/lib/api';
 import axios from 'axios';
 import Header from '@/components/layout/Header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
   Activity,
   Calendar,
   Clock,
-  ArrowLeft,
   LogIn,
   LogOut,
   Globe,
@@ -21,10 +19,10 @@ import {
   FileText,
   Search,
   AlertCircle,
-  CheckCircle,
-  XCircle,
   TrendingUp,
   Download,
+  XCircle,
+  CheckCircle,
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 
@@ -59,7 +57,6 @@ const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'
 
 const UserActivityDashboardPage = () => {
   const { userId } = useParams<{ userId: string }>();
-  const navigate = useNavigate();
   const [userSummary, setUserSummary] = useState<UserSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -141,9 +138,6 @@ const UserActivityDashboardPage = () => {
             <div className="text-center">
               <AlertCircle className="mx-auto text-red-400 mb-4" size={48} />
               <p className="text-gray-400">Failed to load user activity data</p>
-              <Button onClick={() => navigate('/manage-users')} className="mt-4">
-                Back to Manage Users
-              </Button>
             </div>
           </div>
         </div>
@@ -152,7 +146,7 @@ const UserActivityDashboardPage = () => {
   }
 
   const chartData = Object.entries(userSummary.statistics.byActionType).map(([name, value]) => ({
-    name: name.replace('_', ' '),
+    name: name.replace('_', ' ').charAt(0).toUpperCase() + name.replace('_', ' ').slice(1),
     value,
   }));
 
@@ -165,17 +159,13 @@ const UserActivityDashboardPage = () => {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.6 }}
       >
-        {/* Header with Back Button */}
-        <div className="mb-6">
-          <Button
-            onClick={() => navigate('/manage-users')}
-            variant="outline"
-            className="mb-4 border-gray-700"
-          >
-            <ArrowLeft size={16} className="mr-2" />
-            Back to Manage Users
-          </Button>
-
+        {/* Header */}
+        <motion.div
+          className="mb-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+        >
           <div className="flex items-center space-x-4">
             <div className="p-3 rounded bg-blue-700/10 text-blue-400">
               <Activity size={28} />
@@ -187,46 +177,7 @@ const UserActivityDashboardPage = () => {
               </p>
             </div>
           </div>
-        </div>
-
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card className="bg-jetBlack/50 border-gray-700">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-400 mb-1">Total Activities</p>
-                  <p className="text-3xl font-bold text-blue-400">{userSummary.statistics.total}</p>
-                </div>
-                <Activity size={40} className="text-blue-400 opacity-20" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-jetBlack/50 border-gray-700">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-400 mb-1">Successful</p>
-                  <p className="text-3xl font-bold text-green-400">{userSummary.statistics.byStatus.success || 0}</p>
-                </div>
-                <CheckCircle size={40} className="text-green-400 opacity-20" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-jetBlack/50 border-gray-700">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-400 mb-1">Failed</p>
-                  <p className="text-3xl font-bold text-red-400">{userSummary.statistics.byStatus.failed || 0}</p>
-                </div>
-                <XCircle size={40} className="text-red-400 opacity-20" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        </motion.div>
 
         {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
@@ -239,18 +190,24 @@ const UserActivityDashboardPage = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="name" stroke="#9CA3AF" fontSize={12} angle={-45} textAnchor="end" height={80} />
-                  <YAxis stroke="#9CA3AF" fontSize={12} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151' }}
-                    labelStyle={{ color: '#F3F4F6' }}
-                  />
-                  <Bar dataKey="value" fill="#3B82F6" />
-                </BarChart>
-              </ResponsiveContainer>
+              {chartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis dataKey="name" stroke="#9CA3AF" fontSize={12} angle={-45} textAnchor="end" height={80} />
+                    <YAxis stroke="#9CA3AF" fontSize={12} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151' }}
+                      labelStyle={{ color: '#F3F4F6' }}
+                    />
+                    <Bar dataKey="value" fill="#3B82F6" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-[300px] text-gray-400">
+                  No activity data available
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -263,27 +220,33 @@ const UserActivityDashboardPage = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={chartData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={100}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151' }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              {chartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={chartData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={100}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {chartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-[300px] text-gray-400">
+                  No activity data available
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -297,18 +260,24 @@ const UserActivityDashboardPage = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={userSummary.dailyActivity}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="date" stroke="#9CA3AF" fontSize={12} />
-                <YAxis stroke="#9CA3AF" fontSize={12} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151' }}
-                  labelStyle={{ color: '#F3F4F6' }}
-                />
-                <Line type="monotone" dataKey="count" stroke="#3B82F6" strokeWidth={2} dot={{ fill: '#3B82F6' }} />
-              </LineChart>
-            </ResponsiveContainer>
+            {userSummary.dailyActivity && userSummary.dailyActivity.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={userSummary.dailyActivity}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="date" stroke="#9CA3AF" fontSize={12} />
+                  <YAxis stroke="#9CA3AF" fontSize={12} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151' }}
+                    labelStyle={{ color: '#F3F4F6' }}
+                  />
+                  <Line type="monotone" dataKey="count" stroke="#3B82F6" strokeWidth={2} dot={{ fill: '#3B82F6' }} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-gray-400">
+                No activity trend data available
+              </div>
+            )}
           </CardContent>
         </Card>
 
