@@ -615,7 +615,7 @@ const DataManagementPage = () => {
                         onChange={(e) =>
                           setNewPolicy({ ...newPolicy, name: e.target.value })
                         }
-                        className="w-full bg-jetBlack/50 border border-emerald-500/20 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500"
+                        className="w-full bg-jetBlack border border-emerald-500/20 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500 placeholder:text-coolWhite/40"
                         placeholder="my-ilm-policy"
                       />
                     </div>
@@ -634,7 +634,7 @@ const DataManagementPage = () => {
                             // Invalid JSON, ignore
                           }
                         }}
-                        className="w-full bg-jetBlack/50 border border-emerald-500/20 rounded-lg px-4 py-2 text-white font-mono text-sm focus:outline-none focus:border-emerald-500"
+                        className="w-full bg-jetBlack border border-emerald-500/20 rounded-lg px-4 py-2 text-white font-mono text-sm focus:outline-none focus:border-emerald-500 placeholder:text-coolWhite/40"
                         rows={12}
                         placeholder={`{
   "hot": {
