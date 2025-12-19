@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { elasticsearchService } from '../../services/elasticsearch.service';
+import { logAdminAction } from '../../utils/adminLogger';
 
 const router = Router();
 
@@ -97,6 +98,15 @@ router.post('/indices', requireAdmin, async (req: Request, res: Response) => {
     // Validate index name (lowercase, no special characters except - and _)
     const indexNameRegex = /^[a-z0-9_-]+$/;
     if (!indexNameRegex.test(indexName)) {
+      await logAdminAction({
+        req,
+        action: 'create_index_failed',
+        category: 'index',
+        resource: indexName,
+        status: 'error',
+        details: { reason: 'Invalid index name format' }
+      });
+      
       return res.status(400).json({
         success: false,
         error: 'Invalid index name. Use only lowercase letters, numbers, hyphens, and underscores.',
@@ -105,12 +115,33 @@ router.post('/indices', requireAdmin, async (req: Request, res: Response) => {
 
     await elasticsearchService.createIndex(indexName, settings);
     
+    // Log successful creation
+    await logAdminAction({
+      req,
+      action: 'create_index',
+      category: 'index',
+      resource: indexName,
+      status: 'success',
+      details: { indexName, settings }
+    });
+    
     res.json({
       success: true,
       message: `Index '${indexName}' created successfully`,
     });
   } catch (error: any) {
     console.error('Error creating index:', error);
+    
+    // Log failed creation
+    await logAdminAction({
+      req,
+      action: 'create_index_failed',
+      category: 'index',
+      resource: req.body.indexName || 'unknown',
+      status: 'error',
+      details: { error: error.message }
+    });
+    
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to create index',
@@ -128,6 +159,15 @@ router.delete('/indices/:indexName', requireAdmin, async (req: Request, res: Res
 
     // Prevent deletion of system indices
     if (indexName.startsWith('.')) {
+      await logAdminAction({
+        req,
+        action: 'delete_index_failed',
+        category: 'index',
+        resource: indexName,
+        status: 'error',
+        details: { reason: 'Cannot delete system indices' }
+      });
+      
       return res.status(400).json({
         success: false,
         error: 'Cannot delete system indices',
@@ -136,12 +176,33 @@ router.delete('/indices/:indexName', requireAdmin, async (req: Request, res: Res
 
     await elasticsearchService.deleteIndex(indexName);
     
+    // Log successful deletion
+    await logAdminAction({
+      req,
+      action: 'delete_index',
+      category: 'index',
+      resource: indexName,
+      status: 'success',
+      details: { indexName }
+    });
+    
     res.json({
       success: true,
       message: `Index '${indexName}' deleted successfully`,
     });
   } catch (error: any) {
     console.error(`Error deleting index ${req.params.indexName}:`, error);
+    
+    // Log failed deletion
+    await logAdminAction({
+      req,
+      action: 'delete_index_failed',
+      category: 'index',
+      resource: req.params.indexName,
+      status: 'error',
+      details: { error: error.message }
+    });
+    
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to delete index',

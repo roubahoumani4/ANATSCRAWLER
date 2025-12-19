@@ -69,8 +69,21 @@ interface AdminStats {
 const AdminLogsPage = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  const [selectedAdmin, setSelectedAdmin] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [dateRange, setDateRange] = useState({ start: "", end: "" });
+
+  // Fetch list of admins
+  const { data: adminsList } = useQuery({
+    queryKey: ["/api/v1/admin/elasticsearch/logs/admins"],
+    queryFn: async () => {
+      const response = await axios.get(
+        `${API_BASE_URL}/api/v1/admin/elasticsearch/logs/admins`,
+        { withCredentials: true }
+      );
+      return response.data.admins as Array<{ email: string; name: string; actionCount: number }>;
+    },
+  });
 
   // Fetch admin logs
   const { data: logs, isLoading: logsLoading } = useQuery({
@@ -78,6 +91,7 @@ const AdminLogsPage = () => {
       "/api/v1/admin/elasticsearch/logs",
       selectedCategory,
       selectedStatus,
+      selectedAdmin,
       searchQuery,
       dateRange,
     ],
@@ -85,6 +99,7 @@ const AdminLogsPage = () => {
       const params = new URLSearchParams();
       if (selectedCategory !== "all") params.append("category", selectedCategory);
       if (selectedStatus !== "all") params.append("status", selectedStatus);
+      if (selectedAdmin !== "all") params.append("adminEmail", selectedAdmin);
       if (searchQuery) params.append("search", searchQuery);
       if (dateRange.start) params.append("startDate", dateRange.start);
       if (dateRange.end) params.append("endDate", dateRange.end);
@@ -219,7 +234,7 @@ const AdminLogsPage = () => {
         >
           <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 flex items-center gap-3">
             <FontAwesomeIcon icon={faClipboardList} className="text-emerald-400" />
-            Admin Activity Logs
+            Activity Logs
           </h1>
           <p className="text-coolWhite/70">
             Track and monitor all administrative actions in Index Management
@@ -353,7 +368,7 @@ const AdminLogsPage = () => {
 
         {/* Filters */}
         <div className="bg-deepNavy/50 border border-emerald-500/20 rounded-lg p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
             {/* Category Filter */}
             <div>
               <label className="block text-sm font-medium text-coolWhite/70 mb-2">
@@ -386,6 +401,26 @@ const AdminLogsPage = () => {
                 {statuses.map((status) => (
                   <option key={status.value} value={status.value}>
                     {status.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Admin Filter */}
+            <div>
+              <label className="block text-sm font-medium text-coolWhite/70 mb-2">
+                <FontAwesomeIcon icon={faUser} className="mr-2" />
+                Admin User
+              </label>
+              <select
+                value={selectedAdmin}
+                onChange={(e) => setSelectedAdmin(e.target.value)}
+                className="w-full bg-jetBlack border border-emerald-500/20 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500 [&>option]:bg-jetBlack [&>option]:text-white"
+              >
+                <option value="all" className="bg-jetBlack text-white">All Admins</option>
+                {adminsList?.map((admin) => (
+                  <option key={admin.email} value={admin.email} className="bg-jetBlack text-white">
+                    {admin.name} ({admin.actionCount})
                   </option>
                 ))}
               </select>

@@ -24,7 +24,7 @@ function requireAdmin(req: Request, res: Response, next: any) {
  */
 router.get('/', requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { category, status, search, startDate, endDate, limit = 100 } = req.query;
+    const { category, status, search, startDate, endDate, adminEmail, limit = 100 } = req.query;
 
     // Build Elasticsearch query
     const must: any[] = [
@@ -37,6 +37,10 @@ router.get('/', requireAdmin, async (req: Request, res: Response) => {
 
     if (status && status !== 'all') {
       must.push({ term: { status } });
+    }
+    
+    if (adminEmail && adminEmail !== 'all') {
+      must.push({ term: { 'adminEmail.keyword': adminEmail } });
     }
 
     if (search) {
@@ -83,6 +87,59 @@ router.get('/', requireAdmin, async (req: Request, res: Response) => {
     
     res.status(500).json({ 
       error: 'Failed to fetch admin logs',
+      details: error.response?.data || error.message 
+    });
+  }
+});
+
+/**
+ * GET /api/v1/admin/elasticsearch/logs/admins
+ * Get list of all admin users for filtering
+ */
+router.get('/admins', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    // Get unique admin emails from logs
+    const response = await axios.post(
+      `${ELASTICSEARCH_URI}/admin-logs-*/_search`,
+      {
+        size: 0,
+        aggs: {
+          admins: {
+            terms: {
+              field: 'adminEmail.keyword',
+              size: 100
+            },
+            aggs: {
+              latest: {
+                top_hits: {
+                  size: 1,
+                  sort: [{ timestamp: { order: 'desc' } }],
+                  _source: ['adminName', 'adminEmail']
+                }
+              }
+            }
+          }
+        }
+      }
+    );
+
+    const admins = response.data.aggregations.admins.buckets.map((bucket: any) => ({
+      email: bucket.key,
+      name: bucket.latest.hits.hits[0]?._source.adminName || bucket.key,
+      actionCount: bucket.doc_count
+    }));
+
+    res.json({ success: true, admins });
+  } catch (error: any) {
+    console.error('Error fetching admin list:', error.response?.data || error.message);
+    
+    // If index doesn't exist yet, return empty array
+    if (error.response?.status === 404) {
+      return res.json({ success: true, admins: [] });
+    }
+    
+    res.status(500).json({ 
+      error: 'Failed to fetch admin list',
       details: error.response?.data || error.message 
     });
   }
