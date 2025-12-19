@@ -440,13 +440,17 @@ const DataManagementPage = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 flex items-center gap-3">
-            <FontAwesomeIcon icon={faDatabase} className="text-emerald-400" />
-            Data Management
-          </h1>
-          <p className="text-coolWhite/70">
-            Manage index lifecycle, snapshots, and data retention policies
-          </p>
+          <div className="flex items-center gap-4 mb-4">
+            <div className="p-3 rounded bg-blue-700/10 text-white">
+              <FontAwesomeIcon icon={faDatabase} className="text-white text-2xl" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-semibold">Data Management</h1>
+              <p className="text-sm text-gray-400">
+                Manage index lifecycle, snapshots, and data retention policies
+              </p>
+            </div>
+          </div>
         </motion.div>
 
         {/* Tab Navigation */}
@@ -455,7 +459,7 @@ const DataManagementPage = () => {
             onClick={() => setActiveTab("ilm")}
             className={`px-6 py-3 rounded-lg font-medium transition-all ${
               activeTab === "ilm"
-                ? "bg-emerald-500 text-white"
+                ? "bg-gray-700 text-white"
                 : "bg-deepNavy/50 text-coolWhite/70 hover:bg-deepNavy"
             }`}
           >
@@ -466,7 +470,7 @@ const DataManagementPage = () => {
             onClick={() => setActiveTab("snapshot")}
             className={`px-6 py-3 rounded-lg font-medium transition-all ${
               activeTab === "snapshot"
-                ? "bg-emerald-500 text-white"
+                ? "bg-gray-700 text-white"
                 : "bg-deepNavy/50 text-coolWhite/70 hover:bg-deepNavy"
             }`}
           >
@@ -477,7 +481,7 @@ const DataManagementPage = () => {
             onClick={() => setActiveTab("purge")}
             className={`px-6 py-3 rounded-lg font-medium transition-all ${
               activeTab === "purge"
-                ? "bg-emerald-500 text-white"
+                ? "bg-gray-700 text-white"
                 : "bg-deepNavy/50 text-coolWhite/70 hover:bg-deepNavy"
             }`}
           >
@@ -500,7 +504,7 @@ const DataManagementPage = () => {
               </h2>
               <button
                 onClick={() => setShowCreatePolicy(true)}
-                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-colors"
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
               >
                 <FontAwesomeIcon icon={faCog} className="mr-2" />
                 Create Policy
@@ -667,7 +671,7 @@ const DataManagementPage = () => {
                       <button
                         onClick={() => createILMPolicy.mutate(newPolicy)}
                         disabled={!newPolicy.name || createILMPolicy.isPending}
-                        className="flex-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                        className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
                       >
                         {createILMPolicy.isPending ? "Creating..." : "Create Policy"}
                       </button>
@@ -702,7 +706,7 @@ const DataManagementPage = () => {
               </h2>
               <button
                 onClick={() => setShowCreateSnapshot(true)}
-                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-colors"
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
               >
                 <FontAwesomeIcon icon={faCloudUploadAlt} className="mr-2" />
                 Create Snapshot
@@ -783,7 +787,7 @@ const DataManagementPage = () => {
                                 snapshot: snapshot.snapshot,
                               })
                             }
-                            className="px-3 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded transition-colors"
+                            className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded transition-colors"
                           >
                             <FontAwesomeIcon icon={faCloudDownloadAlt} className="mr-2" />
                             Restore
@@ -894,7 +898,7 @@ const DataManagementPage = () => {
                           })
                         }
                         disabled={!selectedRepository || !snapshotName || createSnapshot.isPending}
-                        className="flex-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                        className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
                       >
                         {createSnapshot.isPending ? "Creating..." : "Create"}
                       </button>
@@ -928,7 +932,7 @@ const DataManagementPage = () => {
               <h2 className="text-2xl font-bold text-white">Data Purging</h2>
               <button
                 onClick={() => setShowCreatePurge(true)}
-                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-colors"
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
               >
                 <FontAwesomeIcon icon={faTrash} className="mr-2" />
                 New Purge Job
@@ -1135,7 +1139,7 @@ const DataManagementPage = () => {
                           const retentionDays = parseInt((document.getElementById("retentionDays") as HTMLInputElement).value);
                           executePurge.mutate({ indexPattern, dateField, retentionDays });
                         }}
-                        className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+                        className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
                       >
                         <FontAwesomeIcon icon={faPlay} className="mr-2" />
                         Execute Purge

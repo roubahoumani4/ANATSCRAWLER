@@ -607,14 +607,14 @@ const IndexManagementPage = () => {
         >
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-4">
-              <div className="p-3 bg-gradient-to-br from-cyan-500/20 to-purple-600/20 rounded-lg border border-cyan-400/30">
-                <FontAwesomeIcon icon={faDatabase} className="text-cyan-400 text-2xl" />
+              <div className="p-3 rounded bg-blue-700/10 text-white">
+                <FontAwesomeIcon icon={faDatabase} className="text-white text-2xl" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-purple-500 text-transparent bg-clip-text">
+                <h1 className="text-2xl font-semibold">
                   Index Management
                 </h1>
-                <p className="text-gray-400 mt-1">Manage Elasticsearch indices and monitor cluster health</p>
+                <p className="text-sm text-gray-400">Manage Elasticsearch indices and monitor cluster health</p>
               </div>
             </div>
 
@@ -623,7 +623,7 @@ const IndexManagementPage = () => {
                 onClick={() => setBulkMode(!bulkMode)}
                 className={`px-4 py-2 rounded-lg border transition-all ${
                   bulkMode
-                    ? "bg-purple-500/20 border-purple-500/50 text-purple-400"
+                    ? "bg-gray-700 border-gray-600 text-gray-200"
                     : "bg-gray-800/50 border-gray-700 text-gray-400"
                 }`}
               >
@@ -635,7 +635,7 @@ const IndexManagementPage = () => {
                 onClick={() => setAutoRefresh(!autoRefresh)}
                 className={`px-4 py-2 rounded-lg border transition-all ${
                   autoRefresh
-                    ? "bg-green-500/20 border-green-500/50 text-green-400"
+                    ? "bg-gray-700 border-gray-600 text-gray-200"
                     : "bg-gray-800/50 border-gray-700 text-gray-400"
                 }`}
               >
@@ -645,7 +645,7 @@ const IndexManagementPage = () => {
 
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-purple-600 rounded-lg hover:from-cyan-500 hover:to-purple-500 transition-all flex items-center gap-2"
+                className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-all flex items-center gap-2"
               >
                 <FontAwesomeIcon icon={faPlus} />
                 Create Index
@@ -657,7 +657,7 @@ const IndexManagementPage = () => {
           <div className="flex items-center gap-3 mt-4">
             <button
               onClick={() => setShowCloneModal(true)}
-              className="px-3 py-2 bg-blue-500/20 border border-blue-500/50 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-all flex items-center gap-2 text-sm"
+              className="px-3 py-2 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg hover:bg-gray-600 transition-all flex items-center gap-2 text-sm"
             >
               <FontAwesomeIcon icon={faCopy} />
               Clone Index
@@ -665,7 +665,7 @@ const IndexManagementPage = () => {
 
             <button
               onClick={() => setShowReindexModal(true)}
-              className="px-3 py-2 bg-green-500/20 border border-green-500/50 text-green-400 rounded-lg hover:bg-green-500/30 transition-all flex items-center gap-2 text-sm"
+              className="px-3 py-2 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg hover:bg-gray-600 transition-all flex items-center gap-2 text-sm"
             >
               <FontAwesomeIcon icon={faExchangeAlt} />
               Reindex
@@ -673,7 +673,7 @@ const IndexManagementPage = () => {
 
             <button
               onClick={() => setShowAliasModal(true)}
-              className="px-3 py-2 bg-yellow-500/20 border border-yellow-500/50 text-yellow-400 rounded-lg hover:bg-yellow-500/30 transition-all flex items-center gap-2 text-sm"
+              className="px-3 py-2 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg hover:bg-gray-600 transition-all flex items-center gap-2 text-sm"
             >
               <FontAwesomeIcon icon={faLink} />
               Manage Aliases
@@ -681,7 +681,7 @@ const IndexManagementPage = () => {
 
             <button
               onClick={() => setShowAliasSwapModal(true)}
-              className="px-3 py-2 bg-orange-500/20 border border-orange-500/50 text-orange-400 rounded-lg hover:bg-orange-500/30 transition-all flex items-center gap-2 text-sm"
+              className="px-3 py-2 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg hover:bg-gray-600 transition-all flex items-center gap-2 text-sm"
             >
               <FontAwesomeIcon icon={faExchangeAlt} />
               Swap Alias
@@ -689,7 +689,7 @@ const IndexManagementPage = () => {
 
             <button
               onClick={() => setShowAliasListModal(true)}
-              className="px-3 py-2 bg-purple-500/20 border border-purple-500/50 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-all flex items-center gap-2 text-sm"
+              className="px-3 py-2 bg-gray-700 border border-gray-600 text-gray-200 rounded-lg hover:bg-gray-600 transition-all flex items-center gap-2 text-sm"
             >
               <FontAwesomeIcon icon={faTasks} />
               View All Aliases
@@ -702,16 +702,16 @@ const IndexManagementPage = () => {
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-6 p-4 bg-purple-900/20 border border-purple-500/50 rounded-lg"
+            className="mb-6 p-4 bg-gray-800/50 border border-gray-700 rounded-lg"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <span className="text-purple-400 font-semibold">
+                <span className="text-gray-200 font-semibold">
                   {selectedIndices.size} indices selected
                 </span>
                 <button
                   onClick={selectAllIndices}
-                  className="px-3 py-1 text-sm bg-purple-600 hover:bg-purple-500 rounded transition-all"
+                  className="px-3 py-1 text-sm bg-gray-700 hover:bg-gray-600 rounded transition-all"
                 >
                   Select All
                 </button>
@@ -727,7 +727,7 @@ const IndexManagementPage = () => {
                 <button
                   onClick={handleBulkRefresh}
                   disabled={selectedIndices.size === 0 || bulkRefreshMutation.isPending}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg transition-all disabled:opacity-50 flex items-center gap-2"
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all disabled:opacity-50 flex items-center gap-2"
                 >
                   <FontAwesomeIcon icon={faRefresh} />
                   Refresh Selected
@@ -735,7 +735,7 @@ const IndexManagementPage = () => {
                 <button
                   onClick={handleBulkDelete}
                   disabled={selectedIndices.size === 0 || bulkDeleteMutation.isPending}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg transition-all disabled:opacity-50 flex items-center gap-2"
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all disabled:opacity-50 flex items-center gap-2"
                 >
                   <FontAwesomeIcon icon={faTrash} />
                   Delete Selected
@@ -960,7 +960,7 @@ const IndexManagementPage = () => {
             animate={{ opacity: 1, scale: 1 }}
             className="bg-gray-900 rounded-lg border border-gray-800 max-w-md w-full p-6"
           >
-            <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-cyan-400 to-purple-500 text-transparent bg-clip-text">
+            <h2 className="text-2xl font-semibold mb-4 text-white">
               Create New Index
             </h2>
             <div className="mb-4">
@@ -989,7 +989,7 @@ const IndexManagementPage = () => {
               <button
                 onClick={handleCreateIndex}
                 disabled={createIndexMutation.isPending}
-                className="flex-1 px-4 py-2 bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 rounded-lg transition-all disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all disabled:opacity-50"
               >
                 {createIndexMutation.isPending ? "Creating..." : "Create"}
               </button>
@@ -1041,7 +1041,7 @@ const IndexManagementPage = () => {
             animate={{ opacity: 1, scale: 1 }}
             className="bg-gray-900 rounded-lg border border-blue-500/50 max-w-md w-full p-6"
           >
-            <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-cyan-500 text-transparent bg-clip-text">
+            <h2 className="text-2xl font-semibold mb-4 text-white">
               Clone Index
             </h2>
             
@@ -1100,7 +1100,7 @@ const IndexManagementPage = () => {
               <button
                 onClick={() => cloneIndexMutation.mutate()}
                 disabled={!cloneSourceIndex || !cloneTargetIndex || cloneIndexMutation.isPending}
-                className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 rounded-lg transition-all disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all disabled:opacity-50"
               >
                 {cloneIndexMutation.isPending ? "Cloning..." : "Clone Index"}
               </button>
@@ -1117,7 +1117,7 @@ const IndexManagementPage = () => {
             animate={{ opacity: 1, scale: 1 }}
             className="bg-gray-900 rounded-lg border border-green-500/50 max-w-md w-full p-6"
           >
-            <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-green-400 to-emerald-500 text-transparent bg-clip-text">
+            <h2 className="text-2xl font-semibold mb-4 text-white">
               Reindex Data
             </h2>
             
@@ -1182,7 +1182,7 @@ const IndexManagementPage = () => {
               <button
                 onClick={() => reindexMutation.mutate()}
                 disabled={!reindexSource || !reindexDest || reindexMutation.isPending || reindexTaskId !== ""}
-                className="flex-1 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 rounded-lg transition-all disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all disabled:opacity-50"
               >
                 {reindexMutation.isPending ? "Starting..." : "Start Reindex"}
               </button>
@@ -1199,7 +1199,7 @@ const IndexManagementPage = () => {
             animate={{ opacity: 1, scale: 1 }}
             className="bg-gray-900 rounded-lg border border-yellow-500/50 max-w-md w-full p-6"
           >
-            <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-yellow-400 to-orange-500 text-transparent bg-clip-text">
+            <h2 className="text-2xl font-semibold mb-4 text-white">
               Manage Alias
             </h2>
             
@@ -1288,7 +1288,7 @@ const IndexManagementPage = () => {
             className="bg-gray-900 rounded-lg border border-purple-500/50 max-w-2xl w-full p-6 max-h-[80vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 text-transparent bg-clip-text">
+              <h2 className="text-2xl font-semibold text-white">
                 All Index Aliases
               </h2>
               <button
@@ -1340,7 +1340,7 @@ const IndexManagementPage = () => {
             animate={{ opacity: 1, scale: 1 }}
             className="bg-gray-900 rounded-lg border border-orange-500/50 max-w-md w-full p-6"
           >
-            <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-orange-400 to-red-500 text-transparent bg-clip-text">
+            <h2 className="text-2xl font-semibold mb-4 text-white">
               Swap Alias (Zero-Downtime)
             </h2>
             

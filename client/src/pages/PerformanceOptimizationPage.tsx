@@ -342,13 +342,17 @@ const PerformanceOptimizationPage = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <h1 className="text-4xl font-bold text-white mb-2 flex items-center gap-3">
-            <FontAwesomeIcon icon={faGaugeHigh} className="text-blue-400" />
-            Performance & Optimization
-          </h1>
-          <p className="text-gray-400">
-            Monitor and optimize your Elasticsearch cluster performance
-          </p>
+          <div className="flex items-center gap-4 mb-4">
+            <div className="p-3 rounded bg-blue-700/10 text-white">
+              <FontAwesomeIcon icon={faGaugeHigh} className="text-white text-2xl" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-semibold">Performance & Optimization</h1>
+              <p className="text-sm text-gray-400">
+                Monitor and optimize your Elasticsearch cluster performance
+              </p>
+            </div>
+          </div>
         </motion.div>
 
         {/* Tab Navigation */}
@@ -359,7 +363,7 @@ const PerformanceOptimizationPage = () => {
             onClick={() => setActiveTab("index-optimization")}
             className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all ${
               activeTab === "index-optimization"
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-500/50"
+                ? "bg-gray-700 text-white"
                 : "bg-gray-800/50 text-gray-400 hover:bg-gray-700/50"
             }`}
           >
@@ -372,7 +376,7 @@ const PerformanceOptimizationPage = () => {
             onClick={() => setActiveTab("performance")}
             className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all ${
               activeTab === "performance"
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-500/50"
+                ? "bg-gray-700 text-white"
                 : "bg-gray-800/50 text-gray-400 hover:bg-gray-700/50"
             }`}
           >
@@ -385,7 +389,7 @@ const PerformanceOptimizationPage = () => {
             onClick={() => setActiveTab("shards")}
             className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all ${
               activeTab === "shards"
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-500/50"
+                ? "bg-gray-700 text-white"
                 : "bg-gray-800/50 text-gray-400 hover:bg-gray-700/50"
             }`}
           >
@@ -587,7 +591,7 @@ const PerformanceOptimizationPage = () => {
                         }
                       }}
                       disabled={!selectedIndex || clearCacheMutation.isPending}
-                      className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg mt-2 transition-colors"
+                      className="w-full flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg mt-2 transition-colors"
                     >
                       <FontAwesomeIcon icon={faTrash} />
                       {clearCacheMutation.isPending ? 'Clearing...' : 'Clear Cache'}
@@ -872,7 +876,7 @@ const PerformanceOptimizationPage = () => {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => refetchShards()}
-                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+                  className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg"
                 >
                   <FontAwesomeIcon icon={faSync} />
                   Refresh

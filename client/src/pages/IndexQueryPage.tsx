@@ -341,14 +341,14 @@ const IndexQueryPage = () => {
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="p-3 bg-gradient-to-br from-cyan-500/20 to-purple-600/20 rounded-lg border border-cyan-400/30">
-                <FontAwesomeIcon icon={faSearch} className="text-cyan-400 text-2xl" />
+              <div className="p-3 rounded bg-blue-700/10 text-white">
+                <FontAwesomeIcon icon={faSearch} className="text-white text-2xl" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-purple-500 text-transparent bg-clip-text">
+                <h1 className="text-2xl font-semibold">
                   Query & Search
                 </h1>
-                <p className="text-gray-400 mt-1">
+                <p className="text-sm text-gray-400">
                   Browse documents and execute custom Elasticsearch queries
                 </p>
               </div>
@@ -359,8 +359,8 @@ const IndexQueryPage = () => {
                 onClick={() => setShowHistoryPanel(!showHistoryPanel)}
                 className={`px-4 py-2 rounded-lg border transition-all ${
                   showHistoryPanel
-                    ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-400"
-                    : "bg-gray-800/50 border-gray-700 text-gray-400 hover:border-cyan-500/30"
+                    ? "bg-gray-700 border-gray-600 text-gray-200"
+                    : "bg-gray-800/50 border-gray-700 text-gray-400 hover:border-gray-600"
                 }`}
               >
                 <FontAwesomeIcon icon={faHistory} className="mr-2" />
@@ -370,8 +370,8 @@ const IndexQueryPage = () => {
                 onClick={() => setShowSavedPanel(!showSavedPanel)}
                 className={`px-4 py-2 rounded-lg border transition-all ${
                   showSavedPanel
-                    ? "bg-purple-500/20 border-purple-500/50 text-purple-400"
-                    : "bg-gray-800/50 border-gray-700 text-gray-400 hover:border-purple-500/30"
+                    ? "bg-gray-700 border-gray-600 text-gray-200"
+                    : "bg-gray-800/50 border-gray-700 text-gray-400 hover:border-gray-600"
                 }`}
               >
                 <FontAwesomeIcon icon={faBookmark} className="mr-2" />
@@ -507,7 +507,7 @@ const IndexQueryPage = () => {
                 <button
                   onClick={handleSearch}
                   disabled={!selectedIndex || searchMutation.isPending}
-                  className="flex-1 px-4 py-2 bg-gradient-to-r from-cyan-600 to-purple-600 rounded-lg hover:from-cyan-500 hover:to-purple-500 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-2 bg-gray-700 rounded-lg hover:bg-gray-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   <FontAwesomeIcon icon={faSearch} />
                   {searchMutation.isPending ? "Searching..." : "Search"}
@@ -614,7 +614,7 @@ const IndexQueryPage = () => {
                 <button
                   onClick={() => setShowSaveModal(true)}
                   disabled={!selectedIndex}
-                  className="px-3 py-1 text-sm bg-purple-600 hover:bg-purple-500 rounded transition-all disabled:opacity-50 flex items-center gap-2"
+                  className="px-3 py-1 text-sm bg-gray-700 hover:bg-gray-600 rounded transition-all disabled:opacity-50 flex items-center gap-2"
                 >
                   <FontAwesomeIcon icon={faSave} />
                   Save Query
@@ -632,7 +632,7 @@ const IndexQueryPage = () => {
                 <button
                   onClick={handleExecuteDsl}
                   disabled={!selectedIndex || executeDslMutation.isPending}
-                  className="flex-1 px-4 py-2 bg-gradient-to-r from-cyan-600 to-purple-600 rounded-lg hover:from-cyan-500 hover:to-purple-500 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-2 bg-gray-700 rounded-lg hover:bg-gray-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   <FontAwesomeIcon icon={faPlay} />
                   {executeDslMutation.isPending ? "Executing..." : "Execute Query"}
@@ -682,7 +682,7 @@ const IndexQueryPage = () => {
             className="bg-gray-900 rounded-lg border border-gray-800 max-w-2xl w-full p-6 max-h-[80vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-purple-500 text-transparent bg-clip-text">
+              <h2 className="text-2xl font-semibold text-white">
                 Query History
               </h2>
               <button
@@ -736,7 +736,7 @@ const IndexQueryPage = () => {
             className="bg-gray-900 rounded-lg border border-gray-800 max-w-2xl w-full p-6 max-h-[80vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-purple-500 text-transparent bg-clip-text">
+              <h2 className="text-2xl font-semibold text-white">
                 Saved Queries
               </h2>
               <button onClick={() => setShowSavedPanel(false)} className="text-gray-400 hover:text-coolWhite">
@@ -783,7 +783,7 @@ const IndexQueryPage = () => {
             animate={{ opacity: 1, scale: 1 }}
             className="bg-gray-900 rounded-lg border border-gray-800 max-w-md w-full p-6"
           >
-            <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-cyan-400 to-purple-500 text-transparent bg-clip-text">
+            <h2 className="text-2xl font-semibold mb-4 text-white">
               Save Query
             </h2>
 
@@ -825,7 +825,7 @@ const IndexQueryPage = () => {
               <button
                 onClick={() => saveQueryMutation.mutate()}
                 disabled={!queryName.trim() || saveQueryMutation.isPending}
-                className="flex-1 px-4 py-2 bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 rounded-lg transition-all disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all disabled:opacity-50"
               >
                 {saveQueryMutation.isPending ? "Saving..." : "Save"}
               </button>

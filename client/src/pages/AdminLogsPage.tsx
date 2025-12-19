@@ -232,13 +232,17 @@ const AdminLogsPage = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 flex items-center gap-3">
-            <FontAwesomeIcon icon={faClipboardList} className="text-emerald-400" />
-            Activity Logs
-          </h1>
-          <p className="text-coolWhite/70">
-            Track and monitor all administrative actions in Index Management
-          </p>
+          <div className="flex items-center gap-4 mb-4">
+            <div className="p-3 rounded bg-blue-700/10 text-white">
+              <FontAwesomeIcon icon={faClipboardList} className="text-white text-2xl" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-semibold">Activity Logs</h1>
+              <p className="text-sm text-gray-400">
+                Track and monitor all administrative actions in Index Management
+              </p>
+            </div>
+          </div>
         </motion.div>
 
         {/* Statistics Dashboard */}
@@ -472,7 +476,7 @@ const AdminLogsPage = () => {
           <div className="mt-4 flex justify-end">
             <button
               onClick={exportLogs}
-              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-colors"
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
             >
               <FontAwesomeIcon icon={faDownload} className="mr-2" />
               Export Logs
