@@ -473,9 +473,7 @@ const PerformanceOptimizationPage = () => {
                   <FontAwesomeIcon icon={faLayerGroup} className="text-purple-400" />
                   Segment Merging Status
                 </h2>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+                <button
                   onClick={() => {
                     console.log('Force Merge button clicked, selectedIndex:', selectedIndex);
                     if (selectedIndex) {
@@ -498,11 +496,11 @@ const PerformanceOptimizationPage = () => {
                     }
                   }}
                   disabled={!selectedIndex || forceMergeMutation.isPending}
-                  className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white px-4 py-2 rounded-lg"
+                  className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors"
                 >
                   <FontAwesomeIcon icon={faCompressAlt} />
-                  Force Merge
-                </motion.button>
+                  {forceMergeMutation.isPending ? 'Merging...' : 'Force Merge'}
+                </button>
               </div>
 
               <div className="overflow-x-auto">
@@ -570,9 +568,7 @@ const PerformanceOptimizationPage = () => {
                     <h3 className="text-lg font-semibold text-white mb-2 capitalize">
                       {cacheType} Cache
                     </h3>
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
+                    <button
                       onClick={() => {
                         console.log('Clear Cache button clicked for:', cacheType, 'selectedIndex:', selectedIndex);
                         if (selectedIndex) {
@@ -591,11 +587,11 @@ const PerformanceOptimizationPage = () => {
                         }
                       }}
                       disabled={!selectedIndex || clearCacheMutation.isPending}
-                      className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white px-4 py-2 rounded-lg mt-2"
+                      className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg mt-2 transition-colors"
                     >
                       <FontAwesomeIcon icon={faTrash} />
-                      Clear Cache
-                    </motion.button>
+                      {clearCacheMutation.isPending ? 'Clearing...' : 'Clear Cache'}
+                    </button>
                   </div>
                 ))}
               </div>
