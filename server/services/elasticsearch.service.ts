@@ -235,6 +235,103 @@ class ElasticsearchService {
       return false;
     }
   }
+
+  /**
+   * Search documents in an index with pagination and filters
+   */
+  async searchDocuments(
+    indexName: string,
+    query: any = { match_all: {} },
+    from: number = 0,
+    size: number = 10,
+    sort?: any
+  ): Promise<any> {
+    try {
+      const searchBody: any = {
+        query,
+        from,
+        size,
+      };
+
+      if (sort) {
+        searchBody.sort = sort;
+      }
+
+      const response = await axios.post(`${this.baseUrl}/${indexName}/_search`, searchBody);
+      
+      return {
+        hits: response.data.hits.hits,
+        total: response.data.hits.total.value,
+        took: response.data.took,
+        maxScore: response.data.hits.max_score,
+      };
+    } catch (error: any) {
+      console.error(`Error searching documents in index ${indexName}:`, error.message);
+      throw new Error(`Failed to search documents: ${error.message}`);
+    }
+  }
+
+  /**
+   * Execute custom DSL query
+   */
+  async executeQuery(indexName: string, dslQuery: any): Promise<any> {
+    try {
+      const startTime = Date.now();
+      const response = await axios.post(`${this.baseUrl}/${indexName}/_search`, dslQuery);
+      const executionTime = Date.now() - startTime;
+
+      return {
+        hits: response.data.hits.hits,
+        total: response.data.hits.total.value,
+        took: response.data.took,
+        maxScore: response.data.hits.max_score,
+        aggregations: response.data.aggregations,
+        executionTime,
+      };
+    } catch (error: any) {
+      console.error(`Error executing DSL query on index ${indexName}:`, error.message);
+      throw new Error(`Failed to execute query: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get all field names from an index mapping
+   */
+  async getIndexFields(indexName: string): Promise<string[]> {
+    try {
+      const mapping = await this.getIndexMapping(indexName);
+      const fields: string[] = [];
+
+      const extractFields = (obj: any, prefix = '') => {
+        if (obj.properties) {
+          Object.keys(obj.properties).forEach((key) => {
+            const fullPath = prefix ? `${prefix}.${key}` : key;
+            fields.push(fullPath);
+            extractFields(obj.properties[key], fullPath);
+          });
+        }
+      };
+
+      extractFields(mapping);
+      return fields;
+    } catch (error: any) {
+      console.error(`Error fetching fields for index ${indexName}:`, error.message);
+      throw new Error(`Failed to fetch index fields: ${error.message}`);
+    }
+  }
+
+  /**
+   * Count documents matching a query
+   */
+  async countDocuments(indexName: string, query: any = { match_all: {} }): Promise<number> {
+    try {
+      const response = await axios.post(`${this.baseUrl}/${indexName}/_count`, { query });
+      return response.data.count;
+    } catch (error: any) {
+      console.error(`Error counting documents in index ${indexName}:`, error.message);
+      throw new Error(`Failed to count documents: ${error.message}`);
+    }
+  }
 }
 
 export const elasticsearchService = new ElasticsearchService();

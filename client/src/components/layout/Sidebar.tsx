@@ -119,6 +119,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
       hasSubmenu: true,
       features: [
         { path: "/index/management", label: "Manage Indices", icon: <Database size={16} />, color: "text-white" },
+        { path: "/index/query", label: "Query & Search", icon: <Search size={16} />, color: "text-white" },
       ]
     }] : [])
   ];
