@@ -421,11 +421,30 @@ const IndexManagementPage = () => {
           // Continue polling
           setTimeout(() => checkReindexProgress(taskId), 1000);
         } else {
-          const documentsCount = statusData.progress || statusData.total || 0;
+          const documentsCreated = statusData.progress || 0;
+          const totalDocs = statusData.total || 0;
+          const failures = statusData.failures?.length || 0;
+          const versionConflicts = statusData.version_conflicts || 0;
+
+          // Build completion message
+          let message = `Reindexing completed! ${documentsCreated} of ${totalDocs} documents processed.`;
+          
+          if (failures > 0) {
+            message = `⚠️ Reindexing completed with issues! ${documentsCreated} documents succeeded, ${failures} failed due to mapping conflicts.`;
+          } else if (documentsCreated === 0 && totalDocs > 0) {
+            message = `❌ Reindexing failed! 0 documents transferred due to mapping conflicts. Check destination index mappings.`;
+          }
+
+          if (versionConflicts > 0) {
+            message += ` (${versionConflicts} version conflicts)`;
+          }
+
           toast({
-            title: "Success",
-            description: `Reindexing completed! ${documentsCount} documents processed.`,
+            title: failures > 0 || (documentsCreated === 0 && totalDocs > 0) ? "Warning" : "Success",
+            description: message,
+            variant: failures > 0 || (documentsCreated === 0 && totalDocs > 0) ? "destructive" : "default",
           });
+          
           queryClient.invalidateQueries({ queryKey: ["/api/v1/admin/elasticsearch/indices"] });
           setShowReindexModal(false);
           setReindexSource("");
@@ -439,8 +458,9 @@ const IndexManagementPage = () => {
       // If task not found (404), it means it completed very quickly
       if (error.response?.status === 404) {
         toast({
-          title: "Success",
-          description: "Reindexing completed!",
+          title: "Warning",
+          description: "Reindex task completed but status unavailable. Check destination index manually.",
+          variant: "destructive",
         });
         queryClient.invalidateQueries({ queryKey: ["/api/v1/admin/elasticsearch/indices"] });
         setShowReindexModal(false);

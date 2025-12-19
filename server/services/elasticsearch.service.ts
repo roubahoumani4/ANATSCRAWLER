@@ -480,18 +480,15 @@ class ElasticsearchService {
   /**
    * Reindex from one index to another
    */
-  async reindex(sourceIndex: string, destIndex: string, waitForCompletion: boolean = false): Promise<any> {
+  async reindex(sourceIndex: string, destIndex: string, waitForCompletion: boolean = false, conflicts: string = 'abort'): Promise<any> {
     try {
-      const response = await axios.post(`${this.baseUrl}/_reindex`, {
+      const response = await axios.post(`${this.baseUrl}/_reindex?wait_for_completion=${waitForCompletion}`, {
+        conflicts: conflicts, // 'abort' or 'proceed'
         source: {
           index: sourceIndex,
         },
         dest: {
           index: destIndex,
-        },
-      }, {
-        params: {
-          wait_for_completion: waitForCompletion,
         },
       });
 
@@ -506,7 +503,7 @@ class ElasticsearchService {
       }
 
       // If wait_for_completion is true, we get the full result
-      return {
+      const result = {
         total: response.data.total || 0,
         created: response.data.created || 0,
         updated: response.data.updated || 0,
@@ -516,7 +513,15 @@ class ElasticsearchService {
         noops: response.data.noops || 0,
         took: response.data.took || 0,
         failures: response.data.failures || [],
+        timed_out: response.data.timed_out || false,
       };
+
+      // Log failures if any
+      if (result.failures.length > 0) {
+        console.error(`Reindex had ${result.failures.length} failures:`, result.failures.slice(0, 3));
+      }
+
+      return result;
     } catch (error: any) {
       console.error(`Error reindexing from ${sourceIndex} to ${destIndex}:`, error.response?.data || error.message);
       const errorMsg = error.response?.data?.error?.reason || error.message;
@@ -542,6 +547,7 @@ class ElasticsearchService {
           progress: 0,
           total: 0,
           percentage: 100,
+          failures: [],
           error: 'Task not found or already completed',
         };
       }
@@ -557,6 +563,8 @@ class ElasticsearchService {
         progress: created,
         total: total,
         percentage: percentage,
+        failures: status.failures || [],
+        version_conflicts: status.version_conflicts || 0,
       };
     } catch (error: any) {
       console.error(`Error fetching task status ${taskId}:`, error.response?.data || error.message);
@@ -569,6 +577,7 @@ class ElasticsearchService {
           progress: 0,
           total: 0,
           percentage: 100,
+          failures: [],
           error: 'Task completed or not found',
         };
       }
