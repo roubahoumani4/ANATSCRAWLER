@@ -70,6 +70,7 @@ const IndexManagementPage = () => {
   const [showReindexModal, setShowReindexModal] = useState(false);
   const [showAliasModal, setShowAliasModal] = useState(false);
   const [showAliasListModal, setShowAliasListModal] = useState(false);
+  const [showAliasSwapModal, setShowAliasSwapModal] = useState(false);
   
   // Clone modal state
   const [cloneSourceIndex, setCloneSourceIndex] = useState("");
@@ -86,6 +87,11 @@ const IndexManagementPage = () => {
   const [aliasIndexName, setAliasIndexName] = useState("");
   const [aliasName, setAliasName] = useState("");
   const [aliasAction, setAliasAction] = useState<"create" | "delete">("create");
+  
+  // Alias swap modal state
+  const [swapOldIndex, setSwapOldIndex] = useState("");
+  const [swapNewIndex, setSwapNewIndex] = useState("");
+  const [swapAliasName, setSwapAliasName] = useState("");
 
   // Fetch all indices
   const {
@@ -372,6 +378,37 @@ const IndexManagementPage = () => {
     },
   });
 
+  // Alias swap mutation
+  const aliasSwapMutation = useMutation({
+    mutationFn: async () => {
+      const res = await axios.post(
+        `${API_BASE_URL}/api/v1/admin/elasticsearch/aliases/swap`,
+        { oldIndex: swapOldIndex, newIndex: swapNewIndex, aliasName: swapAliasName },
+        { withCredentials: true }
+      );
+      return res.data;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Success",
+        description: data.message,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/v1/admin/elasticsearch/indices"] });
+      setShowAliasSwapModal(false);
+      setSwapOldIndex("");
+      setSwapNewIndex("");
+      setSwapAliasName("");
+      refetchAliases();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.response?.data?.error || "Failed to swap alias",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleCreateIndex = () => {
     if (!newIndexName.trim()) {
       toast({
@@ -640,6 +677,14 @@ const IndexManagementPage = () => {
             >
               <FontAwesomeIcon icon={faLink} />
               Manage Aliases
+            </button>
+
+            <button
+              onClick={() => setShowAliasSwapModal(true)}
+              className="px-3 py-2 bg-orange-500/20 border border-orange-500/50 text-orange-400 rounded-lg hover:bg-orange-500/30 transition-all flex items-center gap-2 text-sm"
+            >
+              <FontAwesomeIcon icon={faExchangeAlt} />
+              Swap Alias
             </button>
 
             <button
@@ -1283,6 +1328,89 @@ const IndexManagementPage = () => {
             >
               Close
             </button>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Swap Alias Modal */}
+      {showAliasSwapModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-gray-900 rounded-lg border border-orange-500/50 max-w-md w-full p-6"
+          >
+            <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-orange-400 to-red-500 text-transparent bg-clip-text">
+              Swap Alias (Zero-Downtime)
+            </h2>
+            
+            <div className="mb-4 p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg">
+              <p className="text-xs text-orange-400">
+                ⚡ This performs an atomic swap - instantly moves the alias from old index to new index with zero downtime!
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Alias Name</label>
+                <input
+                  type="text"
+                  value={swapAliasName}
+                  onChange={(e) => setSwapAliasName(e.target.value.toLowerCase())}
+                  placeholder="my-alias"
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-coolWhite placeholder-gray-500 focus:outline-none focus:border-orange-500/50"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Current Index (Remove alias from)</label>
+                <select
+                  value={swapOldIndex}
+                  onChange={(e) => setSwapOldIndex(e.target.value)}
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-coolWhite focus:outline-none focus:border-orange-500/50"
+                >
+                  <option value="">-- Select old index --</option>
+                  {indicesData?.indices?.map((index) => (
+                    <option key={index.uuid} value={index.name}>{index.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">New Index (Add alias to)</label>
+                <select
+                  value={swapNewIndex}
+                  onChange={(e) => setSwapNewIndex(e.target.value)}
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-coolWhite focus:outline-none focus:border-orange-500/50"
+                >
+                  <option value="">-- Select new index --</option>
+                  {indicesData?.indices?.map((index) => (
+                    <option key={index.uuid} value={index.name}>{index.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowAliasSwapModal(false);
+                  setSwapOldIndex("");
+                  setSwapNewIndex("");
+                  setSwapAliasName("");
+                }}
+                className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => aliasSwapMutation.mutate()}
+                disabled={!swapOldIndex || !swapNewIndex || !swapAliasName || aliasSwapMutation.isPending}
+                className="flex-1 px-4 py-2 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 rounded-lg transition-all disabled:opacity-50 font-semibold"
+              >
+                {aliasSwapMutation.isPending ? "Swapping..." : "⚡ Atomic Swap"}
+              </button>
+            </div>
           </motion.div>
         </div>
       )}
