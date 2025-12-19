@@ -31,16 +31,20 @@ router.get('/optimization', requireAdmin, async (req: Request, res: Response) =>
     
     for (const [indexName, indexStats] of Object.entries(statsResponse.data.indices || {})) {
       const total = (indexStats as any).total || {};
+      const primaries = (indexStats as any).primaries || {};
       
       stats.push({
         indexName,
         segmentCount: total.segments?.count || 0,
         segmentMemory: total.segments?.memory_in_bytes || 0,
         cacheSize: total.query_cache?.memory_size_in_bytes || 0,
+        // Use store size as a proxy for memory when segment memory is 0
         memoryUsage: (total.segments?.memory_in_bytes || 0) + 
                      (total.query_cache?.memory_size_in_bytes || 0) +
-                     (total.fielddata?.memory_size_in_bytes || 0),
-        shardCount: total.segments?.max_unsafe_auto_id_timestamp || 0,
+                     (total.fielddata?.memory_size_in_bytes || 0) +
+                     (total.store?.size_in_bytes || 0), // Add store size
+        storeSize: total.store?.size_in_bytes || 0,
+        shardCount: primaries.docs?.count ? Math.ceil(primaries.docs.count / 1000000) || 1 : 1,
         queryCacheHits: total.query_cache?.hit_count || 0,
         queryCacheMisses: total.query_cache?.miss_count || 0,
         fieldDataMemory: total.fielddata?.memory_size_in_bytes || 0,

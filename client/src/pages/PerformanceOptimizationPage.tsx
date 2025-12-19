@@ -432,18 +432,20 @@ const PerformanceOptimizationPage = () => {
                       <p className="text-xl font-bold text-white">{stat.segmentCount}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-400">Segment Memory</p>
-                      <p className="text-lg text-blue-400">{formatBytes(stat.segmentMemory)}</p>
+                      <p className="text-xs text-gray-400">Store Size</p>
+                      <p className="text-lg text-blue-400">{formatBytes((stat as any).storeSize || 0)}</p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-400">Cache Hit Rate</p>
                       <p className="text-lg text-green-400">
-                        {getCacheHitRate(stat.queryCacheHits, stat.queryCacheMisses)}%
+                        {stat.queryCacheHits + stat.queryCacheMisses > 0 
+                          ? getCacheHitRate(stat.queryCacheHits, stat.queryCacheMisses)
+                          : '0.00'}%
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-400">Memory Usage</p>
-                      <p className="text-lg text-yellow-400">{formatBytes(stat.memoryUsage)}</p>
+                      <p className="text-xs text-gray-400">Index Size</p>
+                      <p className="text-lg text-yellow-400">{formatBytes((stat as any).storeSize || stat.memoryUsage)}</p>
                     </div>
                   </div>
                 </motion.div>
@@ -582,27 +584,34 @@ const PerformanceOptimizationPage = () => {
               </div>
 
               {/* Cache Performance Chart */}
-              {optimizationData?.stats && optimizationData.stats.length > 0 && (
+              {optimizationData?.stats && optimizationData.stats.length > 0 ? (
                 <div className="bg-gray-900/50 rounded-lg p-4">
                   <h3 className="text-lg font-semibold text-white mb-4">Cache Hit Rates</h3>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={optimizationData.stats.slice(0, 10)}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                      <XAxis dataKey="indexName" stroke="#9ca3af" />
-                      <YAxis stroke="#9ca3af" />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "#1f2937",
-                          border: "1px solid #374151",
-                        }}
-                      />
-                      <Legend />
-                      <Bar dataKey="queryCacheHits" fill="#10b981" name="Cache Hits" />
-                      <Bar dataKey="queryCacheMisses" fill="#ef4444" name="Cache Misses" />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  {optimizationData.stats.some((stat: any) => stat.queryCacheHits > 0 || stat.queryCacheMisses > 0) ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={optimizationData.stats.slice(0, 10)}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                        <XAxis dataKey="indexName" stroke="#9ca3af" />
+                        <YAxis stroke="#9ca3af" />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: "#1f2937",
+                            border: "1px solid #374151",
+                          }}
+                        />
+                        <Legend />
+                        <Bar dataKey="queryCacheHits" fill="#10b981" name="Cache Hits" />
+                        <Bar dataKey="queryCacheMisses" fill="#ef4444" name="Cache Misses" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="text-center py-8 text-gray-400">
+                      <p>No cache activity yet</p>
+                      <p className="text-sm text-gray-500 mt-2">Cache statistics will appear after queries are executed</p>
+                    </div>
+                  )}
                 </div>
-              )}
+              ) : null}
             </motion.div>
 
             {/* Memory Usage */}
@@ -613,17 +622,21 @@ const PerformanceOptimizationPage = () => {
             >
               <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
                 <FontAwesomeIcon icon={faMemory} className="text-yellow-400" />
-                Memory Usage Per Index
+                Storage Size Per Index
               </h2>
 
-              {optimizationData?.stats && optimizationData.stats.length > 0 && (
+              {optimizationData?.stats && 
+               optimizationData.stats.filter((stat: any) => (stat.storeSize || stat.memoryUsage) > 0).length > 0 ? (
                 <ResponsiveContainer width="100%" height={400}>
                   <PieChart>
                     <Pie
-                      data={optimizationData.stats.slice(0, 5).map((stat) => ({
-                        name: stat.indexName,
-                        value: stat.memoryUsage,
-                      }))}
+                      data={optimizationData.stats
+                        .filter((stat: any) => (stat.storeSize || stat.memoryUsage) > 0)
+                        .slice(0, 5)
+                        .map((stat: any) => ({
+                          name: stat.indexName,
+                          value: stat.storeSize || stat.memoryUsage,
+                        }))}
                       cx="50%"
                       cy="50%"
                       labelLine={false}
@@ -632,9 +645,12 @@ const PerformanceOptimizationPage = () => {
                       fill="#8884d8"
                       dataKey="value"
                     >
-                      {optimizationData.stats.slice(0, 5).map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
+                      {optimizationData.stats
+                        .filter((stat: any) => (stat.storeSize || stat.memoryUsage) > 0)
+                        .slice(0, 5)
+                        .map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
                     </Pie>
                     <Tooltip
                       formatter={(value: any) => formatBytes(value)}
@@ -645,6 +661,11 @@ const PerformanceOptimizationPage = () => {
                     />
                   </PieChart>
                 </ResponsiveContainer>
+              ) : (
+                <div className="text-center py-12">
+                  <p className="text-gray-400">No index data available with storage size</p>
+                  <p className="text-sm text-gray-500 mt-2">Indices may be empty or data hasn't been indexed yet</p>
+                </div>
               )}
             </motion.div>
           </div>
