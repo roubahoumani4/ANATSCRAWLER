@@ -8,6 +8,7 @@ import activityLogsRoutes from './admin/activity-logs.routes';
 import sessionsRoutes from './admin/sessions.routes';
 import elasticsearchRoutes from './admin/elasticsearch.routes';
 import elasticsearchQueryRoutes from './admin/elasticsearch-query.routes';
+import elasticsearchPerformanceRoutes from './admin/elasticsearch-performance.routes';
 import authRoutes from './auth/auth.routes';
 import userRoutes from './auth/user.routes';
 import twoFactorRoutes from './auth/2fa.routes';
@@ -60,6 +61,9 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   // Elasticsearch query and search routes - admin only
   app.use(`${apiV1}/admin/elasticsearch/query`, authenticate, elasticsearchQueryRoutes);
+
+  // Elasticsearch performance and optimization routes - admin only
+  app.use(`${apiV1}/admin/elasticsearch/performance`, authenticate, elasticsearchPerformanceRoutes);
 
   // Search routes - authenticated users only
   app.use(`${apiV1}/search`, authenticate, searchRoutes);

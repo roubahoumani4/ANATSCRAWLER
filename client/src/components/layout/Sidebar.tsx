@@ -120,6 +120,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
       features: [
         { path: "/index/management", label: "Manage Indices", icon: <Database size={16} />, color: "text-white" },
         { path: "/index/query", label: "Query & Search", icon: <Search size={16} />, color: "text-white" },
+        { path: "/index/performance", label: "Performance & Optimization", icon: <Activity size={16} />, color: "text-white" },
       ]
     }] : [])
   ];

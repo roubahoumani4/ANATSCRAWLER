@@ -27,6 +27,7 @@ import SessionManagementPage from '@/pages/SessionManagementPage';
 import IndexManagementPage from '@/pages/IndexManagementPage';
 import IndexDetailsPage from '@/pages/IndexDetailsPage';
 import IndexQueryPage from '@/pages/IndexQueryPage';
+import PerformanceOptimizationPage from '@/pages/PerformanceOptimizationPage';
 
 // Layout Component
 import Layout from '@/components/layout/Layout';
@@ -109,6 +110,7 @@ export default function AppContent() {
           <Route path="/index/management" element={<AdminRoute><IndexManagementPage /></AdminRoute>} />
           <Route path="/index/details/:indexName" element={<AdminRoute><IndexDetailsPage /></AdminRoute>} />
           <Route path="/index/query" element={<AdminRoute><IndexQueryPage /></AdminRoute>} />
+          <Route path="/index/performance" element={<AdminRoute><PerformanceOptimizationPage /></AdminRoute>} />
           
           {/* Fallback Route */}
           <Route path="*" element={<ProtectedRoute><NotFoundPage /></ProtectedRoute>} />
