@@ -32,6 +32,7 @@ import {
   FileText,
   History as HistoryIcon,
   Database,
+  ClipboardList,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -122,6 +123,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
         { path: "/index/query", label: "Query & Search", icon: <Search size={16} />, color: "text-white" },
         { path: "/index/performance", label: "Performance & Optimization", icon: <Activity size={16} />, color: "text-white" },
         { path: "/index/data-management", label: "Data Management", icon: <Database size={16} />, color: "text-white" },
+        { path: "/index/admin-logs", label: "Admin Activity Logs", icon: <ClipboardList size={16} />, color: "text-white" },
       ]
     }] : [])
   ];
