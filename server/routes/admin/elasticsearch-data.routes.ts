@@ -446,25 +446,15 @@ router.post('/purge/execute', requireAdmin, async (req: Request, res: Response) 
 
 /**
  * GET /api/v1/admin/elasticsearch/data/purge/jobs
- * Get all scheduled purge jobs (mock implementation)
- * Note: This is a placeholder. In production, you would store these in a database
- * and use a job scheduler like node-cron
+ * Get all scheduled purge jobs
+ * Note: Scheduled purge jobs require a database and job scheduler implementation.
+ * This endpoint returns an empty array until that infrastructure is set up.
  */
 router.get('/purge/jobs', requireAdmin, async (req: Request, res: Response) => {
   try {
-    // Mock data - in production, fetch from database
-    const jobs = [
-      {
-        id: 'purge-1',
-        indexPattern: 'logs-*',
-        dateField: '@timestamp',
-        retentionDays: 30,
-        schedule: '0 0 * * *', // Daily at midnight
-        enabled: true,
-        lastRun: new Date(Date.now() - 86400000).toISOString(),
-        nextRun: new Date(Date.now() + 86400000).toISOString(),
-      },
-    ];
+    // TODO: Implement database storage for scheduled purge jobs
+    // For now, return empty array - no mock data
+    const jobs: any[] = [];
 
     res.json({ success: true, jobs });
   } catch (error: any) {

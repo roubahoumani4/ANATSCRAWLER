@@ -275,15 +275,28 @@ const DataManagementPage = () => {
     onSuccess: () => {
       toast({
         title: "Success",
-        description: "Snapshot restoration initiated",
+        description: "Snapshot restoration initiated successfully. Check cluster status for progress.",
       });
     },
     onError: (error: any) => {
+      const errorDetails = error.response?.data?.details;
+      let errorMessage = error.response?.data?.error || "Failed to restore snapshot";
+      
+      // Add more specific error information if available
+      if (errorDetails?.error?.reason) {
+        errorMessage += `: ${errorDetails.error.reason}`;
+      } else if (typeof errorDetails === 'string') {
+        errorMessage += `: ${errorDetails}`;
+      }
+      
       toast({
-        title: "Error",
-        description: error.response?.data?.error || "Failed to restore snapshot",
+        title: "Restore Failed",
+        description: errorMessage,
         variant: "destructive",
       });
+      
+      // Log full error for debugging
+      console.error("Snapshot restore error:", error.response?.data);
     },
   });
 
@@ -790,11 +803,11 @@ const DataManagementPage = () => {
                       <select
                         value={selectedRepository}
                         onChange={(e) => setSelectedRepository(e.target.value)}
-                        className="w-full bg-jetBlack/50 border border-emerald-500/20 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500"
+                        className="w-full bg-jetBlack border border-emerald-500/20 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500 [&>option]:bg-jetBlack [&>option]:text-white"
                       >
-                        <option value="">Select a repository</option>
+                        <option value="" className="bg-jetBlack text-coolWhite/70">Select a repository</option>
                         {repositories?.map((repo) => (
-                          <option key={repo.name} value={repo.name}>
+                          <option key={repo.name} value={repo.name} className="bg-jetBlack text-white">
                             {repo.name}
                           </option>
                         ))}
