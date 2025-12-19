@@ -215,14 +215,18 @@ const PerformanceOptimizationPage = () => {
   // Force merge mutation
   const forceMergeMutation = useMutation({
     mutationFn: async ({ index, maxSegments }: { index: string; maxSegments: number }) => {
+      console.log('Force merge mutation called with:', { index, maxSegments });
+      console.log('API URL:', `${API_BASE_URL}/api/v1/admin/elasticsearch/performance/force-merge`);
       const res = await axios.post(
         `${API_BASE_URL}/api/v1/admin/elasticsearch/performance/force-merge`,
         { index, maxSegments },
         { withCredentials: true }
       );
+      console.log('Force merge response:', res.data);
       return res.data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Force merge success:', data);
       toast({
         title: "Force Merge Initiated",
         description: "The force merge operation has been started successfully.",
@@ -230,6 +234,7 @@ const PerformanceOptimizationPage = () => {
       refetchOptimization();
     },
     onError: (error: any) => {
+      console.error('Force merge error:', error);
       toast({
         title: "Force Merge Failed",
         description: error.response?.data?.error || "Failed to initiate force merge",
@@ -241,14 +246,18 @@ const PerformanceOptimizationPage = () => {
   // Clear cache mutation
   const clearCacheMutation = useMutation({
     mutationFn: async ({ index, cacheType }: { index: string; cacheType: string }) => {
+      console.log('Clear cache mutation called with:', { index, cacheType });
+      console.log('API URL:', `${API_BASE_URL}/api/v1/admin/elasticsearch/performance/clear-cache`);
       const res = await axios.post(
         `${API_BASE_URL}/api/v1/admin/elasticsearch/performance/clear-cache`,
         { index, cacheType },
         { withCredentials: true }
       );
+      console.log('Clear cache response:', res.data);
       return res.data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Clear cache success:', data);
       toast({
         title: "Cache Cleared",
         description: "The cache has been cleared successfully.",
@@ -256,6 +265,7 @@ const PerformanceOptimizationPage = () => {
       refetchOptimization();
     },
     onError: (error: any) => {
+      console.error('Clear cache error:', error);
       toast({
         title: "Clear Cache Failed",
         description: error.response?.data?.error || "Failed to clear cache",
@@ -467,15 +477,19 @@ const PerformanceOptimizationPage = () => {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => {
+                    console.log('Force Merge button clicked, selectedIndex:', selectedIndex);
                     if (selectedIndex) {
                       const maxSegments = prompt("Enter max segments (default: 1):", "1");
+                      console.log('User entered maxSegments:', maxSegments);
                       if (maxSegments) {
+                        console.log('Calling forceMergeMutation.mutate');
                         forceMergeMutation.mutate({
                           index: selectedIndex,
                           maxSegments: parseInt(maxSegments),
                         });
                       }
                     } else {
+                      console.log('No index selected, showing toast');
                       toast({
                         title: "No Index Selected",
                         description: "Please select an index first",
@@ -560,12 +574,15 @@ const PerformanceOptimizationPage = () => {
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => {
+                        console.log('Clear Cache button clicked for:', cacheType, 'selectedIndex:', selectedIndex);
                         if (selectedIndex) {
+                          console.log('Calling clearCacheMutation.mutate');
                           clearCacheMutation.mutate({
                             index: selectedIndex,
                             cacheType,
                           });
                         } else {
+                          console.log('No index selected, showing toast');
                           toast({
                             title: "No Index Selected",
                             description: "Please select an index first",
