@@ -392,8 +392,10 @@ class ElasticsearchService {
       });
       return true;
     } catch (error: any) {
-      console.error(`Error creating alias ${aliasName}:`, error.message);
-      throw new Error(`Failed to create alias: ${error.message}`);
+      console.error(`Error creating alias ${aliasName}:`, error.response?.data || error.message);
+      // Extract the actual error message from Elasticsearch
+      const errorMsg = error.response?.data?.error?.reason || error.message;
+      throw new Error(errorMsg);
     }
   }
 
@@ -414,8 +416,9 @@ class ElasticsearchService {
       });
       return true;
     } catch (error: any) {
-      console.error(`Error deleting alias ${aliasName}:`, error.message);
-      throw new Error(`Failed to delete alias: ${error.message}`);
+      console.error(`Error deleting alias ${aliasName}:`, error.response?.data || error.message);
+      const errorMsg = error.response?.data?.error?.reason || error.message;
+      throw new Error(errorMsg);
     }
   }
 
@@ -492,15 +495,32 @@ class ElasticsearchService {
         },
       });
 
+      console.log('Reindex response:', JSON.stringify(response.data, null, 2));
+
+      // If wait_for_completion is false, we get a task ID
+      if (!waitForCompletion && response.data.task) {
+        return {
+          task: response.data.task,
+          started: true,
+        };
+      }
+
+      // If wait_for_completion is true, we get the full result
       return {
-        task: response.data.task,
-        total: response.data.total,
-        created: response.data.created,
-        updated: response.data.updated,
+        total: response.data.total || 0,
+        created: response.data.created || 0,
+        updated: response.data.updated || 0,
+        deleted: response.data.deleted || 0,
+        batches: response.data.batches || 0,
+        version_conflicts: response.data.version_conflicts || 0,
+        noops: response.data.noops || 0,
+        took: response.data.took || 0,
+        failures: response.data.failures || [],
       };
     } catch (error: any) {
-      console.error(`Error reindexing from ${sourceIndex} to ${destIndex}:`, error.message);
-      throw new Error(`Failed to reindex: ${error.message}`);
+      console.error(`Error reindexing from ${sourceIndex} to ${destIndex}:`, error.response?.data || error.message);
+      const errorMsg = error.response?.data?.error?.reason || error.message;
+      throw new Error(errorMsg);
     }
   }
 
@@ -512,18 +532,49 @@ class ElasticsearchService {
       const response = await axios.get(`${this.baseUrl}/_tasks/${taskId}`);
       const task = response.data;
       
+      console.log('Task status response:', JSON.stringify(task, null, 2));
+
+      // Check if task exists
+      if (!task || !task.task) {
+        return {
+          completed: true,
+          status: { created: 0, total: 0 },
+          progress: 0,
+          total: 0,
+          percentage: 100,
+          error: 'Task not found or already completed',
+        };
+      }
+
+      const status = task.task.status || {};
+      const created = status.created || 0;
+      const total = status.total || 0;
+      const percentage = total > 0 ? Math.round((created / total) * 100) : 100;
+
       return {
-        completed: task.completed,
-        status: task.task?.status,
-        progress: task.task?.status?.created || 0,
-        total: task.task?.status?.total || 0,
-        percentage: task.task?.status?.total 
-          ? Math.round((task.task.status.created / task.task.status.total) * 100)
-          : 0,
+        completed: task.completed || false,
+        status: status,
+        progress: created,
+        total: total,
+        percentage: percentage,
       };
     } catch (error: any) {
-      console.error(`Error fetching task status ${taskId}:`, error.message);
-      throw new Error(`Failed to fetch task status: ${error.message}`);
+      console.error(`Error fetching task status ${taskId}:`, error.response?.data || error.message);
+      
+      // If task is not found, it might have completed
+      if (error.response?.status === 404) {
+        return {
+          completed: true,
+          status: { created: 0, total: 0 },
+          progress: 0,
+          total: 0,
+          percentage: 100,
+          error: 'Task completed or not found',
+        };
+      }
+      
+      const errorMsg = error.response?.data?.error?.reason || error.message;
+      throw new Error(errorMsg);
     }
   }
 

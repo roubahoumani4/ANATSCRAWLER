@@ -414,15 +414,17 @@ const IndexManagementPage = () => {
       );
       
       if (res.data.success) {
-        setReindexProgress(res.data.status.percentage);
+        const statusData = res.data.status;
+        setReindexProgress(statusData.percentage);
         
-        if (!res.data.status.completed) {
+        if (!statusData.completed) {
           // Continue polling
           setTimeout(() => checkReindexProgress(taskId), 1000);
         } else {
+          const documentsCount = statusData.progress || statusData.total || 0;
           toast({
             title: "Success",
-            description: "Reindexing completed successfully!",
+            description: `Reindexing completed! ${documentsCount} documents processed.`,
           });
           queryClient.invalidateQueries({ queryKey: ["/api/v1/admin/elasticsearch/indices"] });
           setShowReindexModal(false);
@@ -432,8 +434,21 @@ const IndexManagementPage = () => {
           setReindexProgress(0);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error checking reindex progress:", error);
+      // If task not found (404), it means it completed very quickly
+      if (error.response?.status === 404) {
+        toast({
+          title: "Success",
+          description: "Reindexing completed!",
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/v1/admin/elasticsearch/indices"] });
+        setShowReindexModal(false);
+        setReindexSource("");
+        setReindexDest("");
+        setReindexTaskId("");
+        setReindexProgress(0);
+      }
     }
   };
 
