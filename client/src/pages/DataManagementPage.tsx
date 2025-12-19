@@ -392,6 +392,43 @@ const DataManagementPage = () => {
     }
   };
 
+  const getPolicyDescription = (policy: ILMPolicy): string => {
+    const phases = Object.keys(policy.phases);
+    const phaseCount = phases.length;
+    
+    // Check for specific policy patterns
+    if (policy.name.includes('history')) {
+      return 'Manages ILM history indices - tracks lifecycle policy execution';
+    }
+    if (policy.name.includes('fleet')) {
+      return 'Manages Elastic Fleet/Agent metadata and logs';
+    }
+    
+    // Generate description based on phases
+    const descriptions: string[] = [];
+    
+    if (policy.phases.hot?.actions?.rollover) {
+      descriptions.push('Auto-rollover enabled');
+    }
+    if (policy.phases.warm) {
+      descriptions.push('Moves to warm tier');
+    }
+    if (policy.phases.cold) {
+      descriptions.push('Archives to cold storage');
+    }
+    if (policy.phases.frozen) {
+      descriptions.push('Freezes for long-term storage');
+    }
+    if (policy.phases.delete) {
+      const deleteAge = policy.phases.delete.min_age || '90d';
+      descriptions.push(`Deletes after ${deleteAge}`);
+    }
+    
+    return descriptions.length > 0 
+      ? descriptions.join(' → ') 
+      : `${phaseCount} phase${phaseCount !== 1 ? 's' : ''} configured`;
+  };
+
   return (
     <div className="relative min-h-screen bg-jetBlack text-coolWhite overflow-hidden">
       <MatrixBackground />
@@ -483,12 +520,15 @@ const DataManagementPage = () => {
                     className="bg-deepNavy/50 border border-emerald-500/20 rounded-lg p-6"
                   >
                     <div className="flex justify-between items-start mb-4">
-                      <div>
+                      <div className="flex-1">
                         <h3 className="text-xl font-bold text-white mb-1">
                           {policy.name}
                         </h3>
+                        <p className="text-sm text-emerald-400/80 mb-2">
+                          {getPolicyDescription(policy)}
+                        </p>
                         {policy.modified_date && (
-                          <p className="text-sm text-coolWhite/60">
+                          <p className="text-xs text-coolWhite/60">
                             Modified: {formatDate(policy.modified_date)}
                           </p>
                         )}
@@ -821,7 +861,7 @@ const DataManagementPage = () => {
                         type="text"
                         value={snapshotName}
                         onChange={(e) => setSnapshotName(e.target.value)}
-                        className="w-full bg-jetBlack/50 border border-emerald-500/20 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500"
+                        className="w-full bg-jetBlack border border-emerald-500/20 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500 placeholder:text-coolWhite/40"
                         placeholder="snapshot-2025-01-01"
                       />
                     </div>
@@ -840,7 +880,7 @@ const DataManagementPage = () => {
                               .filter(Boolean)
                           )
                         }
-                        className="w-full bg-jetBlack/50 border border-emerald-500/20 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500"
+                        className="w-full bg-jetBlack border border-emerald-500/20 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500 placeholder:text-coolWhite/40"
                         placeholder="index1, index2"
                       />
                     </div>
