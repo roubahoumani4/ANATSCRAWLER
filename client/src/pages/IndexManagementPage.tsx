@@ -12,6 +12,12 @@ import {
   faCircle,
   faServer,
   faChartLine,
+  faCheckSquare,
+  faSquare,
+  faCopy,
+  faExchangeAlt,
+  faLink,
+  faTasks,
 } from "@fortawesome/free-solid-svg-icons";
 import { useToast } from "@/hooks/use-toast";
 import MatrixBackground from "@/components/ui/MatrixBackground";
@@ -54,6 +60,32 @@ const IndexManagementPage = () => {
   const [selectedIndex, setSelectedIndex] = useState<string | null>(null);
   const [newIndexName, setNewIndexName] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(true);
+  
+  // Bulk operations state
+  const [selectedIndices, setSelectedIndices] = useState<Set<string>>(new Set());
+  const [bulkMode, setBulkMode] = useState(false);
+  
+  // Advanced features modals
+  const [showCloneModal, setShowCloneModal] = useState(false);
+  const [showReindexModal, setShowReindexModal] = useState(false);
+  const [showAliasModal, setShowAliasModal] = useState(false);
+  const [showAliasListModal, setShowAliasListModal] = useState(false);
+  
+  // Clone modal state
+  const [cloneSourceIndex, setCloneSourceIndex] = useState("");
+  const [cloneTargetIndex, setCloneTargetIndex] = useState("");
+  const [cloneIncludeData, setCloneIncludeData] = useState(false);
+  
+  // Reindex modal state
+  const [reindexSource, setReindexSource] = useState("");
+  const [reindexDest, setReindexDest] = useState("");
+  const [reindexTaskId, setReindexTaskId] = useState("");
+  const [reindexProgress, setReindexProgress] = useState(0);
+  
+  // Alias modal state
+  const [aliasIndexName, setAliasIndexName] = useState("");
+  const [aliasName, setAliasName] = useState("");
+  const [aliasAction, setAliasAction] = useState<"create" | "delete">("create");
 
   // Fetch all indices
   const {
@@ -166,6 +198,180 @@ const IndexManagementPage = () => {
     },
   });
 
+  // Fetch all aliases
+  const { data: aliasesData, refetch: refetchAliases } = useQuery({
+    queryKey: ["/api/v1/admin/elasticsearch/aliases"],
+    queryFn: async () => {
+      const res = await axios.get(`${API_BASE_URL}/api/v1/admin/elasticsearch/aliases`, {
+        withCredentials: true,
+      });
+      return res.data;
+    },
+    enabled: showAliasListModal,
+  });
+
+  // Bulk delete mutation
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (indexNames: string[]) => {
+      const res = await axios.post(
+        `${API_BASE_URL}/api/v1/admin/elasticsearch/indices/bulk-delete`,
+        { indexNames },
+        { withCredentials: true }
+      );
+      return res.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/v1/admin/elasticsearch/indices"] });
+      toast({
+        title: "Success",
+        description: data.message,
+      });
+      setSelectedIndices(new Set());
+      setBulkMode(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.response?.data?.error || "Failed to bulk delete indices",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Bulk refresh mutation
+  const bulkRefreshMutation = useMutation({
+    mutationFn: async (indexNames: string[]) => {
+      const res = await axios.post(
+        `${API_BASE_URL}/api/v1/admin/elasticsearch/indices/bulk-refresh`,
+        { indexNames },
+        { withCredentials: true }
+      );
+      return res.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/v1/admin/elasticsearch/indices"] });
+      toast({
+        title: "Success",
+        description: data.message,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.response?.data?.error || "Failed to bulk refresh indices",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Clone index mutation
+  const cloneIndexMutation = useMutation({
+    mutationFn: async () => {
+      const res = await axios.post(
+        `${API_BASE_URL}/api/v1/admin/elasticsearch/indices/clone`,
+        {
+          sourceIndex: cloneSourceIndex,
+          targetIndex: cloneTargetIndex,
+          includeData: cloneIncludeData,
+        },
+        { withCredentials: true }
+      );
+      return res.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/v1/admin/elasticsearch/indices"] });
+      toast({
+        title: "Success",
+        description: data.message,
+      });
+      setShowCloneModal(false);
+      setCloneSourceIndex("");
+      setCloneTargetIndex("");
+      setCloneIncludeData(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.response?.data?.error || "Failed to clone index",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Reindex mutation
+  const reindexMutation = useMutation({
+    mutationFn: async () => {
+      const res = await axios.post(
+        `${API_BASE_URL}/api/v1/admin/elasticsearch/indices/reindex`,
+        {
+          sourceIndex: reindexSource,
+          destIndex: reindexDest,
+          waitForCompletion: false,
+        },
+        { withCredentials: true }
+      );
+      return res.data;
+    },
+    onSuccess: (data) => {
+      if (data.result.task) {
+        setReindexTaskId(data.result.task);
+        toast({
+          title: "Success",
+          description: "Reindexing started. Tracking progress...",
+        });
+        // Start polling for progress
+        checkReindexProgress(data.result.task);
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.response?.data?.error || "Failed to start reindexing",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Alias mutation
+  const aliasMutation = useMutation({
+    mutationFn: async () => {
+      if (aliasAction === "create") {
+        const res = await axios.post(
+          `${API_BASE_URL}/api/v1/admin/elasticsearch/aliases`,
+          { indexName: aliasIndexName, aliasName },
+          { withCredentials: true }
+        );
+        return res.data;
+      } else {
+        const res = await axios.delete(
+          `${API_BASE_URL}/api/v1/admin/elasticsearch/aliases`,
+          { 
+            data: { indexName: aliasIndexName, aliasName },
+            withCredentials: true 
+          }
+        );
+        return res.data;
+      }
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Success",
+        description: data.message,
+      });
+      setShowAliasModal(false);
+      setAliasIndexName("");
+      setAliasName("");
+      refetchAliases();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.response?.data?.error || "Failed to manage alias",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleCreateIndex = () => {
     if (!newIndexName.trim()) {
       toast({
@@ -197,6 +403,88 @@ const IndexManagementPage = () => {
 
   const handleRefreshIndex = (indexName: string) => {
     refreshIndexMutation.mutate(indexName);
+  };
+
+  // Check reindex progress
+  const checkReindexProgress = async (taskId: string) => {
+    try {
+      const res = await axios.get(
+        `${API_BASE_URL}/api/v1/admin/elasticsearch/tasks/${taskId}`,
+        { withCredentials: true }
+      );
+      
+      if (res.data.success) {
+        setReindexProgress(res.data.status.percentage);
+        
+        if (!res.data.status.completed) {
+          // Continue polling
+          setTimeout(() => checkReindexProgress(taskId), 1000);
+        } else {
+          toast({
+            title: "Success",
+            description: "Reindexing completed successfully!",
+          });
+          queryClient.invalidateQueries({ queryKey: ["/api/v1/admin/elasticsearch/indices"] });
+          setShowReindexModal(false);
+          setReindexSource("");
+          setReindexDest("");
+          setReindexTaskId("");
+          setReindexProgress(0);
+        }
+      }
+    } catch (error) {
+      console.error("Error checking reindex progress:", error);
+    }
+  };
+
+  // Toggle index selection for bulk operations
+  const toggleIndexSelection = (indexName: string) => {
+    const newSelection = new Set(selectedIndices);
+    if (newSelection.has(indexName)) {
+      newSelection.delete(indexName);
+    } else {
+      newSelection.add(indexName);
+    }
+    setSelectedIndices(newSelection);
+  };
+
+  // Select all indices
+  const selectAllIndices = () => {
+    if (filteredIndices) {
+      const allNames = filteredIndices.filter(idx => !idx.name.startsWith('.')).map(idx => idx.name);
+      setSelectedIndices(new Set(allNames));
+    }
+  };
+
+  // Deselect all indices
+  const deselectAllIndices = () => {
+    setSelectedIndices(new Set());
+  };
+
+  // Handle bulk delete
+  const handleBulkDelete = () => {
+    if (selectedIndices.size === 0) {
+      toast({
+        title: "Error",
+        description: "Please select at least one index",
+        variant: "destructive",
+      });
+      return;
+    }
+    bulkDeleteMutation.mutate(Array.from(selectedIndices));
+  };
+
+  // Handle bulk refresh
+  const handleBulkRefresh = () => {
+    if (selectedIndices.size === 0) {
+      toast({
+        title: "Error",
+        description: "Please select at least one index",
+        variant: "destructive",
+      });
+      return;
+    }
+    bulkRefreshMutation.mutate(Array.from(selectedIndices));
   };
 
   // Filter indices based on search query
@@ -258,7 +546,19 @@ const IndexManagementPage = () => {
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setBulkMode(!bulkMode)}
+                className={`px-4 py-2 rounded-lg border transition-all ${
+                  bulkMode
+                    ? "bg-purple-500/20 border-purple-500/50 text-purple-400"
+                    : "bg-gray-800/50 border-gray-700 text-gray-400"
+                }`}
+              >
+                <FontAwesomeIcon icon={faCheckSquare} className="mr-2" />
+                {bulkMode ? "Exit Bulk Mode" : "Bulk Operations"}
+              </button>
+
               <button
                 onClick={() => setAutoRefresh(!autoRefresh)}
                 className={`px-4 py-2 rounded-lg border transition-all ${
@@ -280,7 +580,90 @@ const IndexManagementPage = () => {
               </button>
             </div>
           </div>
+
+          {/* Advanced Operations Bar */}
+          <div className="flex items-center gap-3 mt-4">
+            <button
+              onClick={() => setShowCloneModal(true)}
+              className="px-3 py-2 bg-blue-500/20 border border-blue-500/50 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-all flex items-center gap-2 text-sm"
+            >
+              <FontAwesomeIcon icon={faCopy} />
+              Clone Index
+            </button>
+
+            <button
+              onClick={() => setShowReindexModal(true)}
+              className="px-3 py-2 bg-green-500/20 border border-green-500/50 text-green-400 rounded-lg hover:bg-green-500/30 transition-all flex items-center gap-2 text-sm"
+            >
+              <FontAwesomeIcon icon={faExchangeAlt} />
+              Reindex
+            </button>
+
+            <button
+              onClick={() => setShowAliasModal(true)}
+              className="px-3 py-2 bg-yellow-500/20 border border-yellow-500/50 text-yellow-400 rounded-lg hover:bg-yellow-500/30 transition-all flex items-center gap-2 text-sm"
+            >
+              <FontAwesomeIcon icon={faLink} />
+              Manage Aliases
+            </button>
+
+            <button
+              onClick={() => setShowAliasListModal(true)}
+              className="px-3 py-2 bg-purple-500/20 border border-purple-500/50 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-all flex items-center gap-2 text-sm"
+            >
+              <FontAwesomeIcon icon={faTasks} />
+              View All Aliases
+            </button>
+          </div>
         </motion.div>
+
+        {/* Bulk Operations Toolbar */}
+        {bulkMode && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 bg-purple-900/20 border border-purple-500/50 rounded-lg"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <span className="text-purple-400 font-semibold">
+                  {selectedIndices.size} indices selected
+                </span>
+                <button
+                  onClick={selectAllIndices}
+                  className="px-3 py-1 text-sm bg-purple-600 hover:bg-purple-500 rounded transition-all"
+                >
+                  Select All
+                </button>
+                <button
+                  onClick={deselectAllIndices}
+                  className="px-3 py-1 text-sm bg-gray-700 hover:bg-gray-600 rounded transition-all"
+                >
+                  Deselect All
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleBulkRefresh}
+                  disabled={selectedIndices.size === 0 || bulkRefreshMutation.isPending}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg transition-all disabled:opacity-50 flex items-center gap-2"
+                >
+                  <FontAwesomeIcon icon={faRefresh} />
+                  Refresh Selected
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={selectedIndices.size === 0 || bulkDeleteMutation.isPending}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg transition-all disabled:opacity-50 flex items-center gap-2"
+                >
+                  <FontAwesomeIcon icon={faTrash} />
+                  Delete Selected
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Cluster Health */}
         {clusterHealthData?.health && (
@@ -371,6 +754,11 @@ const IndexManagementPage = () => {
               <table className="w-full">
                 <thead className="bg-gray-800/50">
                   <tr>
+                    {bulkMode && (
+                      <th className="px-4 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        <FontAwesomeIcon icon={faCheckSquare} />
+                      </th>
+                    )}
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
                       Index Name
                     </th>
@@ -397,6 +785,21 @@ const IndexManagementPage = () => {
                 <tbody className="divide-y divide-gray-800">
                   {filteredIndices.map((index) => (
                     <tr key={index.uuid} className="hover:bg-gray-800/30 transition-colors">
+                      {bulkMode && (
+                        <td className="px-4 py-4">
+                          {!index.name.startsWith('.') && (
+                            <button
+                              onClick={() => toggleIndexSelection(index.name)}
+                              className="text-xl"
+                            >
+                              <FontAwesomeIcon
+                                icon={selectedIndices.has(index.name) ? faCheckSquare : faSquare}
+                                className={selectedIndices.has(index.name) ? "text-purple-400" : "text-gray-600"}
+                              />
+                            </button>
+                          )}
+                        </td>
+                      )}
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <FontAwesomeIcon icon={faDatabase} className="text-cyan-400" />
@@ -546,6 +949,305 @@ const IndexManagementPage = () => {
                 {deleteIndexMutation.isPending ? "Deleting..." : "Delete"}
               </button>
             </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Clone Index Modal */}
+      {showCloneModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-gray-900 rounded-lg border border-blue-500/50 max-w-md w-full p-6"
+          >
+            <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-cyan-500 text-transparent bg-clip-text">
+              Clone Index
+            </h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Source Index</label>
+                <select
+                  value={cloneSourceIndex}
+                  onChange={(e) => setCloneSourceIndex(e.target.value)}
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-coolWhite focus:outline-none focus:border-blue-500/50"
+                >
+                  <option value="">-- Select source index --</option>
+                  {indicesData?.indices?.map((index) => (
+                    <option key={index.uuid} value={index.name}>{index.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Target Index Name</label>
+                <input
+                  type="text"
+                  value={cloneTargetIndex}
+                  onChange={(e) => setCloneTargetIndex(e.target.value.toLowerCase())}
+                  placeholder="new-index-name"
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-coolWhite placeholder-gray-500 focus:outline-none focus:border-blue-500/50"
+                />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="includeData"
+                  checked={cloneIncludeData}
+                  onChange={(e) => setCloneIncludeData(e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <label htmlFor="includeData" className="text-sm text-gray-300">
+                  Include data (clone with documents)
+                </label>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowCloneModal(false);
+                  setCloneSourceIndex("");
+                  setCloneTargetIndex("");
+                  setCloneIncludeData(false);
+                }}
+                className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => cloneIndexMutation.mutate()}
+                disabled={!cloneSourceIndex || !cloneTargetIndex || cloneIndexMutation.isPending}
+                className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 rounded-lg transition-all disabled:opacity-50"
+              >
+                {cloneIndexMutation.isPending ? "Cloning..." : "Clone Index"}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Reindex Modal */}
+      {showReindexModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-gray-900 rounded-lg border border-green-500/50 max-w-md w-full p-6"
+          >
+            <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-green-400 to-emerald-500 text-transparent bg-clip-text">
+              Reindex Data
+            </h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Source Index</label>
+                <select
+                  value={reindexSource}
+                  onChange={(e) => setReindexSource(e.target.value)}
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-coolWhite focus:outline-none focus:border-green-500/50"
+                >
+                  <option value="">-- Select source index --</option>
+                  {indicesData?.indices?.map((index) => (
+                    <option key={index.uuid} value={index.name}>{index.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Destination Index</label>
+                <select
+                  value={reindexDest}
+                  onChange={(e) => setReindexDest(e.target.value)}
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-coolWhite focus:outline-none focus:border-green-500/50"
+                >
+                  <option value="">-- Select destination index --</option>
+                  {indicesData?.indices?.map((index) => (
+                    <option key={index.uuid} value={index.name}>{index.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {reindexTaskId && (
+                <div className="p-4 bg-green-900/20 border border-green-500/30 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-gray-400">Reindexing Progress</span>
+                    <span className="text-sm font-semibold text-green-400">{reindexProgress}%</span>
+                  </div>
+                  <div className="w-full bg-gray-800 rounded-full h-2">
+                    <div
+                      className="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${reindexProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowReindexModal(false);
+                  setReindexSource("");
+                  setReindexDest("");
+                  setReindexTaskId("");
+                  setReindexProgress(0);
+                }}
+                className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => reindexMutation.mutate()}
+                disabled={!reindexSource || !reindexDest || reindexMutation.isPending || reindexTaskId !== ""}
+                className="flex-1 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 rounded-lg transition-all disabled:opacity-50"
+              >
+                {reindexMutation.isPending ? "Starting..." : "Start Reindex"}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Alias Management Modal */}
+      {showAliasModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-gray-900 rounded-lg border border-yellow-500/50 max-w-md w-full p-6"
+          >
+            <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-yellow-400 to-orange-500 text-transparent bg-clip-text">
+              Manage Alias
+            </h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Action</label>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setAliasAction("create")}
+                    className={`flex-1 px-4 py-2 rounded-lg border transition-all ${
+                      aliasAction === "create"
+                        ? "bg-green-500/20 border-green-500/50 text-green-400"
+                        : "bg-gray-800 border-gray-700 text-gray-400"
+                    }`}
+                  >
+                    Create
+                  </button>
+                  <button
+                    onClick={() => setAliasAction("delete")}
+                    className={`flex-1 px-4 py-2 rounded-lg border transition-all ${
+                      aliasAction === "delete"
+                        ? "bg-red-500/20 border-red-500/50 text-red-400"
+                        : "bg-gray-800 border-gray-700 text-gray-400"
+                    }`}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Index Name</label>
+                <select
+                  value={aliasIndexName}
+                  onChange={(e) => setAliasIndexName(e.target.value)}
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-coolWhite focus:outline-none focus:border-yellow-500/50"
+                >
+                  <option value="">-- Select index --</option>
+                  {indicesData?.indices?.map((index) => (
+                    <option key={index.uuid} value={index.name}>{index.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Alias Name</label>
+                <input
+                  type="text"
+                  value={aliasName}
+                  onChange={(e) => setAliasName(e.target.value.toLowerCase())}
+                  placeholder="alias-name"
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-coolWhite placeholder-gray-500 focus:outline-none focus:border-yellow-500/50"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowAliasModal(false);
+                  setAliasIndexName("");
+                  setAliasName("");
+                }}
+                className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => aliasMutation.mutate()}
+                disabled={!aliasIndexName || !aliasName || aliasMutation.isPending}
+                className="flex-1 px-4 py-2 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 rounded-lg transition-all disabled:opacity-50"
+              >
+                {aliasMutation.isPending ? "Processing..." : aliasAction === "create" ? "Create Alias" : "Delete Alias"}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* View All Aliases Modal */}
+      {showAliasListModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-gray-900 rounded-lg border border-purple-500/50 max-w-2xl w-full p-6 max-h-[80vh] overflow-y-auto"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 text-transparent bg-clip-text">
+                All Index Aliases
+              </h2>
+              <button
+                onClick={() => setShowAliasListModal(false)}
+                className="text-gray-400 hover:text-coolWhite"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {aliasesData?.aliases && aliasesData.aliases.length > 0 ? (
+                aliasesData.aliases.map((alias: any, idx: number) => (
+                  <div
+                    key={idx}
+                    className="p-4 bg-gray-950 rounded-lg border border-gray-800 hover:border-purple-500/30 transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-mono text-purple-400">{alias.alias}</div>
+                        <div className="text-xs text-gray-500 mt-1">Index: {alias.index}</div>
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        {alias.index === alias.alias ? "Default" : "Alias"}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center text-gray-500 py-8">No aliases found</div>
+              )}
+            </div>
+
+            <button
+              onClick={() => setShowAliasListModal(false)}
+              className="w-full mt-6 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+            >
+              Close
+            </button>
           </motion.div>
         </div>
       )}

@@ -332,6 +332,244 @@ class ElasticsearchService {
       throw new Error(`Failed to count documents: ${error.message}`);
     }
   }
+
+  /**
+   * Bulk delete multiple indices
+   */
+  async bulkDeleteIndices(indexNames: string[]): Promise<{ success: string[]; failed: string[] }> {
+    const success: string[] = [];
+    const failed: string[] = [];
+
+    for (const indexName of indexNames) {
+      try {
+        if (indexName.startsWith('.')) {
+          failed.push(indexName);
+          continue;
+        }
+        await this.deleteIndex(indexName);
+        success.push(indexName);
+      } catch (error) {
+        failed.push(indexName);
+      }
+    }
+
+    return { success, failed };
+  }
+
+  /**
+   * Bulk refresh multiple indices
+   */
+  async bulkRefreshIndices(indexNames: string[]): Promise<{ success: string[]; failed: string[] }> {
+    const success: string[] = [];
+    const failed: string[] = [];
+
+    for (const indexName of indexNames) {
+      try {
+        await this.refreshIndex(indexName);
+        success.push(indexName);
+      } catch (error) {
+        failed.push(indexName);
+      }
+    }
+
+    return { success, failed };
+  }
+
+  /**
+   * Create index alias
+   */
+  async createAlias(indexName: string, aliasName: string): Promise<boolean> {
+    try {
+      await axios.post(`${this.baseUrl}/_aliases`, {
+        actions: [
+          {
+            add: {
+              index: indexName,
+              alias: aliasName,
+            },
+          },
+        ],
+      });
+      return true;
+    } catch (error: any) {
+      console.error(`Error creating alias ${aliasName}:`, error.message);
+      throw new Error(`Failed to create alias: ${error.message}`);
+    }
+  }
+
+  /**
+   * Delete index alias
+   */
+  async deleteAlias(indexName: string, aliasName: string): Promise<boolean> {
+    try {
+      await axios.post(`${this.baseUrl}/_aliases`, {
+        actions: [
+          {
+            remove: {
+              index: indexName,
+              alias: aliasName,
+            },
+          },
+        ],
+      });
+      return true;
+    } catch (error: any) {
+      console.error(`Error deleting alias ${aliasName}:`, error.message);
+      throw new Error(`Failed to delete alias: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get all aliases
+   */
+  async getAllAliases(): Promise<any> {
+    try {
+      const response = await axios.get(`${this.baseUrl}/_cat/aliases?format=json`);
+      return response.data;
+    } catch (error: any) {
+      console.error('Error fetching aliases:', error.message);
+      throw new Error(`Failed to fetch aliases: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get aliases for a specific index
+   */
+  async getIndexAliases(indexName: string): Promise<string[]> {
+    try {
+      const response = await axios.get(`${this.baseUrl}/${indexName}/_alias`);
+      const aliases = response.data[indexName]?.aliases || {};
+      return Object.keys(aliases);
+    } catch (error: any) {
+      console.error(`Error fetching aliases for ${indexName}:`, error.message);
+      throw new Error(`Failed to fetch index aliases: ${error.message}`);
+    }
+  }
+
+  /**
+   * Atomic alias swap (zero-downtime reindexing)
+   */
+  async swapAlias(oldIndex: string, newIndex: string, aliasName: string): Promise<boolean> {
+    try {
+      await axios.post(`${this.baseUrl}/_aliases`, {
+        actions: [
+          {
+            remove: {
+              index: oldIndex,
+              alias: aliasName,
+            },
+          },
+          {
+            add: {
+              index: newIndex,
+              alias: aliasName,
+            },
+          },
+        ],
+      });
+      return true;
+    } catch (error: any) {
+      console.error(`Error swapping alias ${aliasName}:`, error.message);
+      throw new Error(`Failed to swap alias: ${error.message}`);
+    }
+  }
+
+  /**
+   * Reindex from one index to another
+   */
+  async reindex(sourceIndex: string, destIndex: string, waitForCompletion: boolean = false): Promise<any> {
+    try {
+      const response = await axios.post(`${this.baseUrl}/_reindex`, {
+        source: {
+          index: sourceIndex,
+        },
+        dest: {
+          index: destIndex,
+        },
+      }, {
+        params: {
+          wait_for_completion: waitForCompletion,
+        },
+      });
+
+      return {
+        task: response.data.task,
+        total: response.data.total,
+        created: response.data.created,
+        updated: response.data.updated,
+      };
+    } catch (error: any) {
+      console.error(`Error reindexing from ${sourceIndex} to ${destIndex}:`, error.message);
+      throw new Error(`Failed to reindex: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get reindex task status
+   */
+  async getTaskStatus(taskId: string): Promise<any> {
+    try {
+      const response = await axios.get(`${this.baseUrl}/_tasks/${taskId}`);
+      const task = response.data;
+      
+      return {
+        completed: task.completed,
+        status: task.task?.status,
+        progress: task.task?.status?.created || 0,
+        total: task.task?.status?.total || 0,
+        percentage: task.task?.status?.total 
+          ? Math.round((task.task.status.created / task.task.status.total) * 100)
+          : 0,
+      };
+    } catch (error: any) {
+      console.error(`Error fetching task status ${taskId}:`, error.message);
+      throw new Error(`Failed to fetch task status: ${error.message}`);
+    }
+  }
+
+  /**
+   * Clone an index (structure only or with data)
+   */
+  async cloneIndex(sourceIndex: string, targetIndex: string, includeData: boolean = false): Promise<boolean> {
+    try {
+      if (includeData) {
+        // Clone with data using reindex
+        await this.reindex(sourceIndex, targetIndex, true);
+      } else {
+        // Clone structure only
+        const mapping = await this.getIndexMapping(sourceIndex);
+        const settings = await this.getIndexSettings(sourceIndex);
+
+        await this.createIndex(targetIndex, {
+          mappings: mapping,
+          settings: {
+            index: {
+              number_of_shards: settings.index.number_of_shards,
+              number_of_replicas: settings.index.number_of_replicas,
+            },
+          },
+        });
+      }
+
+      return true;
+    } catch (error: any) {
+      console.error(`Error cloning index ${sourceIndex}:`, error.message);
+      throw new Error(`Failed to clone index: ${error.message}`);
+    }
+  }
+
+  /**
+   * Create index from template
+   */
+  async createIndexFromTemplate(indexName: string, templateSettings: any): Promise<boolean> {
+    try {
+      await axios.put(`${this.baseUrl}/${indexName}`, templateSettings);
+      return true;
+    } catch (error: any) {
+      console.error(`Error creating index from template:`, error.message);
+      throw new Error(`Failed to create index from template: ${error.message}`);
+    }
+  }
 }
 
 export const elasticsearchService = new ElasticsearchService();

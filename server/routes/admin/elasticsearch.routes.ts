@@ -232,4 +232,282 @@ router.get('/connection', requireAdmin, async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /api/v1/admin/elasticsearch/indices/bulk-delete
+ * Bulk delete multiple indices
+ */
+router.post('/indices/bulk-delete', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { indexNames } = req.body;
+
+    if (!indexNames || !Array.isArray(indexNames) || indexNames.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Index names array is required',
+      });
+    }
+
+    const result = await elasticsearchService.bulkDeleteIndices(indexNames);
+
+    res.json({
+      success: true,
+      result,
+      message: `Deleted ${result.success.length} indices, ${result.failed.length} failed`,
+    });
+  } catch (error: any) {
+    console.error('Error bulk deleting indices:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to bulk delete indices',
+    });
+  }
+});
+
+/**
+ * POST /api/v1/admin/elasticsearch/indices/bulk-refresh
+ * Bulk refresh multiple indices
+ */
+router.post('/indices/bulk-refresh', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { indexNames } = req.body;
+
+    if (!indexNames || !Array.isArray(indexNames) || indexNames.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Index names array is required',
+      });
+    }
+
+    const result = await elasticsearchService.bulkRefreshIndices(indexNames);
+
+    res.json({
+      success: true,
+      result,
+      message: `Refreshed ${result.success.length} indices, ${result.failed.length} failed`,
+    });
+  } catch (error: any) {
+    console.error('Error bulk refreshing indices:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to bulk refresh indices',
+    });
+  }
+});
+
+/**
+ * GET /api/v1/admin/elasticsearch/aliases
+ * Get all aliases
+ */
+router.get('/aliases', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const aliases = await elasticsearchService.getAllAliases();
+    res.json({
+      success: true,
+      aliases,
+    });
+  } catch (error: any) {
+    console.error('Error fetching aliases:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch aliases',
+    });
+  }
+});
+
+/**
+ * GET /api/v1/admin/elasticsearch/indices/:indexName/aliases
+ * Get aliases for a specific index
+ */
+router.get('/indices/:indexName/aliases', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { indexName } = req.params;
+    const aliases = await elasticsearchService.getIndexAliases(indexName);
+    res.json({
+      success: true,
+      aliases,
+    });
+  } catch (error: any) {
+    console.error('Error fetching index aliases:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch index aliases',
+    });
+  }
+});
+
+/**
+ * POST /api/v1/admin/elasticsearch/aliases
+ * Create an alias
+ */
+router.post('/aliases', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { indexName, aliasName } = req.body;
+
+    if (!indexName || !aliasName) {
+      return res.status(400).json({
+        success: false,
+        error: 'Index name and alias name are required',
+      });
+    }
+
+    await elasticsearchService.createAlias(indexName, aliasName);
+
+    res.json({
+      success: true,
+      message: `Alias '${aliasName}' created for index '${indexName}'`,
+    });
+  } catch (error: any) {
+    console.error('Error creating alias:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to create alias',
+    });
+  }
+});
+
+/**
+ * DELETE /api/v1/admin/elasticsearch/aliases
+ * Delete an alias
+ */
+router.delete('/aliases', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { indexName, aliasName } = req.body;
+
+    if (!indexName || !aliasName) {
+      return res.status(400).json({
+        success: false,
+        error: 'Index name and alias name are required',
+      });
+    }
+
+    await elasticsearchService.deleteAlias(indexName, aliasName);
+
+    res.json({
+      success: true,
+      message: `Alias '${aliasName}' deleted from index '${indexName}'`,
+    });
+  } catch (error: any) {
+    console.error('Error deleting alias:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to delete alias',
+    });
+  }
+});
+
+/**
+ * POST /api/v1/admin/elasticsearch/aliases/swap
+ * Atomic alias swap
+ */
+router.post('/aliases/swap', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { oldIndex, newIndex, aliasName } = req.body;
+
+    if (!oldIndex || !newIndex || !aliasName) {
+      return res.status(400).json({
+        success: false,
+        error: 'Old index, new index, and alias name are required',
+      });
+    }
+
+    await elasticsearchService.swapAlias(oldIndex, newIndex, aliasName);
+
+    res.json({
+      success: true,
+      message: `Alias '${aliasName}' swapped from '${oldIndex}' to '${newIndex}'`,
+    });
+  } catch (error: any) {
+    console.error('Error swapping alias:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to swap alias',
+    });
+  }
+});
+
+/**
+ * POST /api/v1/admin/elasticsearch/indices/reindex
+ * Reindex from one index to another
+ */
+router.post('/indices/reindex', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { sourceIndex, destIndex, waitForCompletion = false } = req.body;
+
+    if (!sourceIndex || !destIndex) {
+      return res.status(400).json({
+        success: false,
+        error: 'Source index and destination index are required',
+      });
+    }
+
+    const result = await elasticsearchService.reindex(sourceIndex, destIndex, waitForCompletion);
+
+    res.json({
+      success: true,
+      result,
+      message: waitForCompletion 
+        ? `Reindexing completed: ${result.created} documents created`
+        : `Reindexing started. Task ID: ${result.task}`,
+    });
+  } catch (error: any) {
+    console.error('Error reindexing:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to reindex',
+    });
+  }
+});
+
+/**
+ * GET /api/v1/admin/elasticsearch/tasks/:taskId
+ * Get task status
+ */
+router.get('/tasks/:taskId', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { taskId } = req.params;
+    const status = await elasticsearchService.getTaskStatus(taskId);
+
+    res.json({
+      success: true,
+      status,
+    });
+  } catch (error: any) {
+    console.error('Error fetching task status:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch task status',
+    });
+  }
+});
+
+/**
+ * POST /api/v1/admin/elasticsearch/indices/clone
+ * Clone an index
+ */
+router.post('/indices/clone', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { sourceIndex, targetIndex, includeData = false } = req.body;
+
+    if (!sourceIndex || !targetIndex) {
+      return res.status(400).json({
+        success: false,
+        error: 'Source index and target index are required',
+      });
+    }
+
+    await elasticsearchService.cloneIndex(sourceIndex, targetIndex, includeData);
+
+    res.json({
+      success: true,
+      message: `Index '${sourceIndex}' cloned to '${targetIndex}' ${includeData ? 'with data' : '(structure only)'}`,
+    });
+  } catch (error: any) {
+    console.error('Error cloning index:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to clone index',
+    });
+  }
+});
+
 export default router;
