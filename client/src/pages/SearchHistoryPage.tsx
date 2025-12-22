@@ -78,16 +78,36 @@ const SearchHistoryPage: React.FC = () => {
         params.hasResults = 'false';
       }
 
+      console.log('Fetching search history with params:', params);
+
       const [historyRes, statsRes] = await Promise.all([
         axios.get('/api/v1/history/searches', { params }),
         axios.get('/api/v1/history/stats')
       ]);
 
-      setSearches(historyRes.data.data.searches);
-      setTotalPages(historyRes.data.data.pagination.pages);
-      setStats(statsRes.data.data);
-    } catch (error) {
+      console.log('History response:', historyRes.data);
+      console.log('Stats response:', statsRes.data);
+
+      if (historyRes.data.success && historyRes.data.data) {
+        setSearches(historyRes.data.data.searches || []);
+        setTotalPages(historyRes.data.data.pagination?.pages || 1);
+      } else {
+        setSearches([]);
+        setTotalPages(1);
+      }
+
+      if (statsRes.data.success && statsRes.data.data) {
+        setStats(statsRes.data.data);
+      }
+    } catch (error: any) {
       console.error('Error fetching history:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      
+      // Show user-friendly error
+      if (error.response?.status === 401) {
+        console.error('Authentication error - user may need to log in again');
+      }
     } finally {
       setLoading(false);
     }

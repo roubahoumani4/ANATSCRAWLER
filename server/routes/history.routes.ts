@@ -27,8 +27,18 @@ router.post('/searches', async (req: Request, res: Response) => {
       status
     } = req.body;
 
+    console.log('📝 Saving search history:', {
+      userId: userId?.toString(),
+      searchType,
+      query,
+      resultsCount,
+      hasResults,
+      status
+    });
+
     // Validate required fields
     if (!searchType || !query) {
+      console.error('❌ Missing required fields:', { searchType, query });
       return res.status(400).json({
         success: false,
         error: 'Missing required fields: searchType and query'
@@ -37,6 +47,7 @@ router.post('/searches', async (req: Request, res: Response) => {
 
     // Validate searchType
     if (searchType !== 'discovery' && searchType !== 'domain-monitoring') {
+      console.error('❌ Invalid searchType:', searchType);
       return res.status(400).json({
         success: false,
         error: 'Invalid searchType. Must be "discovery" or "domain-monitoring"'
@@ -58,6 +69,8 @@ router.post('/searches', async (req: Request, res: Response) => {
 
     await searchHistory.save();
 
+    console.log('✅ Search history saved successfully:', searchHistory._id);
+
     // Log search activity
     await logActivity(
       userId,
@@ -76,7 +89,7 @@ router.post('/searches', async (req: Request, res: Response) => {
       message: 'Search history saved successfully'
     });
   } catch (error: any) {
-    console.error('Error saving search history:', error);
+    console.error('❌ Error saving search history:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to save search history',
@@ -100,6 +113,14 @@ router.get('/searches', async (req: Request, res: Response) => {
       startDate,
       endDate 
     } = req.query;
+
+    console.log('🔍 Fetching search history:', {
+      userId: userId?.toString(),
+      searchType,
+      page,
+      limit,
+      hasResults
+    });
 
     const query: any = { userId };
 
@@ -132,6 +153,13 @@ router.get('/searches', async (req: Request, res: Response) => {
       SearchHistory.countDocuments(query)
     ]);
 
+    console.log('✅ Found searches:', {
+      total,
+      returned: searches.length,
+      page: Number(page),
+      pages: Math.ceil(total / Number(limit))
+    });
+
     res.json({
       success: true,
       data: {
@@ -145,7 +173,7 @@ router.get('/searches', async (req: Request, res: Response) => {
       }
     });
   } catch (error: any) {
-    console.error('Error fetching search history:', error);
+    console.error('❌ Error fetching search history:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch search history',

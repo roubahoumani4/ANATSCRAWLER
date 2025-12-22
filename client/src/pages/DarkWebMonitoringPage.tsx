@@ -84,13 +84,31 @@ const DarkWebMonitoringPage: React.FC = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      // Fetch real data from APIs
+      // Fetch real data from APIs with proper error handling
       const [historyStats, recentSearches, threatDist, secScore, esStats] = await Promise.all([
-        axios.get('/api/v1/history/stats').catch(() => ({ data: { data: null } })),
-        axios.get('/api/v1/history/searches', { params: { limit: 4 } }).catch(() => ({ data: { data: { searches: [] } } })),
-        axios.get('/api/v1/analytics/threat-distribution').catch(() => ({ data: { data: [] } })),
-        axios.get('/api/v1/analytics/security-score').catch(() => ({ data: { data: [] } })),
-        axios.get('/api/v1/analytics/elasticsearch-stats').catch(() => ({ data: { data: { totalDocuments: 0, indices: {} } } }))
+        axios.get('/api/v1/history/stats', { withCredentials: true }).catch((err) => {
+          console.error('Failed to fetch history stats:', err.response?.data || err.message);
+          return { data: { data: null } };
+        }),
+        axios.get('/api/v1/history/searches', { 
+          params: { limit: 4 }, 
+          withCredentials: true 
+        }).catch((err) => {
+          console.error('Failed to fetch recent searches:', err.response?.data || err.message);
+          return { data: { data: { searches: [] } } };
+        }),
+        axios.get('/api/v1/analytics/threat-distribution', { withCredentials: true }).catch((err) => {
+          console.error('Failed to fetch threat distribution:', err.response?.data || err.message);
+          return { data: { data: [] } };
+        }),
+        axios.get('/api/v1/analytics/security-score', { withCredentials: true }).catch((err) => {
+          console.error('Failed to fetch security score:', err.response?.data || err.message);
+          return { data: { data: [] } };
+        }),
+        axios.get('/api/v1/analytics/elasticsearch-stats', { withCredentials: true }).catch((err) => {
+          console.error('Failed to fetch elasticsearch stats:', err.response?.data || err.message);
+          return { data: { data: { totalDocuments: 0, indices: {} } } };
+        })
       ]);
 
       if (historyStats.data.data) {
