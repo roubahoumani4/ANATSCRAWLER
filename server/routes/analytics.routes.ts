@@ -19,12 +19,16 @@ router.get('/threat-distribution', async (req: Request, res: Response) => {
       });
     }
 
+    console.log('📊 Calculating threat distribution for user:', userId.toString());
+
     // Get searches with results for this user only
     const searches = await SearchHistory.find({ 
       userId,
       hasResults: true,
       results: { $exists: true, $ne: [] }
     }).select('results resultsCount searchType');
+
+    console.log('📊 Found searches with results:', searches.length);
 
     let critical = 0;
     let high = 0;
@@ -70,6 +74,8 @@ router.get('/threat-distribution', async (req: Request, res: Response) => {
       { name: 'Low', value: low, color: '#3b82f6' }
     ];
 
+    console.log('📊 Threat distribution calculated:', { critical, high, medium, low, totalSearches: searches.length });
+
     res.json({
       success: true,
       data: distribution
@@ -99,12 +105,16 @@ router.get('/security-score', async (req: Request, res: Response) => {
       });
     }
 
+    console.log('🔒 Calculating security score for user:', userId.toString());
+
     const totalSearches = await SearchHistory.countDocuments({ userId });
     const successfulSearches = await SearchHistory.countDocuments({ userId, hasResults: true });
     const recentSearches = await SearchHistory.countDocuments({
       userId,
       createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
     });
+
+    console.log('🔒 Search counts:', { totalSearches, successfulSearches, recentSearches });
 
     // Get all searches with results for analysis (user-specific)
     const searchesWithResults = await SearchHistory.find({ 
@@ -170,6 +180,8 @@ router.get('/security-score', async (req: Request, res: Response) => {
       { category: 'Response Time', score: avgResponseTime },
       { category: 'Intelligence Quality', score: intelligenceQualityScore }
     ];
+
+    console.log('🔒 Security score calculated:', securityScore);
 
     res.json({
       success: true,
