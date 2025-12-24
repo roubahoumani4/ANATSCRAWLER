@@ -258,6 +258,8 @@ const DomainMonitoringPage = () => {
             passwordStrength: stats.passwordStrength
           },
           status: results.length > 0 ? 'success' : 'no-results'
+        }, {
+          withCredentials: true
         });
         
         console.log('Domain search history saved successfully:', historyResponse.data);
@@ -295,6 +297,8 @@ const DomainMonitoringPage = () => {
             error: String(error)
           },
           status: 'failed'
+        }, {
+          withCredentials: true
         });
         console.log('Failed domain search tracked successfully');
       } catch (historyError: any) {

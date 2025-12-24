@@ -196,7 +196,8 @@ export interface IUser extends mongoose.Document {
 
 // Export models with check to prevent overwrite errors
 export const User = mongoose.models.User || mongoose.model<IUser>('User', userSchema, 'users');
-export const SearchHistory = mongoose.models.SearchHistory || mongoose.model('SearchHistory', searchHistorySchema, 'search_history');
+// NOTE: SearchHistory is now exported from SearchHistory.ts with the updated schema
+// export const SearchHistory = mongoose.models.SearchHistory || mongoose.model('SearchHistory', searchHistorySchema, 'search_history');
 export const SearchResult = mongoose.models.SearchResult || mongoose.model('SearchResult', searchResultSchema, 'search_results');
 export const UserSearchResult = mongoose.models.UserSearchResult || mongoose.model('UserSearchResult', userSearchResultSchema, 'user_search_results');
 export const Session = mongoose.models.Session || mongoose.model('Session', sessionSchema, 'sessions');

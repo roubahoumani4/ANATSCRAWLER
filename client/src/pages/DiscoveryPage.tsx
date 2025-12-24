@@ -191,6 +191,8 @@ const DiscoveryPage: React.FC = () => {
               searchDuration
             },
             status: results.length > 0 ? 'success' : 'no-results'
+          }, {
+            withCredentials: true
           });
           
           console.log('Search history saved successfully:', historyResponse.data);
@@ -226,6 +228,8 @@ const DiscoveryPage: React.FC = () => {
               error: errorMsg
             },
             status: 'failed'
+          }, {
+            withCredentials: true
           });
           console.log('Failed search tracked successfully');
         } catch (historyError: any) {
@@ -251,6 +255,8 @@ const DiscoveryPage: React.FC = () => {
             error: String(error)
           },
           status: 'failed'
+        }, {
+          withCredentials: true
         });
         console.log('Exception-based failed search tracked successfully');
       } catch (historyError: any) {
