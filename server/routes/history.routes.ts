@@ -255,23 +255,27 @@ router.get('/stats', async (req: Request, res: Response) => {
   try {
     const userId = req.user?._id;
 
-    const [
-      totalSearches,
-      successfulSearches,
-      discoverySearches,
-      domainSearches,
-      recentSearchesRaw
-    ] = await Promise.all([
-      SearchHistory.countDocuments({ userId }),
-      SearchHistory.countDocuments({ userId, hasResults: true }),
-      SearchHistory.countDocuments({ userId, searchType: 'discovery' }),
-      SearchHistory.countDocuments({ userId, searchType: 'domain-monitoring' }),
-      SearchHistory.find({ userId })
-        .sort({ createdAt: -1 })
-        .limit(5)
-        .select('query searchType resultsCount createdAt hasResults timestamp')
-        .lean()
-    ]);
+    // Get all searches to manually count by type (for backward compatibility with old records)
+    const allSearches = await SearchHistory.find({ userId })
+      .select('searchType hasResults')
+      .lean();
+    
+    const totalSearches = allSearches.length;
+    const successfulSearches = allSearches.filter((s: any) => s.hasResults === true).length;
+    
+    // Count by searchType, treating missing searchType as 'discovery' (legacy records)
+    const discoverySearches = allSearches.filter((s: any) => 
+      !s.searchType || s.searchType === 'discovery'
+    ).length;
+    const domainSearches = allSearches.filter((s: any) => 
+      s.searchType === 'domain-monitoring'
+    ).length;
+    
+    const recentSearchesRaw = await SearchHistory.find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .select('query searchType resultsCount createdAt hasResults timestamp')
+      .lean();
 
     // Normalize old records that might have 'timestamp' instead of 'createdAt'
     const recentSearches = recentSearchesRaw.map((search: any) => {
