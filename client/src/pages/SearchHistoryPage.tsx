@@ -161,11 +161,14 @@ const SearchHistoryPage: React.FC = () => {
   };
 
   const getStatusBadge = (item: SearchHistoryItem) => {
-    if (item.hasResults) {
+    // Consider a search successful if it has results AND resultsCount > 0
+    const hasValidResults = item.hasResults && item.resultsCount > 0;
+    
+    if (hasValidResults) {
       return (
         <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
           <CheckCircle className="w-3 h-3 mr-1" />
-          {item.resultsCount} Results
+          {item.resultsCount} Result{item.resultsCount !== 1 ? 's' : ''}
         </Badge>
       );
     } else {
@@ -179,8 +182,26 @@ const SearchHistoryPage: React.FC = () => {
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString();
+    try {
+      const date = new Date(dateString);
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+      
+      return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error, dateString);
+      return 'Invalid Date';
+    }
   };
 
   const formatDuration = (ms?: number) => {

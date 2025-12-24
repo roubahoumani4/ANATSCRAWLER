@@ -114,6 +114,8 @@ const DarkWebMonitoringPage: React.FC = () => {
       if (historyStats.data.data) {
         const statsData = historyStats.data.data;
         
+        console.log('📊 History stats received:', statsData);
+        
         setStats({
           threatIntelligence: { 
             total: 0, // Will be populated when threat intelligence API is available
@@ -138,19 +140,29 @@ const DarkWebMonitoringPage: React.FC = () => {
         const totalDiscovery = statsData.discoverySearches || 0;
         const totalDomain = statsData.domainSearches || 0;
 
-        if (totalDiscovery + totalDomain > 0) {
-          setSearchTypeDistribution([
-            { 
+        if (totalDiscovery > 0 || totalDomain > 0) {
+          const distribution = [];
+          
+          if (totalDiscovery > 0) {
+            distribution.push({ 
               name: "Email Discovery", 
               value: totalDiscovery, 
               color: "#8b5cf6" 
-            },
-            { 
+            });
+          }
+          
+          if (totalDomain > 0) {
+            distribution.push({ 
               name: "Domain Monitoring", 
               value: totalDomain, 
               color: "#06b6d4" 
-            }
-          ]);
+            });
+          }
+          
+          setSearchTypeDistribution(distribution);
+        } else {
+          // No searches yet
+          setSearchTypeDistribution([]);
         }
 
         // Process searches by day for activity chart
@@ -158,22 +170,38 @@ const DarkWebMonitoringPage: React.FC = () => {
           const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
           const last7Days = statsData.searchesByDay.slice(-7).map((day: any) => {
             const date = new Date(day._id);
-            const totalSearches = totalDiscovery + totalDomain;
+            // Calculate proportional distribution based on total counts
+            const discoveryRatio = statsData.totalSearches > 0 ? statsData.discoverySearches / statsData.totalSearches : 0.5;
+            const domainRatio = statsData.totalSearches > 0 ? statsData.domainSearches / statsData.totalSearches : 0.5;
+            
             return {
               name: dayNames[date.getDay()],
               threats: 0, // Will be populated when threat intelligence API is available
-              discoveries: totalSearches > 0 ? Math.floor(day.count * (totalDiscovery / totalSearches)) : 0,
-              domains: totalSearches > 0 ? Math.floor(day.count * (totalDomain / totalSearches)) : 0
+              discoveries: Math.round(day.count * discoveryRatio),
+              domains: Math.round(day.count * domainRatio)
             };
           });
           setActivityData(last7Days);
+        } else {
+          // If no data, show empty state by keeping activityData empty
+          setActivityData([]);
         }
       }
 
       // Process recent searches for activity feed
       if (recentSearches.data.data && recentSearches.data.data.searches) {
         const activities = recentSearches.data.data.searches.map((search: any) => {
-          const timeAgo = getTimeAgo(new Date(search.createdAt));
+          // Ensure createdAt is properly parsed
+          const searchDate = new Date(search.createdAt);
+          const timeAgo = getTimeAgo(searchDate);
+          
+          console.log('Processing recent search:', {
+            query: search.query,
+            createdAt: search.createdAt,
+            parsedDate: searchDate,
+            timeAgo
+          });
+          
           return {
             type: search.searchType === 'discovery' ? 'discovery' : 'domain',
             title: search.searchType === 'discovery' 
@@ -184,16 +212,24 @@ const DarkWebMonitoringPage: React.FC = () => {
           };
         });
         setRecentActivity(activities);
+      } else {
+        setRecentActivity([]);
       }
 
       // Process threat distribution data
       if (threatDist.data.data && Array.isArray(threatDist.data.data)) {
-        setThreatDistribution(threatDist.data.data);
+        // Filter out threat levels with 0 values for cleaner visualization
+        const filteredThreatDist = threatDist.data.data.filter((item: any) => item.value > 0);
+        setThreatDistribution(filteredThreatDist);
+      } else {
+        setThreatDistribution([]);
       }
 
       // Process security score data
-      if (secScore.data.data && Array.isArray(secScore.data.data)) {
+      if (secScore.data.data && Array.isArray(secScore.data.data) && secScore.data.data.length > 0) {
         setSecurityScore(secScore.data.data);
+      } else {
+        setSecurityScore([]);
       }
 
       // Process Elasticsearch stats
@@ -212,12 +248,26 @@ const DarkWebMonitoringPage: React.FC = () => {
 
   // Helper function to calculate time ago
   const getTimeAgo = (date: Date) => {
-    const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
-    
-    if (seconds < 60) return `${seconds} seconds ago`;
-    if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)} hour${Math.floor(seconds / 3600) > 1 ? 's' : ''} ago`;
-    return `${Math.floor(seconds / 86400)} day${Math.floor(seconds / 86400) > 1 ? 's' : ''} ago`;
+    try {
+      // Ensure we have a valid Date object
+      const parsedDate = date instanceof Date ? date : new Date(date);
+      
+      // Check if date is valid
+      if (isNaN(parsedDate.getTime())) {
+        return 'Unknown time';
+      }
+      
+      const seconds = Math.floor((new Date().getTime() - parsedDate.getTime()) / 1000);
+      
+      if (seconds < 0) return 'Just now';
+      if (seconds < 60) return `${seconds} second${seconds !== 1 ? 's' : ''} ago`;
+      if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+      if (seconds < 86400) return `${Math.floor(seconds / 3600)} hour${Math.floor(seconds / 3600) > 1 ? 's' : ''} ago`;
+      return `${Math.floor(seconds / 86400)} day${Math.floor(seconds / 86400) > 1 ? 's' : ''} ago`;
+    } catch (error) {
+      console.error('Error calculating time ago:', error);
+      return 'Unknown time';
+    }
   };
 
   // Feature cards configuration

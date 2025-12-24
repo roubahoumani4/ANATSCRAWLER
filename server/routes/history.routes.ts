@@ -157,7 +157,13 @@ router.get('/searches', async (req: Request, res: Response) => {
       total,
       returned: searches.length,
       page: Number(page),
-      pages: Math.ceil(total / Number(limit))
+      pages: Math.ceil(total / Number(limit)),
+      sampleSearch: searches.length > 0 ? {
+        query: searches[0].query,
+        createdAt: searches[0].createdAt,
+        hasResults: searches[0].hasResults,
+        resultsCount: searches[0].resultsCount
+      } : null
     });
 
     res.json({
@@ -270,18 +276,22 @@ router.get('/stats', async (req: Request, res: Response) => {
       }
     ]);
 
+    const responseData = {
+      totalSearches,
+      successfulSearches,
+      failedSearches: totalSearches - successfulSearches,
+      discoverySearches,
+      domainSearches,
+      successRate: totalSearches > 0 ? ((successfulSearches / totalSearches) * 100).toFixed(1) : '0',
+      recentSearches,
+      searchesByDay
+    };
+
+    console.log('📊 Sending search stats:', responseData);
+
     res.json({
       success: true,
-      data: {
-        totalSearches,
-        successfulSearches,
-        failedSearches: totalSearches - successfulSearches,
-        discoverySearches,
-        domainSearches,
-        successRate: totalSearches > 0 ? ((successfulSearches / totalSearches) * 100).toFixed(1) : '0',
-        recentSearches,
-        searchesByDay
-      }
+      data: responseData
     });
   } catch (error: any) {
     console.error('Error fetching search stats:', error);
