@@ -143,7 +143,7 @@ router.get('/searches', async (req: Request, res: Response) => {
 
     const skip = (Number(page) - 1) * Number(limit);
 
-    const [searches, total] = await Promise.all([
+    const [searchesRaw, total] = await Promise.all([
       SearchHistory.find(query)
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -152,6 +152,30 @@ router.get('/searches', async (req: Request, res: Response) => {
         .lean(),
       SearchHistory.countDocuments(query)
     ]);
+
+    // Normalize old records that might have 'timestamp' instead of 'createdAt'
+    const searches = searchesRaw.map((search: any) => {
+      // If createdAt is missing but timestamp exists, use timestamp
+      if (!search.createdAt && search.timestamp) {
+        search.createdAt = search.timestamp;
+      }
+      
+      // Set defaults for missing fields in old records
+      if (search.searchType === undefined) {
+        search.searchType = 'discovery'; // Default to discovery for old records
+      }
+      if (search.hasResults === undefined) {
+        search.hasResults = false;
+      }
+      if (search.resultsCount === undefined) {
+        search.resultsCount = 0;
+      }
+      if (search.status === undefined) {
+        search.status = 'no-results';
+      }
+      
+      return search;
+    });
 
     console.log('✅ Found searches:', {
       total,
@@ -236,7 +260,7 @@ router.get('/stats', async (req: Request, res: Response) => {
       successfulSearches,
       discoverySearches,
       domainSearches,
-      recentSearches
+      recentSearchesRaw
     ] = await Promise.all([
       SearchHistory.countDocuments({ userId }),
       SearchHistory.countDocuments({ userId, hasResults: true }),
@@ -245,9 +269,26 @@ router.get('/stats', async (req: Request, res: Response) => {
       SearchHistory.find({ userId })
         .sort({ createdAt: -1 })
         .limit(5)
-        .select('query searchType resultsCount createdAt hasResults')
+        .select('query searchType resultsCount createdAt hasResults timestamp')
         .lean()
     ]);
+
+    // Normalize old records that might have 'timestamp' instead of 'createdAt'
+    const recentSearches = recentSearchesRaw.map((search: any) => {
+      if (!search.createdAt && search.timestamp) {
+        search.createdAt = search.timestamp;
+      }
+      if (search.searchType === undefined) {
+        search.searchType = 'discovery';
+      }
+      if (search.hasResults === undefined) {
+        search.hasResults = false;
+      }
+      if (search.resultsCount === undefined) {
+        search.resultsCount = 0;
+      }
+      return search;
+    });
 
     // Get searches by day for the last 30 days
     const thirtyDaysAgo = new Date();
