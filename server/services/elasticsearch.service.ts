@@ -589,32 +589,102 @@ class ElasticsearchService {
 
   /**
    * Clone an index (structure only or with data)
+   * Returns task ID if cloning with data, otherwise returns true
    */
-  async cloneIndex(sourceIndex: string, targetIndex: string, includeData: boolean = false): Promise<boolean> {
+  async cloneIndex(sourceIndex: string, targetIndex: string, includeData: boolean = false): Promise<any> {
     try {
-      if (includeData) {
-        // Clone with data using reindex
-        await this.reindex(sourceIndex, targetIndex, true);
-      } else {
-        // Clone structure only
-        const mapping = await this.getIndexMapping(sourceIndex);
-        const settings = await this.getIndexSettings(sourceIndex);
+      // First, always create the target index with the same structure
+      const mapping = await this.getIndexMapping(sourceIndex);
+      const settings = await this.getIndexSettings(sourceIndex);
 
-        await this.createIndex(targetIndex, {
-          mappings: mapping,
-          settings: {
-            index: {
-              number_of_shards: settings.index.number_of_shards,
-              number_of_replicas: settings.index.number_of_replicas,
-            },
+      // Create target index with optimized settings for bulk operations
+      await this.createIndex(targetIndex, {
+        mappings: mapping,
+        settings: {
+          index: {
+            number_of_shards: settings.index.number_of_shards,
+            number_of_replicas: 0, // Set to 0 during cloning for performance
+            refresh_interval: '-1', // Disable refresh during bulk operations
           },
-        });
-      }
+        },
+      });
 
-      return true;
+      if (includeData) {
+        // Clone with data using async reindex (don't wait for completion)
+        const reindexResult = await this.reindexAsync(sourceIndex, targetIndex);
+        
+        return {
+          success: true,
+          taskId: reindexResult.task,
+          message: 'Cloning started in background',
+        };
+      } else {
+        // Structure only clone is complete
+        return {
+          success: true,
+          message: 'Structure cloned successfully',
+        };
+      }
     } catch (error: any) {
       console.error(`Error cloning index ${sourceIndex}:`, error.message);
       throw new Error(`Failed to clone index: ${error.message}`);
+    }
+  }
+
+  /**
+   * Async reindex with proper configuration to prevent Elasticsearch crashes
+   */
+  async reindexAsync(sourceIndex: string, destIndex: string): Promise<any> {
+    try {
+      const response = await axios.post(`${this.baseUrl}/_reindex?wait_for_completion=false`, {
+        conflicts: 'proceed', // Continue on conflicts instead of aborting
+        source: {
+          index: sourceIndex,
+          size: 1000, // Process in batches of 1000 documents
+        },
+        dest: {
+          index: destIndex,
+          op_type: 'create', // Only create new documents, skip if exists
+        },
+        // Add timeout and request settings to prevent overwhelming ES
+        timeout: '30m', // 30 minute timeout
+        scroll: '5m', // Keep scroll context for 5 minutes
+      });
+
+      console.log('Async reindex started:', JSON.stringify(response.data, null, 2));
+
+      return {
+        task: response.data.task,
+        started: true,
+      };
+    } catch (error: any) {
+      console.error(`Error starting async reindex from ${sourceIndex} to ${destIndex}:`, error.response?.data || error.message);
+      const errorMsg = error.response?.data?.error?.reason || error.message;
+      throw new Error(errorMsg);
+    }
+  }
+
+  /**
+   * Finalize cloned index after reindex completes
+   */
+  async finalizeClonedIndex(indexName: string): Promise<boolean> {
+    try {
+      // Restore optimal settings after cloning
+      await axios.put(`${this.baseUrl}/${indexName}/_settings`, {
+        index: {
+          refresh_interval: '1s', // Restore normal refresh interval
+          number_of_replicas: 1, // Restore replicas
+        },
+      });
+
+      // Force a refresh to make all documents searchable
+      await axios.post(`${this.baseUrl}/${indexName}/_refresh`);
+
+      console.log(`Finalized cloned index: ${indexName}`);
+      return true;
+    } catch (error: any) {
+      console.error(`Error finalizing cloned index ${indexName}:`, error.message);
+      throw new Error(`Failed to finalize cloned index: ${error.message}`);
     }
   }
 

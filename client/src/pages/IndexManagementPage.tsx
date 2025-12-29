@@ -285,15 +285,27 @@ const IndexManagementPage = () => {
       return res.data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/v1/admin/elasticsearch/indices"] });
-      toast({
-        title: "Success",
-        description: data.message,
-      });
-      setShowCloneModal(false);
-      setCloneSourceIndex("");
-      setCloneTargetIndex("");
-      setCloneIncludeData(false);
+      if (data.taskId && cloneIncludeData) {
+        // Async clone with data - monitor task
+        setReindexTaskId(data.taskId);
+        toast({
+          title: "Success",
+          description: "Index cloning started. Monitoring progress...",
+        });
+        // Start polling for progress and finalize when complete
+        checkCloneProgress(data.taskId, cloneTargetIndex);
+      } else {
+        // Structure-only clone completed immediately
+        queryClient.invalidateQueries({ queryKey: ["/api/v1/admin/elasticsearch/indices"] });
+        toast({
+          title: "Success",
+          description: data.message,
+        });
+        setShowCloneModal(false);
+        setCloneSourceIndex("");
+        setCloneTargetIndex("");
+        setCloneIncludeData(false);
+      }
     },
     onError: (error: any) => {
       toast({
@@ -506,6 +518,77 @@ const IndexManagementPage = () => {
         setReindexTaskId("");
         setReindexProgress(0);
       }
+    }
+  };
+
+  // Check clone progress (similar to reindex but finalizes the index when done)
+  const checkCloneProgress = async (taskId: string, targetIndex: string) => {
+    try {
+      const res = await axios.get(
+        `${API_BASE_URL}/api/v1/admin/elasticsearch/tasks/${taskId}`,
+        { withCredentials: true }
+      );
+      
+      if (res.data.success) {
+        const statusData = res.data.status;
+        setReindexProgress(statusData.percentage);
+        
+        if (!statusData.completed) {
+          // Continue polling
+          setTimeout(() => checkCloneProgress(taskId, targetIndex), 1000);
+        } else {
+          const documentsCreated = statusData.progress || 0;
+          const totalDocs = statusData.total || 0;
+          const failures = statusData.failures?.length || 0;
+
+          // Finalize the cloned index (restore settings and replicas)
+          try {
+            await axios.post(
+              `${API_BASE_URL}/api/v1/admin/elasticsearch/indices/finalize-clone`,
+              { indexName: targetIndex },
+              { withCredentials: true }
+            );
+          } catch (finalizeError) {
+            console.error("Error finalizing clone:", finalizeError);
+          }
+
+          // Build completion message
+          let message = `Cloning completed! ${documentsCreated} of ${totalDocs} documents copied.`;
+          
+          if (failures > 0) {
+            message = `⚠️ Cloning completed with issues! ${documentsCreated} documents succeeded, ${failures} failed.`;
+          } else if (documentsCreated === 0 && totalDocs > 0) {
+            message = `❌ Cloning failed! 0 documents transferred. Check mapping compatibility.`;
+          }
+
+          toast({
+            title: failures > 0 || (documentsCreated === 0 && totalDocs > 0) ? "Warning" : "Success",
+            description: message,
+            variant: failures > 0 || (documentsCreated === 0 && totalDocs > 0) ? "destructive" : "default",
+          });
+          
+          queryClient.invalidateQueries({ queryKey: ["/api/v1/admin/elasticsearch/indices"] });
+          setShowCloneModal(false);
+          setCloneSourceIndex("");
+          setCloneTargetIndex("");
+          setCloneIncludeData(false);
+          setReindexTaskId("");
+          setReindexProgress(0);
+        }
+      }
+    } catch (error: any) {
+      console.error("Error checking clone progress:", error);
+      toast({
+        title: "Error",
+        description: "Failed to monitor clone progress. The operation may still complete in the background.",
+        variant: "destructive",
+      });
+      setShowCloneModal(false);
+      setCloneSourceIndex("");
+      setCloneTargetIndex("");
+      setCloneIncludeData(false);
+      setReindexTaskId("");
+      setReindexProgress(0);
     }
   };
 

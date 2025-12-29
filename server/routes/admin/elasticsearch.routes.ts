@@ -543,7 +543,7 @@ router.get('/tasks/:taskId', requireAdmin, async (req: Request, res: Response) =
 
 /**
  * POST /api/v1/admin/elasticsearch/indices/clone
- * Clone an index
+ * Clone an index (async operation for data cloning)
  */
 router.post('/indices/clone', requireAdmin, async (req: Request, res: Response) => {
   try {
@@ -556,17 +556,59 @@ router.post('/indices/clone', requireAdmin, async (req: Request, res: Response) 
       });
     }
 
-    await elasticsearchService.cloneIndex(sourceIndex, targetIndex, includeData);
+    const result = await elasticsearchService.cloneIndex(sourceIndex, targetIndex, includeData);
 
-    res.json({
-      success: true,
-      message: `Index '${sourceIndex}' cloned to '${targetIndex}' ${includeData ? 'with data' : '(structure only)'}`,
-    });
+    if (includeData && result.taskId) {
+      // Return task ID for async monitoring
+      res.json({
+        success: true,
+        message: `Cloning '${sourceIndex}' to '${targetIndex}' started in background`,
+        taskId: result.taskId,
+        includeData: true,
+      });
+    } else {
+      // Structure only clone completed immediately
+      res.json({
+        success: true,
+        message: `Index '${sourceIndex}' structure cloned to '${targetIndex}'`,
+        includeData: false,
+      });
+    }
   } catch (error: any) {
     console.error('Error cloning index:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to clone index',
+    });
+  }
+});
+
+/**
+ * POST /api/v1/admin/elasticsearch/indices/finalize-clone
+ * Finalize a cloned index after async reindex completes
+ */
+router.post('/indices/finalize-clone', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { indexName } = req.body;
+
+    if (!indexName) {
+      return res.status(400).json({
+        success: false,
+        error: 'Index name is required',
+      });
+    }
+
+    await elasticsearchService.finalizeClonedIndex(indexName);
+
+    res.json({
+      success: true,
+      message: `Index '${indexName}' finalized successfully`,
+    });
+  } catch (error: any) {
+    console.error('Error finalizing cloned index:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to finalize cloned index',
     });
   }
 });

@@ -416,63 +416,71 @@ const DarkWebMonitoringPage: React.FC = () => {
         variants={staggerContainer}
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8"
       >
-        <motion.div variants={fadeIn} className="bg-darkGray rounded-xl p-6 border border-coolWhite/10">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 rounded-lg bg-orange-500/10">
-              <AlertTriangle className="w-6 h-6 text-orange-500" />
+        <motion.div variants={fadeIn} className="bg-gradient-to-br from-amber-900/40 via-amber-800/30 to-amber-900/40 border border-amber-700/50 rounded-xl p-6 hover:border-amber-500/70 transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/20">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-amber-400 text-sm font-semibold uppercase tracking-wide mb-1">Active Threats</p>
+              <h3 className="text-3xl font-bold text-white">{stats.threatIntelligence.total}</h3>
+              <p className="text-sm text-gray-300 mt-2">Monitoring</p>
             </div>
-            <TrendingUp className="w-5 h-5 text-green-500" />
+            <div className="w-12 h-12 rounded-full bg-amber-600/20 flex items-center justify-center">
+              <AlertTriangle className="text-amber-400" size={24} />
+            </div>
           </div>
-          <div className="text-3xl font-bold mb-1">{stats.threatIntelligence.total}</div>
-          <div className="text-sm text-gray-400">Active Threats</div>
         </motion.div>
 
-        <motion.div variants={fadeIn} className="bg-darkGray rounded-xl p-6 border border-coolWhite/10">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 rounded-lg bg-red-500/10">
-              <Shield className="w-6 h-6 text-red-500" />
+        <motion.div variants={fadeIn} className="bg-gradient-to-br from-red-900/40 via-red-800/30 to-red-900/40 border border-red-700/50 rounded-xl p-6 hover:border-red-500/70 transition-all duration-300 hover:shadow-lg hover:shadow-red-500/20">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-red-400 text-sm font-semibold uppercase tracking-wide mb-1">Discovery</p>
+              <h3 className="text-3xl font-bold text-white">{stats.discovery.totalSearches}</h3>
+              <p className="text-sm text-gray-300 mt-2">Searches</p>
             </div>
-            <TrendingUp className="w-5 h-5 text-green-500" />
+            <div className="w-12 h-12 rounded-full bg-red-600/20 flex items-center justify-center">
+              <Shield className="text-red-400" size={24} />
+            </div>
           </div>
-          <div className="text-3xl font-bold mb-1">{stats.discovery.totalSearches}</div>
-          <div className="text-sm text-gray-400">Discovery Searches</div>
         </motion.div>
 
-        <motion.div variants={fadeIn} className="bg-darkGray rounded-xl p-6 border border-coolWhite/10">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 rounded-lg bg-blue-500/10">
-              <Globe className="w-6 h-6 text-blue-500" />
+        <motion.div variants={fadeIn} className="bg-gradient-to-br from-sky-900/40 via-sky-800/30 to-sky-900/40 border border-sky-700/50 rounded-xl p-6 hover:border-sky-500/70 transition-all duration-300 hover:shadow-lg hover:shadow-sky-500/20">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sky-400 text-sm font-semibold uppercase tracking-wide mb-1">Domains</p>
+              <h3 className="text-3xl font-bold text-white">{stats.domainMonitoring.monitoredDomains}</h3>
+              <p className="text-sm text-gray-300 mt-2">Monitored</p>
             </div>
-            <TrendingUp className="w-5 h-5 text-green-500" />
+            <div className="w-12 h-12 rounded-full bg-sky-600/20 flex items-center justify-center">
+              <Globe className="text-sky-400" size={24} />
+            </div>
           </div>
-          <div className="text-3xl font-bold mb-1">{stats.domainMonitoring.monitoredDomains}</div>
-          <div className="text-sm text-gray-400">Monitored Domains</div>
         </motion.div>
 
-        <motion.div variants={fadeIn} className="bg-darkGray rounded-xl p-6 border border-coolWhite/10">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 rounded-lg bg-purple-500/10">
-              <HistoryIcon className="w-6 h-6 text-purple-500" />
+        <motion.div variants={fadeIn} className="bg-gradient-to-br from-purple-900/40 via-purple-800/30 to-purple-900/40 border border-purple-700/50 rounded-xl p-6 hover:border-purple-500/70 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/20">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-purple-400 text-sm font-semibold uppercase tracking-wide mb-1">Searches</p>
+              <h3 className="text-3xl font-bold text-white">{stats.searchHistory.totalSearches}</h3>
+              <p className="text-sm text-gray-300 mt-2">{stats.searchHistory.successRate}% success</p>
             </div>
-            <div className="text-sm text-green-500">
-              {stats.searchHistory.successRate}% success
+            <div className="w-12 h-12 rounded-full bg-purple-600/20 flex items-center justify-center">
+              <HistoryIcon className="text-purple-400" size={24} />
             </div>
           </div>
-          <div className="text-3xl font-bold mb-1">{stats.searchHistory.totalSearches}</div>
-          <div className="text-sm text-gray-400">Total Searches</div>
         </motion.div>
 
-        <motion.div variants={fadeIn} className="bg-darkGray rounded-xl p-6 border border-coolWhite/10">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 rounded-lg bg-cyan-500/10">
-              <Database className="w-6 h-6 text-cyan-500" />
+        <motion.div variants={fadeIn} className="bg-gradient-to-br from-emerald-900/40 via-emerald-800/30 to-emerald-900/40 border border-emerald-700/50 rounded-xl p-6 hover:border-emerald-500/70 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/20">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-emerald-400 text-sm font-semibold uppercase tracking-wide mb-1">Indexed</p>
+              <h3 className="text-3xl font-bold text-white">
+                {elasticsearchStats.totalDocuments.toLocaleString()}
+              </h3>
+              <p className="text-sm text-gray-300 mt-2">Files</p>
             </div>
-            <TrendingUp className="w-5 h-5 text-cyan-500" />
+            <div className="w-12 h-12 rounded-full bg-emerald-600/20 flex items-center justify-center">
+              <Database className="text-emerald-400" size={24} />
+            </div>
           </div>
-          <div className="text-3xl font-bold mb-1">
-            {elasticsearchStats.totalDocuments.toLocaleString()}
-          </div>
-          <div className="text-sm text-gray-400">Indexed Files</div>
         </motion.div>
       </motion.div>
 
@@ -481,7 +489,7 @@ const DarkWebMonitoringPage: React.FC = () => {
         {/* Activity Chart */}
         <motion.div
           variants={fadeIn}
-          className="lg:col-span-2 bg-darkGray rounded-xl p-6 border border-coolWhite/10"
+          className="lg:col-span-2 bg-gray-900/60 rounded-xl p-6 border border-gray-800"
         >
           <h2 className="text-xl font-semibold mb-6 flex items-center">
             <BarChart3 className="w-6 h-6 mr-2 text-cyan-400" />
@@ -555,7 +563,7 @@ const DarkWebMonitoringPage: React.FC = () => {
         {/* Recent Activity */}
         <motion.div
           variants={fadeIn}
-          className="bg-darkGray rounded-xl p-6 border border-coolWhite/10"
+          className="bg-gray-900/60 rounded-xl p-6 border border-gray-800"
         >
           <h2 className="text-xl font-semibold mb-6 flex items-center">
             <Zap className="w-6 h-6 mr-2 text-yellow-400" />
@@ -597,7 +605,7 @@ const DarkWebMonitoringPage: React.FC = () => {
         {/* Threat Distribution */}
         <motion.div
           variants={fadeIn}
-          className="bg-darkGray rounded-xl p-6 border border-coolWhite/10"
+          className="bg-gray-900/60 rounded-xl p-6 border border-gray-800"
         >
           <h2 className="text-xl font-semibold mb-6 flex items-center">
             <PieChartIcon className="w-6 h-6 mr-2 text-orange-400" />
@@ -643,7 +651,7 @@ const DarkWebMonitoringPage: React.FC = () => {
         {/* Search Type Distribution */}
         <motion.div
           variants={fadeIn}
-          className="bg-darkGray rounded-xl p-6 border border-coolWhite/10"
+          className="bg-gray-900/60 rounded-xl p-6 border border-gray-800"
         >
           <h2 className="text-xl font-semibold mb-6 flex items-center">
             <Database className="w-6 h-6 mr-2 text-purple-400" />
@@ -683,7 +691,7 @@ const DarkWebMonitoringPage: React.FC = () => {
         {/* Security Score Radar */}
         <motion.div
           variants={fadeIn}
-          className="bg-darkGray rounded-xl p-6 border border-coolWhite/10"
+          className="bg-gray-900/60 rounded-xl p-6 border border-gray-800"
         >
           <h2 className="text-xl font-semibold mb-6 flex items-center">
             <Shield className="w-6 h-6 mr-2 text-green-400" />
@@ -741,7 +749,7 @@ const DarkWebMonitoringPage: React.FC = () => {
             <motion.div
               key={index}
               variants={fadeIn}
-              className="bg-darkGray rounded-xl overflow-hidden border border-coolWhite/10 hover:border-cyan-400/30 transition-all duration-300 group cursor-pointer"
+              className="bg-gray-900/60 rounded-xl overflow-hidden border border-gray-800 hover:border-cyan-400/30 transition-all duration-300 group cursor-pointer"
               onClick={() => navigate(feature.path)}
             >
               <div className={`h-2 bg-gradient-to-r ${feature.color}`}></div>
@@ -793,7 +801,7 @@ const DarkWebMonitoringPage: React.FC = () => {
       {/* System Status */}
       <motion.div
         variants={fadeIn}
-        className="bg-darkGray rounded-xl p-6 border border-coolWhite/10"
+        className="bg-gray-900/60 rounded-xl p-6 border border-gray-800"
       >
         <h2 className="text-xl font-semibold mb-6 flex items-center">
           <Lock className="w-6 h-6 mr-2 text-green-400" />
