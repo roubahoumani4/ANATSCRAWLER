@@ -644,6 +644,14 @@ class ElasticsearchService {
    */
   async reindexAsync(sourceIndex: string, destIndex: string): Promise<any> {
     try {
+      // Check if destination index already has documents
+      const destStats = await axios.get(`${this.baseUrl}/${destIndex}/_stats`).catch(() => null);
+      const existingDocs = destStats?.data?.indices?.[destIndex]?.total?.docs?.count || 0;
+      
+      if (existingDocs > 0) {
+        console.warn(`Destination index ${destIndex} already has ${existingDocs} documents. Using 'index' op_type to update/overwrite.`);
+      }
+
       const response = await axios.post(
         `${this.baseUrl}/_reindex?wait_for_completion=false&requests_per_second=500&slices=auto`,
         {
@@ -654,7 +662,8 @@ class ElasticsearchService {
           },
           dest: {
             index: destIndex,
-            op_type: 'create', // Only create new documents, skip if exists
+            // Use 'index' instead of 'create' to allow updates if documents exist
+            // This ensures documents are copied even if some already exist
           },
         },
         {
@@ -684,6 +693,12 @@ class ElasticsearchService {
    */
   async finalizeClonedIndex(indexName: string): Promise<boolean> {
     try {
+      // First, check index stats to see if it has documents
+      const statsResponse = await axios.get(`${this.baseUrl}/${indexName}/_stats`);
+      const docCount = statsResponse.data.indices?.[indexName]?.total?.docs?.count || 0;
+      
+      console.log(`Finalizing index ${indexName} with ${docCount} documents`);
+
       // Restore optimal settings after cloning
       await axios.put(`${this.baseUrl}/${indexName}/_settings`, {
         index: {
@@ -697,13 +712,26 @@ class ElasticsearchService {
       // Force a refresh to make all documents searchable
       await axios.post(`${this.baseUrl}/${indexName}/_refresh`);
       
-      // Force merge to optimize the index (combines segments)
-      try {
-        await axios.post(`${this.baseUrl}/${indexName}/_forcemerge?max_num_segments=1`, {}, {
-          timeout: 300000, // 5 minute timeout for force merge
-        });
-      } catch (mergeError) {
-        console.warn(`Force merge failed for ${indexName}, but index is functional:`, mergeError);
+      // Only attempt force merge if index has documents and is not empty
+      if (docCount > 0) {
+        try {
+          console.log(`Starting force merge for ${indexName}...`);
+          // Use only_expunge_deletes for safer merge that won't fail on active writes
+          await axios.post(
+            `${this.baseUrl}/${indexName}/_forcemerge?only_expunge_deletes=true&max_num_segments=5`,
+            {},
+            {
+              timeout: 300000, // 5 minute timeout for force merge
+            }
+          );
+          console.log(`Force merge completed for ${indexName}`);
+        } catch (mergeError: any) {
+          const errorMsg = mergeError.response?.data?.error?.reason || mergeError.message;
+          console.warn(`Force merge skipped for ${indexName}: ${errorMsg}`);
+          // Don't throw - force merge is optional optimization
+        }
+      } else {
+        console.log(`Skipping force merge for ${indexName} - index is empty`);
       }
 
       console.log(`Finalized cloned index: ${indexName}`);
