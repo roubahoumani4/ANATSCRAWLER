@@ -636,20 +636,20 @@ class ElasticsearchService {
    */
   async reindexAsync(sourceIndex: string, destIndex: string): Promise<any> {
     try {
-      const response = await axios.post(`${this.baseUrl}/_reindex?wait_for_completion=false`, {
-        conflicts: 'proceed', // Continue on conflicts instead of aborting
-        source: {
-          index: sourceIndex,
-          size: 1000, // Process in batches of 1000 documents
-        },
-        dest: {
-          index: destIndex,
-          op_type: 'create', // Only create new documents, skip if exists
-        },
-        // Add timeout and request settings to prevent overwhelming ES
-        timeout: '30m', // 30 minute timeout
-        scroll: '5m', // Keep scroll context for 5 minutes
-      });
+      const response = await axios.post(
+        `${this.baseUrl}/_reindex?wait_for_completion=false&timeout=30m&scroll=5m`,
+        {
+          conflicts: 'proceed', // Continue on conflicts instead of aborting
+          source: {
+            index: sourceIndex,
+            size: 1000, // Process in batches of 1000 documents
+          },
+          dest: {
+            index: destIndex,
+            op_type: 'create', // Only create new documents, skip if exists
+          },
+        }
+      );
 
       console.log('Async reindex started:', JSON.stringify(response.data, null, 2));
 
