@@ -233,7 +233,7 @@ const SignupPage = () => {
         {/* Footer */}
         <div className="mt-8 text-center text-gray-400 text-sm">
           <p>Advanced Data Discovery & Security Platform</p>
-          <p className="mt-2">© {new Date().getFullYear()} ANAT Security</p>
+          <p className="mt-2">© {new Date().getFullYear()} ANATSCRAWLER</p>
         </div>
       </div>
     </div>

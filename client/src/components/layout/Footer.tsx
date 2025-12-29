@@ -10,7 +10,7 @@ const Footer = () => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
-      <p>&copy; {currentYear} ANAT Security. All Rights Reserved.</p>
+      <p>&copy; {currentYear} ANATSCRAWLER. All Rights Reserved.</p>
       <nav className="mt-2">
         <a 
           href="/privacy-policy" 

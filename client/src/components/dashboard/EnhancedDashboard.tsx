@@ -211,43 +211,19 @@ const EnhancedDashboard = () => {
 
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
+  // OSINT data for donut chart
+  const osintData = [
+    { name: 'Total Scans', value: darkWebStats.totalSearches, color: '#3b82f6' },
+    { name: 'Success', value: Math.round(darkWebStats.totalSearches * (darkWebStats.successRate / 100)), color: '#10b981' }
+  ].filter(d => d.value > 0);
+
   return (
     <motion.div
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white p-6"
+      className="min-h-screen bg-jetBlack text-white p-6"
     >
-      {/* Matrix Background Effect */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-cyan-500/5 to-transparent"></div>
-        {[...Array(15)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute text-blue-400 font-mono text-xs opacity-10 select-none"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `-10%`,
-            }}
-            animate={{
-              y: ["0vh", "110vh"],
-            }}
-            transition={{
-              duration: Math.random() * 6 + 8,
-              repeat: Infinity,
-              delay: Math.random() * 4,
-              ease: "linear"
-            }}
-          >
-            {Array.from({ length: 15 }, (_, idx) => (
-              <div key={idx} className="mb-1">
-                {String.fromCharCode(33 + Math.floor(Math.random() * 94))}
-              </div>
-            ))}
-          </motion.div>
-        ))}
-      </div>
-
       <div className="relative z-10">
         {/* Enhanced Header */}
         <motion.div 
@@ -337,16 +313,56 @@ const EnhancedDashboard = () => {
                 <Badge className="bg-green-500/20 text-green-400">ACTIVE</Badge>
               </div>
               
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="bg-gray-900/60 rounded-lg p-4">
-                  <p className="text-sm text-gray-400 mb-1">Total Scans</p>
-                  <p className="text-2xl font-bold text-white">{darkWebStats.totalSearches}</p>
+              {osintData.length > 0 ? (
+                <>
+                  <ResponsiveContainer width="100%" height={150}>
+                    <PieChart>
+                      <Pie
+                        data={osintData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={40}
+                        outerRadius={60}
+                        dataKey="value"
+                        label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                      >
+                        {osintData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: '#1f2937', 
+                          border: '1px solid #374151',
+                          borderRadius: '8px'
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  
+                  <div className="grid grid-cols-2 gap-4 mb-4 mt-2">
+                    <div className="bg-gray-900/60 rounded-lg p-4">
+                      <p className="text-sm text-gray-400 mb-1">Total Scans</p>
+                      <p className="text-2xl font-bold text-white">{darkWebStats.totalSearches}</p>
+                    </div>
+                    <div className="bg-gray-900/60 rounded-lg p-4">
+                      <p className="text-sm text-gray-400 mb-1">Success Rate</p>
+                      <p className="text-2xl font-bold text-green-400">{darkWebStats.successRate.toFixed(1)}%</p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="bg-gray-900/60 rounded-lg p-4">
+                    <p className="text-sm text-gray-400 mb-1">Total Scans</p>
+                    <p className="text-2xl font-bold text-white">{darkWebStats.totalSearches}</p>
+                  </div>
+                  <div className="bg-gray-900/60 rounded-lg p-4">
+                    <p className="text-sm text-gray-400 mb-1">Success Rate</p>
+                    <p className="text-2xl font-bold text-green-400">{darkWebStats.successRate.toFixed(1)}%</p>
+                  </div>
                 </div>
-                <div className="bg-gray-900/60 rounded-lg p-4">
-                  <p className="text-sm text-gray-400 mb-1">Success Rate</p>
-                  <p className="text-2xl font-bold text-green-400">{darkWebStats.successRate.toFixed(1)}%</p>
-                </div>
-              </div>
+              )}
 
               <Button 
                 onClick={() => navigate('/discovery')}
@@ -469,6 +485,59 @@ const EnhancedDashboard = () => {
             </div>
           </motion.div>
         </div>
+
+        {/* Quick Stats Row */}
+        <motion.div variants={itemVariants} className="mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+            <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-4 text-center">
+              <Activity className="text-blue-400 mx-auto mb-2" size={24} />
+              <p className="text-2xl font-bold text-white">{activityStats?.today || 0}</p>
+              <p className="text-xs text-gray-400">Activity Today</p>
+            </div>
+            
+            <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-4 text-center">
+              <UserPlus className="text-purple-400 mx-auto mb-2" size={24} />
+              <p className="text-2xl font-bold text-white">{newUsersThisWeek}</p>
+              <p className="text-xs text-gray-400">New Users</p>
+            </div>
+            
+            <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-4 text-center">
+              <CheckCircle className="text-emerald-400 mx-auto mb-2" size={24} />
+              <p className="text-2xl font-bold text-white">{healthyIndices}</p>
+              <p className="text-xs text-gray-400">Healthy Indices</p>
+            </div>
+            
+            <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-4 text-center">
+              <HardDrive className="text-amber-400 mx-auto mb-2" size={24} />
+              <p className="text-2xl font-bold text-white">{formatStorage(totalStorageBytes)}</p>
+              <p className="text-xs text-gray-400">Storage Used</p>
+            </div>
+            
+            <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-4 text-center">
+              <Search className="text-indigo-400 mx-auto mb-2" size={24} />
+              <p className="text-2xl font-bold text-white">{darkWebStats.totalSearches}</p>
+              <p className="text-xs text-gray-400">Total Searches</p>
+            </div>
+            
+            <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-4 text-center">
+              <Shield className="text-cyan-400 mx-auto mb-2" size={24} />
+              <p className="text-2xl font-bold text-white">{sessionStats?.activeSessions || 0}</p>
+              <p className="text-xs text-gray-400">Active Sessions</p>
+            </div>
+            
+            <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-4 text-center">
+              <Layers className="text-yellow-400 mx-auto mb-2" size={24} />
+              <p className="text-2xl font-bold text-white">{totalIndices}</p>
+              <p className="text-xs text-gray-400">Total Indices</p>
+            </div>
+            
+            <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-4 text-center">
+              <TrendingUp className="text-green-400 mx-auto mb-2" size={24} />
+              <p className="text-2xl font-bold text-white">{darkWebStats.successRate.toFixed(1)}%</p>
+              <p className="text-xs text-gray-400">Success Rate</p>
+            </div>
+          </div>
+        </motion.div>
 
         {/* Analytics Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6 mb-6">
@@ -661,59 +730,6 @@ const EnhancedDashboard = () => {
             </motion.div>
           )}
         </div>
-
-        {/* Quick Stats Row */}
-        <motion.div variants={itemVariants}>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-            <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-4 text-center">
-              <Activity className="text-blue-400 mx-auto mb-2" size={24} />
-              <p className="text-2xl font-bold text-white">{activityStats?.today || 0}</p>
-              <p className="text-xs text-gray-400">Activity Today</p>
-            </div>
-            
-            <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-4 text-center">
-              <UserPlus className="text-purple-400 mx-auto mb-2" size={24} />
-              <p className="text-2xl font-bold text-white">{newUsersThisWeek}</p>
-              <p className="text-xs text-gray-400">New Users</p>
-            </div>
-            
-            <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-4 text-center">
-              <CheckCircle className="text-emerald-400 mx-auto mb-2" size={24} />
-              <p className="text-2xl font-bold text-white">{healthyIndices}</p>
-              <p className="text-xs text-gray-400">Healthy Indices</p>
-            </div>
-            
-            <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-4 text-center">
-              <HardDrive className="text-amber-400 mx-auto mb-2" size={24} />
-              <p className="text-2xl font-bold text-white">{formatStorage(totalStorageBytes)}</p>
-              <p className="text-xs text-gray-400">Storage Used</p>
-            </div>
-            
-            <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-4 text-center">
-              <Search className="text-indigo-400 mx-auto mb-2" size={24} />
-              <p className="text-2xl font-bold text-white">{darkWebStats.totalSearches}</p>
-              <p className="text-xs text-gray-400">Total Searches</p>
-            </div>
-            
-            <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-4 text-center">
-              <Shield className="text-cyan-400 mx-auto mb-2" size={24} />
-              <p className="text-2xl font-bold text-white">{sessionStats?.activeSessions || 0}</p>
-              <p className="text-xs text-gray-400">Active Sessions</p>
-            </div>
-            
-            <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-4 text-center">
-              <Layers className="text-yellow-400 mx-auto mb-2" size={24} />
-              <p className="text-2xl font-bold text-white">{totalIndices}</p>
-              <p className="text-xs text-gray-400">Total Indices</p>
-            </div>
-            
-            <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-4 text-center">
-              <TrendingUp className="text-green-400 mx-auto mb-2" size={24} />
-              <p className="text-2xl font-bold text-white">{darkWebStats.successRate.toFixed(1)}%</p>
-              <p className="text-xs text-gray-400">Success Rate</p>
-            </div>
-          </div>
-        </motion.div>
       </div>
     </motion.div>
   );

@@ -1248,7 +1248,7 @@ const AssessmentPage: React.FC = () => {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(16);
         doc.setTextColor(40, 40, 40);
-        doc.text('ANAT SECURITY', margin + 30, 18);
+        doc.text('ANATSCRAWLER', margin + 30, 18);
         
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(10);
@@ -1283,7 +1283,7 @@ const AssessmentPage: React.FC = () => {
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
         doc.text(`Page ${pageNumber}`, pageWidth / 2, footerY, { align: 'center' });
-        doc.text('ANAT Security - Confidential Report', pageWidth - margin, footerY, { align: 'right' });
+        doc.text('ANATSCRAWLER - Confidential Report', pageWidth - margin, footerY, { align: 'right' });
       };
 
       // Helper function to check and add new page if needed

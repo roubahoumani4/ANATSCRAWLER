@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useLanguage } from "@/context/LanguageContext";
+import anatLogo from "@/assets/anatlogo.png";
 import {
   Search,
   Settings,
@@ -13,7 +14,6 @@ import {
   Moon,
   Sun,
   BarChart2,
-  Shield,
   Globe,
   Eye,
   Bug,
@@ -93,7 +93,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
       hasSubmenu: true,
       features: [
         { path: "/threat-intelligence", label: "Threat Intelligence", icon: <AlertTriangle size={16} />, color: "text-white" },
-        { path: "/discovery", label: "Discovery", icon: <Shield size={16} />, color: "text-white" },
+        { path: "/discovery", label: "Discovery", icon: <Search size={16} />, color: "text-white" },
         { path: "/domain-monitoring", label: "Domain Monitoring", icon: <Globe size={16} />, color: "text-white" },
         { path: "/search-history", label: "Search History", icon: <HistoryIcon size={16} />, color: "text-white" }
       ]
@@ -108,7 +108,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
       features: [
         { path: "/users/management", label: "Manage Users", icon: <UserCog size={16} />, color: "text-white" },
         { path: "/users/activity-logs", label: "Activity Logs", icon: <Activity size={16} />, color: "text-white" },
-        { path: "/users/sessions", label: "Session Management", icon: <Shield size={16} />, color: "text-white" }
+        { path: "/users/sessions", label: "Session Management", icon: <Lock size={16} />, color: "text-white" }
       ]
     },
     // Index Management - Only visible for admin users
@@ -152,13 +152,24 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
     >
       <div className="flex items-center justify-between p-4 border-b border-gray-800">
         <motion.div
-          className="flex items-center"
+          className="flex items-center gap-3"
           variants={logoVariants}
           animate={collapsed ? "collapsed" : "expanded"}
           transition={{ duration: 0.3 }}
         >
-          <Shield className="text-crimsonRed mr-2" size={24} />
-          <span className="text-lg font-bold text-coolWhite">ANAT Security</span>
+          <img 
+            src={anatLogo} 
+            alt="ANATSCRAWLER Logo" 
+            className="w-8 h-8 object-contain"
+          />
+          <div className="flex flex-col">
+            <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600">
+              ANATSCRAWLER
+            </span>
+            <span className="text-[10px] text-gray-400 tracking-wider">
+              SECURITY PLATFORM
+            </span>
+          </div>
         </motion.div>
         
         <button

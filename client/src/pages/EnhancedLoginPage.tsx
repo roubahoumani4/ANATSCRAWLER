@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
-import { Shield, Lock, User, AlertCircle, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { Lock, User, AlertCircle, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import anatLogo from "@/assets/anatlogo.png";
 
 const EnhancedLoginPage = () => {
   const { login, isAuthenticated } = useAuth();
@@ -140,21 +141,27 @@ const EnhancedLoginPage = () => {
             {/* Header */}
             <div className="text-center mb-8">
               <motion.div
-                className="w-16 h-16 mx-auto mb-4 bg-indigo-900 rounded-xl flex items-center justify-center"
+                className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-cyan-900/40 via-blue-900/40 to-purple-900/40 rounded-xl flex items-center justify-center border-2 border-indigo-500/30"
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
               >
-                <Shield className="w-8 h-8 text-indigo-400" />
+                <img 
+                  src={anatLogo} 
+                  alt="ANATSCRAWLER Logo" 
+                  className="w-12 h-12 object-contain"
+                />
               </motion.div>
               
               <motion.h1
-                className="text-2xl font-bold text-white mb-2"
+                className="text-3xl font-black mb-2"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5 }}
               >
-                {translations.title[language]}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600">
+                  ANATSCRAWLER
+                </span>
               </motion.h1>
               
               <motion.p
@@ -234,7 +241,7 @@ const EnhancedLoginPage = () => {
                     2FA CODE
                   </label>
                   <div className="relative">
-                    <Shield className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
                     <input
                       type="text"
                       value={twoFactorCode}
@@ -284,7 +291,7 @@ const EnhancedLoginPage = () => {
         {/* Footer */}
         <div className="mt-8 text-center text-gray-400 text-sm">
           <p>Advanced Data Discovery & Security Platform</p>
-          <p className="mt-2">© {new Date().getFullYear()} ANAT Security</p>
+          <p className="mt-2">© {new Date().getFullYear()} ANATSCRAWLER</p>
         </div>
       </div>
     </div>
