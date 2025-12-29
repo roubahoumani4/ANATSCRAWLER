@@ -140,40 +140,38 @@ const UserManagementDashboardPage = () => {
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
   return (
-    <div className="min-h-screen bg-jetBlack text-coolWhite p-6">
-      <div className="relative z-10">
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="max-w-7xl mx-auto"
-        >
-          {/* Header */}
-          <motion.div variants={itemVariants} className="mb-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold flex items-center gap-3">
-                  <Users className="text-cyan-400" size={36} />
-                  User Management
-                </h1>
-                <p className="text-gray-400 mt-2">
-                  Comprehensive overview of users, sessions, and activities
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <Button
-                  onClick={() => navigate('/users/management')}
-                  className="bg-crimsonRed hover:bg-crimsonRed/80 text-white"
-                >
-                  <UserCog className="mr-2 h-4 w-4" />
-                  Manage Users
-                </Button>
-              </div>
-            </div>
-          </motion.div>
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="min-h-screen bg-jetBlack text-coolWhite p-6"
+    >
+      {/* Header */}
+      <motion.div variants={itemVariants} className="mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-3">
+              <Users className="text-cyan-400" size={36} />
+              User Management
+            </h1>
+            <p className="text-gray-400 mt-2">
+              Comprehensive overview of users, sessions, and activities
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <Button
+              onClick={() => navigate('/users/management')}
+              className="bg-crimsonRed hover:bg-crimsonRed/80 text-white"
+            >
+              <UserCog className="mr-2 h-4 w-4" />
+              Manage Users
+            </Button>
+          </div>
+        </div>
+      </motion.div>
 
-          {/* Quick Stats Cards */}
-          <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      {/* Quick Stats Cards */}
+      <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {/* Total Users */}
             <div className="bg-gradient-to-br from-sky-900/40 via-sky-800/30 to-sky-900/40 border border-sky-700/50 rounded-xl p-6 hover:border-sky-500/70 transition-all duration-300 hover:shadow-lg hover:shadow-sky-500/20 cursor-pointer"
                  onClick={() => navigate('/users/management')}>
@@ -576,10 +574,8 @@ const UserManagementDashboardPage = () => {
                 </div>
               </div>
             </motion.div>
-          </motion.div>
-        </div>
-      </div>
-    );
-  };
+    </motion.div>
+  );
+};
 
-  export default UserManagementDashboardPage;
+export default UserManagementDashboardPage;
