@@ -294,6 +294,63 @@ router.get('/users', async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/v1/admin/activity-logs/stats
+ * Get overall activity statistics for dashboard
+ */
+router.get('/stats', async (req: Request, res: Response) => {
+  try {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - 7);
+
+    const [
+      total,
+      today,
+      thisWeek,
+      byActionType
+    ] = await Promise.all([
+      // Total activities
+      ActivityLog.countDocuments(),
+
+      // Today's activities
+      ActivityLog.countDocuments({
+        createdAt: { $gte: startOfToday }
+      }),
+
+      // This week's activities
+      ActivityLog.countDocuments({
+        createdAt: { $gte: startOfWeek }
+      }),
+
+      // By action type
+      ActivityLog.aggregate([
+        { $group: { _id: '$actionType', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 10 }
+      ])
+    ]);
+
+    res.json({
+      success: true,
+      stats: {
+        total,
+        today,
+        thisWeek,
+        byActionType
+      }
+    });
+  } catch (error: any) {
+    console.error('Error fetching activity stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch activity stats',
+      message: error.message
+    });
+  }
+});
+
+/**
  * GET /api/v1/admin/activity-logs/user-summary/:userId
  * Get activity summary for a specific user
  */

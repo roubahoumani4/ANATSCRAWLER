@@ -20,6 +20,7 @@ import DomainMonitoringPage from '@/pages/DomainMonitoringPage';
 import ThreatIntelligenceFeedPage from '@/pages/ThreatIntelligenceFeedPage';
 import SearchHistoryPage from '@/pages/SearchHistoryPage';
 import DarkWebMonitoringPage from '@/pages/DarkWebMonitoringPage';
+import UserManagementDashboardPage from '@/pages/UserManagementDashboardPage';
 import ManageUsersPage from '@/pages/ManageUsersPage';
 import UserActivityLogsPage from '@/pages/UserActivityLogsPage';
 import UserActivityDashboardPage from '@/pages/UserActivityDashboardPage';
@@ -103,6 +104,7 @@ export default function AppContent() {
           <Route path="/settings" element={<ProtectedRoute><GeneralSettingsPage /></ProtectedRoute>} />
           
           {/* User Management Routes - Admin Only */}
+          <Route path="/users" element={<AdminRoute><UserManagementDashboardPage /></AdminRoute>} />
           <Route path="/users/management" element={<AdminRoute><ManageUsersPage /></AdminRoute>} />
           <Route path="/users/activity-logs" element={<AdminRoute><UserActivityLogsPage /></AdminRoute>} />
           <Route path="/users/sessions" element={<AdminRoute><SessionManagementPage /></AdminRoute>} />
