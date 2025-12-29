@@ -597,14 +597,21 @@ class ElasticsearchService {
       const mapping = await this.getIndexMapping(sourceIndex);
       const settings = await this.getIndexSettings(sourceIndex);
 
-      // Create target index with optimized settings for bulk operations
+      // Create target index with highly optimized settings for bulk operations
+      // These settings minimize resource usage during cloning
       await this.createIndex(targetIndex, {
         mappings: mapping,
         settings: {
           index: {
             number_of_shards: settings.index.number_of_shards,
-            number_of_replicas: 0, // Set to 0 during cloning for performance
-            refresh_interval: '-1', // Disable refresh during bulk operations
+            number_of_replicas: 0, // No replicas during cloning
+            refresh_interval: '-1', // Disable refresh completely during bulk operations
+            // Translog settings to reduce disk I/O and memory usage
+            'translog.durability': 'async',
+            'translog.sync_interval': '30s',
+            'translog.flush_threshold_size': '1gb',
+            // Reduce memory pressure
+            'merge.scheduler.max_thread_count': 1,
           },
         },
       });
@@ -633,20 +640,27 @@ class ElasticsearchService {
 
   /**
    * Async reindex with proper configuration to prevent Elasticsearch crashes
+   * Uses very conservative settings to avoid overwhelming ES
    */
   async reindexAsync(sourceIndex: string, destIndex: string): Promise<any> {
     try {
       const response = await axios.post(
-        `${this.baseUrl}/_reindex?wait_for_completion=false&timeout=30m&scroll=5m`,
+        `${this.baseUrl}/_reindex?wait_for_completion=false&requests_per_second=500&slices=auto`,
         {
           conflicts: 'proceed', // Continue on conflicts instead of aborting
           source: {
             index: sourceIndex,
-            size: 1000, // Process in batches of 1000 documents
+            size: 500, // Reduced to 500 documents per batch for stability
           },
           dest: {
             index: destIndex,
             op_type: 'create', // Only create new documents, skip if exists
+          },
+        },
+        {
+          timeout: 60000, // 60 second HTTP timeout for the request itself
+          headers: {
+            'Content-Type': 'application/json',
           },
         }
       );
@@ -666,6 +680,7 @@ class ElasticsearchService {
 
   /**
    * Finalize cloned index after reindex completes
+   * Restores normal settings and optimizes the index
    */
   async finalizeClonedIndex(indexName: string): Promise<boolean> {
     try {
@@ -674,11 +689,22 @@ class ElasticsearchService {
         index: {
           refresh_interval: '1s', // Restore normal refresh interval
           number_of_replicas: 1, // Restore replicas
+          'translog.durability': 'request', // Restore default durability
+          'translog.sync_interval': '5s', // Restore default sync interval
         },
       });
 
       // Force a refresh to make all documents searchable
       await axios.post(`${this.baseUrl}/${indexName}/_refresh`);
+      
+      // Force merge to optimize the index (combines segments)
+      try {
+        await axios.post(`${this.baseUrl}/${indexName}/_forcemerge?max_num_segments=1`, {}, {
+          timeout: 300000, // 5 minute timeout for force merge
+        });
+      } catch (mergeError) {
+        console.warn(`Force merge failed for ${indexName}, but index is functional:`, mergeError);
+      }
 
       console.log(`Finalized cloned index: ${indexName}`);
       return true;
