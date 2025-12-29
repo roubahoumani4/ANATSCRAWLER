@@ -81,6 +81,26 @@ router.get('/cluster/health', requireAdmin, async (req: Request, res: Response) 
 });
 
 /**
+ * GET /api/v1/admin/elasticsearch/cluster/stats
+ * Get Elasticsearch cluster statistics including node stats
+ */
+router.get('/cluster/stats', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const stats = await elasticsearchService.getClusterStats();
+    res.json({
+      success: true,
+      stats,
+    });
+  } catch (error: any) {
+    console.error('Error fetching cluster stats:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch cluster stats',
+    });
+  }
+});
+
+/**
  * POST /api/v1/admin/elasticsearch/indices
  * Create a new index
  */

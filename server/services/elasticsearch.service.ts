@@ -175,6 +175,86 @@ class ElasticsearchService {
   }
 
   /**
+   * Get cluster statistics including indexing and search performance
+   */
+  async getClusterStats(): Promise<any> {
+    try {
+      // Get node stats for performance metrics
+      const nodesStatsResponse = await axios.get(`${this.baseUrl}/_nodes/stats/indices,jvm,process,os`);
+      
+      // Get cluster stats for overall metrics
+      const clusterStatsResponse = await axios.get(`${this.baseUrl}/_cluster/stats`);
+      
+      // Extract node stats (aggregated across all nodes)
+      const nodesStats = nodesStatsResponse.data.nodes;
+      const nodeIds = Object.keys(nodesStats);
+      
+      // Aggregate metrics across all nodes
+      let totalIndexingRate = 0;
+      let totalSearchRate = 0;
+      let totalQueryTime = 0;
+      let totalIndexingTime = 0;
+      let totalQueries = 0;
+      let totalIndexed = 0;
+      
+      nodeIds.forEach(nodeId => {
+        const node = nodesStats[nodeId];
+        const indices = node.indices;
+        
+        if (indices) {
+          // Indexing metrics
+          if (indices.indexing) {
+            totalIndexed += indices.indexing.index_total || 0;
+            totalIndexingTime += indices.indexing.index_time_in_millis || 0;
+            
+            // Calculate rate (docs per second) - using index_current as approximation
+            totalIndexingRate += indices.indexing.index_current || 0;
+          }
+          
+          // Search/query metrics
+          if (indices.search) {
+            totalQueries += indices.search.query_total || 0;
+            totalQueryTime += indices.search.query_time_in_millis || 0;
+            
+            // Calculate rate (queries per second) - using query_current as approximation
+            totalSearchRate += indices.search.query_current || 0;
+          }
+        }
+      });
+      
+      // Get indices stats for document counts
+      const indicesStatsResponse = await axios.get(`${this.baseUrl}/_stats`);
+      const totalDocs = indicesStatsResponse.data._all?.total?.docs?.count || 0;
+      const totalSize = indicesStatsResponse.data._all?.total?.store?.size_in_bytes || 0;
+      
+      return {
+        indexing: {
+          rate: totalIndexingRate, // Current indexing rate (docs/sec)
+          total: totalIndexed, // Total documents indexed
+          timeInMillis: totalIndexingTime,
+          avgTimePerDoc: totalIndexed > 0 ? totalIndexingTime / totalIndexed : 0
+        },
+        search: {
+          rate: totalSearchRate, // Current query rate (queries/sec)
+          total: totalQueries, // Total queries executed
+          timeInMillis: totalQueryTime,
+          avgTimePerQuery: totalQueries > 0 ? totalQueryTime / totalQueries : 0
+        },
+        cluster: {
+          totalDocuments: totalDocs,
+          totalSizeBytes: totalSize,
+          numberOfNodes: clusterStatsResponse.data.nodes?.count?.total || 0,
+          numberOfIndices: clusterStatsResponse.data.indices?.count || 0
+        },
+        timestamp: Date.now()
+      };
+    } catch (error: any) {
+      console.error('Error fetching cluster stats:', error.message);
+      throw new Error(`Failed to fetch cluster stats: ${error.message}`);
+    }
+  }
+
+  /**
    * Get index mapping
    */
   async getIndexMapping(indexName: string): Promise<any> {

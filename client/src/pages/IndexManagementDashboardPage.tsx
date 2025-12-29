@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface ElasticsearchIndex {
   name: string;
@@ -38,6 +38,13 @@ interface ElasticsearchIndex {
 
 const IndexManagementDashboardPage = () => {
   const navigate = useNavigate();
+  
+  // State to track performance history for chart
+  const [performanceHistory, setPerformanceHistory] = useState<Array<{
+    time: string;
+    indexing: number;
+    queries: number;
+  }>>([]);
 
   const containerVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -61,7 +68,36 @@ const IndexManagementDashboardPage = () => {
     queryKey: ["/api/v1/admin/elasticsearch/indices"],
   });
 
+  // Fetch cluster stats for performance metrics
+  const { data: clusterStatsData } = useQuery<{ success: boolean; stats: any }>({
+    queryKey: ["/api/v1/admin/elasticsearch/cluster/stats"],
+    refetchInterval: 5000, // Refetch every 5 seconds for real-time data
+  });
+
   const indices = indicesData?.indices || [];
+  const clusterStats = clusterStatsData?.stats;
+
+  // Update performance history when new stats arrive
+  useEffect(() => {
+    if (clusterStats) {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      
+      setPerformanceHistory(prev => {
+        const newHistory = [
+          ...prev,
+          {
+            time: timeStr,
+            indexing: clusterStats.indexing?.rate || 0,
+            queries: clusterStats.search?.rate || 0,
+          }
+        ];
+        
+        // Keep only last 20 data points (about 100 seconds of data)
+        return newHistory.slice(-20);
+      });
+    }
+  }, [clusterStats]);
 
   // Calculate statistics
   const totalIndices = indices.length;
@@ -295,14 +331,48 @@ const IndexManagementDashboardPage = () => {
               <Activity className="text-cyan-400" size={20} />
               Performance Overview
             </h3>
-            <p className="text-sm text-gray-400 mb-4">Query & indexing activity (24h)</p>
-            <div className="h-[300px] flex items-center justify-center">
-              <div className="text-center">
-                <Activity className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                <p className="text-gray-400">Performance metrics coming soon</p>
-                <p className="text-sm text-gray-500 mt-1">Real-time monitoring will be available here</p>
+            <p className="text-sm text-gray-400 mb-4">Real-time indexing & query activity</p>
+            {performanceHistory.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={performanceHistory}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="time" stroke="#9ca3af" />
+                  <YAxis stroke="#9ca3af" label={{ value: 'Operations/sec', angle: -90, position: 'insideLeft', style: { fill: '#9ca3af' } }} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#1f2937',
+                      border: '1px solid #374151',
+                      borderRadius: '8px'
+                    }}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="indexing"
+                    stroke="#f59e0b"
+                    strokeWidth={2}
+                    name="Indexing Rate"
+                    dot={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="queries"
+                    stroke="#06b6d4"
+                    strokeWidth={2}
+                    name="Query Rate"
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center">
+                <div className="text-center">
+                  <Activity className="w-12 h-12 text-gray-600 mx-auto mb-3 animate-pulse" />
+                  <p className="text-gray-400">Collecting performance metrics...</p>
+                  <p className="text-sm text-gray-500 mt-1">Data will appear as operations occur</p>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </motion.div>
       </div>
