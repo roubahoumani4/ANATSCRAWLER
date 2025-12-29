@@ -141,7 +141,7 @@ const EnhancedLoginPage = () => {
             {/* Header */}
             <div className="text-center mb-8">
               <motion.div
-                className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-cyan-900/40 via-blue-900/40 to-purple-900/40 rounded-xl flex items-center justify-center border-2 border-indigo-500/30"
+                className="w-32 h-32 mx-auto mb-6 flex items-center justify-center"
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
@@ -149,20 +149,9 @@ const EnhancedLoginPage = () => {
                 <img 
                   src={anatLogo} 
                   alt="ANATSCRAWLER Logo" 
-                  className="w-12 h-12 object-contain"
+                  className="w-full h-full object-contain"
                 />
               </motion.div>
-              
-              <motion.h1
-                className="text-3xl font-black mb-2"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5 }}
-              >
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600">
-                  ANATSCRAWLER
-                </span>
-              </motion.h1>
               
               <motion.p
                 className="text-sm text-gray-400 font-medium"

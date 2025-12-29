@@ -28,9 +28,9 @@ const LandingPage = () => {
 
   const translations = {
     title: {
-      English: "DARKSCRAWLER SECURITY FRAMEWORK",
-      French: "CADRE DE SÉCURITÉ DARKSCRAWLER",
-      Spanish: "MARCO DE SEGURIDAD DARKSCRAWLER"
+      English: "ANATSCRAWLER SECURITY FRAMEWORK",
+      French: "CADRE DE SÉCURITÉ ANATSCRAWLER",
+      Spanish: "MARCO DE SEGURIDAD ANATSCRAWLER"
     },
     subtitle: {
       English: "Advanced Network Analysis & Deep Web Intelligence",
@@ -50,15 +50,6 @@ const LandingPage = () => {
 
   const handleLogin = () => {
     navigate("/login");
-  };
-
-  const handleSignup = () => {
-    navigate("/signup");
-  };
-
-  const handleSubscribe = () => {
-    // Add subscription logic here
-    alert("Subscription feature coming soon!");
   };
 
   const handleDarkWebSearch = async () => {
@@ -248,20 +239,11 @@ const LandingPage = () => {
                 <Shield className="h-6 w-6 text-white" />
               </motion.div>
               <span className="text-xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-500">
-                DARKSCRAWLER
+                ANATSCRAWLER
               </span>
             </motion.div>
 
             <div className="flex items-center space-x-4">
-              <motion.button 
-                onClick={handleSubscribe}
-                className="px-4 py-2 text-sm font-bold border-2 border-green-500/50 rounded-lg bg-green-600/20 text-green-400 hover:bg-green-500/30 hover:border-green-400 transition-all duration-300"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                SUBSCRIBE
-              </motion.button>
-
               <div className="relative">
                 <motion.button 
                   onClick={handleAccessTerminal}
@@ -280,15 +262,9 @@ const LandingPage = () => {
                   >
                     <button
                       onClick={handleLogin}
-                      className="w-full px-4 py-3 text-left text-blue-400 hover:bg-blue-600/20 transition-colors rounded-t-lg"
+                      className="w-full px-4 py-3 text-left text-blue-400 hover:bg-blue-600/20 transition-colors rounded-lg"
                     >
                       Login
-                    </button>
-                    <button
-                      onClick={handleSignup}
-                      className="w-full px-4 py-3 text-left text-green-400 hover:bg-green-600/20 transition-colors rounded-b-lg"
-                    >
-                      Sign Up
                     </button>
                   </motion.div>
                 )}
@@ -344,7 +320,7 @@ const LandingPage = () => {
                   transition={{ duration: 3, repeat: Infinity }}
                   style={{ backgroundSize: "200% 200%" }}
                 >
-                  DARKSCRAWLER
+                  ANATSCRAWLER
                 </motion.span>
               </h1>
 

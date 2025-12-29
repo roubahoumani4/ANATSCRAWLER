@@ -152,7 +152,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
     >
       <div className="flex items-center justify-between p-4 border-b border-gray-800">
         <motion.div
-          className="flex items-center gap-3"
+          className="flex items-center justify-center flex-1"
           variants={logoVariants}
           animate={collapsed ? "collapsed" : "expanded"}
           transition={{ duration: 0.3 }}
@@ -160,16 +160,9 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
           <img 
             src={anatLogo} 
             alt="ANATSCRAWLER Logo" 
-            className="w-8 h-8 object-contain"
+            className={collapsed ? "w-10 h-10" : "w-24 h-24"}
+            style={{ objectFit: "contain" }}
           />
-          <div className="flex flex-col">
-            <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600">
-              ANATSCRAWLER
-            </span>
-            <span className="text-[10px] text-gray-400 tracking-wider">
-              SECURITY PLATFORM
-            </span>
-          </div>
         </motion.div>
         
         <button
