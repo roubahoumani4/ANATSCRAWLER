@@ -151,7 +151,7 @@ const UserManagementDashboardPage = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-3">
-              <Users className="text-cyan-400" size={36} />
+              <Users className="text-white" size={36} />
               User Management
             </h1>
             <p className="text-gray-400 mt-2">

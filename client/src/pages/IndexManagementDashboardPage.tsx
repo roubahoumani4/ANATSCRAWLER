@@ -175,7 +175,7 @@ const IndexManagementDashboardPage = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-3">
-              <Database className="text-cyan-400" size={36} />
+              <Database className="text-white" size={36} />
               Index Management
             </h1>
             <p className="text-gray-400 mt-2">
@@ -467,7 +467,7 @@ const IndexManagementDashboardPage = () => {
               className="h-auto py-6 bg-gray-800 hover:bg-gray-700 text-white border border-gray-700"
             >
               <div className="flex flex-col items-center gap-2">
-                <Database className="h-8 w-8" />
+                <Database className="h-8 w-8 text-white" />
                 <div className="text-center">
                   <div className="font-semibold">Manage Indices</div>
                   <div className="text-xs opacity-80">Create, clone, and delete indices</div>
