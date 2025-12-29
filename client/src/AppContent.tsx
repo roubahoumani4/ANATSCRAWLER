@@ -25,6 +25,7 @@ import ManageUsersPage from '@/pages/ManageUsersPage';
 import UserActivityLogsPage from '@/pages/UserActivityLogsPage';
 import UserActivityDashboardPage from '@/pages/UserActivityDashboardPage';
 import SessionManagementPage from '@/pages/SessionManagementPage';
+import IndexManagementDashboardPage from '@/pages/IndexManagementDashboardPage';
 import IndexManagementPage from '@/pages/IndexManagementPage';
 import IndexDetailsPage from '@/pages/IndexDetailsPage';
 import IndexQueryPage from '@/pages/IndexQueryPage';
@@ -111,6 +112,7 @@ export default function AppContent() {
           <Route path="/users/activity/:userId" element={<AdminRoute><UserActivityDashboardPage /></AdminRoute>} />
           
           {/* Index Management Routes - Admin Only */}
+          <Route path="/index" element={<AdminRoute><IndexManagementDashboardPage /></AdminRoute>} />
           <Route path="/index/management" element={<AdminRoute><IndexManagementPage /></AdminRoute>} />
           <Route path="/index/details/:indexName" element={<AdminRoute><IndexDetailsPage /></AdminRoute>} />
           <Route path="/index/query" element={<AdminRoute><IndexQueryPage /></AdminRoute>} />
