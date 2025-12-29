@@ -160,7 +160,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
           <img 
             src={anatLogo} 
             alt="ANATSCRAWLER Logo" 
-            className={collapsed ? "w-10 h-10" : "w-24 h-24"}
+            className={collapsed ? "w-12 h-12" : "w-32 h-32"}
             style={{ objectFit: "contain" }}
           />
         </motion.div>

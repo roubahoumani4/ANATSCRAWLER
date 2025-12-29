@@ -141,7 +141,7 @@ const EnhancedLoginPage = () => {
             {/* Header */}
             <div className="text-center mb-8">
               <motion.div
-                className="w-32 h-32 mx-auto mb-6 flex items-center justify-center"
+                className="w-40 h-40 mx-auto mb-6 flex items-center justify-center"
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
