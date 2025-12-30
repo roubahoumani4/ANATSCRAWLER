@@ -37,9 +37,9 @@ const LandingPage = () => {
       Spanish: "Análisis de Red Avanzado e Inteligencia de la Web Profunda"
     },
     description: {
-      English: "Professional cybersecurity reconnaissance tool for penetration testing, threat intelligence, and dark web monitoring operations. Subscription required for full system access.",
-      French: "Outil professionnel de reconnaissance cybersécuritaire pour les tests de pénétration, l'intelligence des menaces et les opérations de surveillance du web profond. Abonnement requis pour l'accès complet au système.",
-      Spanish: "Herramienta profesional de reconocimiento de ciberseguridad para pruebas de penetración, inteligencia de amenazas y operaciones de monitoreo de la web oscura. Se requiere suscripción para el acceso completo al sistema."
+      English: "Professional cybersecurity reconnaissance tool for penetration testing, threat intelligence, and dark web monitoring operations.",
+      French: "Outil professionnel de reconnaissance cybersécuritaire pour les tests de pénétration, l'intelligence des menaces et les opérations de surveillance du web profond.",
+      Spanish: "Herramienta profesional de reconocimiento de ciberseguridad para pruebas de penetración, inteligencia de amenazas y operaciones de monitoreo de la web oscura."
     }
   };
 
@@ -96,23 +96,23 @@ const LandingPage = () => {
   const features = [
     {
       icon: <Terminal className="w-8 h-8" />,
-      title: "Deep Web Crawling",
-      description: "Advanced reconnaissance and data extraction from hidden network infrastructures"
+      title: "OSINT Intelligence",
+      description: "Comprehensive security assessments with vulnerability scanning, target analysis, and detailed penetration testing reports"
     },
     {
       icon: <Skull className="w-8 h-8" />,
-      title: "Threat Intelligence",
-      description: "Real-time threat detection with AI-powered analysis and automated response"
+      title: "Dark Web Monitoring",
+      description: "Search exposed credentials and emails across breach databases with multi-source intelligence and instant alerts"
     },
     {
       icon: <Wifi className="w-8 h-8" />,
-      title: "Network Mapping",
-      description: "Comprehensive network topology discovery and vulnerability assessment"
+      title: "Domain Monitoring",
+      description: "Track domain-level exposures and organization-wide security posture with continuous risk scoring and monitoring"
     },
     {
       icon: <Code2 className="w-8 h-8" />,
-      title: "Exploit Analysis",
-      description: "Automated vulnerability analysis with detailed penetration testing reports"
+      title: "Threat Intelligence",
+      description: "Real-time threat detection from dark web sources with critical alerts and comprehensive threat analysis"
     }
   ];
 
@@ -368,7 +368,7 @@ const LandingPage = () => {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         onKeyPress={handleSearchKeyPress}
-                        placeholder="Enter search terms for dark web reconnaissance..."
+                        placeholder="username, email, domain..."
                         className="w-full pl-12 pr-4 py-4 bg-gray-800/50 border-2 border-blue-400/20 rounded-xl text-white placeholder-gray-400 font-mono text-lg focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20 transition-all duration-300"
                         disabled={isSearching}
                       />
