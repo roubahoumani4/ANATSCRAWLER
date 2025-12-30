@@ -215,7 +215,7 @@ const LandingPage = () => {
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.6 }}
         >
-          <div className="max-w-7xl mx-auto px-6 lg:px-8">
+          <div className="w-full px-4 lg:px-6">
             <div className="flex items-center justify-between py-2">
               {/* Logo Section - Left Aligned */}
               <motion.div 
