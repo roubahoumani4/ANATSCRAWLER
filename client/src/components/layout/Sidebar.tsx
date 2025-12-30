@@ -150,9 +150,9 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
       animate={collapsed ? "collapsed" : "expanded"}
       transition={{ duration: 0.3, type: "tween" }}
     >
-      <div className="relative flex items-start justify-center h-32 border-b border-gray-800 overflow-hidden pt-2">
+      <div className="relative flex items-start justify-center h-32 border-b border-gray-800 overflow-hidden pt-0">
         <motion.div
-          className="flex items-center justify-center"
+          className="flex items-center justify-center -mt-2"
           variants={logoVariants}
           animate={collapsed ? "collapsed" : "expanded"}
           transition={{ duration: 0.3 }}
