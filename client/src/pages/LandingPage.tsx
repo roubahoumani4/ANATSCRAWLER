@@ -37,9 +37,9 @@ const LandingPage = () => {
       Spanish: "Análisis de Red Avanzado e Inteligencia de la Web Profunda"
     },
     description: {
-      English: "Professional cybersecurity reconnaissance tool for penetration testing, threat intelligence, and dark web monitoring operations.",
-      French: "Outil professionnel de reconnaissance cybersécuritaire pour les tests de pénétration, l'intelligence des menaces et les opérations de surveillance du web profond.",
-      Spanish: "Herramienta profesional de reconocimiento de ciberseguridad para pruebas de penetración, inteligencia de amenazas y operaciones de monitoreo de la web oscura."
+      English: "Advanced OSINT reconnaissance platform with automated target analysis.\nReal-time dark web monitoring for breach detection and threat intelligence.\nComprehensive security assessment with vulnerability scanning and risk analysis.",
+      French: "Plateforme de reconnaissance OSINT avancée avec analyse automatique des cibles.\nSurveillance en temps réel du dark web pour la détection des violations et l'intelligence des menaces.\nÉvaluation de sécurité complète avec analyse des vulnérabilités et des risques.",
+      Spanish: "Plataforma avanzada de reconocimiento OSINT con análisis automático de objetivos.\nMonitoreo en tiempo real de la web oscura para detección de brechas e inteligencia de amenazas.\nEvaluación de seguridad integral con escaneo de vulnerabilidades y análisis de riesgos."
     }
   };
 
@@ -232,7 +232,7 @@ const LandingPage = () => {
               {/* Action Button - Right Aligned */}
               <motion.button 
                 onClick={handleAccessTerminal}
-                className="flex items-center space-x-2 px-6 py-3 rounded-lg bg-white/5 backdrop-blur-sm border border-white/10 text-white hover:bg-white/10 transition-all duration-300 font-medium text-sm group"
+                className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-black rounded-xl border-2 border-blue-400/50 hover:border-blue-400 transition-all duration-300 flex items-center space-x-2 group"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
@@ -310,14 +310,16 @@ const LandingPage = () => {
             </motion.div>
 
             {/* Description */}
-            <motion.p 
-              className="text-xl md:text-2xl text-gray-400 mb-8 max-w-4xl mx-auto font-medium leading-relaxed"
+            <motion.div 
+              className="text-xl md:text-2xl text-gray-400 mb-8 max-w-4xl mx-auto font-medium leading-relaxed space-y-2"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 1 }}
             >
-              {translations.description[language as keyof typeof translations.description]}
-            </motion.p>
+              {translations.description[language as keyof typeof translations.description].split('\n').map((line, index) => (
+                <p key={index}>{line}</p>
+              ))}
+            </motion.div>
 
             {/* Dark Web Search Bar */}
             <motion.div
