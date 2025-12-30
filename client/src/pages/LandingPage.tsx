@@ -210,42 +210,62 @@ const LandingPage = () => {
       <div className="relative z-10 min-h-screen flex flex-col">
         {/* Navigation */}
         <motion.nav 
-          className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-gray-900/70 border-b border-gray-600/30"
+          className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-gray-900/80 border-b border-blue-500/20"
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.6 }}
         >
-          <div className="flex items-center justify-between px-6 py-6">
-            <motion.div 
-              className="flex items-center"
-              whileHover={{ scale: 1.05 }}
-            >
-              <motion.div
-                animate={{
-                  filter: [
-                    "drop-shadow(0 0 12px rgba(59, 130, 246, 0.5))",
-                    "drop-shadow(0 0 24px rgba(59, 130, 246, 0.7))",
-                    "drop-shadow(0 0 12px rgba(59, 130, 246, 0.5))"
-                  ]
-                }}
-                transition={{ duration: 2, repeat: Infinity }}
+          <div className="max-w-7xl mx-auto px-6 lg:px-8">
+            <div className="flex items-center justify-between py-4">
+              {/* Logo Section */}
+              <motion.div 
+                className="flex items-center gap-4"
+                whileHover={{ scale: 1.02 }}
               >
-                <img 
-                  src={anatLogo} 
-                  alt="ANATSCRAWLER Logo" 
-                  className="h-20 w-20 object-contain"
-                />
+                <div className="relative">
+                  <motion.div
+                    className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500/20 to-indigo-500/20 blur-xl"
+                    animate={{
+                      opacity: [0.5, 0.8, 0.5],
+                      scale: [1, 1.1, 1],
+                    }}
+                    transition={{ duration: 3, repeat: Infinity }}
+                  />
+                  <motion.div
+                    className="relative p-2 rounded-2xl bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border border-blue-400/30"
+                    whileHover={{ 
+                      borderColor: "rgba(59, 130, 246, 0.6)",
+                      boxShadow: "0 0 30px rgba(59, 130, 246, 0.3)"
+                    }}
+                  >
+                    <img 
+                      src={anatLogo} 
+                      alt="ANATSCRAWLER Logo" 
+                      className="h-12 w-12 object-contain"
+                    />
+                  </motion.div>
+                </div>
+                <div className="hidden sm:block">
+                  <h1 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">
+                    ANATSCRAWLER
+                  </h1>
+                  <p className="text-xs text-gray-400 font-medium">Security Intelligence Platform</p>
+                </div>
               </motion.div>
-            </motion.div>
 
-            <div className="flex items-center space-x-4">
+              {/* Action Button */}
               <motion.button 
                 onClick={handleAccessTerminal}
-                className="px-6 py-2 text-sm font-bold border-2 border-blue-400/50 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-500/30 hover:border-blue-400 transition-all duration-300"
+                className="relative px-8 py-3 text-sm font-bold rounded-lg overflow-hidden group"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                ACCESS TERMINAL
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-90 group-hover:opacity-100 transition-opacity" />
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-indigo-400 opacity-0 group-hover:opacity-20 blur-xl transition-opacity" />
+                <span className="relative text-white flex items-center gap-2">
+                  ACCESS TERMINAL
+                  <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </span>
               </motion.button>
             </div>
           </div>
