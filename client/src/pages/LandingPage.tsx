@@ -225,23 +225,19 @@ const LandingPage = () => {
                 <img 
                   src={anatLogo} 
                   alt="ANATSCRAWLER Logo" 
-                  className="h-32 w-32 object-contain"
+                  className="h-40 w-40 object-contain"
                 />
               </motion.div>
 
               {/* Action Button - Right Aligned */}
               <motion.button 
                 onClick={handleAccessTerminal}
-                className="relative px-8 py-3 text-sm font-bold rounded-lg overflow-hidden group"
+                className="flex items-center space-x-2 px-6 py-3 rounded-lg bg-white/5 backdrop-blur-sm border border-white/10 text-white hover:bg-white/10 transition-all duration-300 font-medium text-sm group"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-90 group-hover:opacity-100 transition-opacity" />
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-indigo-400 opacity-0 group-hover:opacity-20 blur-xl transition-opacity" />
-                <span className="relative text-white flex items-center gap-2">
-                  ACCESS TERMINAL
-                  <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </span>
+                <span>ACCESS TERMINAL</span>
+                <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </motion.button>
             </div>
           </div>
