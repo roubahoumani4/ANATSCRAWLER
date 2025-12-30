@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Lock, Shield, Eye, EyeOff, QrCode, Check, X, Settings } from "lucide-react";
+import MatrixBackground from "@/components/ui/MatrixBackground";
 
 const GeneralSettings = () => {
   const { user } = useAuth();
@@ -268,31 +269,26 @@ const GeneralSettings = () => {
   };
 
   return (
-    <div className="min-h-screen bg-jetBlack text-coolWhite p-8">
-      <div className="w-full">
+    <div className="min-h-screen bg-jetBlack text-coolWhite p-8 relative">
+      <MatrixBackground />
+      <div className="w-full relative z-10">
         {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
-          <div className="flex items-center space-x-4 mb-4">
-            <div className="p-3 rounded bg-blue-700/10 text-blue-400">
-              <Settings size={28} />
-            </div>
-            <div>
-              <h1 className="text-2xl font-semibold">Settings</h1>
-              <p className="text-sm text-gray-400">
-                Manage your account security and privacy preferences
-              </p>
-            </div>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-semibold flex items-center gap-2">
+              <Settings className="text-white" size={28} />
+              Settings
+            </h1>
+            <p className="text-sm text-gray-400 mt-1">
+              Manage your account security and privacy preferences
+            </p>
           </div>
-        </motion.div>
+        </div>
 
         <div className="space-y-6 mt-6">
           {/* Change Password Section */}
           <motion.div
-            className="bg-gray-850 rounded-lg p-8 border border-gray-800"
+            className="bg-gray-900/60 rounded-lg p-8 border border-gray-800"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
@@ -377,7 +373,7 @@ const GeneralSettings = () => {
               <motion.button
                 type="submit"
                 disabled={passwordMutation.isPending}
-                className="px-6 py-2 bg-gray-700 text-white rounded font-semibold hover:bg-gray-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
@@ -388,7 +384,7 @@ const GeneralSettings = () => {
 
           {/* Security Settings Section */}
           <motion.div
-            className="bg-gray-850 rounded-lg p-8 border border-gray-800"
+            className="bg-gray-900/60 rounded-lg p-8 border border-gray-800"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
@@ -437,7 +433,7 @@ const GeneralSettings = () => {
 
               <motion.button
                 onClick={handleSecuritySettingsSave}
-                className="px-6 py-2 bg-gray-700 text-white rounded font-semibold hover:bg-gray-600 transition"
+                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-colors"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
@@ -448,7 +444,7 @@ const GeneralSettings = () => {
 
           {/* Privacy Settings Section */}
           <motion.div
-            className="bg-gray-850 rounded-lg p-8 border border-gray-800"
+            className="bg-gray-900/60 rounded-lg p-8 border border-gray-800"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.3 }}
@@ -495,7 +491,7 @@ const GeneralSettings = () => {
 
               <motion.button
                 onClick={handlePrivacySettingsSave}
-                className="px-6 py-2 bg-gray-700 text-white rounded font-semibold hover:bg-gray-600 transition"
+                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-colors"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
@@ -552,7 +548,7 @@ const GeneralSettings = () => {
                 <div className="flex gap-3">
                   <motion.button
                     onClick={() => setShow2FASetup(false)}
-                    className="flex-1 px-6 py-3 bg-gray-700 text-white rounded font-semibold hover:bg-gray-600 transition"
+                    className="flex-1 px-6 py-2.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
@@ -561,7 +557,7 @@ const GeneralSettings = () => {
                   <motion.button
                     onClick={handleVerify2FA}
                     disabled={verify2FAMutation.isPending || verificationCode.length !== 6}
-                    className="flex-1 px-6 py-3 bg-[hsl(var(--crimsonRed))] text-white rounded font-semibold hover:bg-[hsl(var(--crimsonRed),.85)] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
@@ -629,7 +625,7 @@ const GeneralSettings = () => {
                 <div className="flex gap-3">
                   <motion.button
                     onClick={() => setShowDisable2FA(false)}
-                    className="flex-1 px-6 py-3 bg-gray-700 text-white rounded font-semibold hover:bg-gray-600 transition"
+                    className="flex-1 px-6 py-2.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
@@ -638,7 +634,7 @@ const GeneralSettings = () => {
                   <motion.button
                     onClick={handleDisable2FA}
                     disabled={disable2FAMutation.isPending}
-                    className="flex-1 px-6 py-3 bg-red-600 text-white rounded font-semibold hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 px-6 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
