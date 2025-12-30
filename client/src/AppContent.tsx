@@ -10,7 +10,6 @@ import EnhancedLoginPage from '@/pages/EnhancedLoginPage';
 import GeneralSettingsPage from '@/pages/GeneralSettingsPage';
 import LandingPage from '@/pages/LandingPage';
 import NotFoundPage from '@/pages/NotFoundPage';
-import SignupPage from '@/pages/SignupPage';
 import AssessmentPage from '@/pages/AssessmentPage';
 import OutputPage from '@/pages/OutputPage';
 import HistoryPage from '@/pages/HistoryPage';
@@ -86,7 +85,6 @@ export default function AppContent() {
         <Routes>
           {/* Public Routes */}
           <Route path="/login" element={!isAuthenticated ? <EnhancedLoginPage /> : <Navigate to="/" />} />
-          <Route path="/signup" element={!isAuthenticated ? <SignupPage /> : <Navigate to="/" />} />
           
           {/* Landing Page - Public but redirects if authenticated */}
           <Route path="/" element={!isAuthenticated ? <LandingPage /> : <Navigate to="/dashboard" />} />

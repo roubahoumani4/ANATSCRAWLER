@@ -5,6 +5,7 @@ import { Shield, Terminal, Zap, Globe, AlertTriangle, Eye, Lock, ChevronRight, S
 import { useTheme } from "@/context/ThemeContext";
 import { useLanguage } from "@/context/LanguageContext";
 import ResultsTable from "@/components/dashboard/ResultsTable";
+import anatLogo from "@/assets/anatlogo.png";
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -16,8 +17,6 @@ const LandingPage = () => {
   const [searchResults, setSearchResults] = React.useState<any[]>([]);
   const [isSearching, setIsSearching] = React.useState(false);
   const [showResults, setShowResults] = React.useState(false);
-  const [showAuthOptions, setShowAuthOptions] = React.useState(false);
-  const [showLoginSignup, setShowLoginSignup] = React.useState(false);
 
   React.useEffect(() => {
     setIsVisible(true);
@@ -45,10 +44,6 @@ const LandingPage = () => {
   };
 
   const handleAccessTerminal = () => {
-    setShowAuthOptions(!showAuthOptions);
-  };
-
-  const handleLogin = () => {
     navigate("/login");
   };
 
@@ -226,17 +221,21 @@ const LandingPage = () => {
               whileHover={{ scale: 1.05 }}
             >
               <motion.div
-                className="p-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-700 mr-3"
+                className="mr-3"
                 animate={{
-                  boxShadow: [
-                    "0 0 15px rgba(79, 70, 229, 0.2)",
-                    "0 0 25px rgba(79, 70, 229, 0.4)",
-                    "0 0 15px rgba(79, 70, 229, 0.2)"
+                  filter: [
+                    "drop-shadow(0 0 8px rgba(59, 130, 246, 0.3))",
+                    "drop-shadow(0 0 15px rgba(59, 130, 246, 0.5))",
+                    "drop-shadow(0 0 8px rgba(59, 130, 246, 0.3))"
                   ]
                 }}
                 transition={{ duration: 2, repeat: Infinity }}
               >
-                <Shield className="h-6 w-6 text-white" />
+                <img 
+                  src={anatLogo} 
+                  alt="ANATSCRAWLER Logo" 
+                  className="h-10 w-10 object-contain"
+                />
               </motion.div>
               <span className="text-xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-500">
                 ANATSCRAWLER
@@ -244,31 +243,14 @@ const LandingPage = () => {
             </motion.div>
 
             <div className="flex items-center space-x-4">
-              <div className="relative">
-                <motion.button 
-                  onClick={handleAccessTerminal}
-                  className="px-6 py-2 text-sm font-bold border-2 border-blue-400/50 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-500/30 hover:border-blue-400 transition-all duration-300"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  ACCESS TERMINAL
-                </motion.button>
-
-                {showAuthOptions && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="absolute right-0 mt-2 w-48 bg-gray-900/90 border border-gray-600/50 rounded-lg shadow-xl backdrop-blur-md"
-                  >
-                    <button
-                      onClick={handleLogin}
-                      className="w-full px-4 py-3 text-left text-blue-400 hover:bg-blue-600/20 transition-colors rounded-lg"
-                    >
-                      Login
-                    </button>
-                  </motion.div>
-                )}
-              </div>
+              <motion.button 
+                onClick={handleAccessTerminal}
+                className="px-6 py-2 text-sm font-bold border-2 border-blue-400/50 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-500/30 hover:border-blue-400 transition-all duration-300"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                ACCESS TERMINAL
+              </motion.button>
             </div>
           </div>
         </motion.nav>

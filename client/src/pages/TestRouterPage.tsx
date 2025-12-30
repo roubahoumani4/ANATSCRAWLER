@@ -26,13 +26,6 @@ const TestRouterPage = () => {
           >
             Go to Login Page (/login)
           </button>
-          
-          <button
-            onClick={() => navigate('/signup')}
-            className="w-full bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded"
-          >
-            Go to Signup Page (/signup)
-          </button>
         </div>
       </div>
     </div>

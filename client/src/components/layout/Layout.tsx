@@ -47,9 +47,7 @@ const Layout = ({ children }: LayoutProps) => {
         initial="hidden"
         animate="visible"
       >
-        <div className="container mx-auto px-6 py-8">
-          {children}
-        </div>
+        {children}
       </motion.main>
     </div>
   );

@@ -60,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setToken(null);
           localStorage.removeItem('token');
           // If on a protected route, redirect to login
-          const publicPaths = ["/", "/login", "/signup"];
+          const publicPaths = ["/", "/login"];
           const isPublic = publicPaths.some(p => location.pathname === p || location.pathname.startsWith(p + "/"));
           if (!isPublic) navigate("/login");
         }
@@ -68,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
         setToken(null);
         localStorage.removeItem('token');
-        const publicPaths = ["/", "/login", "/signup"];
+        const publicPaths = ["/", "/login"];
         const isPublic = publicPaths.some(p => location.pathname === p || location.pathname.startsWith(p + "/"));
         if (!isPublic) navigate("/login");
       } finally {

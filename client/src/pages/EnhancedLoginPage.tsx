@@ -318,17 +318,6 @@ const EnhancedLoginPage = () => {
                     <span>{translations.loginButton[language]}</span>
                   )}
                 </motion.button>
-
-                {/* Signup Link */}
-                <div className="mt-6 text-center">
-                  <button
-                    type="button"
-                    onClick={() => navigate("/signup")}
-                    className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors"
-                  >
-                    {language === "English" ? "Need an account? Sign up" : "Besoin d'un compte? S'inscrire"}
-                  </button>
-                </div>
               </form>
             </div>
           </motion.div>

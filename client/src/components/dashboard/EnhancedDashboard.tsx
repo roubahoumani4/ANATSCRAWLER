@@ -222,9 +222,9 @@ const EnhancedDashboard = () => {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="min-h-screen bg-jetBlack text-white p-6"
+      className="min-h-screen bg-jetBlack text-white px-6 py-6"
     >
-      <div className="relative z-10">
+      <div className="relative z-10 w-full">
         {/* Enhanced Header */}
         <motion.div 
           variants={itemVariants}
