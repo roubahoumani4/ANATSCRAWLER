@@ -216,7 +216,7 @@ const LandingPage = () => {
           transition={{ duration: 0.6 }}
         >
           <div className="w-full px-4 lg:px-6">
-            <div className="flex items-center justify-between h-16">
+            <div className="flex items-center justify-between h-24 py-2">
               {/* Logo Section - Left Aligned */}
               <motion.div 
                 className="flex items-center h-full"
@@ -244,7 +244,7 @@ const LandingPage = () => {
         </motion.nav>
 
         {/* Hero Section */}
-        <div className="flex-1 flex flex-col items-center justify-center px-6 pt-32">
+        <div className="flex-1 flex flex-col items-center justify-center px-6 pt-36">
           <motion.div
             className="max-w-6xl mx-auto text-center"
             initial={{ opacity: 0, y: 50 }}
