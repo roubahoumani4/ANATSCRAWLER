@@ -216,41 +216,20 @@ const LandingPage = () => {
           transition={{ duration: 0.6 }}
         >
           <div className="max-w-7xl mx-auto px-6 lg:px-8">
-            <div className="flex items-center justify-between py-3">
-              {/* Logo Section */}
+            <div className="flex items-center justify-between py-2">
+              {/* Logo Section - Left Aligned */}
               <motion.div 
                 className="flex items-center"
-                whileHover={{ scale: 1.02 }}
+                whileHover={{ scale: 1.05 }}
               >
-                <div className="relative">
-                  <motion.div
-                    className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500/20 to-indigo-500/20 blur-xl"
-                    animate={{
-                      opacity: [0.5, 0.8, 0.5],
-                      scale: [1, 1.1, 1],
-                    }}
-                    transition={{ duration: 3, repeat: Infinity }}
-                  />
-                  <motion.div
-                    className="relative p-3 rounded-2xl bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border border-blue-400/30"
-                    whileHover={{ 
-                      borderColor: "rgba(59, 130, 246, 0.6)",
-                      boxShadow: "0 0 30px rgba(59, 130, 246, 0.3)"
-                    }}
-                  >
-                    <img 
-                      src={anatLogo} 
-                      alt="ANATSCRAWLER Logo" 
-                      className="h-16 w-16 object-contain"
-                    />
-                  </motion.div>
-                </div>
+                <img 
+                  src={anatLogo} 
+                  alt="ANATSCRAWLER Logo" 
+                  className="h-20 w-20 object-contain"
+                />
               </motion.div>
 
-              {/* Empty spacer for centering */}
-              <div className="flex-1"></div>
-
-              {/* Action Button */}
+              {/* Action Button - Right Aligned */}
               <motion.button 
                 onClick={handleAccessTerminal}
                 className="relative px-8 py-3 text-sm font-bold rounded-lg overflow-hidden group"
@@ -269,7 +248,7 @@ const LandingPage = () => {
         </motion.nav>
 
         {/* Hero Section */}
-        <div className="flex-1 flex flex-col items-center justify-center px-6 pt-24">
+        <div className="flex-1 flex flex-col items-center justify-center px-6 pt-32">
           <motion.div
             className="max-w-6xl mx-auto text-center"
             initial={{ opacity: 0, y: 50 }}
