@@ -216,16 +216,16 @@ const LandingPage = () => {
           transition={{ duration: 0.6 }}
         >
           <div className="w-full px-4 lg:px-6">
-            <div className="flex items-center justify-between py-2">
+            <div className="flex items-center justify-between h-16">
               {/* Logo Section - Left Aligned */}
               <motion.div 
-                className="flex items-center"
+                className="flex items-center h-full"
                 whileHover={{ scale: 1.05 }}
               >
                 <img 
                   src={anatLogo} 
                   alt="ANATSCRAWLER Logo" 
-                  className="h-20 w-20 object-contain"
+                  className="h-32 w-32 object-contain"
                 />
               </motion.div>
 
