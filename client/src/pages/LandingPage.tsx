@@ -225,7 +225,7 @@ const LandingPage = () => {
                 <img 
                   src={anatLogo} 
                   alt="ANATSCRAWLER Logo" 
-                  className="h-40 w-40 object-contain"
+                  className="h-48 w-48 object-contain"
                 />
               </motion.div>
 
