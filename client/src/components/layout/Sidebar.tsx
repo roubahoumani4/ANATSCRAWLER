@@ -150,9 +150,9 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
       animate={collapsed ? "collapsed" : "expanded"}
       transition={{ duration: 0.3, type: "tween" }}
     >
-      <div className="relative flex items-center justify-center p-6 border-b border-gray-800">
+      <div className="relative flex items-center justify-center h-32 border-b border-gray-800 overflow-hidden">
         <motion.div
-          className="flex items-center justify-center"
+          className="flex items-center justify-center h-full"
           variants={logoVariants}
           animate={collapsed ? "collapsed" : "expanded"}
           transition={{ duration: 0.3 }}
@@ -160,7 +160,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
           <img 
             src={anatLogo} 
             alt="ANATSCRAWLER Logo" 
-            className={collapsed ? "w-12 h-12" : "w-40 h-40"}
+            className={collapsed ? "w-16 h-16" : "w-48 h-48"}
             style={{ objectFit: "contain" }}
           />
         </motion.div>
