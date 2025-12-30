@@ -215,7 +215,7 @@ const LandingPage = () => {
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.6 }}
         >
-          <div className="flex items-center justify-between px-6 py-4">
+          <div className="flex items-center justify-between px-6 py-6">
             <motion.div 
               className="flex items-center"
               whileHover={{ scale: 1.05 }}
@@ -223,9 +223,9 @@ const LandingPage = () => {
               <motion.div
                 animate={{
                   filter: [
-                    "drop-shadow(0 0 10px rgba(59, 130, 246, 0.4))",
-                    "drop-shadow(0 0 20px rgba(59, 130, 246, 0.6))",
-                    "drop-shadow(0 0 10px rgba(59, 130, 246, 0.4))"
+                    "drop-shadow(0 0 12px rgba(59, 130, 246, 0.5))",
+                    "drop-shadow(0 0 24px rgba(59, 130, 246, 0.7))",
+                    "drop-shadow(0 0 12px rgba(59, 130, 246, 0.5))"
                   ]
                 }}
                 transition={{ duration: 2, repeat: Infinity }}
@@ -233,7 +233,7 @@ const LandingPage = () => {
                 <img 
                   src={anatLogo} 
                   alt="ANATSCRAWLER Logo" 
-                  className="h-16 w-16 object-contain"
+                  className="h-20 w-20 object-contain"
                 />
               </motion.div>
             </motion.div>
