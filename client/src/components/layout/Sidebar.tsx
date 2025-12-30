@@ -164,13 +164,6 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
             style={{ objectFit: "contain" }}
           />
         </motion.div>
-        
-        <button
-          onClick={handleCollapseToggle}
-          className="absolute top-2 right-2 p-1 rounded-full hover:bg-darkGray text-coolWhite transition-colors"
-        >
-          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-        </button>
       </div>
 
       <div className="flex-1 py-6 flex flex-col justify-between overflow-y-auto">

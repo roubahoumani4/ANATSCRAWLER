@@ -315,12 +315,12 @@ const EnhancedDashboard = () => {
               
               {osintData.length > 0 ? (
                 <>
-                  <ResponsiveContainer width="100%" height={150}>
+                  <ResponsiveContainer width="100%" height={180}>
                     <PieChart>
                       <Pie
                         data={osintData}
                         cx="50%"
-                        cy="50%"
+                        cy="55%"
                         innerRadius={40}
                         outerRadius={60}
                         dataKey="value"
@@ -376,7 +376,7 @@ const EnhancedDashboard = () => {
 
           {/* Dark Web Monitoring Section */}
           <motion.div variants={itemVariants}>
-            <div className="bg-gradient-to-br from-purple-900/40 via-violet-900/30 to-purple-900/40 border-2 border-purple-500/30 rounded-xl p-6 hover:border-purple-400/50 transition-all duration-300 h-full">
+            <div className="bg-gradient-to-br from-purple-900/40 via-violet-900/30 to-purple-900/40 border-2 border-purple-500/30 rounded-xl p-6 hover:border-purple-400/50 transition-all duration-300">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-full bg-purple-600/20 flex items-center justify-center">
