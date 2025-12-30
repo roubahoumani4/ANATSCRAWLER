@@ -299,7 +299,7 @@ const EnhancedDashboard = () => {
           
           {/* OSINT Platform Section */}
           <motion.div variants={itemVariants}>
-            <div className="bg-gradient-to-br from-blue-900/40 via-indigo-900/30 to-blue-900/40 border-2 border-blue-500/30 rounded-xl p-6 hover:border-blue-400/50 transition-all duration-300 h-full">
+            <div className="bg-gradient-to-br from-blue-900/40 via-indigo-900/30 to-blue-900/40 border-2 border-blue-500/30 rounded-xl p-6 hover:border-blue-400/50 transition-all duration-300">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-full bg-blue-600/20 flex items-center justify-center">
@@ -313,56 +313,16 @@ const EnhancedDashboard = () => {
                 <Badge className="bg-green-500/20 text-green-400">ACTIVE</Badge>
               </div>
               
-              {osintData.length > 0 ? (
-                <>
-                  <ResponsiveContainer width="100%" height={180}>
-                    <PieChart>
-                      <Pie
-                        data={osintData}
-                        cx="50%"
-                        cy="55%"
-                        innerRadius={40}
-                        outerRadius={60}
-                        dataKey="value"
-                        label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
-                      >
-                        {osintData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: '#1f2937', 
-                          border: '1px solid #374151',
-                          borderRadius: '8px'
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  
-                  <div className="grid grid-cols-2 gap-4 mb-4 mt-2">
-                    <div className="bg-gray-900/60 rounded-lg p-4">
-                      <p className="text-sm text-gray-400 mb-1">Total Scans</p>
-                      <p className="text-2xl font-bold text-white">{darkWebStats.totalSearches}</p>
-                    </div>
-                    <div className="bg-gray-900/60 rounded-lg p-4">
-                      <p className="text-sm text-gray-400 mb-1">Success Rate</p>
-                      <p className="text-2xl font-bold text-green-400">{darkWebStats.successRate.toFixed(1)}%</p>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="bg-gray-900/60 rounded-lg p-4">
-                    <p className="text-sm text-gray-400 mb-1">Total Scans</p>
-                    <p className="text-2xl font-bold text-white">{darkWebStats.totalSearches}</p>
-                  </div>
-                  <div className="bg-gray-900/60 rounded-lg p-4">
-                    <p className="text-sm text-gray-400 mb-1">Success Rate</p>
-                    <p className="text-2xl font-bold text-green-400">{darkWebStats.successRate.toFixed(1)}%</p>
-                  </div>
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="bg-gray-900/60 rounded-lg p-4">
+                  <p className="text-sm text-gray-400 mb-1">Total Scans</p>
+                  <p className="text-2xl font-bold text-white">{darkWebStats.totalSearches}</p>
                 </div>
-              )}
+                <div className="bg-gray-900/60 rounded-lg p-4">
+                  <p className="text-sm text-gray-400 mb-1">Success Rate</p>
+                  <p className="text-2xl font-bold text-green-400">{darkWebStats.successRate.toFixed(1)}%</p>
+                </div>
+              </div>
 
               <Button 
                 onClick={() => navigate('/discovery')}
@@ -542,6 +502,53 @@ const EnhancedDashboard = () => {
         {/* Analytics Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6 mb-6">
           
+          {/* OSINT Platform Distribution */}
+          {osintData.length > 0 && (
+            <motion.div variants={itemVariants}>
+              <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-6 h-full">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Eye className="text-blue-400" size={20} />
+                  OSINT Scans
+                </h3>
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie
+                      data={osintData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={40}
+                      outerRadius={70}
+                      dataKey="value"
+                      label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                    >
+                      {osintData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#1f2937', 
+                        border: '1px solid #374151',
+                        borderRadius: '8px'
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex flex-col gap-2 mt-2">
+                  {osintData.map((entry, index) => (
+                    <div key={index} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }}></div>
+                        <span className="text-gray-300">{entry.name}</span>
+                      </div>
+                      <span className="text-white font-semibold">{entry.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {/* Dark Web Search Distribution */}
           {searchDistribution.length > 0 && (
             <motion.div variants={itemVariants}>
