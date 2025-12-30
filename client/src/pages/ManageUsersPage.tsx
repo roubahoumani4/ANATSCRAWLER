@@ -213,48 +213,28 @@ const ManageUsersPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-jetBlack text-coolWhite p-6 relative">
+    <div className="p-8 min-h-screen bg-jetBlack text-coolWhite relative">
       <MatrixBackground />
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="relative z-10"
-      >
-        {/* Header */}
-        <motion.div
-          className="mb-6"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
-          <div className="flex items-center space-x-4 mb-4">
-            <div className="p-3 rounded bg-blue-700/10 text-white">
-              <UserCog size={28} />
-            </div>
-            <div>
-              <h1 className="text-2xl font-semibold">User Management</h1>
-              <p className="text-sm text-gray-400">
-                Manage user accounts and permissions
-              </p>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Actions Bar */}
-        <div className="flex items-center justify-between mb-6">
-          <motion.button
+      <div className="flex items-center justify-between mb-6 relative z-10">
+        <div>
+          <h1 className="text-2xl font-semibold flex items-center gap-2">
+            <UserCog className="text-white" size={28} />
+            User Management
+          </h1>
+          <p className="text-sm text-gray-400 mt-1">
+            Manage user accounts and permissions
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[hsl(var(--crimsonRed))] text-white rounded font-semibold text-sm shadow hover:bg-[hsl(var(--crimsonRed),.85)] transition"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 flex items-center gap-2 transition-colors font-medium text-sm"
           >
             <FontAwesomeIcon icon={faUserPlus} />
             Create New User
-          </motion.button>
-
-          <div className="flex items-center bg-[#232323] rounded-lg px-4 py-2 shadow-inner">
-            <FontAwesomeIcon icon={faSearch} className="text-[hsl(var(--crimsonRed))] mr-3" />
+          </button>
+          <div className="flex items-center bg-gray-800/50 rounded-lg px-4 py-2">
+            <FontAwesomeIcon icon={faSearch} className="text-blue-400 mr-3" />
             <input
               type="text"
               placeholder="Search users..."
@@ -264,125 +244,118 @@ const ManageUsersPage = () => {
             />
           </div>
         </div>
+      </div>
 
-        {/* Users Table */}
-        {isLoading ? (
-          <div className="flex justify-center my-12">
-            <div className="w-12 h-12 border-4 border-coolWhite/10 border-t-white rounded-full animate-spin"></div>
-          </div>
-        ) : error ? (
-          <div className="bg-red-900/20 border border-red-500 rounded-lg p-6 text-center">
-            <p className="text-red-400">{error.message}</p>
-          </div>
-        ) : (
-          <div className="bg-[#1a1a1a] rounded-lg overflow-hidden shadow-xl">
-            <table className="w-full">
-              <thead className="bg-[#232323]">
-                <tr>
-                  <th className="text-left px-6 py-4 text-gray-300 font-semibold">Username</th>
-                  <th className="text-left px-6 py-4 text-gray-300 font-semibold">Email</th>
-                  <th className="text-left px-6 py-4 text-gray-300 font-semibold">Role</th>
-                  <th className="text-left px-6 py-4 text-gray-300 font-semibold">Created</th>
-                  <th className="text-left px-6 py-4 text-gray-300 font-semibold">Status</th>
-                  <th className="text-center px-6 py-4 text-gray-300 font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <AnimatePresence>
-                  {filteredUsers.length > 0 ? (
-                    filteredUsers.map((user, index) => (
-                      <motion.tr
-                        key={user._id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.3, delay: index * 0.05 }}
-                        className="border-b border-gray-800 hover:bg-[#232323] transition"
-                      >
-                        <td className="px-6 py-4">
+      {/* Users Table */}
+      {isLoading ? (
+        <div className="bg-gray-900/60 border border-gray-800 rounded-lg p-8 text-center text-gray-400 animate-pulse">
+          Loading users...
+        </div>
+      ) : error ? (
+        <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-6 text-red-400">
+          {error.message}
+        </div>
+      ) : (
+        <div className="bg-gray-900/60 border border-gray-800 rounded-lg overflow-hidden">
+          {filteredUsers.length === 0 ? (
+            <div className="p-8 text-center text-gray-400">
+              <UserCog size={48} className="mx-auto mb-4 opacity-50" />
+              <p>No users found.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-800/50">
+                  <tr className="text-xs text-gray-400 uppercase tracking-wider">
+                    <th className="py-3 px-4 text-left">Username</th>
+                    <th className="py-3 px-4 text-left">Email</th>
+                    <th className="py-3 px-4 text-left">Role</th>
+                    <th className="py-3 px-4 text-left">Created</th>
+                    <th className="py-3 px-4 text-left">Status</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800">
+                  {filteredUsers.map((user) => (
+                    <tr
+                      key={user._id}
+                      className="hover:bg-gray-800/30 transition-colors"
+                    >
+                      <td className="py-3 px-4 text-white font-medium">
+                        <div className="flex items-center gap-2">
+                          <FontAwesomeIcon icon={faUser} className="text-gray-400" size="sm" />
+                          {user.username}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-gray-400 text-xs">{user.email || "-"}</td>
+                      <td className="py-3 px-4">
+                        {editingUser?._id === user._id ? (
+                          <select
+                            value={user.roles.includes('admin') ? 'admin' : 'user'}
+                            onChange={(e) => handleUpdateRole(user, e.target.value)}
+                            className="bg-gray-800 text-white px-2 py-1 rounded text-xs border border-gray-700"
+                          >
+                            <option value="user">User</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                        ) : (
                           <div className="flex items-center gap-2">
-                            <FontAwesomeIcon icon={faUser} className="text-gray-400" />
-                            <span className="font-semibold text-white">{user.username}</span>
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded text-xs font-medium ${
+                              user.roles.includes('admin')
+                                ? 'bg-purple-700 text-purple-100'
+                                : 'bg-gray-700 text-gray-200'
+                            }`}>
+                              {user.roles.includes('admin') ? 'Admin' : 'User'}
+                            </span>
+                            <button
+                              onClick={() => setEditingUser(user)}
+                              className="text-gray-400 hover:text-blue-400 transition"
+                              title="Change role"
+                            >
+                              <FontAwesomeIcon icon={faEdit} size="sm" />
+                            </button>
                           </div>
-                        </td>
-                        <td className="px-6 py-4 text-gray-300">{user.email || "-"}</td>
-                        <td className="px-6 py-4">
-                          {editingUser?._id === user._id ? (
-                            <select
-                              value={user.roles.includes('admin') ? 'admin' : 'user'}
-                              onChange={(e) => handleUpdateRole(user, e.target.value)}
-                              className="bg-[#232323] text-white px-3 py-1 rounded border border-gray-700 text-sm"
-                            >
-                              <option value="user">User</option>
-                              <option value="admin">Admin</option>
-                            </select>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <span className={`px-3 py-1 rounded text-xs font-medium ${
-                                user.roles.includes('admin') 
-                                  ? 'bg-gray-700 text-gray-200' 
-                                  : 'bg-gray-800 text-gray-400'
-                              }`}>
-                                {user.roles.includes('admin') ? 'Admin' : 'User'}
-                              </span>
-                              <button
-                                onClick={() => setEditingUser(user)}
-                                className="text-gray-400 hover:text-white transition"
-                                title="Change role"
-                              >
-                                <FontAwesomeIcon icon={faEdit} size="sm" />
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-gray-400 text-sm">
-                          {new Date(user.createdAt).toLocaleDateString()}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex px-3 py-1 rounded text-xs font-medium ${
-                            user.isActive 
-                              ? 'bg-gray-700 text-gray-200' 
-                              : 'bg-gray-800 text-gray-500'
-                          }`}>
-                            {user.isActive ? 'Active' : 'Inactive'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex justify-center gap-2">
-                            <motion.button
-                              onClick={() => navigate(`/users/activity/${user._id}`)}
-                              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              title="View Activity Dashboard"
-                            >
-                              <FontAwesomeIcon icon={faChartLine} />
-                            </motion.button>
-                            <motion.button
-                              onClick={() => handleDeleteUser(user._id, user.username)}
-                              className="px-4 py-2 bg-[hsl(var(--crimsonRed))] text-white rounded hover:bg-[hsl(var(--crimsonRed),.85)] transition"
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                            >
-                              <FontAwesomeIcon icon={faTrash} />
-                            </motion.button>
-                          </div>
-                        </td>
-                      </motion.tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
-                        No users found
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-gray-400 text-xs">
+                        {new Date(user.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded text-xs font-medium ${
+                          user.isActive
+                            ? 'bg-emerald-700 text-emerald-100'
+                            : 'bg-gray-700 text-gray-400'
+                        }`}>
+                          {user.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => navigate(`/users/${user._id}/activity`)}
+                            className="px-3 py-1.5 rounded bg-cyan-600 hover:bg-cyan-500 text-xs font-medium flex items-center gap-1.5 transition-colors"
+                          >
+                            <FontAwesomeIcon icon={faChartLine} size="sm" />
+                            Activity
+                          </button>
+                          <button
+                            onClick={() => handleDeleteUser(user._id, user.username)}
+                            disabled={deleteUserMutation.isPending}
+                            className="px-3 py-1.5 rounded bg-red-600 hover:bg-red-500 text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <FontAwesomeIcon icon={faTrash} size="sm" />
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
-                  )}
-                </AnimatePresence>
-              </tbody>
-            </table>
-          </div>
-        )}
-      </motion.div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Create User Modal */}
       <AnimatePresence>

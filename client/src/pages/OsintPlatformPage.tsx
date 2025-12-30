@@ -162,7 +162,7 @@ const OsintPlatformPage: React.FC = () => {
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-3">
               <Shield className="text-white" size={36} />
-              OSINT Platform Dashboard
+              SECURITY ASSESSMENT Dashboard
             </h1>
             <p className="text-gray-400 mt-2">
               Comprehensive overview of your security assessments and intelligence gathering

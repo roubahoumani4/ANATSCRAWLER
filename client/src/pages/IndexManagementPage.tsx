@@ -720,7 +720,7 @@ const IndexManagementPage = () => {
     <div className="min-h-screen bg-jetBlack text-coolWhite relative overflow-hidden">
       <MatrixBackground />
 
-      <div className="relative z-10 container mx-auto px-6 py-8">
+      <div className="relative z-10 px-8 py-8">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
