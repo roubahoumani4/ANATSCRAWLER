@@ -210,16 +210,16 @@ const LandingPage = () => {
       <div className="relative z-10 min-h-screen flex flex-col">
         {/* Navigation */}
         <motion.nav 
-          className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-gray-900/80 border-b border-blue-500/20"
+          className="fixed top-0 left-0 right-0 z-40 backdrop-blur-xl bg-gray-900/80 border-b border-blue-500/20"
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.6 }}
         >
           <div className="max-w-7xl mx-auto px-6 lg:px-8">
-            <div className="flex items-center justify-between py-4">
+            <div className="flex items-center justify-between py-3">
               {/* Logo Section */}
               <motion.div 
-                className="flex items-center gap-4"
+                className="flex items-center"
                 whileHover={{ scale: 1.02 }}
               >
                 <div className="relative">
@@ -232,7 +232,7 @@ const LandingPage = () => {
                     transition={{ duration: 3, repeat: Infinity }}
                   />
                   <motion.div
-                    className="relative p-2 rounded-2xl bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border border-blue-400/30"
+                    className="relative p-3 rounded-2xl bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border border-blue-400/30"
                     whileHover={{ 
                       borderColor: "rgba(59, 130, 246, 0.6)",
                       boxShadow: "0 0 30px rgba(59, 130, 246, 0.3)"
@@ -241,17 +241,14 @@ const LandingPage = () => {
                     <img 
                       src={anatLogo} 
                       alt="ANATSCRAWLER Logo" 
-                      className="h-12 w-12 object-contain"
+                      className="h-16 w-16 object-contain"
                     />
                   </motion.div>
                 </div>
-                <div className="hidden sm:block">
-                  <h1 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">
-                    ANATSCRAWLER
-                  </h1>
-                  <p className="text-xs text-gray-400 font-medium">Security Intelligence Platform</p>
-                </div>
               </motion.div>
+
+              {/* Empty spacer for centering */}
+              <div className="flex-1"></div>
 
               {/* Action Button */}
               <motion.button 
@@ -272,7 +269,7 @@ const LandingPage = () => {
         </motion.nav>
 
         {/* Hero Section */}
-        <div className="flex-1 flex flex-col items-center justify-center px-6 pt-20">
+        <div className="flex-1 flex flex-col items-center justify-center px-6 pt-24">
           <motion.div
             className="max-w-6xl mx-auto text-center"
             initial={{ opacity: 0, y: 50 }}
