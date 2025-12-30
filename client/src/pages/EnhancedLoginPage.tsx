@@ -96,26 +96,72 @@ const EnhancedLoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-white relative overflow-hidden">
-      {/* Advanced Background Effects */}
-      <div className="absolute inset-0">
-        {/* Animated Gradient Orbs */}
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-        
-        {/* Professional Grid Overlay */}
-        <div className="absolute inset-0 opacity-5">
-          <div 
-            className="w-full h-full"
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-white relative overflow-hidden">
+      {/* Matrix Rain Effect */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {[...Array(15)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute text-blue-400 font-mono text-xs opacity-20 select-none"
             style={{
-              backgroundImage: `
-                linear-gradient(rgba(99, 102, 241, 0.3) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(99, 102, 241, 0.3) 1px, transparent 1px)
-              `,
-              backgroundSize: '40px 40px'
+              left: `${Math.random() * 100}%`,
+              top: `-10%`,
+            }}
+            animate={{
+              y: ["0vh", "110vh"],
+            }}
+            transition={{
+              duration: Math.random() * 4 + 6,
+              repeat: Infinity,
+              delay: Math.random() * 3,
+              ease: "linear"
+            }}
+          >
+            {Array(20).fill(0).map((_, idx) => (
+              <div key={idx} className="mb-1">
+                {String.fromCharCode(33 + Math.floor(Math.random() * 94))}
+              </div>
+            ))}
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Cyber Grid Background */}
+      <div className="absolute inset-0 opacity-5">
+        <div 
+          className="w-full h-full"
+          style={{
+            backgroundImage: `
+              linear-gradient(rgba(59, 130, 246, 0.05) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(59, 130, 246, 0.05) 1px, transparent 1px)
+            `,
+            backgroundSize: '50px 50px'
+          }}
+        />
+      </div>
+
+      {/* Floating Cyber Elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        {[...Array(15)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-1 h-1 bg-blue-400 rounded-full shadow-lg shadow-blue-400/30"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+            }}
+            animate={{
+              scale: [1, 2, 1],
+              opacity: [0.3, 1, 0.3],
+              rotate: [0, 360],
+            }}
+            transition={{
+              duration: Math.random() * 5 + 3,
+              repeat: Infinity,
+              delay: Math.random() * 2,
             }}
           />
-        </div>
+        ))}
       </div>
 
       {/* Back Button */}

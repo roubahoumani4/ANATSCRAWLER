@@ -221,12 +221,11 @@ const LandingPage = () => {
               whileHover={{ scale: 1.05 }}
             >
               <motion.div
-                className="mr-3"
                 animate={{
                   filter: [
-                    "drop-shadow(0 0 8px rgba(59, 130, 246, 0.3))",
-                    "drop-shadow(0 0 15px rgba(59, 130, 246, 0.5))",
-                    "drop-shadow(0 0 8px rgba(59, 130, 246, 0.3))"
+                    "drop-shadow(0 0 10px rgba(59, 130, 246, 0.4))",
+                    "drop-shadow(0 0 20px rgba(59, 130, 246, 0.6))",
+                    "drop-shadow(0 0 10px rgba(59, 130, 246, 0.4))"
                   ]
                 }}
                 transition={{ duration: 2, repeat: Infinity }}
@@ -234,12 +233,9 @@ const LandingPage = () => {
                 <img 
                   src={anatLogo} 
                   alt="ANATSCRAWLER Logo" 
-                  className="h-10 w-10 object-contain"
+                  className="h-16 w-16 object-contain"
                 />
               </motion.div>
-              <span className="text-xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-500">
-                ANATSCRAWLER
-              </span>
             </motion.div>
 
             <div className="flex items-center space-x-4">
