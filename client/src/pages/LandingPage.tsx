@@ -54,12 +54,8 @@ const LandingPage = () => {
     setShowResults(false);
 
     try {
-      // Use direct API endpoint to bypass Cloudflare timeout
-      const apiUrl = window.location.hostname.includes('anatsecurity.fr') 
-        ? 'https://direct.anatsecurity.fr/api/public-search/darkweb-search'
-        : '/api/public-search/darkweb-search';
-      
-      const response = await fetch(apiUrl, {
+      // Start async search job
+      const response = await fetch('/api/public-search/darkweb-search-async', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -67,27 +63,59 @@ const LandingPage = () => {
         body: JSON.stringify({ query: searchQuery }),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setSearchResults(data.results || []);
-        setShowResults(true);
-      } else {
-        let errorMsg = response.statusText;
-        try {
-          const errorData = await response.json();
-          if (errorData && errorData.errors && errorData.errors[0] && errorData.errors[0].msg) {
-            errorMsg = errorData.errors[0].msg;
-          } else if (errorData && errorData.error) {
-            errorMsg = errorData.error;
-          }
-        } catch {}
-        console.error('Search failed:', errorMsg);
-        setSearchResults([]);
+      if (!response.ok) {
+        throw new Error('Failed to start search');
       }
+
+      const data = await response.json();
+      const jobId = data.jobId;
+
+      // Poll for results
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusResponse = await fetch(`/api/search/job/${jobId}`);
+          
+          if (!statusResponse.ok) {
+            clearInterval(pollInterval);
+            setIsSearching(false);
+            console.error('Failed to get job status');
+            return;
+          }
+
+          const statusData = await statusResponse.json();
+          const job = statusData.job;
+
+          console.log(`Search status: ${job.status}`, job.progress);
+
+          if (job.status === 'completed') {
+            clearInterval(pollInterval);
+            setSearchResults(job.results || []);
+            setShowResults(true);
+            setIsSearching(false);
+          } else if (job.status === 'failed') {
+            clearInterval(pollInterval);
+            console.error('Search failed:', job.error);
+            setSearchResults([]);
+            setIsSearching(false);
+          }
+          // If still processing, continue polling
+        } catch (pollError) {
+          console.error('Polling error:', pollError);
+        }
+      }, 2000); // Poll every 2 seconds
+
+      // Safety timeout after 10 minutes
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        if (isSearching) {
+          setIsSearching(false);
+          console.error('Search timeout');
+        }
+      }, 10 * 60 * 1000);
+
     } catch (error) {
       console.error('Search error:', error);
       setSearchResults([]);
-    } finally {
       setIsSearching(false);
     }
   };

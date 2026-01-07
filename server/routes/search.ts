@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import { performOsintSearch } from "../lib/search/index";
 import { performElasticsearchSearch } from "../lib/search";
 import { ELASTICSEARCH_URI } from "../config";
+import { searchJobManager } from "../lib/searchJobManager";
 
 const router = express.Router();
 
@@ -429,6 +430,97 @@ router.post("/darkweb-search", async (req: Request, res: Response) => {
       error: 'Darkweb search failed',
       message: errorMessage,
       timestamp: new Date().toISOString()
+    });
+  }
+});
+
+/**
+ * POST /darkweb-search-async - Start an async darkweb search job
+ * Returns immediately with a job ID
+ */
+router.post("/darkweb-search-async", async (req: Request, res: Response) => {
+  try {
+    const { query, limit = 100 } = req.body;
+
+    if (!query || typeof query !== 'string') {
+      return res.status(400).json({ 
+        error: "Search query is required",
+        message: "Please provide a valid search query"
+      });
+    }
+
+    // Create job and return immediately
+    const jobId = searchJobManager.createJob(query);
+    
+    res.json({
+      success: true,
+      jobId,
+      message: "Search job started",
+      pollUrl: `/api/search/job/${jobId}`
+    });
+
+    // Execute search asynchronously
+    searchJobManager.updateJobStatus(jobId, 'processing');
+    
+    performElasticsearchSearch(query, ELASTICSEARCH_URI)
+      .then((results) => {
+        const limitedResults = limit > 0 ? results.slice(0, limit) : results;
+        searchJobManager.completeJob(jobId, limitedResults);
+      })
+      .catch((error) => {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        searchJobManager.failJob(jobId, errorMessage);
+      });
+
+  } catch (error) {
+    console.error('[Async Darkweb Search] Error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({
+      success: false,
+      error: 'Failed to start search job',
+      message: errorMessage
+    });
+  }
+});
+
+/**
+ * GET /job/:jobId - Poll for job status and results
+ */
+router.get("/job/:jobId", async (req: Request, res: Response) => {
+  try {
+    const { jobId } = req.params;
+    const job = searchJobManager.getJob(jobId);
+
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        error: 'Job not found',
+        message: 'The requested job does not exist or has expired'
+      });
+    }
+
+    // Return job status
+    res.json({
+      success: true,
+      job: {
+        id: job.id,
+        query: job.query,
+        status: job.status,
+        progress: job.progress,
+        results: job.status === 'completed' ? job.results : undefined,
+        error: job.error,
+        createdAt: job.createdAt,
+        completedAt: job.completedAt
+      }
+    });
+
+  } catch (error) {
+    console.error('[Job Status] Error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get job status',
+      message: errorMessage
     });
   }
 });
