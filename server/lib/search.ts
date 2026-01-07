@@ -363,10 +363,13 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
         const content = hit._source.content;
         const matches = extractMatchingEntries(content, normalizedQuery);
         
-        // Only process if we found matches
-        if (matches.length > 0) {
+        // Filter out matches that don't have username or password
+        const validMatches = matches.filter(match => match.username || match.password);
+        
+        // Only process if we found valid matches
+        if (validMatches.length > 0) {
           // Create a separate result for each matching entry (up to 10 per file)
-          matches.slice(0, 10).forEach((match, index) => {
+          validMatches.slice(0, 10).forEach((match, index) => {
             console.log(`[ES Search] Match extracted:`, {
               username: match.username,
               password: match.password,
@@ -410,8 +413,8 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
             });
           });
         } else {
-          // If extraction failed, log and skip this result (don't show raw content)
-          console.log(`[ES Search] No matches extracted from ${hit._index}/${hit._id}, skipping`);
+          // If extraction failed or no valid matches, log and skip this result
+          console.log(`[ES Search] No valid matches extracted from ${hit._index}/${hit._id} (found ${matches.length} matches but none had username/password), skipping`);
         }
       } else {
         // For darkweb_structured index, return as-is
