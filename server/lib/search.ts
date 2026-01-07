@@ -299,7 +299,8 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
 
       // Only enable highlighting for the structured index to avoid hitting
       // index.highlight.max_analyzed_offset limits on very large file contents.
-      if (indexName !== 'files_index') {
+      // Disable for files_index and collection1 which may have large content
+      if (indexName !== 'files_index' && indexName !== 'collection1') {
         searchBody.highlight = {
           fields: {
             content: {
@@ -324,11 +325,19 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
       console.log(`[ES Search] ${indexName} response status: ${searchResponse.status}`);
       console.log(`[ES Search] ${indexName} hits:`, searchData.hits?.total?.value || 0);
       
-      if (searchResponse.ok && searchData.hits && searchData.hits.hits) {
+      // Check for hits even if there's an error (like highlighting errors that don't affect results)
+      if (searchData.hits && searchData.hits.hits && searchData.hits.hits.length > 0) {
         console.log(`[ES Search] Adding ${searchData.hits.hits.length} results from ${indexName}`);
         allResults.push(...searchData.hits.hits);
+        
+        // Log any errors but don't let them stop us from using the results
+        if (searchData.error) {
+          console.log(`[ES Search] Warning from ${indexName}:`, searchData.error.type || searchData.error);
+        }
+      } else if (searchResponse.ok) {
+        console.log(`[ES Search] No results from ${indexName}`);
       } else {
-        console.log(`[ES Search] No results from ${indexName}:`, searchData.error || 'Unknown error');
+        console.log(`[ES Search] Error from ${indexName}:`, searchData.error || 'Unknown error');
       }
     } // End of for loop
     
