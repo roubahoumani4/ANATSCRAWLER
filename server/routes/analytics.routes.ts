@@ -203,7 +203,7 @@ router.get('/security-score', async (req: Request, res: Response) => {
  */
 router.get('/elasticsearch-stats', async (req: Request, res: Response) => {
   try {
-    const indices = ['darkweb_structured', 'files_index'];
+    const indices = ['darkweb_structured', 'files_index', 'collection1'];
     let totalDocuments = 0;
     const indexStats: any = {};
 

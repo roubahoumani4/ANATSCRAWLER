@@ -213,8 +213,8 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
   return matches;
 }export async function performElasticsearchSearch(query: string, elasticsearchUri: string): Promise<SearchResult[]> {
   try {
-    // Search both 'darkweb_structured' and 'files_index' indices
-    const indices = ['darkweb_structured', 'files_index'];
+    // Search across multiple indices
+    const indices = ['darkweb_structured', 'files_index', 'collection1'];
     
     // Normalize query: trim whitespace
     const normalizedQuery = query.trim();

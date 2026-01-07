@@ -405,7 +405,7 @@ router.post("/darkweb-search", async (req: Request, res: Response) => {
       query,
       searchType: 'darkweb',
       elasticsearchUri: ELASTICSEARCH_URI,
-      indices: ['darkweb_structured', 'files_index'],
+      indices: ['darkweb_structured', 'files_index', 'collection1'],
       totalResults: results.length,
       limitedResults: limitedResults.length,
       limit: limit || null,
