@@ -156,6 +156,38 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
   console.log(`[ES Search] First 5 lines sample:`, lines.slice(0, 5).map(l => l.substring(0, 100)));
   console.log(`[ES Search] Looking for query: "${queryLower}"`);
   
+  // If content is a single line and contains the query, try to extract from it
+  if (lines.length === 1 && lines[0].toLowerCase().includes(queryLower)) {
+    console.log(`[ES Search] Single-line content contains query, attempting extraction`);
+    
+    // Try to find email:password or email:hash patterns in the content
+    const emailPasswordPattern = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)[:\s]+([^\s,}\]]+)/gi;
+    const contentStr = lines[0];
+    let match;
+    
+    while ((match = emailPasswordPattern.exec(contentStr)) !== null && matches.length < MAX_MATCHES) {
+      const email = match[1];
+      const password = match[2];
+      
+      // Only add if the email or password matches the query
+      if (email.toLowerCase().includes(queryLower) || password.toLowerCase().includes(queryLower)) {
+        console.log(`[ES Search] Extracted match via regex: ${email}:${password.substring(0, 10)}...`);
+        matches.push({
+          username: email,
+          password: password,
+          content: `${email}:${password}`,
+          context: `Found in single-line content`
+        });
+      }
+    }
+    
+    // If we found matches, return them
+    if (matches.length > 0) {
+      console.log(`[ES Search] Found ${matches.length} matches via regex extraction`);
+      return matches;
+    }
+  }
+  
   for (const line of lines) {
     if (matches.length >= MAX_MATCHES) {
       console.log(`[ES Search] Reached max matches limit (${MAX_MATCHES}), stopping`);
