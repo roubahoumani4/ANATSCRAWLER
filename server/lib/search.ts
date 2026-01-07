@@ -363,50 +363,56 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
         const content = hit._source.content;
         const matches = extractMatchingEntries(content, normalizedQuery);
         
-        // Create a separate result for each matching entry (up to 10 per file)
-        matches.slice(0, 10).forEach((match, index) => {
-          console.log(`[ES Search] Match extracted:`, {
-            username: match.username,
-            password: match.password,
-            context: match.context
+        // Only process if we found matches
+        if (matches.length > 0) {
+          // Create a separate result for each matching entry (up to 10 per file)
+          matches.slice(0, 10).forEach((match, index) => {
+            console.log(`[ES Search] Match extracted:`, {
+              username: match.username,
+              password: match.password,
+              context: match.context
+            });
+            
+            processedResults.push({
+              id: `${hit._id}_${index}`,
+              score: hit._score,
+              source: hit._source.file_path || hit._index,
+              fileName: hit._source.file_name || '',
+              content: match.content,
+              timestamp: hit._source.timestamp || '',
+              collection: hit._index,
+              matchedTerms: hit.matchedTerms || [],
+              highlights: [match.content],
+              context: match.context || '',
+              index: hit._index || '',
+              name: match.username || '',
+              first_name: '',
+              last_name: '',
+              phone: '',
+              email: match.username || '',
+              birthdate: '',
+              gender: '',
+              locale: '',
+              city: '',
+              location: '',
+              location2: '',
+              link: '',
+              link2: '',
+              protocol: '',
+              social_link: '',
+              fileType: hit._source.file_type || '',
+              extractionConfidence: '',
+              exposed: match.password ? ['password'] : [],
+              file_size: hit._source.file_size || 0,
+              file_path: hit._source.file_path || '',
+              password: match.password || '',
+              database_source: databaseSource,
+            });
           });
-          
-          processedResults.push({
-            id: `${hit._id}_${index}`,
-            score: hit._score,
-            source: hit._source.file_path || hit._index,
-            fileName: hit._source.file_name || '',
-            content: match.content,
-            timestamp: hit._source.timestamp || '',
-            collection: hit._index,
-            matchedTerms: hit.matchedTerms || [],
-            highlights: [match.content],
-            context: match.context || '',
-            index: hit._index || '',
-            name: match.username || '',
-            first_name: '',
-            last_name: '',
-            phone: '',
-            email: match.username || '',
-            birthdate: '',
-            gender: '',
-            locale: '',
-            city: '',
-            location: '',
-            location2: '',
-            link: '',
-            link2: '',
-            protocol: '',
-            social_link: '',
-            fileType: hit._source.file_type || '',
-            extractionConfidence: '',
-            exposed: match.password ? ['password'] : [],
-            file_size: hit._source.file_size || 0,
-            file_path: hit._source.file_path || '',
-            password: match.password || '',
-            database_source: databaseSource,
-          });
-        });
+        } else {
+          // If extraction failed, log and skip this result (don't show raw content)
+          console.log(`[ES Search] No matches extracted from ${hit._index}/${hit._id}, skipping`);
+        }
       } else {
         // For darkweb_structured index, return as-is
         processedResults.push({
