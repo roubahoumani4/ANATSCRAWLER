@@ -36,7 +36,7 @@ const queryHistorySchema = new Schema<IQueryHistory>(
     timestamp: {
       type: Date,
       default: Date.now,
-      index: true,
+      // index: true - removed, defined in schema.index() below
     },
   },
   {

@@ -101,7 +101,7 @@ const searchResultSchema = new mongoose.Schema({
     type: String,
     required: true
   }
-});
+}, { suppressReservedKeysWarning: true });
 
 // User Search Results Schema
 const userSearchResultSchema = new mongoose.Schema({

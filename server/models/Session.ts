@@ -80,12 +80,12 @@ const SessionSchema = new Schema<ISession>({
   createdAt: {
     type: Date,
     default: Date.now,
-    index: true,
+    // index: true - removed, defined in schema.index() below
   },
   expiresAt: {
     type: Date,
     required: true,
-    index: true,
+    // index: true - removed, defined in schema.index() below with expireAfterSeconds
   },
   isActive: {
     type: Boolean,
