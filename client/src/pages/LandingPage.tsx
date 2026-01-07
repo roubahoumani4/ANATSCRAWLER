@@ -54,7 +54,12 @@ const LandingPage = () => {
     setShowResults(false);
 
     try {
-      const response = await fetch('/api/public-search/darkweb-search', {
+      // Use direct API endpoint to bypass Cloudflare timeout
+      const apiUrl = window.location.hostname.includes('anatsecurity.fr') 
+        ? 'https://direct.anatsecurity.fr/api/public-search/darkweb-search'
+        : '/api/public-search/darkweb-search';
+      
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
