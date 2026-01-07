@@ -358,8 +358,8 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
         hit._source.database_source
       );
       
-      // If this is from files_index, parse the content and extract matching entries
-      if (hit._index === 'files_index' && hit._source.content) {
+      // If this is from files_index or collection1, parse the content and extract matching entries
+      if ((hit._index === 'files_index' || hit._index === 'collection1') && hit._source.content) {
         const content = hit._source.content;
         const matches = extractMatchingEntries(content, normalizedQuery);
         
