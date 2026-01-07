@@ -151,6 +151,11 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
   let processedLines = 0;
   const MAX_MATCHES = 50; // Limit to 50 matches per file to prevent memory issues
   
+  // Debug: show first few lines
+  console.log(`[ES Search] Total lines in content: ${lines.length}`);
+  console.log(`[ES Search] First 5 lines sample:`, lines.slice(0, 5).map(l => l.substring(0, 100)));
+  console.log(`[ES Search] Looking for query: "${queryLower}"`);
+  
   for (const line of lines) {
     if (matches.length >= MAX_MATCHES) {
       console.log(`[ES Search] Reached max matches limit (${MAX_MATCHES}), stopping`);
