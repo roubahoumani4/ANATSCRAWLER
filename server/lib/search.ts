@@ -225,10 +225,11 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
     const allResults: any[] = [];
     
     for (const indexName of indices) {
-      console.log(`[ES Search] Searching index: ${indexName}`);
-      
-      // Use a simple match_phrase query for exact matching (handles special characters like @ and .)
-      const searchBody: any = {
+      try {
+        console.log(`[ES Search] Searching index: ${indexName}`);
+        
+        // Use a simple match_phrase query for exact matching (handles special characters like @ and .)
+        const searchBody: any = {
         query: {
           bool: {
             should: [
@@ -313,15 +314,23 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
         };
       }
       
-      const searchResponse = await fetch(`${elasticsearchUri}/${indexName}/_search`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(searchBody)
-      });
+      // Add timeout to prevent hanging on slow indices
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout per index
+      
+      try {
+        const searchResponse = await fetch(`${elasticsearchUri}/${indexName}/_search`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(searchBody),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
 
-      const searchData = await searchResponse.json() as any;
+        const searchData = await searchResponse.json() as any;
       console.log(`[ES Search] ${indexName} response status: ${searchResponse.status}`);
       console.log(`[ES Search] ${indexName} hits:`, searchData.hits?.total?.value || 0);
       
@@ -338,6 +347,18 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
         console.log(`[ES Search] No results from ${indexName}`);
       } else {
         console.log(`[ES Search] Error from ${indexName}:`, searchData.error || 'Unknown error');
+      }
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        if (fetchError.name === 'AbortError') {
+          console.error(`[ES Search] Timeout searching ${indexName} (10s limit exceeded)`);
+        } else {
+          console.error(`[ES Search] Fetch error for ${indexName}:`, fetchError.message || fetchError);
+        }
+      }
+      } catch (indexError: any) {
+        console.error(`[ES Search] Exception searching ${indexName}:`, indexError.message || indexError);
+        // Continue to next index even if this one fails
       }
     } // End of for loop
     
