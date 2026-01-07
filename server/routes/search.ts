@@ -456,7 +456,7 @@ router.post("/darkweb-search-async", async (req: Request, res: Response) => {
       success: true,
       jobId,
       message: "Search job started",
-      pollUrl: `/api/search/job/${jobId}`
+      pollUrl: `/api/public-search/job/${jobId}`
     });
 
     // Execute search asynchronously

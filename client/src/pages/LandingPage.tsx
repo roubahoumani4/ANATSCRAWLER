@@ -73,7 +73,7 @@ const LandingPage = () => {
       // Poll for results
       const pollInterval = setInterval(async () => {
         try {
-          const statusResponse = await fetch(`/api/search/job/${jobId}`);
+          const statusResponse = await fetch(`/api/public-search/job/${jobId}`);
           
           if (!statusResponse.ok) {
             clearInterval(pollInterval);
