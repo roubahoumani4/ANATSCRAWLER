@@ -314,10 +314,13 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
         };
       }
       
-      // Add timeout to prevent hanging on slow indices
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout per index
+      console.log(`[ES Search] Query for ${indexName}:`, JSON.stringify(searchBody.query).substring(0, 200));
       
+      // Add timeout to prevent hanging on slow indices (60 seconds per index)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout per index
+      
+      const startTime = Date.now();
       try {
         const searchResponse = await fetch(`${elasticsearchUri}/${indexName}/_search`, {
           method: 'POST',
@@ -328,6 +331,8 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
           signal: controller.signal
         });
         
+        const elapsedTime = Date.now() - startTime;
+        console.log(`[ES Search] ${indexName} search took ${elapsedTime}ms`);
         clearTimeout(timeoutId);
 
         const searchData = await searchResponse.json() as any;
@@ -351,7 +356,7 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
       } catch (fetchError: any) {
         clearTimeout(timeoutId);
         if (fetchError.name === 'AbortError') {
-          console.error(`[ES Search] Timeout searching ${indexName} (10s limit exceeded)`);
+          console.error(`[ES Search] Timeout searching ${indexName} (60s limit exceeded)`);
         } else {
           console.error(`[ES Search] Fetch error for ${indexName}:`, fetchError.message || fetchError);
         }
