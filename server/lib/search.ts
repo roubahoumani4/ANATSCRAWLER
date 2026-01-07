@@ -313,23 +313,39 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
         };
       }
       
-      const searchResponse = await fetch(`${elasticsearchUri}/${indexName}/_search`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(searchBody)
-      });
-
-      const searchData = await searchResponse.json() as any;
-      console.log(`[ES Search] ${indexName} response status: ${searchResponse.status}`);
-      console.log(`[ES Search] ${indexName} hits:`, searchData.hits?.total?.value || 0);
+      // Add abort controller for timeout (20 seconds per index)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
       
-      if (searchResponse.ok && searchData.hits && searchData.hits.hits) {
-        console.log(`[ES Search] Adding ${searchData.hits.hits.length} results from ${indexName}`);
-        allResults.push(...searchData.hits.hits);
-      } else {
-        console.log(`[ES Search] No results from ${indexName}:`, searchData.error || 'Unknown error');
+      try {
+        const searchResponse = await fetch(`${elasticsearchUri}/${indexName}/_search`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(searchBody),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+        const searchData = await searchResponse.json() as any;
+        console.log(`[ES Search] ${indexName} response status: ${searchResponse.status}`);
+        console.log(`[ES Search] ${indexName} hits:`, searchData.hits?.total?.value || 0);
+        
+        if (searchResponse.ok && searchData.hits && searchData.hits.hits) {
+          console.log(`[ES Search] Adding ${searchData.hits.hits.length} results from ${indexName}`);
+          allResults.push(...searchData.hits.hits);
+        } else {
+          console.log(`[ES Search] No results from ${indexName}:`, searchData.error || 'Unknown error');
+        }
+      } catch (error: any) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+          console.log(`[ES Search] Timeout searching ${indexName} after 20s - skipping`);
+        } else {
+          console.log(`[ES Search] Error searching ${indexName}:`, error.message);
+        }
+        // Continue to next index
       }
     } // End of for loop
     
