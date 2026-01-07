@@ -225,11 +225,10 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
     const allResults: any[] = [];
     
     for (const indexName of indices) {
-      try {
-        console.log(`[ES Search] Searching index: ${indexName}`);
-        
-        // Use a simple match_phrase query for exact matching (handles special characters like @ and .)
-        const searchBody: any = {
+      console.log(`[ES Search] Searching index: ${indexName}`);
+      
+      // Use a simple match_phrase query for exact matching (handles special characters like @ and .)
+      const searchBody: any = {
         query: {
           bool: {
             should: [
@@ -314,56 +313,23 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
         };
       }
       
-      console.log(`[ES Search] Query for ${indexName}:`, JSON.stringify(searchBody.query).substring(0, 200));
-      
-      // Add timeout to prevent hanging on slow indices (60 seconds per index)
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout per index
-      
-      const startTime = Date.now();
-      try {
-        const searchResponse = await fetch(`${elasticsearchUri}/${indexName}/_search`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(searchBody),
-          signal: controller.signal
-        });
-        
-        const elapsedTime = Date.now() - startTime;
-        console.log(`[ES Search] ${indexName} search took ${elapsedTime}ms`);
-        clearTimeout(timeoutId);
+      const searchResponse = await fetch(`${elasticsearchUri}/${indexName}/_search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(searchBody)
+      });
 
-        const searchData = await searchResponse.json() as any;
+      const searchData = await searchResponse.json() as any;
       console.log(`[ES Search] ${indexName} response status: ${searchResponse.status}`);
       console.log(`[ES Search] ${indexName} hits:`, searchData.hits?.total?.value || 0);
       
-      // Check for hits even if there's an error (like highlighting errors that don't affect results)
-      if (searchData.hits && searchData.hits.hits && searchData.hits.hits.length > 0) {
+      if (searchResponse.ok && searchData.hits && searchData.hits.hits) {
         console.log(`[ES Search] Adding ${searchData.hits.hits.length} results from ${indexName}`);
         allResults.push(...searchData.hits.hits);
-        
-        // Log any errors but don't let them stop us from using the results
-        if (searchData.error) {
-          console.log(`[ES Search] Warning from ${indexName}:`, searchData.error.type || searchData.error);
-        }
-      } else if (searchResponse.ok) {
-        console.log(`[ES Search] No results from ${indexName}`);
       } else {
-        console.log(`[ES Search] Error from ${indexName}:`, searchData.error || 'Unknown error');
-      }
-      } catch (fetchError: any) {
-        clearTimeout(timeoutId);
-        if (fetchError.name === 'AbortError') {
-          console.error(`[ES Search] Timeout searching ${indexName} (60s limit exceeded)`);
-        } else {
-          console.error(`[ES Search] Fetch error for ${indexName}:`, fetchError.message || fetchError);
-        }
-      }
-      } catch (indexError: any) {
-        console.error(`[ES Search] Exception searching ${indexName}:`, indexError.message || indexError);
-        // Continue to next index even if this one fails
+        console.log(`[ES Search] No results from ${indexName}:`, searchData.error || 'Unknown error');
       }
     } // End of for loop
     
