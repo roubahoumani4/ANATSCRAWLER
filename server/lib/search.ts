@@ -8,6 +8,7 @@ interface SearchResult {
   content: string;
   timestamp?: string;
   collection?: string;
+  database_source?: string;
 }
 
 interface ElasticsearchHit {
@@ -69,6 +70,20 @@ function inferDatabaseSource(filePath: string | undefined, databaseSource: strin
 function extractMatchingEntries(content: string, query: string): MatchedEntry[] {
   const matches: MatchedEntry[] = [];
   const queryLower = query.toLowerCase();
+
+  // Deduplication helper: ensures identical username/password pairs from same source are only added once
+  const seen = new Set<string>();
+  const makeKey = (username: string, password: string, content: string) => {
+    if (username || password) return `${(username || '').toLowerCase()}|${password || ''}`;
+    return (content || '').toLowerCase().substring(0, 200);
+  };
+  const pushUnique = (entry: MatchedEntry) => {
+    const key = makeKey(entry.username, entry.password, entry.content);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    matches.push(entry);
+    return true;
+  };
   
   // Limit content size to prevent memory issues (max 5MB of content to parse)
   const MAX_CONTENT_SIZE = 5 * 1024 * 1024;
@@ -107,7 +122,7 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
           if (combined.includes(queryLower) || 
               email.toLowerCase().includes(queryLower) ||
               hash.toLowerCase().includes(queryLower)) {
-            matches.push({
+            pushUnique({
               username: email,
               password: hash,
               content: `${email}:${hash}`,
@@ -127,7 +142,7 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
             email.toLowerCase().includes(queryLower) ||
             hash.toLowerCase().includes(queryLower)) {
           console.log(`[ES Search] Adding match with email="${email}" and hash="${hash}"`);
-          matches.push({
+          pushUnique({
             username: email,
             password: hash,
             content: `${email}:${hash}`,
@@ -171,12 +186,8 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
       const password = jpMatch[2];
       if (email.toLowerCase().includes(queryLower) || password.toLowerCase().includes(queryLower)) {
         console.log(`[ES Search] Extracted match via JSON-pair regex: ${email}:${password.substring(0, 10)}...`);
-        matches.push({ username: email, password, content: `${email}:${password}`, context: `Found via JSON-pair regex` });
+        pushUnique({ username: email, password, content: `${email}:${password}`, context: `Found via JSON-pair regex` });        }
       }
-    }
-
-    // Also handle cases where the username/email field contains both email and password separated by a semicolon
-    // Example: "username":"user@example.com;password123"
     const jsonSemicolonPattern = /"(?:username|email)"\s*:\s*"([^";]+);([^"}]+)"/gi;
     let jsMatch;
     while ((jsMatch = jsonSemicolonPattern.exec(contentStr)) !== null && matches.length < MAX_MATCHES) {
@@ -184,7 +195,7 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
       const password = jsMatch[2];
       if (email.toLowerCase().includes(queryLower) || password.toLowerCase().includes(queryLower)) {
         console.log(`[ES Search] Extracted match via JSON-semicolon regex: ${email}:${password.substring(0, 10)}...`);
-        matches.push({ username: email, password, content: `${email}:${password}`, context: `Found via JSON-semicolon regex` });
+        pushUnique({ username: email, password, content: `${email}:${password}`, context: `Found via JSON-semicolon regex` });
       }
     }
 
@@ -204,7 +215,7 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
       // Only add if the email or password matches the query
       if (email.toLowerCase().includes(queryLower) || password.toLowerCase().includes(queryLower)) {
         console.log(`[ES Search] Extracted match via regex: ${email}:${password.substring(0, 10)}...`);
-        matches.push({
+        pushUnique({
           username: email,
           password: password,
           content: `${email}:${password}`,
@@ -243,7 +254,7 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
         const hash = lineJson.hash || lineJson.password || '';
         
         if (email || hash) {
-          matches.push({
+          pushUnique({
             username: email,
             password: hash,
             content: `${email}:${hash}`,
@@ -260,7 +271,7 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
       if (emailPasswordMatch) {
         const username = emailPasswordMatch[1];
         const password = emailPasswordMatch[2].trim();
-        matches.push({
+        pushUnique({
           username,
           password,
           content: `${username}:${password}`,
@@ -268,7 +279,7 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
         });
       } else {
         // Just include the matching line
-        matches.push({
+        pushUnique({
           username: '',
           password: '',
           content: line.trim(),
@@ -422,11 +433,11 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
           database_source: databaseSource,
         });
       } else {
-        // For darkweb_structured index, return as-is
+        // For darkweb_structured index, return as-is but include inferred database source
         processedResults.push({
           id: hit._id,
           score: hit._score,
-          source: hit._source.source || hit._source.file_path || hit._index,
+          source: databaseSource || hit._source.source || hit._source.file_path || hit._index,
           fileName: hit._source.fileName || hit._source.file_name || '',
           content: hit._source.content || '',
           timestamp: hit._source.timestamp || '',
@@ -450,6 +461,7 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
           link2: hit._source.link2 || '',
           protocol: hit._source.protocol || '',
           social_link: hit._source.social_link || '',
+          database_source: databaseSource,
         });
       }
     }
