@@ -413,7 +413,7 @@ router.get('/document', async (req: Request, res: Response) => {
         return res.status(502).json({ success: false, error: 'Elasticsearch error', status: response.status, body: text });
       }
 
-      const body = await response.json();
+      const body = await response.json() as { _source?: unknown };
       return res.json({ success: true, document: body._source || null });
     } catch (error: any) {
       clearTimeout(timer);

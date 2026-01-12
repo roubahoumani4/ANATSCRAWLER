@@ -175,13 +175,26 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
       }
     }
 
+    // Also handle cases where the username/email field contains both email and password separated by a semicolon
+    // Example: "username":"user@example.com;password123"
+    const jsonSemicolonPattern = /"(?:username|email)"\s*:\s*"([^";]+);([^"}]+)"/gi;
+    let jsMatch;
+    while ((jsMatch = jsonSemicolonPattern.exec(contentStr)) !== null && matches.length < MAX_MATCHES) {
+      const email = jsMatch[1];
+      const password = jsMatch[2];
+      if (email.toLowerCase().includes(queryLower) || password.toLowerCase().includes(queryLower)) {
+        console.log(`[ES Search] Extracted match via JSON-semicolon regex: ${email}:${password.substring(0, 10)}...`);
+        matches.push({ username: email, password, content: `${email}:${password}`, context: `Found via JSON-semicolon regex` });
+      }
+    }
+
     if (matches.length > 0) {
-      console.log(`[ES Search] Found ${matches.length} matches via JSON-pair extraction`);
+      console.log(`[ES Search] Found ${matches.length} matches via JSON-based extraction`);
       return matches;
     }
 
-    // Fallback: try to find email:password or email:hash patterns in the content
-    const emailPasswordPattern = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)[:\s]+([^\s,}\]]+)/gi;
+    // Fallback: try to find email:password or email:hash patterns in the content (accept ':' or ';' separators)
+    const emailPasswordPattern = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})[:;\s]+([^\s,}\]]+)/gi;
     let match;
 
     while ((match = emailPasswordPattern.exec(contentStr)) !== null && matches.length < MAX_MATCHES) {
@@ -242,8 +255,8 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
         // Line is not JSON, continue with regex matching
       }
       
-      // Try to extract email:password pattern
-      const emailPasswordMatch = line.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}):(.+)/);
+      // Try to extract email:password pattern (accept ':' or ';' as separators)
+      const emailPasswordMatch = line.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})[:;](.+)/);
       if (emailPasswordMatch) {
         const username = emailPasswordMatch[1];
         const password = emailPasswordMatch[2].trim();
