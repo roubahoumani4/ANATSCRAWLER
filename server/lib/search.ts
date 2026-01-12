@@ -425,6 +425,8 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
     // Enrich top results by fetching document content for hits that are missing email/password
     // Limited to a small number of documents to avoid large payloads / performance regressions.
     const MAX_DETAIL_FETCH = 10;
+    const MAX_MATCHES_PER_DOC = 5;
+
     const candidates = processedResults
       .filter(r => (r.collection === 'collection1' || r.collection === 'files_index') && (!r.email || r.email === ''))
       .slice(0, MAX_DETAIL_FETCH);
@@ -457,12 +459,50 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
 
           // Run the existing extraction routine on this document's content
           const matches = extractMatchingEntries(content, normalizedQuery);
-          if (matches && matches.length > 0) {
-            const m = matches[0];
-            res.email = m.username || res.email;
-            res.password = m.password || res.password;
-            res.context = res.context ? `${res.context} | extracted` : m.context;
-            res.exposed = res.exposed && res.exposed.length > 0 ? res.exposed : (m.password ? ['password'] : []);
+          if (!matches || matches.length === 0) return;
+
+          // Create one result per extracted match (bounded) and replace original result
+          const newEntries = matches.slice(0, MAX_MATCHES_PER_DOC).map((m: MatchedEntry, idx: number) => ({
+            id: `${res.id}#${idx}`,
+            score: res.score,
+            source: res.source,
+            fileName: res.fileName,
+            content: '', // avoid returning full content in search payload
+            timestamp: res.timestamp,
+            collection: res.collection,
+            matchedTerms: [],
+            highlights: [],
+            context: m.context || res.context || '',
+            index: res.index || res.collection,
+            name: m.username || '',
+            first_name: '',
+            last_name: '',
+            phone: '',
+            email: m.username || res.email || '',
+            birthdate: '',
+            gender: '',
+            locale: '',
+            city: '',
+            location: '',
+            location2: '',
+            link: '',
+            link2: '',
+            protocol: '',
+            social_link: '',
+            fileType: res.fileType || '',
+            extractionConfidence: '',
+            exposed: m.password ? ['password'] : (res.exposed || []),
+            file_size: res.file_size || 0,
+            file_path: res.file_path || '',
+            password: m.password || res.password || '',
+            database_source: res.database_source || inferDatabaseSource(res.file_path || '', undefined),
+          }));
+
+          // Replace the original single entry with the newly generated per-match entries
+          const idx = processedResults.findIndex(p => p.id === res.id && p.collection === res.collection);
+          if (idx !== -1) {
+            // remove original and insert new entries at same position
+            processedResults.splice(idx, 1, ...newEntries);
           }
         } catch (err: any) {
           if (err && err.name === 'AbortError') {
