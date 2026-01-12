@@ -160,15 +160,34 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
   if (lines.length === 1 && lines[0].toLowerCase().includes(queryLower)) {
     console.log(`[ES Search] Single-line content contains query, attempting extraction`);
     
-    // Try to find email:password or email:hash patterns in the content
-    const emailPasswordPattern = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)[:\s]+([^\s,}\]]+)/gi;
     const contentStr = lines[0];
+
+    // First, try to extract JSON-like username/password pairs from the single-line JSON
+    // Handles patterns like: {"username":"a@b.com","password":"p"}, ...
+    const jsonPairPattern = /"(?:username|email)"\s*:\s*"([^"]+)"\s*,\s*"(?:password|hash)"\s*:\s*"([^"]+)"/gi;
+    let jpMatch;
+    while ((jpMatch = jsonPairPattern.exec(contentStr)) !== null && matches.length < MAX_MATCHES) {
+      const email = jpMatch[1];
+      const password = jpMatch[2];
+      if (email.toLowerCase().includes(queryLower) || password.toLowerCase().includes(queryLower)) {
+        console.log(`[ES Search] Extracted match via JSON-pair regex: ${email}:${password.substring(0, 10)}...`);
+        matches.push({ username: email, password, content: `${email}:${password}`, context: `Found via JSON-pair regex` });
+      }
+    }
+
+    if (matches.length > 0) {
+      console.log(`[ES Search] Found ${matches.length} matches via JSON-pair extraction`);
+      return matches;
+    }
+
+    // Fallback: try to find email:password or email:hash patterns in the content
+    const emailPasswordPattern = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)[:\s]+([^\s,}\]]+)/gi;
     let match;
-    
+
     while ((match = emailPasswordPattern.exec(contentStr)) !== null && matches.length < MAX_MATCHES) {
       const email = match[1];
       const password = match[2];
-      
+
       // Only add if the email or password matches the query
       if (email.toLowerCase().includes(queryLower) || password.toLowerCase().includes(queryLower)) {
         console.log(`[ES Search] Extracted match via regex: ${email}:${password.substring(0, 10)}...`);
@@ -364,7 +383,7 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
           collection: hit._index,
           matchedTerms: [],
           highlights: [],
-          context: hit._source.context || '',
+          context: (hit._source.context || '').substring(0, 1000) + ((hit._source.context || '').length > 1000 ? '... (truncated)' : ''),
           index: hit._index || '',
           name: hit._source.name || hit._source.email || '',
           first_name: '',
@@ -401,7 +420,7 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
           collection: hit._index,
           matchedTerms: [],
           highlights: [],
-          context: hit._source.context || '',
+          context: (hit._source.context || '').substring(0, 1000) + ((hit._source.context || '').length > 1000 ? '... (truncated)' : ''),
           index: hit._index || '',
           name: hit._source.name || '',
           first_name: hit._source.first_name || '',
@@ -472,7 +491,7 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
             collection: res.collection,
             matchedTerms: [],
             highlights: [],
-            context: m.context || res.context || '',
+            context: (m.context || res.context || '').substring(0, 1000) + ((m.context || res.context || '').length > 1000 ? '... (truncated)' : ''),
             index: res.index || res.collection,
             name: m.username || '',
             first_name: '',
