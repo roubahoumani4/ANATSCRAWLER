@@ -146,14 +146,22 @@ const DiscoveryPage: React.FC = () => {
     const searchStartTime = Date.now();
 
     try {
+      // Abort the request if it takes too long (prevents UI hanging)
+      const controller = new AbortController();
+      const REQUEST_TIMEOUT_MS = 15000; // 15s client timeout
+      const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
       const response = await fetch('/api/v1/search/darkweb-search', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ query: searchQuery }),
+        body: JSON.stringify({ query: searchQuery, limit: 100 }),
         credentials: 'include',
+        signal: controller.signal
       });
+
+      clearTimeout(timeout);
 
       if (response.ok) {
         const data = await response.json();

@@ -248,7 +248,9 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
   
   console.log(`[ES Search] Extracted ${matches.length} matches from content`);
   return matches;
-}export async function performElasticsearchSearch(query: string, elasticsearchUri: string): Promise<SearchResult[]> {
+}
+
+export async function performElasticsearchSearch(query: string, elasticsearchUri: string): Promise<SearchResult[]> {
   try {
     // Search across multiple indices
     const indices = ['darkweb_structured', 'files_index', 'collection1'];
@@ -256,137 +258,92 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
     // Normalize query: trim whitespace
     const normalizedQuery = query.trim();
     
-    console.log(`[ES Search] Normalized query: "${normalizedQuery}"`);
+    console.log(`[ES Search] Starting optimized search for: "${normalizedQuery}"`);
+    const searchStartTime = Date.now();
     
-    // Search both indices
-    const allResults: any[] = [];
-    
-    for (const indexName of indices) {
-      console.log(`[ES Search] Searching index: ${indexName}`);
-      
-      // Use a simple match_phrase query for exact matching (handles special characters like @ and .)
-      const searchBody: any = {
-        query: {
-          bool: {
-            should: [
-              // Match phrase for exact sequences
-              {
-                match_phrase: {
-                  content: {
-                    query: normalizedQuery,
-                    slop: 0
-                  }
-                }
-              },
-              // Wildcard for partial matching
-              {
-                wildcard: {
-                  content: {
-                    value: `*${normalizedQuery}*`,
-                    case_insensitive: true
-                  }
-                }
-              },
-              // Regular match for token-based search
-              {
-                match: {
-                  content: {
-                    query: normalizedQuery,
-                    operator: "or"
-                  }
-                }
-              }
-            ],
-            minimum_should_match: 1
-          }
-        },
-        _source: indexName === 'files_index'
-          ? ["content", "file_name", "file_path", "file_type", "file_size", "database_source"]
-          : [
-            "content",
-            "fileName",
-            "timestamp",
-            "source",
-            "context",
-            "name",
-            "first_name",
-            "last_name",
-            "phone",
-            "email",
-            "birthdate",
-            "gender",
-            "locale",
-            "city",
-            "location",
-            "location2",
-            "link",
-            "link2",
-            "protocol",
-            "social_link",
-            "fileType",
-            "extractionConfidence",
-            "exposed",
-            "database_source"
-          ],
-        size: 50,
-        sort: [
-          { _score: "desc" }
-        ]
-      };
+    // Use match_phrase for fast, exact matching (optimized for your curl command)
+    // NOTE: we intentionally avoid returning the full `content` field here to keep network
+    // payloads small. If callers need the full file content, fetch it on demand via a
+    // separate endpoint.
+    const minimalSourceFields = ["file_name", "file_path", "fileName", "timestamp", "source", "database_source", "file_type", "file_size", "name", "email", "password"];
 
-      // Only enable highlighting for the structured index to avoid hitting
-      // index.highlight.max_analyzed_offset limits on very large file contents.
-      // Disable for files_index and collection1 which may have large content
-      if (indexName !== 'files_index' && indexName !== 'collection1') {
-        searchBody.highlight = {
-          fields: {
-            content: {
-              pre_tags: ["<em>"],
-              post_tags: ["</em>"],
-              fragment_size: 150,
-              number_of_fragments: 3
-            }
+    const searchBody: any = {
+      query: {
+        match_phrase: {
+          content: {
+            query: normalizedQuery,
+            slop: 0
           }
-        };
-      }
-      
+        }
+      },
+      _source: minimalSourceFields,
+      size: 50,
+      sort: [
+        { _score: "desc" }
+      ]
+    };
+
+    // Per-index request timeout (ms)
+    const REQUEST_TIMEOUT_MS = 3000;
+
+    // Search all indices in parallel with per-index timeouts
+    const searchPromises = indices.map(async indexName => {
+      console.log(`[ES Search] Searching index: ${indexName}`);
+      const indexStart = Date.now();
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
       try {
-        const searchResponse = await fetch(`${elasticsearchUri}/${indexName}/_search`, {
+        const response = await fetch(`${elasticsearchUri}/${indexName}/_search`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(searchBody)
+          body: JSON.stringify(searchBody),
+          signal: controller.signal
         });
 
-        const searchData = await searchResponse.json() as any;
-        console.log(`[ES Search] ${indexName} response status: ${searchResponse.status}`);
-        console.log(`[ES Search] ${indexName} hits:`, searchData.hits?.total?.value || 0);
-        
-        if (searchResponse.ok && searchData.hits && searchData.hits.hits) {
-          console.log(`[ES Search] Adding ${searchData.hits.hits.length} results from ${indexName}`);
-          allResults.push(...searchData.hits.hits);
-        } else {
-          console.log(`[ES Search] No results from ${indexName}:`, searchData.error || 'Unknown error');
+        clearTimeout(timer);
+        const searchData = await response.json();
+        const indexEnd = Date.now();
+        console.log(`[ES Search] ${indexName} completed in ${indexEnd - indexStart}ms - hits:`, searchData.hits?.total?.value || 0);
+
+        if (searchData.hits && searchData.hits.hits) {
+          return searchData.hits.hits.map((hit: any) => ({
+            ...hit,
+            _index: indexName // Ensure index name is preserved
+          }));
         }
+
+        return [];
       } catch (error: any) {
-        console.log(`[ES Search] Error searching ${indexName}:`, error.message);
-        // Continue to next index
+        clearTimeout(timer);
+        if (error && error.name === 'AbortError') {
+          console.log(`[ES Search] ${indexName} request timed out after ${REQUEST_TIMEOUT_MS}ms`);
+        } else {
+          console.log(`[ES Search] Error searching ${indexName}:`, error && error.message ? error.message : error);
+        }
+        return [];
       }
-    } // End of for loop
+    });
+
+    // Wait for all searches to complete
+    const allIndexResults = await Promise.all(searchPromises);
+    const allResults = allIndexResults.flat();
     
-    console.log(`[ES Search] Total results from all indices: ${allResults.length}`);
+    const searchEndTime = Date.now();
+    console.log(`[ES Search] All indices completed in ${searchEndTime - searchStartTime}ms - Total results: ${allResults.length}`);
     
     // Sort all results by score
     allResults.sort((a, b) => b._score - a._score);
     
-    // Take top 100 results
-    const topResults = allResults.slice(0, 100);
+    // Take top 50 results (optimized limit)
+    const topResults = allResults.slice(0, 50);
 
-    // Process results and extract individual matches from files_index
+    // Process results - for collection1 and files_index, return directly without complex parsing
     const processedResults: any[] = [];
     
-    console.log(`[ES Search] Processing ${topResults.length} top results`);
+    console.log(`[ES Search] Processing ${topResults.length} results`);
     
     for (const hit of topResults) {
       // Infer database source from file path or database_source field
@@ -395,64 +352,43 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
         hit._source.database_source
       );
       
-      // If this is from files_index or collection1, parse the content and extract matching entries
-      if ((hit._index === 'files_index' || hit._index === 'collection1') && hit._source.content) {
-        const content = hit._source.content;
-        const matches = extractMatchingEntries(content, normalizedQuery);
-        
-        // Filter out matches that don't have username or password
-        const validMatches = matches.filter(match => match.username || match.password);
-        
-        // Only process if we found valid matches
-        if (validMatches.length > 0) {
-          // Create a separate result for each matching entry (up to 10 per file)
-          validMatches.slice(0, 10).forEach((match, index) => {
-            console.log(`[ES Search] Match extracted:`, {
-              username: match.username,
-              password: match.password,
-              context: match.context
-            });
-            
-            processedResults.push({
-              id: `${hit._id}_${index}`,
-              score: hit._score,
-              source: hit._source.file_path || hit._index,
-              fileName: hit._source.file_name || '',
-              content: match.content,
-              timestamp: hit._source.timestamp || '',
-              collection: hit._index,
-              matchedTerms: hit.matchedTerms || [],
-              highlights: [match.content],
-              context: match.context || '',
-              index: hit._index || '',
-              name: match.username || '',
-              first_name: '',
-              last_name: '',
-              phone: '',
-              email: match.username || '',
-              birthdate: '',
-              gender: '',
-              locale: '',
-              city: '',
-              location: '',
-              location2: '',
-              link: '',
-              link2: '',
-              protocol: '',
-              social_link: '',
-              fileType: hit._source.file_type || '',
-              extractionConfidence: '',
-              exposed: match.password ? ['password'] : [],
-              file_size: hit._source.file_size || 0,
-              file_path: hit._source.file_path || '',
-              password: match.password || '',
-              database_source: databaseSource,
-            });
-          });
-        } else {
-          // If extraction failed or no valid matches, log and skip this result
-          console.log(`[ES Search] No valid matches extracted from ${hit._index}/${hit._id} (found ${matches.length} matches but none had username/password), skipping`);
-        }
+      // For collection1 and files_index, return results directly with minimal parsing
+      if ((hit._index === 'files_index' || hit._index === 'collection1')) {
+        processedResults.push({
+          id: hit._id,
+          score: hit._score,
+          source: hit._source.file_path || hit._source.source || hit._index,
+          fileName: hit._source.file_name || hit._source.fileName || '',
+          content: hit._source.content || '',
+          timestamp: hit._source.timestamp || '',
+          collection: hit._index,
+          matchedTerms: [],
+          highlights: [],
+          context: hit._source.context || '',
+          index: hit._index || '',
+          name: hit._source.name || hit._source.email || '',
+          first_name: '',
+          last_name: '',
+          phone: '',
+          email: hit._source.email || '',
+          birthdate: '',
+          gender: '',
+          locale: '',
+          city: '',
+          location: '',
+          location2: '',
+          link: '',
+          link2: '',
+          protocol: '',
+          social_link: '',
+          fileType: hit._source.file_type || '',
+          extractionConfidence: '',
+          exposed: hit._source.password ? ['password'] : [],
+          file_size: hit._source.file_size || 0,
+          file_path: hit._source.file_path || '',
+          password: hit._source.password || '',
+          database_source: databaseSource,
+        });
       } else {
         // For darkweb_structured index, return as-is
         processedResults.push({
@@ -463,8 +399,8 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
           content: hit._source.content || '',
           timestamp: hit._source.timestamp || '',
           collection: hit._index,
-          matchedTerms: hit.matchedTerms || [],
-          highlights: hit.highlight?.content || [],
+          matchedTerms: [],
+          highlights: [],
           context: hit._source.context || '',
           index: hit._index || '',
           name: hit._source.name || '',
@@ -492,7 +428,8 @@ function extractMatchingEntries(content: string, query: string): MatchedEntry[] 
       }
     }
 
-    console.log(`[ES Search] Final processed results: ${processedResults.length}`);
+    const processingEndTime = Date.now();
+    console.log(`[ES Search] Final results: ${processedResults.length} - Total time: ${processingEndTime - searchStartTime}ms`);
     return processedResults.slice(0, 100);
   } catch (error) {
     console.error('[ES Search] Error:', error);

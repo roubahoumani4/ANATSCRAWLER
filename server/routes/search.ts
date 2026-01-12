@@ -380,6 +380,58 @@ router.get("/health", async (_req: Request, res: Response) => {
 });
 
 /**
+ * Get a single document from Elasticsearch by index and id (fetches _source only)
+ * Example: GET /document?index=collection1&id=695508bb552864d94c1488bb
+ */
+router.get('/document', async (req: Request, res: Response) => {
+  try {
+    const { index, id } = req.query as { index?: string; id?: string };
+
+    if (!index || !id) {
+      return res.status(400).json({ success: false, error: 'index and id query parameters are required' });
+    }
+
+    console.log(`[Search Document] Fetching document ${id} from index ${index}`);
+
+    // Per-request timeout
+    const controller = new AbortController();
+    const REQUEST_TIMEOUT_MS = 5000;
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(`${ELASTICSEARCH_URI}/${encodeURIComponent(index)}/_doc/${encodeURIComponent(id)}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal
+      });
+
+      clearTimeout(timer);
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error('[Search Document] Elasticsearch returned error:', response.status, text);
+        return res.status(502).json({ success: false, error: 'Elasticsearch error', status: response.status, body: text });
+      }
+
+      const body = await response.json();
+      return res.json({ success: true, document: body._source || null });
+    } catch (error: any) {
+      clearTimeout(timer);
+      if (error && error.name === 'AbortError') {
+        console.error('[Search Document] Request timed out');
+        return res.status(504).json({ success: false, error: 'Request timed out' });
+      }
+
+      console.error('[Search Document] Error:', error && error.message ? error.message : error);
+      return res.status(500).json({ success: false, error: 'Failed to fetch document' });
+    }
+  } catch (error) {
+    console.error('[Search Document] Unexpected error:', error);
+    return res.status(500).json({ success: false, error: 'Unexpected server error' });
+  }
+});
+
+/**
  * Darkweb search endpoint - searches Elasticsearch darkweb_structured and files_index indices
  */
 router.post("/darkweb-search", async (req: Request, res: Response) => {

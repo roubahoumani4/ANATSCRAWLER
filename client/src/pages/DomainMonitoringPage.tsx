@@ -161,6 +161,11 @@ const DomainMonitoringPage = () => {
       // Search for all emails matching the domain pattern
       const searchQuery = `@${domain}`;
       
+      // Use a client-side timeout to avoid hanging the UI
+      const controller = new AbortController();
+      const REQUEST_TIMEOUT_MS = 20000; // 20s timeout for domain analysis
+      const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
       const response = await fetch('/api/v1/search/darkweb-search', {
         method: 'POST',
         headers: {
@@ -168,9 +173,12 @@ const DomainMonitoringPage = () => {
         },
         body: JSON.stringify({
           query: searchQuery,
-          limit: 1000 // Get more results for domain analysis
-        })
+          limit: 500 // reduce size to avoid transferring massive payloads
+        }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeout);
 
       if (!response.ok) {
         throw new Error('Search failed');
