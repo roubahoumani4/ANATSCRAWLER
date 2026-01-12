@@ -418,6 +418,64 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
           link2: hit._source.link2 || '',
           protocol: hit._source.protocol || '',
           social_link: hit._source.social_link || '',
+        });
+      }
+    }
+
+    // Enrich top results by fetching document content for hits that are missing email/password
+    // Limited to a small number of documents to avoid large payloads / performance regressions.
+    const MAX_DETAIL_FETCH = 10;
+    const candidates = processedResults
+      .filter(r => (r.collection === 'collection1' || r.collection === 'files_index') && (!r.email || r.email === ''))
+      .slice(0, MAX_DETAIL_FETCH);
+
+    if (candidates.length > 0) {
+      console.log(`[ES Search] Enriching ${candidates.length} hits by fetching document content to extract credentials`);
+
+      const enrichPromises = candidates.map(async (res) => {
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+          const response = await fetch(`${elasticsearchUri}/${encodeURIComponent(res.collection)}/_doc/${encodeURIComponent(res.id)}?_source_includes=content`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal
+          });
+
+          clearTimeout(timer);
+
+          if (!response.ok) {
+            console.log(`[ES Search] Failed to fetch document ${res.id} from ${res.collection} - status: ${response.status}`);
+            return;
+          }
+
+          const body = await response.json();
+          const content = body._source?.content || '';
+
+          if (!content) return;
+
+          // Run the existing extraction routine on this document's content
+          const matches = extractMatchingEntries(content, normalizedQuery);
+          if (matches && matches.length > 0) {
+            const m = matches[0];
+            res.email = m.username || res.email;
+            res.password = m.password || res.password;
+            res.context = res.context ? `${res.context} | extracted` : m.context;
+            res.exposed = res.exposed && res.exposed.length > 0 ? res.exposed : (m.password ? ['password'] : []);
+          }
+        } catch (err: any) {
+          if (err && err.name === 'AbortError') {
+            console.log(`[ES Search] Document fetch ${res.id} timed out after ${REQUEST_TIMEOUT_MS}ms`);
+          } else {
+            console.log(`[ES Search] Error fetching document ${res.id}:`, err && err.message ? err.message : err);
+          }
+        }
+      });
+
+      await Promise.all(enrichPromises);
+      console.log('[ES Search] Enrichment complete');
+    }
           fileType: hit._source.fileType || hit._source.file_type || '',
           extractionConfidence: hit._source.extractionConfidence || '',
           exposed: hit._source.exposed || [],
