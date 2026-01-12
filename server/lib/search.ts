@@ -453,10 +453,15 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
     if (candidates.length > 0) {
       console.log(`[ES Search] Enriching ${candidates.length} hits by fetching document content to extract credentials`);
 
+      const DETAIL_FETCH_TIMEOUT_MS = 5000;
+
       const enrichPromises = candidates.map(async (res) => {
+        const docStart = Date.now();
+        console.log(`[ES Search] Fetching document ${res.id} from ${res.collection} for enrichment`);
+
         try {
           const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+          const timer = setTimeout(() => controller.abort(), DETAIL_FETCH_TIMEOUT_MS);
 
           const response = await fetch(`${elasticsearchUri}/${encodeURIComponent(res.collection)}/_doc/${encodeURIComponent(res.id)}?_source_includes=content`, {
             method: 'GET',
@@ -466,18 +471,25 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
 
           clearTimeout(timer);
 
+          const docFetchMs = Date.now() - docStart;
+
           if (!response.ok) {
-            console.log(`[ES Search] Failed to fetch document ${res.id} from ${res.collection} - status: ${response.status}`);
+            console.log(`[ES Search] Failed to fetch document ${res.id} from ${res.collection} - status: ${response.status} (fetch time ${docFetchMs}ms)`);
             return;
           }
 
           const body = await response.json();
           const content = body._source?.content || '';
 
-          if (!content) return;
+          if (!content) {
+            console.log(`[ES Search] Document ${res.id} has no 'content' field (fetch time ${docFetchMs}ms)`);
+            return;
+          }
 
           // Run the existing extraction routine on this document's content
           const matches = extractMatchingEntries(content, normalizedQuery);
+          console.log(`[ES Search] Document ${res.id} extracted ${matches.length} matches (fetch time ${docFetchMs}ms)`);
+
           if (!matches || matches.length === 0) return;
 
           // Create one result per extracted match (bounded) and replace original result
@@ -522,10 +534,11 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
           if (idx !== -1) {
             // remove original and insert new entries at same position
             processedResults.splice(idx, 1, ...newEntries);
+            console.log(`[ES Search] Replaced doc ${res.id} with ${newEntries.length} entries`);
           }
         } catch (err: any) {
           if (err && err.name === 'AbortError') {
-            console.log(`[ES Search] Document fetch ${res.id} timed out after ${REQUEST_TIMEOUT_MS}ms`);
+            console.log(`[ES Search] Document fetch ${res.id} timed out after ${DETAIL_FETCH_TIMEOUT_MS}ms`);
           } else {
             console.log(`[ES Search] Error fetching document ${res.id}:`, err && err.message ? err.message : err);
           }
