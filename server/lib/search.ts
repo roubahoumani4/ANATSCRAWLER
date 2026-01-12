@@ -476,15 +476,6 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
       await Promise.all(enrichPromises);
       console.log('[ES Search] Enrichment complete');
     }
-          fileType: hit._source.fileType || hit._source.file_type || '',
-          extractionConfidence: hit._source.extractionConfidence || '',
-          exposed: hit._source.exposed || [],
-          file_size: hit._source.file_size || 0,
-          file_path: hit._source.file_path || '',
-          database_source: databaseSource,
-        });
-      }
-    }
 
     const processingEndTime = Date.now();
     console.log(`[ES Search] Final results: ${processedResults.length} - Total time: ${processingEndTime - searchStartTime}ms`);
