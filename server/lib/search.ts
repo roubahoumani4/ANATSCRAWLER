@@ -61,7 +61,7 @@ function inferDatabaseSource(filePath: string | undefined, databaseSource: strin
   }
   
   // If no pattern matched, return the file path as source
-  return 'Unknown';
+  return filePath;
 }
 
 /**
