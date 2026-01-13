@@ -60,7 +60,22 @@ function inferDatabaseSource(filePath: string | undefined, databaseSource: strin
     return 'CompilationOfManyBreaches';
   }
   
-  // If no pattern matched, return the file path as source
+  // If the path contains a dbjsonoutput folder, return the next segment (e.g., '/mnt/dbjsonoutput/Collection 1/...') => 'Collection 1'
+  const dbJsonPatterns = ['dbjsonoutput', 'db_json_output', 'dbjson_output', 'db-json-output'];
+  for (const p of dbJsonPatterns) {
+    const idx = pathLower.indexOf(p);
+    if (idx !== -1) {
+      const after = filePath.substring(idx + p.length);
+      // Remove leading slashes/spaces, split by path separators and return first segment
+      const cleaned = after.replace(/^[/\\\s]+/, '');
+      const parts = cleaned.split(/[\\/]+/).filter(Boolean);
+      if (parts.length > 0) {
+        return parts[0];
+      }
+    }
+  }
+
+  // Otherwise return the file path as a fallback source
   return filePath;
 }
 
