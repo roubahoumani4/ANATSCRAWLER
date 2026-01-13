@@ -53,6 +53,19 @@ const BREACH_INFO: Record<string, {
       'Password reuse exploitation (70% of global internet users potentially affected)'
     ]
   },
+  'Collection1': {
+    name: 'Collection #1',
+    description: 'The 773 Million Record "Collection #1" data set that circulated in early 2019',
+    affectedAccounts: '772.9 million',
+    breachOccurred: 'January 2019',
+    compromisedData: ['Email addresses', 'Passwords'],
+    whatHappened: 'In January 2019, a large collection of credential stuffing lists (combinations of email addresses and passwords used to hijack accounts on other services) was discovered being distributed on a popular hacking forum. The data contained almost 2.7 billion records including 773 million unique email addresses alongside passwords those addresses had used on other breached services. Full details on the incident and how to search the breached passwords are provided in the blog post The 773 Million Record "Collection #1" Data Breach.',
+    potentialThreats: [
+      'Credential stuffing attacks',
+      'Targeted phishing using exposed emails',
+      'Account takeover via password reuse'
+    ]
+  },
   'naz.api': {
     name: 'Naz.API',
     description: 'Stealer logs and credential stuffing lists from various sources',
@@ -74,7 +87,7 @@ const getBreachKey = (dbSource?: string) => {
   if (!dbSource) return dbSource;
   const normalized = dbSource.toLowerCase().replace(/[_\-]/g, ' ').replace(/\s+/g, ' ').trim();
   if (normalized.match(/^collection\s*#?\s*1$/) || normalized === 'collection1' || normalized.includes('collection 1') || normalized.includes('collection #1')) {
-    return 'CompilationOfManyBreaches';
+    return 'Collection1';
   }
   if (normalized.includes('compilation') || normalized.includes('comb')) {
     return 'CompilationOfManyBreaches';
@@ -92,10 +105,10 @@ const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
     const databases = new Set<string>();
     results.forEach(result => {
       if (result.database_source && result.database_source !== 'Unknown') {
-        databases.add(result.database_source);
+        databases.add(getBreachKey(result.database_source));
       }
     });
-    return Array.from(databases);
+    return Array.from(databases).filter(Boolean);
   }, [results]);
 
   const exportToCSV = () => {

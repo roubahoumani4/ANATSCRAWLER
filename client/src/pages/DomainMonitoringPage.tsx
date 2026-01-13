@@ -126,6 +126,20 @@ const DomainMonitoringPage = () => {
         'Monitor accounts for suspicious activity'
       ]
     },
+    'Collection1': {
+      name: 'Collection #1',
+      description: 'The 773 Million Record "Collection #1" data set that circulated in early 2019',
+      date: 'January 2019',
+      affectedAccounts: '772.9 million',
+      whatHappened: 'In January 2019, a large collection of credential stuffing lists (combinations of email addresses and passwords used to hijack accounts on other services) was discovered being distributed on a popular hacking forum. The data contained almost 2.7 billion records including 773 million unique email addresses alongside passwords those addresses had used on other breached services. Full details on the incident and how to search the breached passwords are provided in the blog post The 773 Million Record "Collection #1" Data Breach.',
+      dataCompromised: ['Email addresses', 'Passwords'],
+      recommendations: [
+        'Change passwords immediately for accounts found in the dataset',
+        'Enable multi-factor authentication (MFA)',
+        'Use unique passwords and a password manager',
+        'Monitor accounts for suspicious activity'
+      ]
+    },
     'naz.api': {
       name: 'Naz.API',
       description: 'A large-scale credential database breach',
@@ -148,12 +162,12 @@ const DomainMonitoringPage = () => {
     if (!dbSource) return dbSource;
     const normalized = dbSource.toLowerCase().replace(/[_\-]/g, ' ').replace(/\s+/g, ' ').trim();
 
-    // Common variants for Collection #1 / Collection 1 -> map to COMB
+    // Map Collection 1 variants to its own key (Collection1)
     if (normalized.match(/^collection\s*#?\s*1$/) || normalized === 'collection1' || normalized.includes('collection 1') || normalized.includes('collection #1')) {
-      return 'CompilationOfManyBreaches';
+      return 'Collection1';
     }
 
-    // Also map obvious synonyms
+    // COMB synonyms
     if (normalized.includes('compilation') || normalized.includes('comb')) {
       return 'CompilationOfManyBreaches';
     }
