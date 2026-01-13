@@ -196,7 +196,8 @@ const DomainMonitoringPage = () => {
         .map((r: any) => ({
           email: r.email || r.name || '',
           password: r.password || '',
-          database_source: r.database_source || r.index || 'Unknown',
+          // Treat literal 'Unknown' as absent so we fall back to the index (same behavior as Discovery page)
+          database_source: (r.database_source && r.database_source !== 'Unknown') ? r.database_source : (r.index || 'Unknown'),
           score: r.score || 0
         }));
 
