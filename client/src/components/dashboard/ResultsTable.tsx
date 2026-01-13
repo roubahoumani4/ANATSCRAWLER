@@ -69,6 +69,19 @@ const BREACH_INFO: Record<string, {
   }
 };
 
+// Map db source variants to canonical breach info keys
+const getBreachKey = (dbSource?: string) => {
+  if (!dbSource) return dbSource;
+  const normalized = dbSource.toLowerCase().replace(/[_\-]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (normalized.match(/^collection\s*#?\s*1$/) || normalized === 'collection1' || normalized.includes('collection 1') || normalized.includes('collection #1')) {
+    return 'CompilationOfManyBreaches';
+  }
+  if (normalized.includes('compilation') || normalized.includes('comb')) {
+    return 'CompilationOfManyBreaches';
+  }
+  return dbSource;
+};
+
 const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
   const { translate } = useLanguage();
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
@@ -422,12 +435,13 @@ const ResultsTable = ({ results, onExport, isExported }: ResultsTableProps) => {
         {presentDatabases.length > 0 && (
           <div className="mt-6 space-y-4">
             {presentDatabases.map((dbSource) => {
-              const breachInfo = BREACH_INFO[dbSource];
+              const key = getBreachKey(dbSource);
+              const breachInfo = BREACH_INFO[key];
               if (!breachInfo) return null;
 
               return (
                 <motion.div
-                  key={dbSource}
+                  key={key}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5 }}

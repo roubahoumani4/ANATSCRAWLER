@@ -67,6 +67,24 @@ const DiscoveryPage: React.FC = () => {
     }
   };
 
+  // Map database source strings to canonical keys used by BREACH_INFO
+  const getBreachKey = (dbSource?: string) => {
+    if (!dbSource) return dbSource;
+    const normalized = dbSource.toLowerCase().replace(/[_\-]/g, ' ').replace(/\s+/g, ' ').trim();
+
+    // Common variants for Collection #1 / Collection 1 -> map to COMB
+    if (normalized.match(/^collection\s*#?\s*1$/) || normalized === 'collection1' || normalized.includes('collection 1') || normalized.includes('collection #1')) {
+      return 'CompilationOfManyBreaches';
+    }
+
+    // Also map obvious synonyms
+    if (normalized.includes('compilation') || normalized.includes('comb')) {
+      return 'CompilationOfManyBreaches';
+    }
+
+    return dbSource;
+  };
+
   // Confetti Component
   const Confetti = () => {
     const confettiPieces = Array.from({ length: 50 }, (_, i) => ({
@@ -584,12 +602,13 @@ const DiscoveryPage: React.FC = () => {
                   {searchResults.length > 0 && (
                     <div className="mt-8 space-y-6">
                       {[...new Set(searchResults.map(r => r.database_source).filter(Boolean))].map((dbSource) => {
-                        const breachInfo = BREACH_INFO[dbSource];
+                        const key = getBreachKey(dbSource);
+                        const breachInfo = BREACH_INFO[key];
                         if (!breachInfo) return null;
 
                         return (
                           <motion.div
-                            key={dbSource}
+                            key={key}
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.5 }}

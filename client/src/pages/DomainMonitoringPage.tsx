@@ -143,6 +143,24 @@ const DomainMonitoringPage = () => {
     }
   };
 
+  // Map database source strings to canonical keys used by BREACH_INFO
+  const getBreachKey = (dbSource?: string) => {
+    if (!dbSource) return dbSource;
+    const normalized = dbSource.toLowerCase().replace(/[_\-]/g, ' ').replace(/\s+/g, ' ').trim();
+
+    // Common variants for Collection #1 / Collection 1 -> map to COMB
+    if (normalized.match(/^collection\s*#?\s*1$/) || normalized === 'collection1' || normalized.includes('collection 1') || normalized.includes('collection #1')) {
+      return 'CompilationOfManyBreaches';
+    }
+
+    // Also map obvious synonyms
+    if (normalized.includes('compilation') || normalized.includes('comb')) {
+      return 'CompilationOfManyBreaches';
+    }
+
+    return dbSource;
+  };
+
   // Validate domain format
   const isValidDomain = (domain: string): boolean => {
     // Basic domain validation regex
@@ -805,12 +823,13 @@ const DomainMonitoringPage = () => {
               {domainStats.results.length > 0 && (
                 <div className="mt-8 space-y-6">
                   {[...new Set(domainStats.results.map(r => r.database_source).filter(Boolean))].map((dbSource) => {
-                    const breachInfo = BREACH_INFO[dbSource];
+                    const key = getBreachKey(dbSource);
+                    const breachInfo = BREACH_INFO[key];
                     if (!breachInfo) return null;
 
                     return (
                       <motion.div
-                        key={dbSource}
+                        key={key}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.5 }}
@@ -1085,30 +1104,36 @@ const DomainMonitoringPage = () => {
                 </div>
 
                 {/* Breach Explanation */}
-                {BREACH_INFO[selectedResult.database_source] && (
-                  <div className="bg-gradient-to-br from-cyan-900/20 to-blue-900/20 rounded-lg p-4 border border-cyan-700/50 mt-4">
-                    <h4 className="text-cyan-400 font-semibold mb-2 flex items-center gap-2">
-                      <Eye className="w-5 h-5" />
-                      About {BREACH_INFO[selectedResult.database_source].name}
-                    </h4>
-                    <p className="text-gray-300 text-sm mb-3 leading-relaxed">
-                      {BREACH_INFO[selectedResult.database_source].whatHappened}
-                    </p>
-                    <div className="grid grid-cols-2 gap-3 mb-3">
-                      <div className="bg-gray-900/50 p-2 rounded">
-                        <div className="text-xs text-gray-400">Breach Date</div>
-                        <div className="text-sm font-semibold text-white">{BREACH_INFO[selectedResult.database_source].date}</div>
+                {(() => {
+                  const key = getBreachKey(selectedResult.database_source);
+                  const info = BREACH_INFO[key];
+                  if (!info) return null;
+
+                  return (
+                    <div className="bg-gradient-to-br from-cyan-900/20 to-blue-900/20 rounded-lg p-4 border border-cyan-700/50 mt-4">
+                      <h4 className="text-cyan-400 font-semibold mb-2 flex items-center gap-2">
+                        <Eye className="w-5 h-5" />
+                        About {info.name}
+                      </h4>
+                      <p className="text-gray-300 text-sm mb-3 leading-relaxed">
+                        {info.whatHappened}
+                      </p>
+                      <div className="grid grid-cols-2 gap-3 mb-3">
+                        <div className="bg-gray-900/50 p-2 rounded">
+                          <div className="text-xs text-gray-400">Breach Date</div>
+                          <div className="text-sm font-semibold text-white">{info.date}</div>
+                        </div>
+                        <div className="bg-gray-900/50 p-2 rounded">
+                          <div className="text-xs text-gray-400">Affected Accounts</div>
+                          <div className="text-sm font-semibold text-white">{info.affectedAccounts}</div>
+                        </div>
                       </div>
-                      <div className="bg-gray-900/50 p-2 rounded">
-                        <div className="text-xs text-gray-400">Affected Accounts</div>
-                        <div className="text-sm font-semibold text-white">{BREACH_INFO[selectedResult.database_source].affectedAccounts}</div>
+                      <div className="text-xs text-gray-400">
+                        <span className="font-semibold">Data Compromised:</span> {info.dataCompromised.join(', ')}
                       </div>
                     </div>
-                    <div className="text-xs text-gray-400">
-                      <span className="font-semibold">Data Compromised:</span> {BREACH_INFO[selectedResult.database_source].dataCompromised.join(', ')}
-                    </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-lg p-4 mt-4">
                   <div className="flex items-start gap-2">
