@@ -166,7 +166,14 @@ const DiscoveryPage: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         const results = data.results || [];
-        setSearchResults(results);
+
+        // Normalize database_source: treat literal 'Unknown' as absent and fall back to index (match Domain Monitoring behavior)
+        const normalizedResults = results.map((r: any) => ({
+          ...r,
+          database_source: (r.database_source && r.database_source !== 'Unknown') ? r.database_source : (r.index || 'Unknown')
+        }));
+
+        setSearchResults(normalizedResults);
         setShowResults(true);
 
         // Track search in history
@@ -182,7 +189,8 @@ const DiscoveryPage: React.FC = () => {
           const formattedResults = results.slice(0, 10).map((result: any) => ({
             email: result.email || result.name || result.username || '',
             password: result.password || '',
-            database_source: result.database_source || result.index || 'Unknown',
+            // Treat literal 'Unknown' as absent so the UI falls back to index when appropriate
+            database_source: (result.database_source && result.database_source !== 'Unknown') ? result.database_source : (result.index || 'Unknown'),
             score: result.score || 0,
             // Include any additional fields from the result
             ...result
@@ -534,7 +542,7 @@ const DiscoveryPage: React.FC = () => {
                               </td>
                               <td className="p-3">
                                 <span className="text-cyan-400 font-semibold text-sm">
-                                  {result.database_source || result.index || 'Unknown'}
+                                  {(result.database_source && result.database_source !== 'Unknown') ? result.database_source : (result.index || 'Unknown') }
                                 </span>
                               </td>
                               <td className="p-3">
@@ -805,7 +813,7 @@ const DiscoveryPage: React.FC = () => {
                   <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
                     <div className="text-sm text-gray-500 mb-1">Database Source</div>
                     <div className="text-lg text-cyan-400 font-semibold">
-                      {selectedResult.database_source || selectedResult.index || 'Unknown'}
+                      {(selectedResult.database_source && selectedResult.database_source !== 'Unknown') ? selectedResult.database_source : (selectedResult.index || 'Unknown') }
                     </div>
                   </div>
 
