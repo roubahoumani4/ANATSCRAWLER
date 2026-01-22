@@ -615,7 +615,7 @@ const DiscoveryPage: React.FC = () => {
                   {/* Breach Information Panels */}
                   {searchResults.length > 0 && (
                     <div className="mt-8 space-y-6">
-                      {[...new Set(searchResults.map(r => getBreachKey(r.database_source)).filter(Boolean))].map((key) => {
+                      {[...new Set(searchResults.map(r => getBreachKey(r.database_source)).filter(Boolean) as string[])].map((key) => {
                         const breachInfo = BREACH_INFO[key];
                         if (!breachInfo) return null;
 

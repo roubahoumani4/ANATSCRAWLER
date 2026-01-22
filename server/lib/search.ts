@@ -362,7 +362,7 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
         });
 
         clearTimeout(timer);
-        const searchData = await response.json();
+        const searchData = await response.json() as { hits?: { total?: { value: number }; hits: any[] } };
         const indexEnd = Date.now();
         console.log(`[ES Search] ${indexName} completed in ${indexEnd - indexStart}ms - hits:`, searchData.hits?.total?.value || 0);
 
@@ -518,7 +518,7 @@ export async function performElasticsearchSearch(query: string, elasticsearchUri
             return;
           }
 
-          const body = await response.json();
+          const body = await response.json() as { _source?: { content?: string } };
           const content = body._source?.content || '';
 
           if (!content) {
