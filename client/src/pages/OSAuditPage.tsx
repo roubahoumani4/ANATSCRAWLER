@@ -406,11 +406,31 @@ echo "🚀 Running initial security audit now..."
 echo ""
 $AGENT_DIR/agent.sh
 
-# Setup cron job for regular audits (every day at 2 AM)
+# Ask user if they want to schedule daily audits
 echo ""
-echo "📅 Setting up automatic daily audits at 2:00 AM..."
-CRON_JOB="0 2 * * * $AGENT_DIR/agent.sh >> $AGENT_DIR/agent.log 2>&1"
-(crontab -l 2>/dev/null || echo "") | grep -F "$AGENT_DIR/agent.sh" || (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
+echo "════════════════════════════════════════════════════════"
+echo "Would you like to schedule automatic daily audits?"
+echo "════════════════════════════════════════════════════════"
+echo ""
+echo "Choose an option:"
+echo "  [1] Yes - Schedule daily audits at 2:00 AM"
+echo "  [2] No - Run audits manually only"
+echo ""
+read -p "Enter your choice (1 or 2): " SCHEDULE_CHOICE
+
+if [ "$SCHEDULE_CHOICE" = "1" ]; then
+    echo ""
+    echo "📅 Setting up automatic daily audits at 2:00 AM..."
+    CRON_JOB="0 2 * * * $AGENT_DIR/agent.sh >> $AGENT_DIR/agent.log 2>&1"
+    (crontab -l 2>/dev/null || echo "") | grep -F "$AGENT_DIR/agent.sh" || (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
+    echo "✅ Daily audits scheduled!"
+elif [ "$SCHEDULE_CHOICE" = "2" ]; then
+    echo ""
+    echo "✅ Scheduled audits disabled."
+    echo "You can run audits manually anytime with: sudo $AGENT_DIR/agent.sh"
+else
+    echo "Invalid choice. Skipping cron setup."
+fi
 
 echo ""
 echo "=================================="
@@ -423,10 +443,15 @@ echo "  Machine ID: ${machine.machineId}"
 echo "  Token: ${machine.agentInstallationToken}"
 echo "  Server: $SERVER_URL"
 echo ""
-echo "The agent will run automatically daily at 2 AM"
+echo "📋 Next Steps:"
+echo "  1. Check your dashboard at: $SERVER_URL/os-audit"
+echo "  2. View the audit report in the Reports tab"
+echo "  3. Download the report for your records"
 echo ""
-echo "To run an audit manually, execute:"
-echo "  sudo $AGENT_DIR/agent.sh"
+echo "🔄 Running Audits:"
+echo "  • Manual: sudo $AGENT_DIR/agent.sh"
+echo "  • Scheduled: Check your cron setup with 'crontab -l'"
+echo "  • View logs: tail -f $AGENT_DIR/agent.log"
 echo ""
 echo "To view logs:"
 echo "  tail -f $AGENT_DIR/agent.log"
