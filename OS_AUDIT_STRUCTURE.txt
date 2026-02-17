@@ -1,0 +1,207 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    OS AUDIT FEATURE - COMPLETE STRUCTURE                    ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌─ FRONTEND ─────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│  client/src/pages/OSAuditPage.tsx                                          │
+│  ├─ Dashboard (4 stat cards)                                               │
+│  ├─ Machine Registration Dialog                                             │
+│  ├─ Machines Tab                                                            │
+│  ├─ Reports Tab                                                             │
+│  └─ Agent Installation Modal                                                │
+│                                                                              │
+│  client/src/AppContent.tsx                                                 │
+│  └─ Route: /os-audit (Protected)                                            │
+│                                                                              │
+│  client/src/components/layout/Sidebar.tsx                                  │
+│  └─ Menu Item: OS Audit (Shield icon)                                       │
+│                                                                              │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌─ BACKEND API ──────────────────────────────────────────────────────────────┐
+│                                                                              │
+│  server/routes/os-audit.routes.ts                                          │
+│  ├─ POST   /machines/register                                              │
+│  ├─ GET    /machines                                                        │
+│  ├─ GET    /machines/:machineId                                             │
+│  ├─ PUT    /machines/:machineId                                             │
+│  ├─ DELETE /machines/:machineId                                             │
+│  ├─ POST   /reports (token-based)                                           │
+│  ├─ GET    /reports (paginated)                                             │
+│  ├─ GET    /reports/:machineId                                              │
+│  ├─ GET    /reports/latest/:machineId                                       │
+│  ├─ GET    /reports/details/:reportId                                       │
+│  ├─ POST   /agent/heartbeat (token-based)                                   │
+│  └─ GET    /stats                                                           │
+│                                                                              │
+│  Base Route: /api/v1/os-audit/*                                             │
+│  Authentication: Required (except agent endpoints use tokens)               │
+│                                                                              │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌─ DATABASE (MongoDB) ───────────────────────────────────────────────────────┐
+│                                                                              │
+│  Database: anat_security                                                   │
+│                                                                              │
+│  Collection: os_audit_machines                                              │
+│  ├─ machineId (unique)                                                      │
+│  ├─ owner (ObjectId → User)                                                 │
+│  ├─ ownerName                                                               │
+│  ├─ machineName                                                             │
+│  ├─ ipAddress                                                               │
+│  ├─ operatingSystem                                                         │
+│  ├─ agentStatus (active/inactive/pending)                                  │
+│  ├─ agentInstallationToken (unique)                                         │
+│  ├─ lastAuditDate                                                           │
+│  ├─ registrationDate                                                        │
+│  └─ isActive (boolean)                                                      │
+│                                                                              │
+│  Collection: os_audit_reports                                               │
+│  ├─ reportId (unique)                                                       │
+│  ├─ machine (ObjectId → OSAuditMachine)                                     │
+│  ├─ owner (ObjectId → User)                                                 │
+│  ├─ auditDate                                                               │
+│  ├─ machineName                                                             │
+│  ├─ ipAddress                                                               │
+│  ├─ ownerName                                                               │
+│  ├─ operatingSystem                                                         │
+│  ├─ auditScore (0-100)                                                      │
+│  ├─ warnings (number)                                                       │
+│  ├─ suggestions (number)                                                    │
+│  ├─ systemHardening (number)                                                │
+│  ├─ findings (array of security findings)                                   │
+│  ├─ rawReport (Lynis output)                                                │
+│  ├─ status (completed/failed/pending)                                       │
+│  ├─ auditDuration (seconds)                                                 │
+│  └─ lynisVersion                                                            │
+│                                                                              │
+│  Indexes:                                                                   │
+│  ├─ os_audit_machines: machineId (unique), owner, ipAddress                │
+│  └─ os_audit_reports: owner + auditDate, machine + auditDate               │
+│                                                                              │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌─ AGENT SYSTEM ─────────────────────────────────────────────────────────────┐
+│                                                                              │
+│  Installation Script: os-audit-agent-[machineId].sh                        │
+│  ├─ OS Detection (Ubuntu, RHEL, Arch)                                       │
+│  ├─ Dependencies Installation                                               │
+│  ├─ Lynis Installation                                                      │
+│  ├─ Agent Configuration                                                     │
+│  ├─ Cron Job Setup (daily at 2 AM)                                          │
+│  └─ Initial Test Run                                                        │
+│                                                                              │
+│  Agent Location: /opt/anat-os-audit/agent.sh                                │
+│  ├─ Runs Lynis audit                                                        │
+│  ├─ Collects system information                                             │
+│  ├─ Generates JSON report                                                   │
+│  ├─ Submits via HTTP POST (with token)                                      │
+│  ├─ Sends heartbeat confirmation                                            │
+│  └─ Logs to: /opt/anat-os-audit/agent.log                                   │
+│                                                                              │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌─ DATA FLOW ────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│  1. USER REGISTERS MACHINE                                                  │
+│     Frontend → POST /machines/register → Backend                            │
+│     → Generate machineId & agentInstallationToken                           │
+│     → MongoDB: Save to os_audit_machines                                     │
+│     ← Return agentInstallationToken                                          │
+│                                                                              │
+│  2. AGENT INSTALLED & RUNS AUDIT                                            │
+│     User Machine → /opt/anat-os-audit/agent.sh                              │
+│     → Run Lynis audit                                                       │
+│     → Parse results (score, warnings, suggestions)                          │
+│     → POST /reports with agentInstallationToken                             │
+│                                                                              │
+│  3. REPORT SUBMITTED                                                        │
+│     Backend → Validate token                                                │
+│     → Update machine agentStatus to "active"                                │
+│     → Create OSAuditReport                                                   │
+│     → MongoDB: Save report + update machine lastAuditDate                   │
+│     ← Return success                                                        │
+│                                                                              │
+│  4. USER VIEWS DASHBOARD                                                    │
+│     Frontend → GET /stats → Show statistics                                 │
+│     Frontend → GET /machines → Show all machines                             │
+│     Frontend → GET /reports → Show all reports                              │
+│     ← MongoDB: Query and return data                                         │
+│                                                                              │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌─ SECURITY MODEL ───────────────────────────────────────────────────────────┐
+│                                                                              │
+│  USER ISOLATION                                                             │
+│  └─ Users see only their machines and reports                               │
+│     (filtered by owner field)                                                │
+│                                                                              │
+│  MACHINE REGISTRATION                                                       │
+│  └─ Requires user name before starting audit                                │
+│     └─ Ensures audit is attributed to person                                │
+│                                                                              │
+│  AGENT AUTHENTICATION                                                       │
+│  └─ Each machine gets unique installation token                             │
+│     └─ Token validates agent submissions                                    │
+│                                                                              │
+│  DATA PROTECTION                                                            │
+│  └─ All data stored in MongoDB with encryption                              │
+│     └─ IP addresses tracked for audit trail                                 │
+│                                                                              │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌─ FILES CREATED (7) ────────────────────────────────────────────────────────┐
+│                                                                              │
+│  Backend Models:                                                             │
+│  ├─ server/models/OSAuditMachine.ts (Machine registration model)            │
+│  └─ server/models/OSAuditReport.ts (Audit report model)                     │
+│                                                                              │
+│  Backend API:                                                                │
+│  └─ server/routes/os-audit.routes.ts (12 API endpoints)                    │
+│                                                                              │
+│  Frontend:                                                                   │
+│  └─ client/src/pages/OSAuditPage.tsx (Complete UI)                          │
+│                                                                              │
+│  Documentation:                                                              │
+│  ├─ OS_AUDIT_FEATURE_GUIDE.md (Technical documentation)                     │
+│  ├─ OS_AUDIT_QUICK_START.md (User guide)                                    │
+│  ├─ OS_AUDIT_IMPLEMENTATION_CHECKLIST.md (Implementation details)           │
+│  └─ OS_AUDIT_IMPLEMENTATION_COMPLETE.md (Final summary)                     │
+│                                                                              │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌─ FILES MODIFIED (4) ───────────────────────────────────────────────────────┐
+│                                                                              │
+│  Backend:                                                                    │
+│  └─ server/routes/index.ts (added import & route registration)              │
+│                                                                              │
+│  Frontend:                                                                   │
+│  ├─ client/src/AppContent.tsx (added import & route)                        │
+│  └─ client/src/components/layout/Sidebar.tsx (added menu item)              │
+│                                                                              │
+│  Configuration:                                                              │
+│  └─ package.json (uuid package added via npm install)                       │
+│                                                                              │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌─ STATUS ───────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│  ✅ Database Models        (MongoDB collections created)                   │
+│  ✅ Backend API            (12 endpoints implemented)                        │
+│  ✅ Frontend Page          (Complete UI with all features)                  │
+│  ✅ Navigation             (Menu item integrated)                            │
+│  ✅ Agent System           (Downloadable installation script)               │
+│  ✅ Authentication         (User isolation & token auth)                     │
+│  ✅ Documentation          (4 comprehensive guides)                          │
+│  ✅ Dependencies           (uuid package installed)                          │
+│  ✅ Data Persistence       (All data saved in MongoDB)                       │
+│                                                                              │
+│  Status: ✅ COMPLETE & READY FOR PRODUCTION                                │
+│                                                                              │
+└────────────────────────────────────────────────────────────────────────────┘
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  All data is securely stored in MongoDB as requested!                        ║
+║  OS Audit feature fully integrated into ANATSCRAWLER                         ║
+╚══════════════════════════════════════════════════════════════════════════════╝

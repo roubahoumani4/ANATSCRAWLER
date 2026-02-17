@@ -33,6 +33,7 @@ import {
   History as HistoryIcon,
   Database,
   ClipboardList,
+  Shield,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -97,6 +98,12 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
         { path: "/domain-monitoring", label: "Domain Monitoring", icon: <Globe size={16} />, color: "text-white" },
         { path: "/search-history", label: "Search History", icon: <HistoryIcon size={16} />, color: "text-white" }
       ]
+    },
+    {
+      path: "/os-audit",
+      icon: <Shield size={20} />,
+      label: "OS Audit",
+      color: "text-white"
     },
     // User Management - Only visible for admin users
     ...(isAdmin ? [{

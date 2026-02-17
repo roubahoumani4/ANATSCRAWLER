@@ -21,6 +21,7 @@ import assessmentRoutes from './assessment.routes';
 import threatIntelRoutes from './threat-intelligence-free.routes'; // FREE version with web scraping
 import historyRoutes from './history.routes';
 import analyticsRoutes from './analytics.routes';
+import osAuditRoutes from './os-audit.routes';
 
 /**
  * Register all application routes with proper organization and authentication
@@ -78,6 +79,9 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   // Assessment runner - runs server-side helper scripts for assessment tasks (authenticated)
   app.use(`${apiV1}/assessment`, authenticate, assessmentRoutes);
+
+  // OS Audit routes - authenticated users only
+  app.use(`${apiV1}/os-audit`, authenticate, osAuditRoutes);
 
   // Threat Intelligence routes - authenticated users only
   app.use(`${apiV1}/threat-intel`, authenticate, threatIntelRoutes);

@@ -31,6 +31,7 @@ import IndexQueryPage from '@/pages/IndexQueryPage';
 import PerformanceOptimizationPage from '@/pages/PerformanceOptimizationPage';
 import DataManagementPage from '@/pages/DataManagementPage';
 import AdminLogsPage from '@/pages/AdminLogsPage';
+import OSAuditPage from '@/pages/OSAuditPage';
 
 // Layout Component
 import Layout from '@/components/layout/Layout';
@@ -108,6 +109,9 @@ export default function AppContent() {
           <Route path="/users/activity-logs" element={<AdminRoute><UserActivityLogsPage /></AdminRoute>} />
           <Route path="/users/sessions" element={<AdminRoute><SessionManagementPage /></AdminRoute>} />
           <Route path="/users/activity/:userId" element={<AdminRoute><UserActivityDashboardPage /></AdminRoute>} />
+          
+          {/* OS Audit Routes - Authenticated Users */}
+          <Route path="/os-audit" element={<ProtectedRoute><OSAuditPage /></ProtectedRoute>} />
           
           {/* Index Management Routes - Admin Only */}
           <Route path="/index" element={<AdminRoute><IndexManagementDashboardPage /></AdminRoute>} />
