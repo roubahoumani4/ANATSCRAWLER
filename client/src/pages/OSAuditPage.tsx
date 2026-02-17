@@ -262,29 +262,52 @@ echo "Detected OS: $OS"
 # Install dependencies based on OS
 if [[ "$OS" == "ubuntu" || "$OS" == "debian" ]]; then
     echo "Installing dependencies for Debian/Ubuntu..."
-    apt-get update
-    apt-get install -y curl wget git build-essential
+    apt-get update 2>&1 | grep -v "^Err:" || true
+    apt-get install -y curl wget git build-essential 2>&1 || {
+        echo "⚠️  Some packages failed to install, attempting with --no-install-recommends..."
+        apt-get install -y --no-install-recommends curl wget git 2>&1 || true
+    }
 
 elif [[ "$OS" == "rhel" || "$OS" == "centos" || "$OS" == "fedora" ]]; then
     echo "Installing dependencies for RHEL/CentOS/Fedora..."
-    yum install -y curl wget git gcc make
+    yum install -y curl wget git gcc make 2>&1 || {
+        echo "⚠️  Some packages failed to install, continuing anyway..."
+    }
 
 elif [[ "$OS" == "arch" ]]; then
     echo "Installing dependencies for Arch..."
-    pacman -Syu --noconfirm curl wget git base-devel
+    pacman -Syu --noconfirm curl wget git base-devel 2>&1 || {
+        echo "⚠️  Some packages failed to install, continuing anyway..."
+    }
 
 fi
 
+echo ""
 echo "Installing Lynis..."
 # Clone or download Lynis
 if ! command -v lynis &> /dev/null; then
+    echo "Downloading Lynis from GitHub..."
     cd /tmp
-    git clone https://github.com/CISOfy/lynis.git
-    cd lynis
-    ./lynis audit system --quiet
-    ln -sf /tmp/lynis/lynis /usr/local/bin/lynis || true
+    rm -rf lynis 2>/dev/null || true
+    if git clone https://github.com/CISOfy/lynis.git 2>&1; then
+        cd lynis
+        chmod +x lynis
+        ./lynis audit system --quiet 2>&1 || true
+        ln -sf /tmp/lynis/lynis /usr/local/bin/lynis 2>&1 || {
+            mkdir -p /usr/local/bin
+            cp lynis /usr/local/bin/lynis
+            chmod +x /usr/local/bin/lynis
+        }
+        echo "✅ Lynis installed successfully"
+    else
+        echo "⚠️  Failed to clone Lynis, attempting alternative installation..."
+        apt-get install -y --no-install-recommends lynis 2>&1 || yum install -y lynis 2>&1 || echo "Could not install Lynis"
+    fi
+else
+    echo "✅ Lynis already installed"
 fi
 
+echo ""
 echo "Setting up OS Audit Agent..."
 
 # Create agent directory
@@ -309,6 +332,14 @@ echo ""
 echo "Machine ID: $MACHINE_ID"
 echo "Server: $SERVER_URL"
 echo ""
+
+# Check if Lynis is installed
+if ! command -v lynis &> /dev/null; then
+    echo "❌ Lynis not found. Please install Lynis first:"
+    echo "   Ubuntu/Debian: sudo apt-get install lynis"
+    echo "   RHEL/CentOS: sudo yum install lynis"
+    exit 1
+fi
 
 # Run Lynis audit
 echo "⏱️  Running Lynis security audit..."
