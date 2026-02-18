@@ -315,22 +315,24 @@ AGENT_DIR="/opt/anat-os-audit"
 mkdir -p "$AGENT_DIR"
 
 # Create the agent script
-cat > "$AGENT_DIR/agent.sh" << 'AGENT_SCRIPT'
+cat > "$AGENT_DIR/agent.sh" << AGENT_SCRIPT
 #!/bin/bash
 
 # ANATSCRAWLER OS Audit Agent
 AGENT_TOKEN="${machine.agentInstallationToken}"
-SERVER_URL="${window.location.origin || 'http://localhost:3000'}"
+SERVER_URL="https://horus.anatsecurity.fr"
 MACHINE_ID="${machine.machineId}"
-REPORT_FILE="/tmp/lynis_report_$$.json"
+MACHINE_NAME="${machine.machineName}"
+OWNER_NAME="${machine.ownerName}"
+REPORT_FILE="/tmp/lynis_report_\$\$.json"
 
 echo ""
 echo "╔════════════════════════════════════════════════════════╗"
 echo "║  Starting ANATSCRAWLER OS Audit                         ║"
 echo "╚════════════════════════════════════════════════════════╝"
 echo ""
-echo "Machine ID: $MACHINE_ID"
-echo "Server: $SERVER_URL"
+echo "Machine ID: \$MACHINE_ID"
+echo "Server: \$SERVER_URL"
 echo ""
 
 # Check if Lynis is installed
@@ -345,86 +347,100 @@ fi
 echo "⏱️  Running Lynis security audit..."
 echo "This may take 2-5 minutes..."
 echo ""
-AUDIT_OUTPUT=$(lynis audit system 2>&1 || true)
+AUDIT_OUTPUT=\$(lynis audit system 2>&1 || true)
 
 # Get system information
-OS_INFO=$(lsb_release -d 2>/dev/null | sed 's/Description:\s*//' || uname -s || echo "Unknown OS")
-HOSTNAME=$(hostname)
-IP_ADDRESS=$(hostname -I | awk '{print $1}')
-TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+OS_INFO=\$(lsb_release -d 2>/dev/null | sed 's/Description:\\s*//' || uname -s || echo "Unknown OS")
+HOSTNAME=\$(hostname)
+IP_ADDRESS=\$(hostname -I | awk '{print \$1}')
+TIMESTAMP=\$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Parse Lynis results - extract only the numeric score
-SCORE=$(echo "$AUDIT_OUTPUT" | grep -i "hardening index" | head -1 | grep -oE '[0-9]+' | tail -1)
-[ -z "$SCORE" ] && SCORE="0"
+SCORE=\$(echo "\$AUDIT_OUTPUT" | grep -i "hardening index" | head -1 | grep -oE '[0-9]+' | tail -1)
+[ -z "\$SCORE" ] && SCORE="0"
 
-WARNINGS=$(echo "$AUDIT_OUTPUT" | grep "^\s*\[W\]" | wc -l)
-SUGGESTIONS=$(echo "$AUDIT_OUTPUT" | grep "^\s*\[S\]" | wc -l)
+WARNINGS=\$(echo "\$AUDIT_OUTPUT" | grep "^\\s*\\[W\\]" | wc -l)
+SUGGESTIONS=\$(echo "\$AUDIT_OUTPUT" | grep "^\\s*\\[S\\]" | wc -l)
 
 # Ensure they're numbers
-WARNINGS=$(echo "$WARNINGS" | grep -oE '[0-9]+' | head -1)
-SUGGESTIONS=$(echo "$SUGGESTIONS" | grep -oE '[0-9]+' | head -1)
-[ -z "$WARNINGS" ] && WARNINGS="0"
-[ -z "$SUGGESTIONS" ] && SUGGESTIONS="0"
+WARNINGS=\$(echo "\$WARNINGS" | grep -oE '[0-9]+' | head -1)
+SUGGESTIONS=\$(echo "\$SUGGESTIONS" | grep -oE '[0-9]+' | head -1)
+[ -z "\$WARNINGS" ] && WARNINGS="0"
+[ -z "\$SUGGESTIONS" ] && SUGGESTIONS="0"
 
 echo ""
 echo "✅ Audit completed!"
 echo ""
 echo "Results:"
-echo "  Security Score: $SCORE"
-echo "  Warnings: $WARNINGS"
-echo "  Suggestions: $SUGGESTIONS"
+echo "  Security Score: \$SCORE"
+echo "  Warnings: \$WARNINGS"
+echo "  Suggestions: \$SUGGESTIONS"
 echo ""
 
-# Create temporary JSON file - use printf to safely construct JSON
-TEMP_JSON="/tmp/lynis_report_$$.json"
+# Create JSON report using direct construction
+TEMP_JSON="/tmp/lynis_report_\$\$.json"
 
-# Use printf and cat to construct JSON safely without special character issues
+# Escape quotes in variables for JSON
+ESCAPED_AUDIT=\$(printf '%s\\n' "\$AUDIT_OUTPUT" | sed 's/\\\\/\\\\\\\\/g; s/"/\\\\"/g' | head -c 5000)
+ESCAPED_OS=\$(printf '%s' "\$OS_INFO" | sed 's/\\\\/\\\\\\\\/g; s/"/\\\\"/g')
+
+# Build JSON
+cat > "\$TEMP_JSON" << 'JSON_END'
 {
-  printf '{'
-  printf '"agentInstallationToken":%s,' "$(printf %s \"$AGENT_TOKEN\" | sed 's/\\/\\\\/g;s/"/\\\\"/g')"
-  printf '"machineName":%s,' "$(printf %s \"${machine.machineName}\" | sed 's/\\/\\\\/g;s/"/\\\\"/g')"
-  printf '"ipAddress":%s,' "$(printf %s \"$IP_ADDRESS\" | sed 's/\\/\\\\/g;s/"/\\\\"/g')"
-  printf '"ownerName":%s,' "$(printf %s \"${machine.ownerName}\" | sed 's/\\/\\\\/g;s/"/\\\\"/g')"
-  printf '"auditData":{'
-  printf '"operatingSystem":%s,' "$(printf %s \"$OS_INFO\" | sed 's/\\/\\\\/g;s/"/\\\\"/g')"
-  printf '"auditScore":%s,' "$SCORE"
-  printf '"warnings":%s,' "$WARNINGS"
-  printf '"suggestions":%s,' "$SUGGESTIONS"
-  printf '"systemHardening":%s,' "$SCORE"
-  printf '"lynisVersion":%s,' "$(printf %s \"$(lynis --version 2>/dev/null || echo 'unknown')\" | sed 's/\\/\\\\/g;s/"/\\\\"/g')"
-  printf '"auditDuration":%s,' "60"
-  printf '"rawReport":%s,' "$(printf %s \"$AUDIT_OUTPUT\" | sed 's/\\/\\\\/g;s/"/\\\\"/g' | head -c 5000)"
-  printf '"findings":[],'
-  printf '"sections":{}'
-  printf '}}'
-} > "$TEMP_JSON"
+  "agentInstallationToken": "${machine.agentInstallationToken}",
+  "machineName": "${machine.machineName}",
+  "ipAddress": "IP_PLACEHOLDER",
+  "ownerName": "${machine.ownerName}",
+  "auditData": {
+    "operatingSystem": "OS_PLACEHOLDER",
+    "auditScore": SCORE_PLACEHOLDER,
+    "warnings": WARNINGS_PLACEHOLDER,
+    "suggestions": SUGGESTIONS_PLACEHOLDER,
+    "systemHardening": SCORE_PLACEHOLDER,
+    "lynisVersion": "LYNIS_PLACEHOLDER",
+    "auditDuration": 60,
+    "rawReport": "AUDIT_PLACEHOLDER",
+    "findings": [],
+    "sections": {}
+  }
+}
+JSON_END
+
+# Replace runtime placeholders
+sed -i "s|IP_PLACEHOLDER|\$IP_ADDRESS|g" "\$TEMP_JSON"
+sed -i "s|OS_PLACEHOLDER|\$ESCAPED_OS|g" "\$TEMP_JSON"
+sed -i "s|SCORE_PLACEHOLDER|\$SCORE|g" "\$TEMP_JSON"
+sed -i "s|WARNINGS_PLACEHOLDER|\$WARNINGS|g" "\$TEMP_JSON"
+sed -i "s|SUGGESTIONS_PLACEHOLDER|\$SUGGESTIONS|g" "\$TEMP_JSON"
+sed -i "s|LYNIS_PLACEHOLDER|\$(lynis --version 2>/dev/null || echo 'unknown')|g" "\$TEMP_JSON"
+sed -i "s|AUDIT_PLACEHOLDER|\$ESCAPED_AUDIT|g" "\$TEMP_JSON"
 
 # Send report to server
 echo "📤 Submitting audit report to server..."
-RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SERVER_URL/api/v1/os-audit/reports" \\
+RESPONSE=\$(curl -s -w "\\n%{http_code}" -X POST "\$SERVER_URL/api/v1/os-audit/reports" \\
   -H "Content-Type: application/json" \\
-  -d @"$TEMP_JSON")
+  -d @"\$TEMP_JSON")
 
-HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
+HTTP_CODE=\$(echo "\$RESPONSE" | tail -1)
+RESPONSE_BODY=\$(echo "\$RESPONSE" | sed '\$d')
 
-if echo "$RESPONSE_BODY" | grep -q '"success":true'; then
+if echo "\$RESPONSE_BODY" | grep -q '"success":true'; then
   echo "✅ Report submitted successfully!"
-elif [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "200" ]; then
+elif [ "\$HTTP_CODE" = "201" ] || [ "\$HTTP_CODE" = "200" ]; then
   echo "✅ Report submitted successfully!"
 else
-  echo "⚠️  Failed to submit report (HTTP $HTTP_CODE). Check your internet connection."
-  echo "Response: $RESPONSE_BODY"
+  echo "⚠️  Failed to submit report (HTTP \$HTTP_CODE)."
+  echo "Response: \$RESPONSE_BODY"
 fi
 
 # Cleanup
-rm -f "$TEMP_JSON" "$REPORT_FILE"
+rm -f "\$TEMP_JSON" "\$REPORT_FILE"
 
 # Send heartbeat
 echo "💓 Confirming agent connectivity..."
-curl -s -X POST "$SERVER_URL/api/v1/os-audit/agent/heartbeat" \\
+curl -s -X POST "\$SERVER_URL/api/v1/os-audit/agent/heartbeat" \\
   -H "Content-Type: application/json" \\
-  -d "{\"agentInstallationToken\": \"$AGENT_TOKEN\"}" > /dev/null
+  -d "{\\"agentInstallationToken\\": \\"\$AGENT_TOKEN\\"}" > /dev/null
 
 echo ""
 echo "╔════════════════════════════════════════════════════════╗"
@@ -432,7 +448,7 @@ echo "║  ✅ OS Audit Completed Successfully!                   ║"
 echo "╚════════════════════════════════════════════════════════╝"
 echo ""
 echo "🌐 View your audit report at:"
-echo "   ${window.location.origin || 'http://localhost:3000'}/os-audit"
+echo "   https://horus.anatsecurity.fr/os-audit"
 echo ""
 echo "📊 Dashboard: Machines > Reports tab"
 echo ""
