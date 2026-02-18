@@ -348,20 +348,23 @@ echo ""
 AUDIT_OUTPUT=$(lynis audit system 2>&1 || true)
 
 # Get system information
-OS_INFO=$(lsb_release -d 2>/dev/null || uname -s || echo "Unknown OS")
+OS_INFO=$(lsb_release -d 2>/dev/null | sed 's/Description:\s*//' || uname -s || echo "Unknown OS")
 HOSTNAME=$(hostname)
 IP_ADDRESS=$(hostname -I | awk '{print $1}')
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-# Parse Lynis results - extract numeric score
-SCORE=$(echo "$AUDIT_OUTPUT" | grep -oP 'hardening index[^:]*:\s*\K[0-9]+' || echo "0")
-# If that didn't work, try alternative patterns
-if [ -z "$SCORE" ] || [ "$SCORE" = "0" ]; then
-  SCORE=$(echo "$AUDIT_OUTPUT" | grep -i "hardening" | grep -oE '[0-9]+' | tail -1 || echo "0")
-fi
+# Parse Lynis results - extract only the numeric score
+SCORE=$(echo "$AUDIT_OUTPUT" | grep -i "hardening index" | head -1 | grep -oE '[0-9]+' | tail -1)
+[ -z "$SCORE" ] && SCORE="0"
 
-WARNINGS=$(echo "$AUDIT_OUTPUT" | grep -c "^\s*\[W\]" || echo "0")
-SUGGESTIONS=$(echo "$AUDIT_OUTPUT" | grep -c "^\s*\[S\]" || echo "0")
+WARNINGS=$(echo "$AUDIT_OUTPUT" | grep "^\s*\[W\]" | wc -l)
+SUGGESTIONS=$(echo "$AUDIT_OUTPUT" | grep "^\s*\[S\]" | wc -l)
+
+# Ensure they're numbers
+WARNINGS=$(echo "$WARNINGS" | grep -oE '[0-9]+' | head -1)
+SUGGESTIONS=$(echo "$SUGGESTIONS" | grep -oE '[0-9]+' | head -1)
+[ -z "$WARNINGS" ] && WARNINGS="0"
+[ -z "$SUGGESTIONS" ] && SUGGESTIONS="0"
 
 echo ""
 echo "✅ Audit completed!"
@@ -372,45 +375,29 @@ echo "  Warnings: $WARNINGS"
 echo "  Suggestions: $SUGGESTIONS"
 echo ""
 
-# Create a temporary file to hold the report JSON safely
-TEMP_JSON="/tmp/lynis_report_temp_$$.json"
+# Create temporary JSON file - use printf to safely construct JSON
+TEMP_JSON="/tmp/lynis_report_$$.json"
 
-# Escape the raw report for JSON
-RAW_REPORT_ESCAPED=$(printf '%s\n' "$AUDIT_OUTPUT" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed 's/$/\\n/' | tr -d '\n')
-
-# Create JSON report using a safer method
-cat > "$TEMP_JSON" << 'JSON_END'
+# Use printf and cat to construct JSON safely without special character issues
 {
-  "agentInstallationToken": "TOKEN_PLACEHOLDER",
-  "machineName": "MACHINE_NAME_PLACEHOLDER",
-  "ipAddress": "IP_ADDRESS_PLACEHOLDER",
-  "ownerName": "OWNER_NAME_PLACEHOLDER",
-  "auditData": {
-    "operatingSystem": "OS_INFO_PLACEHOLDER",
-    "auditScore": SCORE_PLACEHOLDER,
-    "warnings": WARNINGS_PLACEHOLDER,
-    "suggestions": SUGGESTIONS_PLACEHOLDER,
-    "systemHardening": SCORE_PLACEHOLDER,
-    "lynisVersion": "LYNIS_VERSION_PLACEHOLDER",
-    "auditDuration": 60,
-    "rawReport": "RAW_REPORT_PLACEHOLDER",
-    "findings": [],
-    "sections": {}
-  }
-}
-JSON_END
-
-# Replace placeholders with actual values
-sed -i "s|TOKEN_PLACEHOLDER|$AGENT_TOKEN|g" "$TEMP_JSON"
-sed -i "s|MACHINE_NAME_PLACEHOLDER|${machine.machineName}|g" "$TEMP_JSON"
-sed -i "s|IP_ADDRESS_PLACEHOLDER|$IP_ADDRESS|g" "$TEMP_JSON"
-sed -i "s|OWNER_NAME_PLACEHOLDER|${machine.ownerName}|g" "$TEMP_JSON"
-sed -i "s|OS_INFO_PLACEHOLDER|$OS_INFO|g" "$TEMP_JSON"
-sed -i "s|SCORE_PLACEHOLDER|$SCORE|g" "$TEMP_JSON"
-sed -i "s|WARNINGS_PLACEHOLDER|$WARNINGS|g" "$TEMP_JSON"
-sed -i "s|SUGGESTIONS_PLACEHOLDER|$SUGGESTIONS|g" "$TEMP_JSON"
-sed -i "s|LYNIS_VERSION_PLACEHOLDER|$(lynis --version 2>/dev/null || echo 'unknown')|g" "$TEMP_JSON"
-sed -i "s|RAW_REPORT_PLACEHOLDER|$RAW_REPORT_ESCAPED|g" "$TEMP_JSON"
+  printf '{'
+  printf '"agentInstallationToken":%s,' "$(printf %s \"$AGENT_TOKEN\" | sed 's/\\/\\\\/g;s/"/\\\\"/g')"
+  printf '"machineName":%s,' "$(printf %s \"${machine.machineName}\" | sed 's/\\/\\\\/g;s/"/\\\\"/g')"
+  printf '"ipAddress":%s,' "$(printf %s \"$IP_ADDRESS\" | sed 's/\\/\\\\/g;s/"/\\\\"/g')"
+  printf '"ownerName":%s,' "$(printf %s \"${machine.ownerName}\" | sed 's/\\/\\\\/g;s/"/\\\\"/g')"
+  printf '"auditData":{'
+  printf '"operatingSystem":%s,' "$(printf %s \"$OS_INFO\" | sed 's/\\/\\\\/g;s/"/\\\\"/g')"
+  printf '"auditScore":%s,' "$SCORE"
+  printf '"warnings":%s,' "$WARNINGS"
+  printf '"suggestions":%s,' "$SUGGESTIONS"
+  printf '"systemHardening":%s,' "$SCORE"
+  printf '"lynisVersion":%s,' "$(printf %s \"$(lynis --version 2>/dev/null || echo 'unknown')\" | sed 's/\\/\\\\/g;s/"/\\\\"/g')"
+  printf '"auditDuration":%s,' "60"
+  printf '"rawReport":%s,' "$(printf %s \"$AUDIT_OUTPUT\" | sed 's/\\/\\\\/g;s/"/\\\\"/g' | head -c 5000)"
+  printf '"findings":[],'
+  printf '"sections":{}'
+  printf '}}'
+} > "$TEMP_JSON"
 
 # Send report to server
 echo "📤 Submitting audit report to server..."
@@ -428,7 +415,6 @@ elif [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "200" ]; then
 else
   echo "⚠️  Failed to submit report (HTTP $HTTP_CODE). Check your internet connection."
   echo "Response: $RESPONSE_BODY"
-  echo "Debug: Machine name was '${machine.machineName}', IP was '$IP_ADDRESS', Token was '$AGENT_TOKEN'"
 fi
 
 # Cleanup
