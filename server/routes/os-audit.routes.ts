@@ -302,6 +302,10 @@ router.post('/reports', async (req: AuthenticatedRequest, res: Response) => {
       findings: auditData?.findings || [],
       sections: auditData?.sections || {},
       rawReport: auditData?.rawReport || '',
+      lynisLogFile: auditData?.lynisLogFile || '/var/log/lynis.log',
+      lynisReportFile: auditData?.lynisReportFile || '/var/log/lynis-report.dat',
+      logFileContent: auditData?.logFileContent || '',
+      reportFileContent: auditData?.reportFileContent || '',
       status: 'completed',
       lynisVersion: auditData?.lynisVersion || 'unknown',
       auditDuration: parseInt(String(auditData?.auditDuration || 0), 10) || 0

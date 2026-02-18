@@ -82,6 +82,24 @@ const osAuditReportSchema = new Schema({
     type: String,
     description: 'Raw Lynis report output'
   },
+  lynisLogFile: {
+    type: String,
+    default: '/var/log/lynis.log',
+    description: 'Path to Lynis log file on the audited machine'
+  },
+  lynisReportFile: {
+    type: String,
+    default: '/var/log/lynis-report.dat',
+    description: 'Path to Lynis report data file on the audited machine'
+  },
+  logFileContent: {
+    type: String,
+    description: 'Content of /var/log/lynis.log (test and debug information)'
+  },
+  reportFileContent: {
+    type: String,
+    description: 'Content of /var/log/lynis-report.dat (report data)'
+  },
   status: {
     type: String,
     enum: ['completed', 'failed', 'pending'],
@@ -143,6 +161,10 @@ export interface IOSAuditReport extends mongoose.Document {
   }>;
   sections?: any;
   rawReport?: string;
+  lynisLogFile?: string;
+  lynisReportFile?: string;
+  logFileContent?: string;
+  reportFileContent?: string;
   status: 'completed' | 'failed' | 'pending';
   errorMessage?: string;
   auditDuration?: number;

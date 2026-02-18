@@ -284,24 +284,29 @@ fi
 
 echo ""
 echo "Installing Lynis..."
-# Clone or download Lynis
+# Install Lynis via package manager
 if ! command -v lynis &> /dev/null; then
-    echo "Downloading Lynis from GitHub..."
-    cd /tmp
-    rm -rf lynis 2>/dev/null || true
-    if git clone https://github.com/CISOfy/lynis.git 2>&1; then
-        cd lynis
-        chmod +x lynis
-        ./lynis audit system --quiet 2>&1 || true
-        ln -sf /tmp/lynis/lynis /usr/local/bin/lynis 2>&1 || {
-            mkdir -p /usr/local/bin
-            cp lynis /usr/local/bin/lynis
-            chmod +x /usr/local/bin/lynis
+    echo "Installing Lynis from package repository..."
+    
+    if [[ "$OS" == "ubuntu" || "$OS" == "debian" ]]; then
+        apt-get install -y lynis 2>&1 || {
+            echo "⚠️  Failed to install Lynis via apt, trying alternative..."
+            apt-get install -y --no-install-recommends lynis 2>&1 || echo "Could not install Lynis"
         }
+    elif [[ "$OS" == "rhel" || "$OS" == "centos" || "$OS" == "fedora" ]]; then
+        yum install -y lynis 2>&1 || {
+            echo "⚠️  Lynis not available in default repos, trying EPEL..."
+            yum install -y epel-release 2>&1 || true
+            yum install -y lynis 2>&1 || echo "Could not install Lynis"
+        }
+    elif [[ "$OS" == "arch" ]]; then
+        pacman -S --noconfirm lynis 2>&1 || echo "Could not install Lynis"
+    fi
+    
+    if command -v lynis &> /dev/null; then
         echo "✅ Lynis installed successfully"
     else
-        echo "⚠️  Failed to clone Lynis, attempting alternative installation..."
-        apt-get install -y --no-install-recommends lynis 2>&1 || yum install -y lynis 2>&1 || echo "Could not install Lynis"
+        echo "❌ Failed to install Lynis. Please install manually: apt install lynis (Ubuntu/Debian) or yum install lynis (RHEL/CentOS)"
     fi
 else
     echo "✅ Lynis already installed"
@@ -347,7 +352,7 @@ fi
 echo "⏱️  Running Lynis security audit..."
 echo "This may take 2-5 minutes..."
 echo ""
-AUDIT_OUTPUT=$(lynis audit system 2>&1 || true)
+lynis audit system 2>&1 || true
 
 # Get system information
 OS_INFO=$(lsb_release -d 2>/dev/null | sed 's/Description:\s*//' || uname -s || echo "Unknown OS")
@@ -355,14 +360,42 @@ HOSTNAME=$(hostname)
 IP_ADDRESS=$(hostname -I | awk '{print $1}')
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-# Parse Lynis results - extract only the numeric score
-SCORE=$(echo "$AUDIT_OUTPUT" | grep -i "hardening index" | head -1 | grep -oE '[0-9]+' | tail -1)
+# Read from lynis log files
+# Check if log files exist
+if [ ! -f /var/log/lynis.log ] || [ ! -f /var/log/lynis-report.dat ]; then
+    echo "⚠️  Lynis log files not found at expected locations"
+    echo "   Checking for alternative locations..."
+    LYNIS_LOG=$(find /var/log -name "lynis.log" -type f 2>/dev/null | head -1)
+    LYNIS_REPORT=$(find /var/log -name "lynis-report.dat" -type f 2>/dev/null | head -1)
+    
+    if [ -z "$LYNIS_LOG" ]; then
+        echo "❌ Lynis logs not found. Attempting to locate..."
+        LYNIS_LOG="/var/log/lynis.log"
+    fi
+    if [ -z "$LYNIS_REPORT" ]; then
+        LYNIS_REPORT="/var/log/lynis-report.dat"
+    fi
+else
+    LYNIS_LOG="/var/log/lynis.log"
+    LYNIS_REPORT="/var/log/lynis-report.dat"
+fi
+
+echo ""
+echo "Reading audit results from:"
+echo "  - $LYNIS_LOG"
+echo "  - $LYNIS_REPORT"
+echo ""
+
+# Parse Lynis results from log files
+# Extract score from the report data file
+SCORE=$(grep "^hardening_index=" "$LYNIS_REPORT" 2>/dev/null | cut -d= -f2 || echo "0")
 [ -z "$SCORE" ] && SCORE="0"
 
-WARNINGS=$(echo "$AUDIT_OUTPUT" | grep "^\s*\[W\]" | wc -l)
-SUGGESTIONS=$(echo "$AUDIT_OUTPUT" | grep "^\s*\[S\]" | wc -l)
+# Count warnings and suggestions from the log file
+WARNINGS=$(grep -c "^\[W\]" "$LYNIS_LOG" 2>/dev/null || echo "0")
+SUGGESTIONS=$(grep -c "^\[S\]" "$LYNIS_LOG" 2>/dev/null || echo "0")
 
-# Ensure they're numbers
+# Ensure they're valid numbers
 WARNINGS=$(echo "$WARNINGS" | grep -oE '[0-9]+' | head -1)
 SUGGESTIONS=$(echo "$SUGGESTIONS" | grep -oE '[0-9]+' | head -1)
 [ -z "$WARNINGS" ] && WARNINGS="0"
@@ -380,6 +413,10 @@ echo ""
 # Create JSON report
 TEMP_JSON="/tmp/lynis_report_$$.json"
 
+# Read the raw log files for inclusion in report
+LOG_CONTENT=$(cat "$LYNIS_LOG" 2>/dev/null | head -c 10000 || echo "")
+REPORT_DAT_CONTENT=$(cat "$LYNIS_REPORT" 2>/dev/null | head -c 5000 || echo "")
+
 # Create the JSON file with placeholders that will be replaced
 cat > "$TEMP_JSON" << 'JSON_END'
 {
@@ -396,6 +433,10 @@ cat > "$TEMP_JSON" << 'JSON_END'
     "lynisVersion": "LYNIS_PLACEHOLDER",
     "auditDuration": 60,
     "rawReport": "AUDIT_PLACEHOLDER",
+    "lynisLogFile": "/var/log/lynis.log",
+    "lynisReportFile": "/var/log/lynis-report.dat",
+    "logFileContent": "LOG_CONTENT_PLACEHOLDER",
+    "reportFileContent": "REPORT_CONTENT_PLACEHOLDER",
     "findings": [],
     "sections": {}
   }
@@ -417,13 +458,17 @@ sed_escape() {
 ESCAPED_IP=$(json_escape "$IP_ADDRESS")
 ESCAPED_OS=$(json_escape "$OS_INFO")
 ESCAPED_LYNIS=$(json_escape "$(lynis --version 2>/dev/null || echo 'unknown')")
-ESCAPED_AUDIT=$(json_escape "$(printf '%s' "$AUDIT_OUTPUT" | head -c 5000)")
+ESCAPED_AUDIT=$(json_escape "$(cat "$LYNIS_LOG" 2>/dev/null | head -c 5000)")
+ESCAPED_LOG_CONTENT=$(json_escape "$LOG_CONTENT")
+ESCAPED_REPORT_CONTENT=$(json_escape "$REPORT_DAT_CONTENT")
 
 # Also escape for sed
 SED_ESCAPED_IP=$(sed_escape "$ESCAPED_IP")
 SED_ESCAPED_OS=$(sed_escape "$ESCAPED_OS")
 SED_ESCAPED_LYNIS=$(sed_escape "$ESCAPED_LYNIS")
 SED_ESCAPED_AUDIT=$(sed_escape "$ESCAPED_AUDIT")
+SED_ESCAPED_LOG=$(sed_escape "$ESCAPED_LOG_CONTENT")
+SED_ESCAPED_REPORT=$(sed_escape "$ESCAPED_REPORT_CONTENT")
 
 # Replace runtime variables in JSON
 sed -i "s|IP_PLACEHOLDER|$SED_ESCAPED_IP|g" "$TEMP_JSON"
@@ -433,6 +478,8 @@ sed -i "s|WARNINGS_PLACEHOLDER|$WARNINGS|g" "$TEMP_JSON"
 sed -i "s|SUGGESTIONS_PLACEHOLDER|$SUGGESTIONS|g" "$TEMP_JSON"
 sed -i "s|LYNIS_PLACEHOLDER|$SED_ESCAPED_LYNIS|g" "$TEMP_JSON"
 sed -i "s|AUDIT_PLACEHOLDER|$SED_ESCAPED_AUDIT|g" "$TEMP_JSON"
+sed -i "s|LOG_CONTENT_PLACEHOLDER|$SED_ESCAPED_LOG|g" "$TEMP_JSON"
+sed -i "s|REPORT_CONTENT_PLACEHOLDER|$SED_ESCAPED_REPORT|g" "$TEMP_JSON"
 
 # Replace agent-specific variables in JSON - also with escaping
 ESCAPED_TOKEN=$(json_escape "$AGENT_TOKEN")
