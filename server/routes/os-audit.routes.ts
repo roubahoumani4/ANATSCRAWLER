@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import authenticate from '../middleware/auth';
 import { OSAuditMachine, IOSAuditMachine } from '../models/OSAuditMachine';
 import { OSAuditReport, IOSAuditReport } from '../models/OSAuditReport';
 
@@ -13,9 +14,9 @@ interface AuthenticatedRequest extends Request {
 /**
  * @route POST /api/v1/os-audit/machines/register
  * @desc Register a new machine for OS audit
- * @access Private
+ * @access Private - Requires authentication
  */
-router.post('/machines/register', async (req: AuthenticatedRequest, res: Response) => {
+router.post('/machines/register', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { machineName, ipAddress, ownerName, operatingSystem, machineHostname } = req.body;
     const userId = req.user?._id || req.user?.id;
@@ -77,9 +78,9 @@ router.post('/machines/register', async (req: AuthenticatedRequest, res: Respons
 /**
  * @route GET /api/v1/os-audit/machines
  * @desc Get all machines for the authenticated user
- * @access Private
+ * @access Private - Requires authentication
  */
-router.get('/machines', async (req: AuthenticatedRequest, res: Response) => {
+router.get('/machines', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?._id || req.user?.id;
 
@@ -102,9 +103,9 @@ router.get('/machines', async (req: AuthenticatedRequest, res: Response) => {
 /**
  * @route GET /api/v1/os-audit/machines/:machineId
  * @desc Get a specific machine details
- * @access Private
+ * @access Private - Requires authentication
  */
-router.get('/machines/:machineId', async (req: AuthenticatedRequest, res: Response) => {
+router.get('/machines/:machineId', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { machineId } = req.params;
     const userId = req.user?._id || req.user?.id;
@@ -137,9 +138,9 @@ router.get('/machines/:machineId', async (req: AuthenticatedRequest, res: Respon
 /**
  * @route PUT /api/v1/os-audit/machines/:machineId
  * @desc Update machine details
- * @access Private
+ * @access Private - Requires authentication
  */
-router.put('/machines/:machineId', async (req: AuthenticatedRequest, res: Response) => {
+router.put('/machines/:machineId', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { machineId } = req.params;
     const userId = req.user?._id || req.user?.id;
@@ -183,9 +184,9 @@ router.put('/machines/:machineId', async (req: AuthenticatedRequest, res: Respon
 /**
  * @route DELETE /api/v1/os-audit/machines/:machineId
  * @desc Delete a machine registration
- * @access Private
+ * @access Private - Requires authentication
  */
-router.delete('/machines/:machineId', async (req: AuthenticatedRequest, res: Response) => {
+router.delete('/machines/:machineId', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { machineId } = req.params;
     const userId = req.user?._id || req.user?.id;
@@ -331,9 +332,9 @@ router.post('/reports', async (req: AuthenticatedRequest, res: Response) => {
 /**
  * @route GET /api/v1/os-audit/reports/:machineId
  * @desc Get all audit reports for a specific machine
- * @access Private
+ * @access Private - Requires authentication
  */
-router.get('/reports/:machineId', async (req: AuthenticatedRequest, res: Response) => {
+router.get('/reports/:machineId', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { machineId } = req.params;
     const userId = req.user?._id || req.user?.id;
@@ -375,9 +376,9 @@ router.get('/reports/:machineId', async (req: AuthenticatedRequest, res: Respons
 /**
  * @route GET /api/v1/os-audit/reports/latest/:machineId
  * @desc Get the latest audit report for a machine
- * @access Private
+ * @access Private - Requires authentication
  */
-router.get('/reports/latest/:machineId', async (req: AuthenticatedRequest, res: Response) => {
+router.get('/reports/latest/:machineId', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { machineId } = req.params;
     const userId = req.user?._id || req.user?.id;
@@ -421,9 +422,9 @@ router.get('/reports/latest/:machineId', async (req: AuthenticatedRequest, res: 
 /**
  * @route GET /api/v1/os-audit/reports/details/:reportId
  * @desc Get a specific audit report details
- * @access Private
+ * @access Private - Requires authentication
  */
-router.get('/reports/details/:reportId', async (req: AuthenticatedRequest, res: Response) => {
+router.get('/reports/details/:reportId', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { reportId } = req.params;
     const userId = req.user?._id || req.user?.id;
@@ -456,9 +457,9 @@ router.get('/reports/details/:reportId', async (req: AuthenticatedRequest, res: 
 /**
  * @route GET /api/v1/os-audit/reports
  * @desc Get all audit reports for the authenticated user
- * @access Private
+ * @access Private - Requires authentication
  */
-router.get('/reports', async (req: AuthenticatedRequest, res: Response) => {
+router.get('/reports', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?._id || req.user?.id;
     const limit = parseInt(req.query.limit as string) || 50;
@@ -542,9 +543,9 @@ router.post('/agent/heartbeat', async (req: AuthenticatedRequest, res: Response)
 /**
  * @route GET /api/v1/os-audit/stats
  * @desc Get OS audit statistics for the authenticated user
- * @access Private
+ * @access Private - Requires authentication
  */
-router.get('/stats', async (req: AuthenticatedRequest, res: Response) => {
+router.get('/stats', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?._id || req.user?.id;
 

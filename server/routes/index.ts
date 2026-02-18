@@ -80,8 +80,9 @@ export async function registerRoutes(app: Express): Promise<void> {
   // Assessment runner - runs server-side helper scripts for assessment tasks (authenticated)
   app.use(`${apiV1}/assessment`, authenticate, assessmentRoutes);
 
-  // OS Audit routes - authenticated users only
-  app.use(`${apiV1}/os-audit`, authenticate, osAuditRoutes);
+  // OS Audit routes - some require authentication, some use token-based auth
+  // Authentication is handled within the route handlers
+  app.use(`${apiV1}/os-audit`, osAuditRoutes);
 
   // Threat Intelligence routes - authenticated users only
   app.use(`${apiV1}/threat-intel`, authenticate, threatIntelRoutes);
