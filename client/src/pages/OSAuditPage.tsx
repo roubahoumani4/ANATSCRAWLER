@@ -453,11 +453,25 @@ fi
 # Cleanup
 rm -f "$TEMP_JSON" "$REPORT_FILE"
 
-# Send heartbeat
+# Send heartbeat - create a proper JSON file
 echo "💓 Confirming agent connectivity..."
+HEARTBEAT_FILE="/tmp/heartbeat_$$.json"
+cat > "$HEARTBEAT_FILE" << 'HEARTBEAT_JSON'
+{
+  "agentInstallationToken": "HEARTBEAT_TOKEN_PLACEHOLDER"
+}
+HEARTBEAT_JSON
+
+# Replace token
+sed -i "s|HEARTBEAT_TOKEN_PLACEHOLDER|$AGENT_TOKEN|g" "$HEARTBEAT_FILE"
+
+# Send heartbeat
 curl -s -X POST "$SERVER_URL/api/v1/os-audit/agent/heartbeat" \
   -H "Content-Type: application/json" \
-  -d "{\"agentInstallationToken\": \"$AGENT_TOKEN\"}" > /dev/null
+  -d @"$HEARTBEAT_FILE" > /dev/null
+
+# Cleanup heartbeat file
+rm -f "$HEARTBEAT_FILE"
 
 echo ""
 echo "╔════════════════════════════════════════════════════════╗"
