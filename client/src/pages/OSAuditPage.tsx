@@ -353,10 +353,15 @@ HOSTNAME=$(hostname)
 IP_ADDRESS=$(hostname -I | awk '{print $1}')
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-# Parse Lynis results
-SCORE=$(echo "$AUDIT_OUTPUT" | grep -i "hardening index" | awk '{print $NF}' || echo "0")
-WARNINGS=$(echo "$AUDIT_OUTPUT" | grep -c "\[W\]" || echo "0")
-SUGGESTIONS=$(echo "$AUDIT_OUTPUT" | grep -c "\[S\]" || echo "0")
+# Parse Lynis results - extract numeric score
+SCORE=$(echo "$AUDIT_OUTPUT" | grep -oP 'hardening index[^:]*:\s*\K[0-9]+' || echo "0")
+# If that didn't work, try alternative patterns
+if [ -z "$SCORE" ] || [ "$SCORE" = "0" ]; then
+  SCORE=$(echo "$AUDIT_OUTPUT" | grep -i "hardening" | grep -oE '[0-9]+' | tail -1 || echo "0")
+fi
+
+WARNINGS=$(echo "$AUDIT_OUTPUT" | grep -c "^\s*\[W\]" || echo "0")
+SUGGESTIONS=$(echo "$AUDIT_OUTPUT" | grep -c "^\s*\[S\]" || echo "0")
 
 echo ""
 echo "✅ Audit completed!"
@@ -367,43 +372,67 @@ echo "  Warnings: $WARNINGS"
 echo "  Suggestions: $SUGGESTIONS"
 echo ""
 
-# Create JSON report
-cat > "$REPORT_FILE" << JSON_END
+# Create a temporary file to hold the report JSON safely
+TEMP_JSON="/tmp/lynis_report_temp_$$.json"
+
+# Escape the raw report for JSON
+RAW_REPORT_ESCAPED=$(printf '%s\n' "$AUDIT_OUTPUT" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed 's/$/\\n/' | tr -d '\n')
+
+# Create JSON report using a safer method
+cat > "$TEMP_JSON" << 'JSON_END'
 {
-  "agentInstallationToken": "$AGENT_TOKEN",
-  "machineName": "${machine.machineName}",
-  "ipAddress": "$IP_ADDRESS",
-  "ownerName": "${machine.ownerName}",
+  "agentInstallationToken": "TOKEN_PLACEHOLDER",
+  "machineName": "MACHINE_NAME_PLACEHOLDER",
+  "ipAddress": "IP_ADDRESS_PLACEHOLDER",
+  "ownerName": "OWNER_NAME_PLACEHOLDER",
   "auditData": {
-    "operatingSystem": "$OS_INFO",
-    "auditScore": $SCORE,
-    "warnings": $WARNINGS,
-    "suggestions": $SUGGESTIONS,
-    "systemHardening": $SCORE,
-    "lynisVersion": "$(lynis --version 2>/dev/null || echo 'unknown')",
+    "operatingSystem": "OS_INFO_PLACEHOLDER",
+    "auditScore": SCORE_PLACEHOLDER,
+    "warnings": WARNINGS_PLACEHOLDER,
+    "suggestions": SUGGESTIONS_PLACEHOLDER,
+    "systemHardening": SCORE_PLACEHOLDER,
+    "lynisVersion": "LYNIS_VERSION_PLACEHOLDER",
     "auditDuration": 60,
-    "rawReport": $(echo "$AUDIT_OUTPUT" | jq -Rs .),
+    "rawReport": "RAW_REPORT_PLACEHOLDER",
     "findings": [],
     "sections": {}
   }
 }
 JSON_END
 
+# Replace placeholders with actual values
+sed -i "s|TOKEN_PLACEHOLDER|$AGENT_TOKEN|g" "$TEMP_JSON"
+sed -i "s|MACHINE_NAME_PLACEHOLDER|${machine.machineName}|g" "$TEMP_JSON"
+sed -i "s|IP_ADDRESS_PLACEHOLDER|$IP_ADDRESS|g" "$TEMP_JSON"
+sed -i "s|OWNER_NAME_PLACEHOLDER|${machine.ownerName}|g" "$TEMP_JSON"
+sed -i "s|OS_INFO_PLACEHOLDER|$OS_INFO|g" "$TEMP_JSON"
+sed -i "s|SCORE_PLACEHOLDER|$SCORE|g" "$TEMP_JSON"
+sed -i "s|WARNINGS_PLACEHOLDER|$WARNINGS|g" "$TEMP_JSON"
+sed -i "s|SUGGESTIONS_PLACEHOLDER|$SUGGESTIONS|g" "$TEMP_JSON"
+sed -i "s|LYNIS_VERSION_PLACEHOLDER|$(lynis --version 2>/dev/null || echo 'unknown')|g" "$TEMP_JSON"
+sed -i "s|RAW_REPORT_PLACEHOLDER|$RAW_REPORT_ESCAPED|g" "$TEMP_JSON"
+
 # Send report to server
 echo "📤 Submitting audit report to server..."
-RESPONSE=$(curl -s -X POST "$SERVER_URL/api/v1/os-audit/reports" \\
+RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SERVER_URL/api/v1/os-audit/reports" \\
   -H "Content-Type: application/json" \\
-  -d @"$REPORT_FILE")
+  -d @"$TEMP_JSON")
 
-if echo "$RESPONSE" | grep -q '"success":true'; then
+HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
+
+if echo "$RESPONSE_BODY" | grep -q '"success":true'; then
+  echo "✅ Report submitted successfully!"
+elif [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "200" ]; then
   echo "✅ Report submitted successfully!"
 else
-  echo "⚠️  Failed to submit report. Check your internet connection."
-  echo "Response: $RESPONSE"
+  echo "⚠️  Failed to submit report (HTTP $HTTP_CODE). Check your internet connection."
+  echo "Response: $RESPONSE_BODY"
+  echo "Debug: Machine name was '${machine.machineName}', IP was '$IP_ADDRESS', Token was '$AGENT_TOKEN'"
 fi
 
 # Cleanup
-rm -f "$REPORT_FILE"
+rm -f "$TEMP_JSON" "$REPORT_FILE"
 
 # Send heartbeat
 echo "💓 Confirming agent connectivity..."

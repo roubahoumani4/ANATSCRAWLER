@@ -262,6 +262,27 @@ router.post('/reports', async (req: AuthenticatedRequest, res: Response) => {
       await machine.save();
     }
 
+    // Validate audit data
+    if (!auditData) {
+      return res.status(400).json({
+        success: false,
+        error: 'auditData is required'
+      });
+    }
+
+    // Parse score to ensure it's a valid number
+    let auditScore = 0;
+    if (auditData.auditScore !== undefined && auditData.auditScore !== null) {
+      const score = parseInt(String(auditData.auditScore), 10);
+      if (!isNaN(score) && score >= 0 && score <= 100) {
+        auditScore = score;
+      }
+    }
+
+    // Parse warnings and suggestions
+    const warnings = parseInt(String(auditData.warnings || 0), 10) || 0;
+    const suggestions = parseInt(String(auditData.suggestions || 0), 10) || 0;
+
     // Create audit report
     const reportId = `report_${uuidv4()}`;
 
@@ -272,17 +293,17 @@ router.post('/reports', async (req: AuthenticatedRequest, res: Response) => {
       machineName: machine.machineName,
       ipAddress: machine.ipAddress,
       ownerName: machine.ownerName,
-      operatingSystem: auditData?.operatingSystem,
-      auditScore: auditData?.auditScore,
-      warnings: auditData?.warnings || 0,
-      suggestions: auditData?.suggestions || 0,
-      systemHardening: auditData?.systemHardening,
+      operatingSystem: auditData?.operatingSystem || 'Unknown',
+      auditScore: auditScore,
+      warnings: warnings,
+      suggestions: suggestions,
+      systemHardening: auditScore,
       findings: auditData?.findings || [],
-      sections: auditData?.sections,
-      rawReport: auditData?.rawReport,
+      sections: auditData?.sections || {},
+      rawReport: auditData?.rawReport || '',
       status: 'completed',
-      lynisVersion: auditData?.lynisVersion,
-      auditDuration: auditData?.auditDuration
+      lynisVersion: auditData?.lynisVersion || 'unknown',
+      auditDuration: parseInt(String(auditData?.auditDuration || 0), 10) || 0
     });
 
     const savedReport = await newReport.save();
@@ -298,9 +319,11 @@ router.post('/reports', async (req: AuthenticatedRequest, res: Response) => {
     });
   } catch (error: any) {
     console.error('Error submitting audit report:', error);
+    console.error('Request body:', req.body);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to submit audit report'
+      error: error.message || 'Failed to submit audit report',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
