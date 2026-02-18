@@ -402,19 +402,35 @@ cat > "$TEMP_JSON" << 'JSON_END'
 }
 JSON_END
 
+# Replace runtime variables in JSON - with proper JSON escaping
+# Function to escape strings for JSON
+json_escape() {
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/$'\''\t'\''/\\t/g; s/$//' | tr '\n' ' '
+}
+
+# Escape each value
+ESCAPED_IP=$(json_escape "$IP_ADDRESS")
+ESCAPED_OS=$(json_escape "$OS_INFO")
+ESCAPED_LYNIS=$(json_escape "$(lynis --version 2>/dev/null || echo 'unknown')")
+ESCAPED_AUDIT=$(json_escape "$(printf '%s' "$AUDIT_OUTPUT" | head -c 5000)")
+
 # Replace runtime variables in JSON
-sed -i "s|IP_PLACEHOLDER|$IP_ADDRESS|g" "$TEMP_JSON"
-sed -i "s|OS_PLACEHOLDER|$OS_INFO|g" "$TEMP_JSON"
+sed -i "s|IP_PLACEHOLDER|$ESCAPED_IP|g" "$TEMP_JSON"
+sed -i "s|OS_PLACEHOLDER|$ESCAPED_OS|g" "$TEMP_JSON"
 sed -i "s|SCORE_PLACEHOLDER|$SCORE|g" "$TEMP_JSON"
 sed -i "s|WARNINGS_PLACEHOLDER|$WARNINGS|g" "$TEMP_JSON"
 sed -i "s|SUGGESTIONS_PLACEHOLDER|$SUGGESTIONS|g" "$TEMP_JSON"
-sed -i "s|LYNIS_PLACEHOLDER|$(lynis --version 2>/dev/null || echo 'unknown')|g" "$TEMP_JSON"
-sed -i "s|AUDIT_PLACEHOLDER|$(printf '%s' "$AUDIT_OUTPUT" | sed 's/\\/\\\\/g; s/"/\\"/g' | head -c 5000)|g" "$TEMP_JSON"
+sed -i "s|LYNIS_PLACEHOLDER|$ESCAPED_LYNIS|g" "$TEMP_JSON"
+sed -i "s|AUDIT_PLACEHOLDER|$ESCAPED_AUDIT|g" "$TEMP_JSON"
 
-# Replace agent-specific variables in JSON
-sed -i "s|AGENT_TOKEN_PLACEHOLDER|$AGENT_TOKEN|g" "$TEMP_JSON"
-sed -i "s|MACHINE_NAME_PLACEHOLDER|$MACHINE_NAME|g" "$TEMP_JSON"
-sed -i "s|OWNER_NAME_PLACEHOLDER|$OWNER_NAME|g" "$TEMP_JSON"
+# Replace agent-specific variables in JSON - also with escaping
+ESCAPED_TOKEN=$(json_escape "$AGENT_TOKEN")
+ESCAPED_MACHINE=$(json_escape "$MACHINE_NAME")
+ESCAPED_OWNER=$(json_escape "$OWNER_NAME")
+
+sed -i "s|AGENT_TOKEN_PLACEHOLDER|$ESCAPED_TOKEN|g" "$TEMP_JSON"
+sed -i "s|MACHINE_NAME_PLACEHOLDER|$ESCAPED_MACHINE|g" "$TEMP_JSON"
+sed -i "s|OWNER_NAME_PLACEHOLDER|$ESCAPED_OWNER|g" "$TEMP_JSON"
 
 # Send report to server
 echo "📤 Submitting audit report to server..."
