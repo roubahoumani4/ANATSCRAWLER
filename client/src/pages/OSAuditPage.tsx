@@ -443,15 +443,14 @@ cat > "$TEMP_JSON" << 'JSON_END'
 }
 JSON_END
 
-# Replace runtime variables in JSON - with proper JSON escaping
 # Function to escape strings for JSON
 json_escape() {
   printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/$'\''\t'\''/\\t/g; s/$//' | tr '\n' ' '
 }
 
-# Function to escape for sed replacement
+# Function to escape for sed replacement - use # as delimiter instead of |
 sed_escape() {
-  printf '%s' "$1" | sed 's/[\/&]/\\&/g'
+  printf '%s' "$1" | sed 's/[\\#]/\\&/g'
 }
 
 # Escape each value for JSON
@@ -462,7 +461,7 @@ ESCAPED_AUDIT=$(json_escape "$(cat "$LYNIS_LOG" 2>/dev/null | head -c 5000)")
 ESCAPED_LOG_CONTENT=$(json_escape "$LOG_CONTENT")
 ESCAPED_REPORT_CONTENT=$(json_escape "$REPORT_DAT_CONTENT")
 
-# Also escape for sed
+# Also escape for sed with # delimiter
 SED_ESCAPED_IP=$(sed_escape "$ESCAPED_IP")
 SED_ESCAPED_OS=$(sed_escape "$ESCAPED_OS")
 SED_ESCAPED_LYNIS=$(sed_escape "$ESCAPED_LYNIS")
@@ -470,16 +469,16 @@ SED_ESCAPED_AUDIT=$(sed_escape "$ESCAPED_AUDIT")
 SED_ESCAPED_LOG=$(sed_escape "$ESCAPED_LOG_CONTENT")
 SED_ESCAPED_REPORT=$(sed_escape "$ESCAPED_REPORT_CONTENT")
 
-# Replace runtime variables in JSON
-sed -i "s|IP_PLACEHOLDER|$SED_ESCAPED_IP|g" "$TEMP_JSON"
-sed -i "s|OS_PLACEHOLDER|$SED_ESCAPED_OS|g" "$TEMP_JSON"
-sed -i "s|SCORE_PLACEHOLDER|$SCORE|g" "$TEMP_JSON"
-sed -i "s|WARNINGS_PLACEHOLDER|$WARNINGS|g" "$TEMP_JSON"
-sed -i "s|SUGGESTIONS_PLACEHOLDER|$SUGGESTIONS|g" "$TEMP_JSON"
-sed -i "s|LYNIS_PLACEHOLDER|$SED_ESCAPED_LYNIS|g" "$TEMP_JSON"
-sed -i "s|AUDIT_PLACEHOLDER|$SED_ESCAPED_AUDIT|g" "$TEMP_JSON"
-sed -i "s|LOG_CONTENT_PLACEHOLDER|$SED_ESCAPED_LOG|g" "$TEMP_JSON"
-sed -i "s|REPORT_CONTENT_PLACEHOLDER|$SED_ESCAPED_REPORT|g" "$TEMP_JSON"
+# Replace runtime variables in JSON using # as delimiter
+sed -i "s#IP_PLACEHOLDER#$SED_ESCAPED_IP#g" "$TEMP_JSON"
+sed -i "s#OS_PLACEHOLDER#$SED_ESCAPED_OS#g" "$TEMP_JSON"
+sed -i "s#SCORE_PLACEHOLDER#$SCORE#g" "$TEMP_JSON"
+sed -i "s#WARNINGS_PLACEHOLDER#$WARNINGS#g" "$TEMP_JSON"
+sed -i "s#SUGGESTIONS_PLACEHOLDER#$SUGGESTIONS#g" "$TEMP_JSON"
+sed -i "s#LYNIS_PLACEHOLDER#$SED_ESCAPED_LYNIS#g" "$TEMP_JSON"
+sed -i "s#AUDIT_PLACEHOLDER#$SED_ESCAPED_AUDIT#g" "$TEMP_JSON"
+sed -i "s#LOG_CONTENT_PLACEHOLDER#$SED_ESCAPED_LOG#g" "$TEMP_JSON"
+sed -i "s#REPORT_CONTENT_PLACEHOLDER#$SED_ESCAPED_REPORT#g" "$TEMP_JSON"
 
 # Replace agent-specific variables in JSON - also with escaping
 ESCAPED_TOKEN=$(json_escape "$AGENT_TOKEN")
@@ -490,9 +489,9 @@ SED_ESCAPED_TOKEN=$(sed_escape "$ESCAPED_TOKEN")
 SED_ESCAPED_MACHINE=$(sed_escape "$ESCAPED_MACHINE")
 SED_ESCAPED_OWNER=$(sed_escape "$ESCAPED_OWNER")
 
-sed -i "s|AGENT_TOKEN_PLACEHOLDER|$SED_ESCAPED_TOKEN|g" "$TEMP_JSON"
-sed -i "s|MACHINE_NAME_PLACEHOLDER|$SED_ESCAPED_MACHINE|g" "$TEMP_JSON"
-sed -i "s|OWNER_NAME_PLACEHOLDER|$SED_ESCAPED_OWNER|g" "$TEMP_JSON"
+sed -i "s#AGENT_TOKEN_PLACEHOLDER#$SED_ESCAPED_TOKEN#g" "$TEMP_JSON"
+sed -i "s#MACHINE_NAME_PLACEHOLDER#$SED_ESCAPED_MACHINE#g" "$TEMP_JSON"
+sed -i "s#OWNER_NAME_PLACEHOLDER#$SED_ESCAPED_OWNER#g" "$TEMP_JSON"
 
 # Send report to server
 echo "📤 Submitting audit report to server..."
@@ -524,9 +523,9 @@ cat > "$HEARTBEAT_FILE" << 'HEARTBEAT_JSON'
 }
 HEARTBEAT_JSON
 
-# Replace token with proper escaping for sed
-ESCAPED_HEARTBEAT_TOKEN=$(printf '%s' "$AGENT_TOKEN" | sed 's/[\/&]/\\&/g')
-sed -i "s|HEARTBEAT_TOKEN_PLACEHOLDER|$ESCAPED_HEARTBEAT_TOKEN|g" "$HEARTBEAT_FILE"
+# Replace token with proper escaping for sed (use # as delimiter)
+ESCAPED_HEARTBEAT_TOKEN=$(printf '%s' "$AGENT_TOKEN" | sed 's/[\\#]/\\&/g')
+sed -i "s#HEARTBEAT_TOKEN_PLACEHOLDER#$ESCAPED_HEARTBEAT_TOKEN#g" "$HEARTBEAT_FILE"
 
 # Send heartbeat
 curl -s -X POST "$SERVER_URL/api/v1/os-audit/agent/heartbeat" \
@@ -554,6 +553,12 @@ ESCAPED_TOKEN=$(echo "${machine.agentInstallationToken}" | sed 's/[\/&]/\\&/g')
 ESCAPED_MACHINE_ID=$(echo "${machine.machineId}" | sed 's/[\/&]/\\&/g')
 ESCAPED_MACHINE_NAME=$(echo "${machine.machineName}" | sed 's/[\/&]/\\&/g')
 ESCAPED_OWNER_NAME=$(echo "${machine.ownerName}" | sed 's/[\/&]/\\&/g')
+
+# Use printf to ensure proper escaping for sed
+ESCAPED_TOKEN=$(printf '%s' "${machine.agentInstallationToken}" | sed 's/[\/&]/\\&/g')
+ESCAPED_MACHINE_ID=$(printf '%s' "${machine.machineId}" | sed 's/[\/&]/\\&/g')
+ESCAPED_MACHINE_NAME=$(printf '%s' "${machine.machineName}" | sed 's/[\/&]/\\&/g')
+ESCAPED_OWNER_NAME=$(printf '%s' "${machine.ownerName}" | sed 's/[\/&]/\\&/g')
 
 sed -i "s|AGENT_TOKEN_PLACEHOLDER|$ESCAPED_TOKEN|g" "$AGENT_DIR/agent.sh"
 sed -i "s|MACHINE_ID_PLACEHOLDER|$ESCAPED_MACHINE_ID|g" "$AGENT_DIR/agent.sh"
