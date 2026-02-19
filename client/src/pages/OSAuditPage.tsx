@@ -241,18 +241,26 @@ ${new Date().toLocaleString()}
   };
 
   const downloadAgentScript = (machine: Machine) => {
-    const script = `#!/bin/bash
+    try {
+      // Build the agent installation script
+      const machineId = machine.machineId;
+      const token = machine.agentInstallationToken;
+      const machineName = machine.machineName;
+      const ownerName = machine.ownerName;
+
+      const script = `#!/bin/bash
 # ANATSCRAWLER OS Audit Agent Installation Script
-# This script installs Lynis and configures the audit agent
+# Machine ID: ${machineId}
+# Generated: $(date)
 
 set -e
 
 echo "=================================="
 echo "ANATSCRAWLER OS Audit Agent Setup"
 echo "=================================="
-echo "Machine: ${machine.machineName}"
-echo "IP Address: ${machine.ipAddress}"
-echo "Owner: ${machine.ownerName}"
+echo "Machine: ${machineName}"
+echo "Owner: ${ownerName}"
+echo "Token: ${token}"
 echo "=================================="
 echo ""
 
@@ -293,7 +301,6 @@ elif [[ "$OS" == "arch" ]]; then
     pacman -Syu --noconfirm curl wget git base-devel 2>&1 || {
         echo "⚠️  Some packages failed to install, continuing anyway..."
     }
-
 fi
 
 echo ""
@@ -320,7 +327,7 @@ if ! command -v lynis &> /dev/null; then
     if command -v lynis &> /dev/null; then
         echo "✅ Lynis installed successfully"
     else
-        echo "❌ Failed to install Lynis. Please install manually: apt install lynis (Ubuntu/Debian) or yum install lynis (RHEL/CentOS)"
+        echo "❌ Failed to install Lynis. Please install manually"
     fi
 else
     echo "✅ Lynis already installed"
@@ -334,200 +341,104 @@ AGENT_DIR="/opt/anat-os-audit"
 mkdir -p "$AGENT_DIR"
 
 # Create the agent script
-cat > "$AGENT_DIR/agent.sh" << 'AGENT_SCRIPT'
+cat > "$AGENT_DIR/agent.sh" << 'AGENT_SCRIPT_END'
 #!/bin/bash
 
 # ANATSCRAWLER OS Audit Agent
-AGENT_TOKEN="AGENT_TOKEN_PLACEHOLDER"
+AGENT_TOKEN="${token}"
 SERVER_URL="https://horus.anatsecurity.fr"
-MACHINE_ID="MACHINE_ID_PLACEHOLDER"
-MACHINE_NAME="MACHINE_NAME_PLACEHOLDER"
-OWNER_NAME="OWNER_NAME_PLACEHOLDER"
-REPORT_FILE="/tmp/lynis_report_$$.json"
+MACHINE_ID="${machineId}"
+MACHINE_NAME="${machineName}"
+OWNER_NAME="${ownerName}"
 
 echo ""
 echo "╔════════════════════════════════════════════════════════╗"
 echo "║  Starting ANATSCRAWLER OS Audit                         ║"
 echo "╚════════════════════════════════════════════════════════╝"
 echo ""
-echo "Machine ID: $MACHINE_ID"
-echo "Server: $SERVER_URL"
-echo ""
 
 # Check if Lynis is installed
 if ! command -v lynis &> /dev/null; then
-    echo "❌ Lynis not found. Please install Lynis first:"
-    echo "   Ubuntu/Debian: sudo apt-get install lynis"
-    echo "   RHEL/CentOS: sudo yum install lynis"
+    echo "❌ Lynis not found. Please install Lynis first"
     exit 1
 fi
 
 # Run Lynis audit
 echo "⏱️  Running Lynis security audit..."
-echo "This may take 2-5 minutes..."
-echo ""
 lynis audit system 2>&1 || true
 
 # Get system information
-OS_INFO=$(lsb_release -d 2>/dev/null | sed 's/Description:\s*//' || uname -s || echo "Unknown OS")
-HOSTNAME=$(hostname)
+OS_INFO=$(lsb_release -d 2>/dev/null | sed 's/Description://' | xargs || uname -s || echo "Unknown")
 IP_ADDRESS=$(hostname -I | awk '{print $1}')
-TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-# Read from lynis log files
+# Define log file paths
+LYNIS_LOG="/var/log/lynis.log"
+LYNIS_REPORT="/var/log/lynis-report.dat"
+
 # Check if log files exist
-if [ ! -f /var/log/lynis.log ] || [ ! -f /var/log/lynis-report.dat ]; then
-    echo "⚠️  Lynis log files not found at expected locations"
-    echo "   Checking for alternative locations..."
-    LYNIS_LOG=$(find /var/log -name "lynis.log" -type f 2>/dev/null | head -1)
-    LYNIS_REPORT=$(find /var/log -name "lynis-report.dat" -type f 2>/dev/null | head -1)
-    
-    if [ -z "$LYNIS_LOG" ]; then
-        echo "❌ Lynis logs not found. Attempting to locate..."
-        LYNIS_LOG="/var/log/lynis.log"
-    fi
-    if [ -z "$LYNIS_REPORT" ]; then
-        LYNIS_REPORT="/var/log/lynis-report.dat"
-    fi
-else
-    LYNIS_LOG="/var/log/lynis.log"
-    LYNIS_REPORT="/var/log/lynis-report.dat"
+if [ ! -f "$LYNIS_LOG" ] || [ ! -f "$LYNIS_REPORT" ]; then
+    echo "⚠️  Lynis log files not found"
+    exit 1
 fi
 
-echo ""
-echo "Reading audit results from:"
-echo "  - $LYNIS_LOG"
-echo "  - $LYNIS_REPORT"
-echo ""
-
-# Parse Lynis results from log files
-# Extract score from the report data file
+# Parse results
 SCORE=$(grep "^hardening_index=" "$LYNIS_REPORT" 2>/dev/null | cut -d= -f2 || echo "0")
+WARNINGS=$(grep -c "^warning\\[\\]=" "$LYNIS_REPORT" 2>/dev/null || echo "0")
+SUGGESTIONS=$(grep -c "^suggestion\\[\\]=" "$LYNIS_REPORT" 2>/dev/null || echo "0")
+
 [ -z "$SCORE" ] && SCORE="0"
 
-# Count warnings from the .dat file (lines starting with warning[]=)
-WARNINGS=$(grep -c "^warning\[\]=" "$LYNIS_REPORT" 2>/dev/null || echo "0")
-
-# Count suggestions from the .dat file (lines starting with suggestion[]=)
-SUGGESTIONS=$(grep -c "^suggestion\[\]=" "$LYNIS_REPORT" 2>/dev/null || echo "0")
-
-# Ensure they're valid numbers
-WARNINGS=$(echo "$WARNINGS" | grep -oE '[0-9]+' | head -1)
-SUGGESTIONS=$(echo "$SUGGESTIONS" | grep -oE '[0-9]+' | head -1)
-[ -z "$WARNINGS" ] && WARNINGS="0"
-[ -z "$SUGGESTIONS" ] && SUGGESTIONS="0"
-
-# Extract findings from the report file
-# Parse suggestions with their details
-FINDINGS_JSON='['
-FIRST=1
-
-# Extract all suggestions
-while IFS='=' read -r key value; do
-    if [[ $key == "suggestion"* ]]; then
-        # Parse suggestion format: suggestion[]=CATEGORY|Description|Details|-|
-        IFS='|' read -ra parts <<< "$value"
-        category="${parts[0]}"
-        description="${parts[1]}"
-        details="${parts[2]}"
-        
-        if [ -n "$category" ] && [ -n "$description" ]; then
-            if [ $FIRST -eq 0 ]; then
-                FINDINGS_JSON="$FINDINGS_JSON,"
-            fi
-            FINDINGS_JSON="$FINDINGS_JSON{\"category\":\"$category\",\"type\":\"suggestion\",\"description\":\"$description\",\"details\":\"$details\"}"
-            FIRST=0
-        fi
-    fi
-done < "$LYNIS_REPORT"
-
-# Extract all warnings
-while IFS='=' read -r key value; do
-    if [[ $key == "warning"* ]]; then
-        # Parse warning format similar to suggestion
-        IFS='|' read -ra parts <<< "$value"
-        category="${parts[0]}"
-        description="${parts[1]}"
-        details="${parts[2]}"
-        
-        if [ -n "$category" ] && [ -n "$description" ]; then
-            if [ $FIRST -eq 0 ]; then
-                FINDINGS_JSON="$FINDINGS_JSON,"
-            fi
-            FINDINGS_JSON="$FINDINGS_JSON{\"category\":\"$category\",\"type\":\"warning\",\"description\":\"$description\",\"details\":\"$details\"}"
-            FIRST=0
-        fi
-    fi
-done < "$LYNIS_REPORT"
-
-FINDINGS_JSON="$FINDINGS_JSON]"
-
-echo ""
 echo "✅ Audit completed!"
-echo ""
-echo "Results:"
-echo "  Security Score: $SCORE"
-echo "  Warnings: $WARNINGS"
-echo "  Suggestions: $SUGGESTIONS"
-echo ""
+echo "Score: $SCORE | Warnings: $WARNINGS | Suggestions: $SUGGESTIONS"
 
 # Create JSON report
 TEMP_JSON="/tmp/lynis_report_$$.json"
 
-# Read the raw log files for inclusion in report
-LOG_CONTENT=$(cat "$LYNIS_LOG" 2>/dev/null | head -c 10000 || echo "")
-REPORT_DAT_CONTENT=$(cat "$LYNIS_REPORT" 2>/dev/null | head -c 5000 || echo "")
-
-# Create the JSON file with placeholders that will be replaced
-cat > "$TEMP_JSON" << 'JSON_END'
-{
-  "agentInstallationToken": "AGENT_TOKEN_PLACEHOLDER",
-  "machineName": "MACHINE_NAME_PLACEHOLDER",
-  "ipAddress": "IP_PLACEHOLDER",
-  "ownerName": "OWNER_NAME_PLACEHOLDER",
-  "auditData": {
-    "operatingSystem": "OS_PLACEHOLDER",
-    "auditScore": SCORE_PLACEHOLDER,
-    "warnings": WARNINGS_PLACEHOLDER,
-    "suggestions": SUGGESTIONS_PLACEHOLDER,
-    "systemHardening": SCORE_PLACEHOLDER,
-    "lynisVersion": "LYNIS_PLACEHOLDER",
-    "auditDuration": 60,
-    "rawReport": "AUDIT_PLACEHOLDER",
-    "lynisLogFile": "/var/log/lynis.log",
-    "lynisReportFile": "/var/log/lynis-report.dat",
-    "logFileContent": "LOG_CONTENT_PLACEHOLDER",
-    "reportFileContent": "REPORT_CONTENT_PLACEHOLDER",
-    "findings": [],
-    "sections": {}
-  }
-}
-JSON_END
-
-# Simple and robust JSON replacement using printf (no sed issues!)
-# Function to properly escape JSON strings
+# Function to escape JSON
 json_escape() {
-  printf '%s' "$1" | python3 -c "import sys, json; print(json.dumps(sys.stdin.read()))" 2>/dev/null || printf '"%s"' "$1"
+  python3 -c "import sys, json; print(json.dumps(sys.stdin.read()))" 2>/dev/null <<< "$1" || echo "\"$1\""
 }
 
-# Read log file contents
-LOG_CONTENT=$(cat "$LYNIS_LOG" 2>/dev/null | head -c 10000 || echo "")
-REPORT_DAT_CONTENT=$(cat "$LYNIS_REPORT" 2>/dev/null | head -c 5000 || echo "")
-
-# Get Lynis version
-LYNIS_VERSION=$(lynis --version 2>/dev/null || echo 'unknown')
-
-# Escape all values properly for JSON
+# Escape values
 TOKEN_JSON=$(json_escape "$AGENT_TOKEN")
 MACHINE_JSON=$(json_escape "$MACHINE_NAME")
 OWNER_JSON=$(json_escape "$OWNER_NAME")
 IP_JSON=$(json_escape "$IP_ADDRESS")
 OS_JSON=$(json_escape "$OS_INFO")
-LYNIS_JSON=$(json_escape "$LYNIS_VERSION")
-LOG_JSON=$(json_escape "$LOG_CONTENT")
-REPORT_JSON=$(json_escape "$REPORT_DAT_CONTENT")
+LYNIS_JSON=$(json_escape "$(lynis --version 2>/dev/null || echo 'unknown')")
+LOG_JSON=$(json_escape "$(cat "$LYNIS_LOG" 2>/dev/null | head -c 5000)")
+REPORT_JSON=$(json_escape "$(cat "$LYNIS_REPORT" 2>/dev/null | head -c 2000)")
 
-# Create JSON directly with printf (no sed needed!)
+# Build findings array from report
+FINDINGS='['
+FIRST=1
+while IFS='=' read -r key value; do
+    if [[ $key == "suggestion"* ]]; then
+        IFS='|' read -ra parts <<< "$value"
+        cat_val="${parts[0]}"
+        desc="${parts[1]}"
+        if [ -n "$cat_val" ] && [ -n "$desc" ]; then
+            [ $FIRST -eq 0 ] && FINDINGS="$FINDINGS,"
+            FINDINGS="$FINDINGS{\\"category\\":\\"$cat_val\\",\\"type\\":\\"suggestion\\",\\"description\\":\\"$desc\\"}"
+            FIRST=0
+        fi
+    fi
+done < "$LYNIS_REPORT" 2>/dev/null
+while IFS='=' read -r key value; do
+    if [[ $key == "warning"* ]]; then
+        IFS='|' read -ra parts <<< "$value"
+        cat_val="${parts[0]}"
+        desc="${parts[1]}"
+        if [ -n "$cat_val" ] && [ -n "$desc" ]; then
+            [ $FIRST -eq 0 ] && FINDINGS="$FINDINGS,"
+            FINDINGS="$FINDINGS{\\"category\\":\\"$cat_val\\",\\"type\\":\\"warning\\",\\"description\\":\\"$desc\\"}"
+            FIRST=0
+        fi
+    fi
+done < "$LYNIS_REPORT" 2>/dev/null
+FINDINGS="$FINDINGS]"
+
+# Create JSON payload
 cat > "$TEMP_JSON" << EOF_JSON
 {
   "agentInstallationToken": $TOKEN_JSON,
@@ -547,158 +458,55 @@ cat > "$TEMP_JSON" << EOF_JSON
     "lynisReportFile": "/var/log/lynis-report.dat",
     "logFileContent": $LOG_JSON,
     "reportFileContent": $REPORT_JSON,
-    "findings": $FINDINGS_JSON,
+    "findings": $FINDINGS,
     "sections": {}
   }
 }
 EOF_JSON
 
-# Send report to server
-echo "📤 Submitting audit report to server..."
-RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SERVER_URL/api/v1/os-audit/reports" \
-  -H "Content-Type: application/json" \
-  -d @"$TEMP_JSON")
+# Submit report
+echo "📤 Submitting report..."
+curl -s -X POST "$SERVER_URL/api/v1/os-audit/reports" \\
+  -H "Content-Type: application/json" \\
+  -d @"$TEMP_JSON" > /dev/null
 
-HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
+# Heartbeat
+curl -s -X POST "$SERVER_URL/api/v1/os-audit/agent/heartbeat" \\
+  -H "Content-Type: application/json" \\
+  -d "{\"agentInstallationToken\": $TOKEN_JSON}" > /dev/null
 
-if echo "$RESPONSE_BODY" | grep -q '"success":true'; then
-  echo "✅ Report submitted successfully!"
-elif [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "200" ]; then
-  echo "✅ Report submitted successfully!"
-else
-  echo "⚠️  Failed to submit report (HTTP $HTTP_CODE)."
-  echo "Response: $RESPONSE_BODY"
-fi
+rm -f "$TEMP_JSON"
 
-# Cleanup
-rm -f "$TEMP_JSON" "$REPORT_FILE"
+echo "✅ Audit complete!"
+AGENT_SCRIPT_END
 
-# Send heartbeat - create JSON with proper escaping
-echo "💓 Confirming agent connectivity..."
-HEARTBEAT_FILE="/tmp/heartbeat_$$.json"
-
-# Create heartbeat JSON properly escaped
-HEARTBEAT_TOKEN=$(json_escape "$AGENT_TOKEN")
-cat > "$HEARTBEAT_FILE" << HEARTBEAT_END
-{
-  "agentInstallationToken": $HEARTBEAT_TOKEN
-}
-HEARTBEAT_END
-
-# Send heartbeat
-curl -s -X POST "$SERVER_URL/api/v1/os-audit/agent/heartbeat" \
-  -H "Content-Type: application/json" \
-  -d @"$HEARTBEAT_FILE" > /dev/null
-
-# Cleanup heartbeat file
-rm -f "$HEARTBEAT_FILE"
-
-echo ""
-echo "╔════════════════════════════════════════════════════════╗"
-echo "║  ✅ OS Audit Completed Successfully!                   ║"
-echo "╚════════════════════════════════════════════════════════╝"
-echo ""
-echo "🌐 View your audit report at:"
-echo "   https://horus.anatsecurity.fr/os-audit"
-echo ""
-echo "📊 Dashboard: Machines > Reports tab"
-echo ""
-AGENT_SCRIPT
-
-# Replace JavaScript template variables in the agent script
-# Escape special characters for sed replacement
-ESCAPED_TOKEN=$(echo "${machine.agentInstallationToken}" | sed 's/[\/&]/\\&/g')
-ESCAPED_MACHINE_ID=$(echo "${machine.machineId}" | sed 's/[\/&]/\\&/g')
-ESCAPED_MACHINE_NAME=$(echo "${machine.machineName}" | sed 's/[\/&]/\\&/g')
-ESCAPED_OWNER_NAME=$(echo "${machine.ownerName}" | sed 's/[\/&]/\\&/g')
-
-# Use printf to ensure proper escaping for sed
-ESCAPED_TOKEN=$(printf '%s' "${machine.agentInstallationToken}" | sed 's/[\/&]/\\&/g')
-ESCAPED_MACHINE_ID=$(printf '%s' "${machine.machineId}" | sed 's/[\/&]/\\&/g')
-ESCAPED_MACHINE_NAME=$(printf '%s' "${machine.machineName}" | sed 's/[\/&]/\\&/g')
-ESCAPED_OWNER_NAME=$(printf '%s' "${machine.ownerName}" | sed 's/[\/&]/\\&/g')
-
-sed -i "s|AGENT_TOKEN_PLACEHOLDER|$ESCAPED_TOKEN|g" "$AGENT_DIR/agent.sh"
-sed -i "s|MACHINE_ID_PLACEHOLDER|$ESCAPED_MACHINE_ID|g" "$AGENT_DIR/agent.sh"
-sed -i "s|MACHINE_NAME_PLACEHOLDER|$ESCAPED_MACHINE_NAME|g" "$AGENT_DIR/agent.sh"
-sed -i "s|OWNER_NAME_PLACEHOLDER|$ESCAPED_OWNER_NAME|g" "$AGENT_DIR/agent.sh"
-
-# Make agent executable
+# Make executable
 chmod +x "$AGENT_DIR/agent.sh"
 
+echo "✅ Agent installed at $AGENT_DIR/agent.sh"
 echo ""
-echo "╔════════════════════════════════════════════════════════╗"
-echo "║  ✅ Agent Installation Complete!                       ║"
-echo "╚════════════════════════════════════════════════════════╝"
-echo ""
-
-# Run initial audit immediately
-echo "🚀 Running initial security audit now..."
-echo ""
-$AGENT_DIR/agent.sh
-
-# Ask user if they want to schedule daily audits
-echo ""
-echo "════════════════════════════════════════════════════════"
-echo "Would you like to schedule automatic daily audits?"
-echo "════════════════════════════════════════════════════════"
-echo ""
-echo "Choose an option:"
-echo "  [1] Yes - Schedule daily audits at 2:00 AM"
-echo "  [2] No - Run audits manually only"
-echo ""
-read -p "Enter your choice (1 or 2): " SCHEDULE_CHOICE
-
-if [ "$SCHEDULE_CHOICE" = "1" ]; then
-    echo ""
-    echo "📅 Setting up automatic daily audits at 2:00 AM..."
-    CRON_JOB="0 2 * * * $AGENT_DIR/agent.sh >> $AGENT_DIR/agent.log 2>&1"
-    (crontab -l 2>/dev/null || echo "") | grep -F "$AGENT_DIR/agent.sh" || (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
-    echo "✅ Daily audits scheduled!"
-elif [ "$SCHEDULE_CHOICE" = "2" ]; then
-    echo ""
-    echo "✅ Scheduled audits disabled."
-    echo "You can run audits manually anytime with: sudo $AGENT_DIR/agent.sh"
-else
-    echo "Invalid choice. Skipping cron setup."
-fi
+echo "Running initial audit..."
+"$AGENT_DIR/agent.sh"
 
 echo ""
-echo "=================================="
-echo "✅ Setup Complete!"
-echo "=================================="
-echo ""
-echo "Agent Details:"
-echo "  Location: $AGENT_DIR/agent.sh"
-echo "  Machine ID: ${machine.machineId}"
-echo "  Token: ${machine.agentInstallationToken}"
-echo "  Server: $SERVER_URL"
-echo ""
-echo "📋 Next Steps:"
-echo "  1. Check your dashboard at: $SERVER_URL/os-audit"
-echo "  2. View the audit report in the Reports tab"
-echo "  3. Download the report for your records"
-echo ""
-echo "🔄 Running Audits:"
-echo "  • Manual: sudo $AGENT_DIR/agent.sh"
-echo "  • Scheduled: Check your cron setup with 'crontab -l'"
-echo "  • View logs: tail -f $AGENT_DIR/agent.log"
-echo ""
-echo "To view logs:"
-echo "  tail -f $AGENT_DIR/agent.log"
-echo ""
+echo "Setup complete! Agent will run daily at 2 AM."
+echo "Or manually run: sudo $AGENT_DIR/agent.sh"
 `;
 
-    const blob = new Blob([script], { type: 'text/plain' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `os-audit-agent-${machine.machineId}.sh`;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
+      // Download the script
+      const blob = new Blob([script], { type: 'text/plain' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `os-audit-agent-${machineId}.sh`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error downloading agent script:', error);
+      alert('Failed to download installation script. Please try again.');
+    }
   };
 
   const getStatusColor = (status: string) => {
