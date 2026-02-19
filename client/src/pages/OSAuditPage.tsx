@@ -443,55 +443,54 @@ cat > "$TEMP_JSON" << 'JSON_END'
 }
 JSON_END
 
-# Function to escape strings for JSON
+# Simple and robust JSON replacement using printf (no sed issues!)
+# Function to properly escape JSON strings
 json_escape() {
-  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/$'\''\t'\''/\\t/g; s/$//' | tr '\n' ' '
+  printf '%s' "$1" | python3 -c "import sys, json; print(json.dumps(sys.stdin.read()))" 2>/dev/null || printf '"%s"' "$1"
 }
 
-# Function to escape for sed replacement - use # as delimiter instead of |
-sed_escape() {
-  printf '%s' "$1" | sed 's/[\\#]/\\&/g'
+# Read log file contents
+LOG_CONTENT=$(cat "$LYNIS_LOG" 2>/dev/null | head -c 10000 || echo "")
+REPORT_DAT_CONTENT=$(cat "$LYNIS_REPORT" 2>/dev/null | head -c 5000 || echo "")
+
+# Get Lynis version
+LYNIS_VERSION=$(lynis --version 2>/dev/null || echo 'unknown')
+
+# Escape all values properly for JSON
+TOKEN_JSON=$(json_escape "$AGENT_TOKEN")
+MACHINE_JSON=$(json_escape "$MACHINE_NAME")
+OWNER_JSON=$(json_escape "$OWNER_NAME")
+IP_JSON=$(json_escape "$IP_ADDRESS")
+OS_JSON=$(json_escape "$OS_INFO")
+LYNIS_JSON=$(json_escape "$LYNIS_VERSION")
+LOG_JSON=$(json_escape "$LOG_CONTENT")
+REPORT_JSON=$(json_escape "$REPORT_DAT_CONTENT")
+
+# Create JSON directly with printf (no sed needed!)
+cat > "$TEMP_JSON" << EOF_JSON
+{
+  "agentInstallationToken": $TOKEN_JSON,
+  "machineName": $MACHINE_JSON,
+  "ipAddress": $IP_JSON,
+  "ownerName": $OWNER_JSON,
+  "auditData": {
+    "operatingSystem": $OS_JSON,
+    "auditScore": $SCORE,
+    "warnings": $WARNINGS,
+    "suggestions": $SUGGESTIONS,
+    "systemHardening": $SCORE,
+    "lynisVersion": $LYNIS_JSON,
+    "auditDuration": 60,
+    "rawReport": $LOG_JSON,
+    "lynisLogFile": "/var/log/lynis.log",
+    "lynisReportFile": "/var/log/lynis-report.dat",
+    "logFileContent": $LOG_JSON,
+    "reportFileContent": $REPORT_JSON,
+    "findings": [],
+    "sections": {}
+  }
 }
-
-# Escape each value for JSON
-ESCAPED_IP=$(json_escape "$IP_ADDRESS")
-ESCAPED_OS=$(json_escape "$OS_INFO")
-ESCAPED_LYNIS=$(json_escape "$(lynis --version 2>/dev/null || echo 'unknown')")
-ESCAPED_AUDIT=$(json_escape "$(cat "$LYNIS_LOG" 2>/dev/null | head -c 5000)")
-ESCAPED_LOG_CONTENT=$(json_escape "$LOG_CONTENT")
-ESCAPED_REPORT_CONTENT=$(json_escape "$REPORT_DAT_CONTENT")
-
-# Also escape for sed with # delimiter
-SED_ESCAPED_IP=$(sed_escape "$ESCAPED_IP")
-SED_ESCAPED_OS=$(sed_escape "$ESCAPED_OS")
-SED_ESCAPED_LYNIS=$(sed_escape "$ESCAPED_LYNIS")
-SED_ESCAPED_AUDIT=$(sed_escape "$ESCAPED_AUDIT")
-SED_ESCAPED_LOG=$(sed_escape "$ESCAPED_LOG_CONTENT")
-SED_ESCAPED_REPORT=$(sed_escape "$ESCAPED_REPORT_CONTENT")
-
-# Replace runtime variables in JSON using # as delimiter
-sed -i "s#IP_PLACEHOLDER#$SED_ESCAPED_IP#g" "$TEMP_JSON"
-sed -i "s#OS_PLACEHOLDER#$SED_ESCAPED_OS#g" "$TEMP_JSON"
-sed -i "s#SCORE_PLACEHOLDER#$SCORE#g" "$TEMP_JSON"
-sed -i "s#WARNINGS_PLACEHOLDER#$WARNINGS#g" "$TEMP_JSON"
-sed -i "s#SUGGESTIONS_PLACEHOLDER#$SUGGESTIONS#g" "$TEMP_JSON"
-sed -i "s#LYNIS_PLACEHOLDER#$SED_ESCAPED_LYNIS#g" "$TEMP_JSON"
-sed -i "s#AUDIT_PLACEHOLDER#$SED_ESCAPED_AUDIT#g" "$TEMP_JSON"
-sed -i "s#LOG_CONTENT_PLACEHOLDER#$SED_ESCAPED_LOG#g" "$TEMP_JSON"
-sed -i "s#REPORT_CONTENT_PLACEHOLDER#$SED_ESCAPED_REPORT#g" "$TEMP_JSON"
-
-# Replace agent-specific variables in JSON - also with escaping
-ESCAPED_TOKEN=$(json_escape "$AGENT_TOKEN")
-ESCAPED_MACHINE=$(json_escape "$MACHINE_NAME")
-ESCAPED_OWNER=$(json_escape "$OWNER_NAME")
-
-SED_ESCAPED_TOKEN=$(sed_escape "$ESCAPED_TOKEN")
-SED_ESCAPED_MACHINE=$(sed_escape "$ESCAPED_MACHINE")
-SED_ESCAPED_OWNER=$(sed_escape "$ESCAPED_OWNER")
-
-sed -i "s#AGENT_TOKEN_PLACEHOLDER#$SED_ESCAPED_TOKEN#g" "$TEMP_JSON"
-sed -i "s#MACHINE_NAME_PLACEHOLDER#$SED_ESCAPED_MACHINE#g" "$TEMP_JSON"
-sed -i "s#OWNER_NAME_PLACEHOLDER#$SED_ESCAPED_OWNER#g" "$TEMP_JSON"
+EOF_JSON
 
 # Send report to server
 echo "📤 Submitting audit report to server..."
@@ -514,18 +513,17 @@ fi
 # Cleanup
 rm -f "$TEMP_JSON" "$REPORT_FILE"
 
-# Send heartbeat - create a proper JSON file
+# Send heartbeat - create JSON with proper escaping
 echo "💓 Confirming agent connectivity..."
 HEARTBEAT_FILE="/tmp/heartbeat_$$.json"
-cat > "$HEARTBEAT_FILE" << 'HEARTBEAT_JSON'
-{
-  "agentInstallationToken": "HEARTBEAT_TOKEN_PLACEHOLDER"
-}
-HEARTBEAT_JSON
 
-# Replace token with proper escaping for sed (use # as delimiter)
-ESCAPED_HEARTBEAT_TOKEN=$(printf '%s' "$AGENT_TOKEN" | sed 's/[\\#]/\\&/g')
-sed -i "s#HEARTBEAT_TOKEN_PLACEHOLDER#$ESCAPED_HEARTBEAT_TOKEN#g" "$HEARTBEAT_FILE"
+# Create heartbeat JSON properly escaped
+HEARTBEAT_TOKEN=$(json_escape "$AGENT_TOKEN")
+cat > "$HEARTBEAT_FILE" << HEARTBEAT_END
+{
+  "agentInstallationToken": $HEARTBEAT_TOKEN
+}
+HEARTBEAT_END
 
 # Send heartbeat
 curl -s -X POST "$SERVER_URL/api/v1/os-audit/agent/heartbeat" \
