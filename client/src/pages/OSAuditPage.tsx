@@ -242,11 +242,15 @@ ${new Date().toLocaleString()}
 
   const downloadAgentScript = (machine: Machine) => {
     try {
+      console.log('downloadAgentScript called with machine:', machine);
+      
       // Build the agent installation script
       const machineId = machine.machineId;
       const token = machine.agentInstallationToken;
       const machineName = machine.machineName;
       const ownerName = machine.ownerName;
+      
+      console.log('Machine data extracted:', { machineId, token, machineName, ownerName });
 
       const script = `#!/bin/bash
 # ANATSCRAWLER OS Audit Agent Installation Script
@@ -415,8 +419,8 @@ FIRST=1
 while IFS='=' read -r key value; do
     if [[ $key == "suggestion"* ]]; then
         IFS='|' read -ra parts <<< "$value"
-        cat_val="${parts[0]}"
-        desc="${parts[1]}"
+        cat_val="\${parts[0]}"
+        desc="\${parts[1]}"
         if [ -n "$cat_val" ] && [ -n "$desc" ]; then
             [ $FIRST -eq 0 ] && FINDINGS="$FINDINGS,"
             FINDINGS="$FINDINGS{\\"category\\":\\"$cat_val\\",\\"type\\":\\"suggestion\\",\\"description\\":\\"$desc\\"}"
@@ -427,8 +431,8 @@ done < "$LYNIS_REPORT" 2>/dev/null
 while IFS='=' read -r key value; do
     if [[ $key == "warning"* ]]; then
         IFS='|' read -ra parts <<< "$value"
-        cat_val="${parts[0]}"
-        desc="${parts[1]}"
+        cat_val="\${parts[0]}"
+        desc="\${parts[1]}"
         if [ -n "$cat_val" ] && [ -n "$desc" ]; then
             [ $FIRST -eq 0 ] && FINDINGS="$FINDINGS,"
             FINDINGS="$FINDINGS{\\"category\\":\\"$cat_val\\",\\"type\\":\\"warning\\",\\"description\\":\\"$desc\\"}"
@@ -494,17 +498,30 @@ echo "Or manually run: sudo $AGENT_DIR/agent.sh"
 `;
 
       // Download the script
+      console.log('Creating blob from script, length:', script.length);
       const blob = new Blob([script], { type: 'text/plain' });
+      console.log('Blob created:', blob);
+      
       const url = window.URL.createObjectURL(blob);
+      console.log('Object URL created:', url);
+      
       const a = document.createElement('a');
       a.href = url;
       a.download = `os-audit-agent-${machineId}.sh`;
+      console.log('Download link prepared:', a.download);
+      
       document.body.appendChild(a);
+      console.log('Link appended to body, clicking...');
+      
       a.click();
+      console.log('Link clicked');
+      
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+      console.log('Cleanup complete');
     } catch (error) {
       console.error('Error downloading agent script:', error);
+      console.error('Error stack:', (error as Error).stack);
       alert('Failed to download installation script. Please try again.');
     }
   };
