@@ -470,14 +470,19 @@ EOF_JSON
 
 # Submit report
 echo "📤 Submitting report..."
+echo "DEBUG: report JSON file content: $TEMP_JSON"
+cat "$TEMP_JSON" 2>/dev/null || true
 curl -s -X POST "$SERVER_URL/api/v1/os-audit/reports" \\
   -H "Content-Type: application/json" \\
   -d @"$TEMP_JSON" > /dev/null
 
 # Heartbeat
+HEARTBEAT_FILE="/tmp/heartbeat_$$.json"
+printf '{"agentInstallationToken": %s}\n' "$TOKEN_JSON" > "$HEARTBEAT_FILE"
 curl -s -X POST "$SERVER_URL/api/v1/os-audit/agent/heartbeat" \\
   -H "Content-Type: application/json" \\
-  -d "{\"agentInstallationToken\": $TOKEN_JSON}" > /dev/null
+  -d @"$HEARTBEAT_FILE" > /dev/null
+rm -f "$HEARTBEAT_FILE"
 
 rm -f "$TEMP_JSON"
 
