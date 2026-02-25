@@ -597,4 +597,80 @@ router.get('/stats', authenticate, async (req: AuthenticatedRequest, res: Respon
   }
 });
 
+/**
+ * @route GET /api/v1/os-audit/reports/:reportId/lynis-log
+ * @desc Download the lynis.log file for a report
+ * @access Private - Requires authentication
+ */
+router.get('/reports/:reportId/lynis-log', authenticate, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { reportId } = req.params;
+    const userId = req.user?._id || req.user?.id;
+
+    // Find the report
+    const report = await OSAuditReport.findOne({
+      reportId,
+      owner: userId
+    });
+
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        error: 'Report not found'
+      });
+    }
+
+    // Return the log file content
+    const fileName = `${report.machineName}_lynis_${report.auditDate.toISOString().split('T')[0]}.log`;
+    
+    res.setHeader('Content-Type', 'text/plain');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.send(report.logFileContent || '');
+  } catch (error: any) {
+    console.error('Error downloading lynis log:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to download log file'
+    });
+  }
+});
+
+/**
+ * @route GET /api/v1/os-audit/reports/:reportId/lynis-report
+ * @desc Download the lynis-report.dat file for a report
+ * @access Private - Requires authentication
+ */
+router.get('/reports/:reportId/lynis-report', authenticate, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { reportId } = req.params;
+    const userId = req.user?._id || req.user?.id;
+
+    // Find the report
+    const report = await OSAuditReport.findOne({
+      reportId,
+      owner: userId
+    });
+
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        error: 'Report not found'
+      });
+    }
+
+    // Return the report data file
+    const fileName = `${report.machineName}_lynis_report_${report.auditDate.toISOString().split('T')[0]}.dat`;
+    
+    res.setHeader('Content-Type', 'text/plain');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.send(report.reportFileContent || '');
+  } catch (error: any) {
+    console.error('Error downloading lynis report:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to download report file'
+    });
+  }
+});
+
 export default router;

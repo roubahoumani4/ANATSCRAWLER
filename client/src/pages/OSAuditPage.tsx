@@ -17,7 +17,8 @@ import {
   Server,
   Zap,
   XCircle,
-  Code
+  Code,
+  FileText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -240,6 +241,68 @@ ${new Date().toLocaleString()}
     }
   };
 
+  const downloadLynisLog = async (report: AuditReport) => {
+    try {
+      const response = await fetch(
+        `/api/v1/os-audit/reports/${report.reportId}/lynis-log`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to download: ${response.statusText}`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${report.machineName}_lynis_${new Date(report.auditDate).toISOString().split('T')[0]}.log`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error downloading Lynis log:', error);
+      alert('Failed to download Lynis log file');
+    }
+  };
+
+  const downloadLynisReport = async (report: AuditReport) => {
+    try {
+      const response = await fetch(
+        `/api/v1/os-audit/reports/${report.reportId}/lynis-report`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to download: ${response.statusText}`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${report.machineName}_lynis_report_${new Date(report.auditDate).toISOString().split('T')[0]}.dat`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error downloading Lynis report:', error);
+      alert('Failed to download Lynis report file');
+    }
+  };
+
   const downloadAgentScript = (machine: Machine) => {
     try {
       console.log('downloadAgentScript called with machine:', machine);
@@ -410,8 +473,8 @@ OWNER_JSON=$(json_escape "$OWNER_NAME")
 IP_JSON=$(json_escape "$IP_ADDRESS")
 OS_JSON=$(json_escape "$OS_INFO")
 LYNIS_JSON=$(json_escape "$(lynis --version 2>/dev/null || echo 'unknown')")
-LOG_JSON=$(json_escape "$(cat "$LYNIS_LOG" 2>/dev/null | head -c 5000)")
-REPORT_JSON=$(json_escape "$(cat "$LYNIS_REPORT" 2>/dev/null | head -c 2000)")
+LOG_JSON=$(json_escape "$(cat "$LYNIS_LOG" 2>/dev/null)")
+REPORT_JSON=$(json_escape "$(cat "$LYNIS_REPORT" 2>/dev/null)")
 
 # Build findings array from report
 FINDINGS='['
@@ -838,9 +901,27 @@ echo "Or manually run: sudo $AGENT_DIR/agent.sh"
                             variant="outline"
                             onClick={() => downloadReport(report)}
                             className="border-green-500/20 text-green-400 hover:bg-green-500/10"
-                            title="Download Report"
+                            title="Download Report Summary"
                           >
                             <Download className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => downloadLynisLog(report)}
+                            className="border-blue-500/20 text-blue-400 hover:bg-blue-500/10"
+                            title="Download lynis.log"
+                          >
+                            <FileText className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => downloadLynisReport(report)}
+                            className="border-purple-500/20 text-purple-400 hover:bg-purple-500/10"
+                            title="Download lynis-report.dat"
+                          >
+                            <FileText className="w-4 h-4" />
                           </Button>
                           <Button
                             size="sm"
