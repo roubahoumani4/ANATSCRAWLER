@@ -533,11 +533,25 @@ EOF_JSON
 
 # Submit report
 echo "📤 Submitting report..."
-echo "DEBUG: report JSON file content: $TEMP_JSON"
-cat "$TEMP_JSON" 2>/dev/null || true
-curl -s -X POST "$SERVER_URL/api/v1/os-audit/reports" \\
-  -H "Content-Type: application/json" \\
-  -d @"$TEMP_JSON" > /dev/null
+echo "DEBUG: JSON file size: $(du -h "$TEMP_JSON" 2>/dev/null | cut -f1)"
+echo "DEBUG: logFileContent size: $(echo "$LOG_JSON" | wc -c) chars"
+echo "DEBUG: reportFileContent size: $(echo "$REPORT_JSON" | wc -c) chars"
+
+HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SERVER_URL/api/v1/os-audit/reports" \
+  -H "Content-Type: application/json" \
+  --max-time 60 \
+  -d @"$TEMP_JSON")
+
+HTTP_CODE=$(echo "$HTTP_RESPONSE" | tail -1)
+BODY=$(echo "$HTTP_RESPONSE" | sed '$d')
+
+echo "DEBUG: HTTP Response Code: $HTTP_CODE"
+if [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "200" ]; then
+    echo "✅ Report submitted successfully!"
+else
+    echo "❌ Failed to submit report (HTTP $HTTP_CODE)"
+    echo "Response: $BODY"
+fi
 
 # Heartbeat
 HEARTBEAT_FILE="/tmp/heartbeat_$$.json"
