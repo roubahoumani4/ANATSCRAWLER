@@ -253,13 +253,23 @@ router.post('/reports', async (req: AuthenticatedRequest, res: Response) => {
     // Log incoming token for debugging
     console.log('🔍 Audit report submission:');
     console.log('  Token received:', agentInstallationToken);
+    console.log('  Token type:', typeof agentInstallationToken);
+    console.log('  Token length:', agentInstallationToken.length);
     console.log('  Machine name:', machineName);
     console.log('  IP address:', ipAddress);
 
-    // Find machine by token
-    const machine = await OSAuditMachine.findOne({
-      agentInstallationToken
+    // Find machine by token - try multiple approaches
+    let machine = await OSAuditMachine.findOne({
+      agentInstallationToken: agentInstallationToken
     });
+
+    // If not found, try with string conversion in case of type mismatch
+    if (!machine) {
+      console.log('⚠️  First query failed, trying with explicit string conversion...');
+      machine = await OSAuditMachine.findOne({
+        agentInstallationToken: String(agentInstallationToken).trim()
+      });
+    }
 
     if (!machine) {
       // Log all registered tokens for debugging
@@ -267,8 +277,12 @@ router.post('/reports', async (req: AuthenticatedRequest, res: Response) => {
       console.error('❌ Machine not found with token:', agentInstallationToken);
       console.log('📋 Registered machines in database:');
       allMachines.forEach(m => {
-        console.log(`   - ${m.machineName}: token=${m.agentInstallationToken}`);
+        console.log(`   - ${m.machineName}: token="${m.agentInstallationToken}" (length=${m.agentInstallationToken?.length})`);
       });
+
+      // Check if token exists at all in any field
+      const tokenExists = allMachines.some(m => m.agentInstallationToken === agentInstallationToken);
+      console.log(`   Token exists in database: ${tokenExists}`);
 
       return res.status(404).json({
         success: false,
@@ -541,11 +555,19 @@ router.post('/agent/heartbeat', async (req: AuthenticatedRequest, res: Response)
       });
     }
 
-    const machine = await OSAuditMachine.findOne({
-      agentInstallationToken
+    // Try to find machine with expanded logging
+    let machine = await OSAuditMachine.findOne({
+      agentInstallationToken: agentInstallationToken
     });
 
     if (!machine) {
+      machine = await OSAuditMachine.findOne({
+        agentInstallationToken: String(agentInstallationToken).trim()
+      });
+    }
+
+    if (!machine) {
+      console.error('❌ Heartbeat: Machine not found with token:', agentInstallationToken);
       return res.status(404).json({
         success: false,
         error: 'Invalid agent installation token'
