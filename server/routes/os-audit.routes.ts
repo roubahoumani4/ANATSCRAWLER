@@ -324,10 +324,16 @@ router.post('/reports', async (req: AuthenticatedRequest, res: Response) => {
     });
   } catch (error: any) {
     console.error('Error submitting audit report:', error);
-    console.error('Request body:', req.body);
+    console.error('Error stack:', error.stack);
+    console.error('Request body keys:', Object.keys(req.body));
+    console.error('auditData keys:', Object.keys(req.body?.auditData || {}));
+    console.error('Request body size:', JSON.stringify(req.body).length, 'bytes');
+    
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to submit audit report',
+      details: process.env.NODE_ENV === 'development' ? error.toString() : undefined
+    });
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
