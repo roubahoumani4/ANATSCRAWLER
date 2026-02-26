@@ -332,8 +332,6 @@ router.post('/reports', async (req: AuthenticatedRequest, res: Response) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to submit audit report',
-      details: process.env.NODE_ENV === 'development' ? error.toString() : undefined
-    });
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
