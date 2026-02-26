@@ -60,6 +60,12 @@ router.post('/machines/register', authenticate, async (req: AuthenticatedRequest
 
     const savedMachine = await newMachine.save();
 
+    console.log('✅ Machine registered:');
+    console.log('  Machine ID:', savedMachine.machineId);
+    console.log('  Token:', savedMachine.agentInstallationToken);
+    console.log('  Name:', savedMachine.machineName);
+    console.log('  Owner ID:', savedMachine.owner);
+
     res.status(201).json({
       success: true,
       message: 'Machine registered successfully',
@@ -244,17 +250,37 @@ router.post('/reports', async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
+    // Log incoming token for debugging
+    console.log('🔍 Audit report submission:');
+    console.log('  Token received:', agentInstallationToken);
+    console.log('  Machine name:', machineName);
+    console.log('  IP address:', ipAddress);
+
     // Find machine by token
     const machine = await OSAuditMachine.findOne({
       agentInstallationToken
     });
 
     if (!machine) {
+      // Log all registered tokens for debugging
+      const allMachines = await OSAuditMachine.find({}).select('machineId agentInstallationToken machineName');
+      console.error('❌ Machine not found with token:', agentInstallationToken);
+      console.log('📋 Registered machines in database:');
+      allMachines.forEach(m => {
+        console.log(`   - ${m.machineName}: token=${m.agentInstallationToken}`);
+      });
+
       return res.status(404).json({
         success: false,
-        error: 'Invalid agent installation token'
+        error: 'Invalid agent installation token',
+        debug: process.env.NODE_ENV === 'development' ? { 
+          tokenReceived: agentInstallationToken,
+          registeredCount: allMachines.length 
+        } : undefined
       });
     }
+
+    console.log('✅ Machine found:', machine.machineName);
 
     // Update machine status if not already active
     if (machine.agentStatus !== 'active') {
