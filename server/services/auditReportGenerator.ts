@@ -127,13 +127,6 @@ export class AuditReportGenerator {
           '-I', lynisReportData.ipAddress,
           '-O', lynisReportData.ownerName
         ]);
-          this.pythonScriptPath,
-          tempReportFile,
-          '-o', outputFile,
-          '-H', lynisReportData.hostname,
-          '-I', lynisReportData.ipAddress,
-          '-O', lynisReportData.ownerName
-        ]);
 
         let stdout = '';
         let stderr = '';
