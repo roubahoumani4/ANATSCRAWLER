@@ -19,8 +19,18 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
       - name: Install deps
         run: npm ci
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r server/scripts/requirements_pdf_report.txt
 
       - name: Verify jspdf installation
         run: |
@@ -197,6 +207,8 @@ jobs:
               cp -r "${CURRENT_DIR}/server/scripts/." "${BASE_DIR}/scripts/"
               chmod -R 755 "${BASE_DIR}/scripts"
               echo "Scripts copied to ${BASE_DIR}/scripts and made executable"
+              echo "Contents of scripts directory:"
+              ls -la "${BASE_DIR}/scripts/"
             else
               echo "No server/scripts directory found in release"
             fi
@@ -210,7 +222,12 @@ jobs:
             if [ -x "${VENV_DIR}/bin/pip" ]; then
               echo "Upgrading pip in venv..."
               "${VENV_DIR}/bin/pip" install --upgrade pip setuptools wheel || true
-              # Install script requirements if provided
+              # Install PDF report requirements
+              if [ -f "${CURRENT_DIR}/server/scripts/requirements_pdf_report.txt" ]; then
+                echo "Installing PDF report requirements into venv..."
+                "${VENV_DIR}/bin/pip" install -r "${CURRENT_DIR}/server/scripts/requirements_pdf_report.txt" || echo "Warning: PDF report requirements failed to install"
+              fi
+              # Install other script requirements if provided
               if [ -f "${CURRENT_DIR}/server/scripts/requirements.txt" ]; then
                 echo "Installing script requirements into venv..."
                 "${VENV_DIR}/bin/pip" install -r "${CURRENT_DIR}/server/scripts/requirements.txt" || echo "Warning: some script requirements failed to install"

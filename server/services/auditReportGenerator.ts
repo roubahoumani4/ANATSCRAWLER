@@ -34,11 +34,14 @@ export class AuditReportGenerator {
   private tempDir: string;
 
   constructor() {
-    // The Python report generator script lives in server/scripts
-    this.pythonScriptPath = path.join(__dirname, '..', 'scripts', 'generate_audit_pdf_report.py');
-    this.tempDir = path.join(__dirname, '..', 'temp');
+    // The Python report generator script is deployed to /var/www/anatscrawler/scripts
+    // Check both locations for compatibility
+    const deployedScriptPath = path.join(__dirname, '..', '..', 'scripts', 'generate_audit_pdf_report.py');
+    const localScriptPath = path.join(__dirname, '..', 'scripts', 'generate_audit_pdf_report.py');
 
-    // Ensure temp directory exists
+    this.pythonScriptPath = fs.existsSync(deployedScriptPath) ? deployedScriptPath : localScriptPath;
+    this.tempDir = path.join(__dirname, '..', '..', 'temp');
+
     if (!fs.existsSync(this.tempDir)) {
       fs.mkdirSync(this.tempDir, { recursive: true });
     }
@@ -49,8 +52,12 @@ export class AuditReportGenerator {
    */
   async checkDependencies(): Promise<boolean> {
     try {
+      // Use virtual environment Python if available
+      const venvPython = path.join(__dirname, '..', '..', '.venv', 'bin', 'python3');
+      const pythonCmd = fs.existsSync(venvPython) ? venvPython : 'python3';
+
       const { stdout } = await exec(
-        'python3 -c "import reportlab; print(reportlab.__version__)"'
+        `${pythonCmd} -c "import reportlab; print(reportlab.__version__)"`
       );
       console.log(`✓ ReportLab is installed: ${stdout.trim()}`);
       return true;
@@ -104,22 +111,22 @@ export class AuditReportGenerator {
       );
 
       // Build command
-      const pythonCmd = [
-        'python3',
-        this.pythonScriptPath,
-        tempReportFile,
-        '-o', outputFile,
-        '-H', lynisReportData.hostname,
-        '-I', lynisReportData.ipAddress,
-        '-O', lynisReportData.ownerName
-      ];
+      const venvPython = path.join(__dirname, '..', '..', '.venv', 'bin', 'python3');
+      const pythonExecutable = fs.existsSync(venvPython) ? venvPython : 'python3';
 
       console.log(`Generating PDF report: ${outputFile}`);
-      console.log(`Command: ${pythonCmd.join(' ')}`);
+      console.log(`Using Python: ${pythonExecutable}`);
 
       // Execute Python script
       return await new Promise((resolve, reject) => {
-        const python = spawn('python3', [
+        const python = spawn(pythonExecutable, [
+          this.pythonScriptPath,
+          tempReportFile,
+          '-o', outputFile,
+          '-H', lynisReportData.hostname,
+          '-I', lynisReportData.ipAddress,
+          '-O', lynisReportData.ownerName
+        ]);
           this.pythonScriptPath,
           tempReportFile,
           '-o', outputFile,
