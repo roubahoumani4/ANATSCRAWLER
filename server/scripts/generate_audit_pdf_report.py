@@ -394,7 +394,7 @@ class AuditPDFReport:
                 self.story.append(
                     Paragraph(f"<b>{category} Priority</b>", self.styles['SubsectionTitle'])
                 )
-                for idx, item in enumerate(items[:5], 1):  # Limit to top 5 per category
+                for idx, item in enumerate(items, 1):  # Show all items, not limited to 5
                     rec_text = f"""
                     <b>{idx}. {item.get('test_id', 'UNKNOWN')}</b><br/>
                     {item.get('description', '')}<br/>
@@ -403,11 +403,6 @@ class AuditPDFReport:
                     self.story.append(Paragraph(rec_text, self.styles['Normal']))
                     self.story.append(Spacer(1, 0.1*inch))
                 
-                if len(items) > 5:
-                    self.story.append(
-                        Paragraph(f"... and {len(items) - 5} more {category.lower()} priority items",
-                                 self.styles['Normal'])
-                    )
                 self.story.append(Spacer(1, 0.1*inch))
     
     def _create_security_controls(self):
