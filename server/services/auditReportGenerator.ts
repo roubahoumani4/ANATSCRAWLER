@@ -34,9 +34,10 @@ export class AuditReportGenerator {
   private tempDir: string;
 
   constructor() {
-    this.pythonScriptPath = path.join(__dirname, 'generate_audit_pdf_report.py');
+    // The Python report generator script lives in server/scripts
+    this.pythonScriptPath = path.join(__dirname, '..', 'scripts', 'generate_audit_pdf_report.py');
     this.tempDir = path.join(__dirname, '..', 'temp');
-    
+
     // Ensure temp directory exists
     if (!fs.existsSync(this.tempDir)) {
       fs.mkdirSync(this.tempDir, { recursive: true });
