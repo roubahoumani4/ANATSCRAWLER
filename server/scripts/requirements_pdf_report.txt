@@ -1,0 +1,6 @@
+# Python dependencies for Lynis Audit PDF Report Generator
+# Install with: pip install -r requirements.txt
+
+reportlab>=4.0.0
+Pillow>=10.0.0
+python-dateutil>=2.8.2

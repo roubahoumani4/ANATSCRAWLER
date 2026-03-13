@@ -22,6 +22,7 @@ import threatIntelRoutes from './threat-intelligence-free.routes'; // FREE versi
 import historyRoutes from './history.routes';
 import analyticsRoutes from './analytics.routes';
 import osAuditRoutes from './os-audit.routes';
+import osAuditReportsRoutes from './os-audit-reports.routes';
 
 /**
  * Register all application routes with proper organization and authentication
@@ -83,6 +84,10 @@ export async function registerRoutes(app: Express): Promise<void> {
   // OS Audit routes - some require authentication, some use token-based auth
   // Authentication is handled within the route handlers
   app.use(`${apiV1}/os-audit`, osAuditRoutes);
+
+  // OS Audit Report Generation routes - authenticated users only
+  // PDF/HTML report generation from audit results
+  app.use(`${apiV1}/os-audit`, osAuditReportsRoutes);
 
   // Threat Intelligence routes - authenticated users only
   app.use(`${apiV1}/threat-intel`, authenticate, threatIntelRoutes);
