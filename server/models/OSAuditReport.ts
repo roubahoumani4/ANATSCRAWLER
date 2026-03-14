@@ -38,6 +38,12 @@ const osAuditReportSchema = new Schema({
     type: String,
     description: 'OS information from the audit'
   },
+  osType: {
+    type: String,
+    enum: ['linux', 'windows'],
+    default: 'linux',
+    description: 'OS type that produced this report'
+  },
   auditScore: {
     type: Number,
     min: 0,
@@ -147,6 +153,7 @@ export interface IOSAuditReport extends mongoose.Document {
   ipAddress: string;
   ownerName: string;
   operatingSystem?: string;
+  osType?: 'linux' | 'windows';
   auditScore?: number;
   warnings: number;
   suggestions: number;

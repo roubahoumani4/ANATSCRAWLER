@@ -36,6 +36,12 @@ const osAuditMachineSchema = new Schema({
     type: String,
     description: 'Operating system type and version'
   },
+  osType: {
+    type: String,
+    enum: ['linux', 'windows'],
+    default: 'linux',
+    description: 'OS type for agent generation (linux or windows)'
+  },
   lynisVersion: {
     type: String,
     description: 'Version of Lynis agent installed'
@@ -97,6 +103,7 @@ export interface IOSAuditMachine extends mongoose.Document {
   machineHostname?: string;
   ipAddress: string;
   operatingSystem?: string;
+  osType?: 'linux' | 'windows';
   lynisVersion?: string;
   agentStatus: 'active' | 'inactive' | 'pending';
   lastAuditDate?: Date;

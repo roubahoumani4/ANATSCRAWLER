@@ -50,6 +50,7 @@ interface Machine {
   ipAddress: string;
   ownerName: string;
   operatingSystem?: string;
+  osType?: 'linux' | 'windows';
   agentStatus: 'active' | 'inactive' | 'pending';
   lastAuditDate?: string;
   registrationDate: string;
@@ -62,6 +63,8 @@ interface AuditReport {
   machineName: string;
   ipAddress: string;
   ownerName: string;
+  osType?: 'linux' | 'windows';
+  operatingSystem?: string;
   auditDate: string;
   auditScore?: number;
   warnings: number;
@@ -103,7 +106,8 @@ const OSAuditPage: React.FC = () => {
     ipAddress: '',
     ownerName: '',
     operatingSystem: '',
-    machineHostname: ''
+    machineHostname: '',
+    osType: 'linux' as 'linux' | 'windows'
   });
 
   useEffect(() => {
@@ -143,7 +147,8 @@ const OSAuditPage: React.FC = () => {
           ipAddress: '',
           ownerName: '',
           operatingSystem: '',
-          machineHostname: ''
+          machineHostname: '',
+          osType: 'linux' as 'linux' | 'windows'
         });
         setShowRegisterDialog(false);
         setSelectedMachine(response.data.machine);
@@ -273,10 +278,173 @@ const OSAuditPage: React.FC = () => {
       const token = machine.agentInstallationToken;
       const machineName = machine.machineName;
       const ownerName = machine.ownerName;
+      const osType = machine.osType || 'linux';
       
-      console.log('Machine data extracted:', { machineId, token, machineName, ownerName });
+      console.log('Machine data extracted:', { machineId, token, machineName, ownerName, osType });
 
-      const script = `#!/bin/bash
+      let script = '';
+      let fileName = `os-audit-agent-${machineId}.sh`;
+
+      if (osType === 'windows') {
+        fileName = `os-audit-agent-${machineId}.ps1`;
+        script = `#Requires -RunAsAdministrator
+# ANATSCRAWLER Windows OS Audit Agent
+# Machine ID: ${machineId}
+
+$ErrorActionPreference = "Continue"
+
+$AGENT_TOKEN = "${token}"
+$SERVER_URL = "https://horus.anatsecurity.fr"
+$MACHINE_ID = "${machineId}"
+$MACHINE_NAME = "${machineName}"
+$OWNER_NAME = "${ownerName}"
+$AGENT_DIR = "C:\\anat-os-audit"
+$KITTY_DIR = "$AGENT_DIR\\HardeningKitty"
+$REPORT_DIR = "$AGENT_DIR\\reports"
+
+function Write-Log {
+  param([string]$Message)
+  $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+  Write-Host "[$ts] $Message"
+}
+
+function Install-AuditTool {
+  New-Item -ItemType Directory -Path $AGENT_DIR -Force | Out-Null
+  New-Item -ItemType Directory -Path $REPORT_DIR -Force | Out-Null
+
+  if (Test-Path $KITTY_DIR) {
+    Write-Log "Audit tool already installed"
+    return
+  }
+
+  $gitPath = Get-Command git -ErrorAction SilentlyContinue
+  if ($gitPath) {
+    Write-Log "Cloning audit tool repository..."
+    git clone https://github.com/scipag/HardeningKitty $KITTY_DIR | Out-Null
+  } else {
+    Write-Log "Git not found, downloading zip package..."
+    $zipPath = "$AGENT_DIR\\audit-tool.zip"
+    Invoke-WebRequest -Uri "https://github.com/scipag/HardeningKitty/archive/refs/heads/master.zip" -OutFile $zipPath
+    Expand-Archive -Path $zipPath -DestinationPath $AGENT_DIR -Force
+    Move-Item "$AGENT_DIR\\HardeningKitty-master" $KITTY_DIR -Force
+    Remove-Item $zipPath -Force
+  }
+}
+
+function Invoke-WindowsAudit {
+  Set-Location $KITTY_DIR
+  Import-Module .\\HardeningKitty.psm1 -Force
+  $raw = Invoke-HardeningKitty -SkipRestartWarning -SkipCurrentDomainJoin 2>&1 | Out-String
+  return $raw
+}
+
+function Parse-Findings {
+  param([string]$RawOutput)
+
+  $findings = @()
+  $critical = 0
+  $high = 0
+  $medium = 0
+  $low = 0
+  $passed = 0
+
+  foreach ($line in ($RawOutput -split [Environment]::NewLine)) {
+    if ($line -match "\\[PASS\\]") {
+      $passed += 1
+      continue
+    }
+    if ($line -notmatch "\\[FAIL\\]") { continue }
+
+    $sev = 'low'
+    if ($line -match 'Firewall|Defender|Credential|Admin|Password') { $sev = 'critical'; $critical += 1 }
+    elseif ($line -match 'UAC|SMB|RDP|WinRM|TLS|SSL|Encryption') { $sev = 'high'; $high += 1 }
+    elseif ($line -match 'Audit|Logging|Registry|Update|Patch') { $sev = 'medium'; $medium += 1 }
+    else { $low += 1 }
+
+    $findings += @{ 
+      id = [Guid]::NewGuid().ToString()
+      test = "Windows Hardening Check"
+      description = $line.Trim()
+      result = "WARNING"
+      severity = $sev
+      recommendation = "Apply the recommended hardening configuration and validate the control."
+    }
+  }
+
+  $score = 100 - ($critical * 15) - ($high * 10) - ($medium * 5) - ($low * 2)
+  if ($score -lt 0) { $score = 0 }
+  if ($score -gt 100) { $score = 100 }
+
+  return @{
+    findings = $findings
+    critical = $critical
+    high = $high
+    medium = $medium
+    low = $low
+    passed = $passed
+    score = $score
+  }
+}
+
+function Submit-Report {
+  param(
+    [hashtable]$Parsed,
+    [string]$RawOutput
+  )
+
+  $hostname = $env:COMPUTERNAME
+  $ipAddress = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -ne '127.0.0.1' } | Select-Object -First 1 -ExpandProperty IPAddress)
+  if (-not $ipAddress) { $ipAddress = "Unknown" }
+  $os = (Get-CimInstance Win32_OperatingSystem).Caption
+
+  $payload = @{
+    agentInstallationToken = $AGENT_TOKEN
+    machineName = $hostname
+    ipAddress = $ipAddress
+    ownerName = $OWNER_NAME
+    auditData = @{
+      operatingSystem = $os
+      auditScore = $Parsed.score
+      warnings = $Parsed.high + $Parsed.critical
+      suggestions = $Parsed.medium + $Parsed.low
+      systemHardening = $Parsed.score
+      findings = $Parsed.findings
+      sections = @{
+        critical = $Parsed.critical
+        high = $Parsed.high
+        medium = $Parsed.medium
+        low = $Parsed.low
+        passed = $Parsed.passed
+      }
+      rawReport = $RawOutput
+      logFileContent = $RawOutput
+      reportFileContent = ""
+      lynisVersion = "windows-audit"
+      auditDuration = 60
+    }
+  } | ConvertTo-Json -Depth 8
+
+  Invoke-RestMethod -Uri "$SERVER_URL/api/v1/os-audit/reports" -Method POST -ContentType "application/json" -Body $payload | Out-Null
+  Invoke-RestMethod -Uri "$SERVER_URL/api/v1/os-audit/agent/heartbeat" -Method POST -ContentType "application/json" -Body (@{agentInstallationToken=$AGENT_TOKEN} | ConvertTo-Json) | Out-Null
+}
+
+Write-Log "Starting Windows audit setup..."
+Install-AuditTool
+$raw = Invoke-WindowsAudit
+$parsed = Parse-Findings -RawOutput $raw
+Submit-Report -Parsed $parsed -RawOutput $raw
+Write-Log "Audit complete. Score: $($parsed.score)/100"
+
+$scriptPath = "$AGENT_DIR\\agent.ps1"
+Set-Content -Path $scriptPath -Value $MyInvocation.MyCommand.Definition -Force
+
+$action = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-ExecutionPolicy Bypass -File $scriptPath"
+$trigger = New-ScheduledTaskTrigger -Daily -At 2am
+Register-ScheduledTask -TaskName "ANATSCRAWLER-OSAudit" -Action $action -Trigger $trigger -RunLevel Highest -Force | Out-Null
+Write-Log "Scheduled task created (daily at 02:00)."
+`;
+      } else {
+        script = `#!/bin/bash
 # ANATSCRAWLER OS Audit Agent Installation Script
 # Machine ID: ${machineId}
 # Generated: $(date)
@@ -539,6 +707,7 @@ echo ""
 echo "Setup complete! Agent will run daily at 2 AM."
 echo "Or manually run: sudo $AGENT_DIR/agent.sh"
 `;
+  }
 
       // Download the script
       console.log('Creating blob from script, length:', script.length);
@@ -550,7 +719,7 @@ echo "Or manually run: sudo $AGENT_DIR/agent.sh"
       
       const a = document.createElement('a');
       a.href = url;
-      a.download = `os-audit-agent-${machineId}.sh`;
+      a.download = fileName;
       console.log('Download link prepared:', a.download);
       
       document.body.appendChild(a);
@@ -618,7 +787,7 @@ echo "Or manually run: sudo $AGENT_DIR/agent.sh"
               <Shield className="w-10 h-10 text-cyan-400" />
               OS Audit
             </h1>
-            <p className="text-coolWhite/60 mt-2">Monitor and audit your systems with Lynis</p>
+            <p className="text-coolWhite/60 mt-2">Monitor and audit Linux and Windows hardening posture</p>
           </div>
           <Dialog open={showRegisterDialog} onOpenChange={setShowRegisterDialog}>
             <DialogTrigger asChild>
@@ -681,6 +850,25 @@ echo "Or manually run: sudo $AGENT_DIR/agent.sh"
                     placeholder="e.g., prod-server-01"
                     className="bg-jetBlack border-coolWhite/10"
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-coolWhite/80 mb-2">Agent Type</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      onClick={() => setRegistrationForm({ ...registrationForm, osType: 'linux' })}
+                      className={registrationForm.osType === 'linux' ? 'bg-cyan-500 hover:bg-cyan-600' : 'bg-jetBlack border border-coolWhite/20 text-coolWhite'}
+                    >
+                      Linux Agent (Lynis)
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => setRegistrationForm({ ...registrationForm, osType: 'windows' })}
+                      className={registrationForm.osType === 'windows' ? 'bg-blue-500 hover:bg-blue-600' : 'bg-jetBlack border border-coolWhite/20 text-coolWhite'}
+                    >
+                      Windows Agent (HardeningKitty)
+                    </Button>
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   <Button type="submit" className="flex-1 bg-cyan-500 hover:bg-cyan-600">
@@ -791,6 +979,10 @@ echo "Or manually run: sudo $AGENT_DIR/agent.sh"
                               </div>
                             )}
                             <div>
+                              <p className="text-coolWhite/60">Agent Type</p>
+                              <p className="text-coolWhite">{(machine.osType || 'linux') === 'windows' ? 'Windows' : 'Linux'}</p>
+                            </div>
+                            <div>
                               <p className="text-coolWhite/60">Last Audit</p>
                               <p className="text-coolWhite">
                                 {machine.lastAuditDate ? new Date(machine.lastAuditDate).toLocaleDateString() : 'Never'}
@@ -837,6 +1029,9 @@ echo "Or manually run: sudo $AGENT_DIR/agent.sh"
                 <div className="grid gap-4">
                   {reports.map((report) => (
                     <Card key={report._id} className="bg-jetBlack border-coolWhite/10 p-6">
+                      {(() => {
+                        const isWindowsReport = report.osType === 'windows' || (report.operatingSystem || '').toLowerCase().includes('windows');
+                        return (
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-3">
@@ -880,24 +1075,28 @@ echo "Or manually run: sudo $AGENT_DIR/agent.sh"
                           >
                             <Download className="w-4 h-4" />
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => downloadLynisLog(report)}
-                            className="border-blue-500/20 text-blue-400 hover:bg-blue-500/10"
-                            title="Download lynis.log"
-                          >
-                            <FileText className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => downloadLynisReport(report)}
-                            className="border-purple-500/20 text-purple-400 hover:bg-purple-500/10"
-                            title="Download lynis-report.dat"
-                          >
-                            <FileText className="w-4 h-4" />
-                          </Button>
+                          {!isWindowsReport && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => downloadLynisLog(report)}
+                                className="border-blue-500/20 text-blue-400 hover:bg-blue-500/10"
+                                title="Download lynis.log"
+                              >
+                                <FileText className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => downloadLynisReport(report)}
+                                className="border-purple-500/20 text-purple-400 hover:bg-purple-500/10"
+                                title="Download lynis-report.dat"
+                              >
+                                <FileText className="w-4 h-4" />
+                              </Button>
+                            </>
+                          )}
                           <Button
                             size="sm"
                             variant="outline"
@@ -912,6 +1111,8 @@ echo "Or manually run: sudo $AGENT_DIR/agent.sh"
                           </Button>
                         </div>
                       </div>
+                        );
+                      })()}
                     </Card>
                   ))}
                 </div>
@@ -926,7 +1127,9 @@ echo "Or manually run: sudo $AGENT_DIR/agent.sh"
         <Dialog open={showInstallDialog} onOpenChange={setShowInstallDialog}>
           <DialogContent className="bg-jetBlack border border-coolWhite/10 max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-coolWhite">Install Lynis Agent</DialogTitle>
+              <DialogTitle className="text-coolWhite">
+                {(selectedMachine.osType || 'linux') === 'windows' ? 'Install Windows Agent' : 'Install Linux Agent (Lynis)'}
+              </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div className="bg-coolWhite/5 border border-coolWhite/10 p-4 rounded-lg">
@@ -949,7 +1152,9 @@ echo "Or manually run: sudo $AGENT_DIR/agent.sh"
                   <div>
                     <p className="font-semibold text-coolWhite mb-2">Step 2: Run the Script on Your Machine</p>
                     <div className="bg-jetBlack border border-cyan-500/20 p-3 rounded font-mono text-sm text-cyan-400 overflow-x-auto">
-                      sudo bash os-audit-agent-{selectedMachine.machineId}.sh
+                      {(selectedMachine.osType || 'linux') === 'windows'
+                        ? `.\\os-audit-agent-${selectedMachine.machineId}.ps1`
+                        : `sudo bash os-audit-agent-${selectedMachine.machineId}.sh`}
                     </div>
                   </div>
 
@@ -971,7 +1176,11 @@ echo "Or manually run: sudo $AGENT_DIR/agent.sh"
 
                   <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded text-sm text-blue-200">
                     <p className="font-semibold mb-1">ℹ️ Note</p>
-                    <p>The script requires root access and will install Lynis along with the audit agent. The agent will run automatically every day at 2 AM.</p>
+                    <p>
+                      {(selectedMachine.osType || 'linux') === 'windows'
+                        ? 'Run PowerShell as Administrator. The script installs the Windows audit agent, performs a scan, submits results, and creates a daily scheduled task at 2 AM.'
+                        : 'The script requires root access and installs Lynis with the Linux audit agent. The agent runs automatically every day at 2 AM.'}
+                    </p>
                   </div>
                 </div>
               </div>

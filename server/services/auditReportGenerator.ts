@@ -31,6 +31,7 @@ interface GenerateReportOptions {
 
 export class AuditReportGenerator {
   private pythonScriptPath: string;
+  private windowsPythonScriptPath: string;
   private tempDir: string;
 
   constructor() {
@@ -38,8 +39,13 @@ export class AuditReportGenerator {
     // Check both locations for compatibility
     const deployedScriptPath = path.join(__dirname, '..', '..', 'scripts', 'generate_audit_pdf_report.py');
     const localScriptPath = path.join(__dirname, '..', 'scripts', 'generate_audit_pdf_report.py');
+    const deployedWindowsScriptPath = path.join(__dirname, '..', '..', 'scripts', 'generate_windows_audit_report.py');
+    const localWindowsScriptPath = path.join(__dirname, '..', 'scripts', 'generate_windows_audit_report.py');
 
     this.pythonScriptPath = fs.existsSync(deployedScriptPath) ? deployedScriptPath : localScriptPath;
+    this.windowsPythonScriptPath = fs.existsSync(deployedWindowsScriptPath)
+      ? deployedWindowsScriptPath
+      : localWindowsScriptPath;
     this.tempDir = path.join(__dirname, '..', '..', 'temp');
 
     if (!fs.existsSync(this.tempDir)) {
@@ -77,6 +83,19 @@ export class AuditReportGenerator {
     );
     
     await promisify(fs.writeFile)(tempFile, reportContent, 'utf-8');
+    return tempFile;
+  }
+
+  /**
+   * Save Windows scanner output to temporary file
+   */
+  private async saveTempWindowsOutputFile(outputContent: string): Promise<string> {
+    const tempFile = path.join(
+      this.tempDir,
+      `windows_audit_output_${Date.now()}.txt`
+    );
+
+    await promisify(fs.writeFile)(tempFile, outputContent, 'utf-8');
     return tempFile;
   }
 
@@ -183,6 +202,76 @@ export class AuditReportGenerator {
 
     await promisify(fs.writeFile)(outputFile, htmlContent, 'utf-8');
     return outputFile;
+  }
+
+  /**
+   * Generate PDF report from Windows audit output
+   */
+  async generateWindowsPDFReport(
+    reportData: LynisReportData,
+    windowsOutputContent: string,
+    options: GenerateReportOptions = {}
+  ): Promise<string> {
+    try {
+      const depsOk = await this.checkDependencies();
+      if (!depsOk) {
+        throw new Error('Required dependencies not installed');
+      }
+
+      const tempOutputFile = await this.saveTempWindowsOutputFile(windowsOutputContent);
+
+      const outputDir = options.outputDir || path.join(__dirname, '..', 'reports');
+      if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
+      }
+
+      const outputFile = path.join(
+        outputDir,
+        `audit_report_${reportData.reportId}_${Date.now()}.pdf`
+      );
+
+      const venvPython = path.join(__dirname, '..', '..', '.venv', 'bin', 'python3');
+      const pythonExecutable = fs.existsSync(venvPython) ? venvPython : 'python3';
+
+      return await new Promise((resolve, reject) => {
+        const python = spawn(pythonExecutable, [
+          this.windowsPythonScriptPath,
+          tempOutputFile,
+          '-o', outputFile,
+          '-H', reportData.hostname,
+          '-I', reportData.ipAddress,
+          '-O', reportData.ownerName,
+        ]);
+
+        let stderr = '';
+
+        python.stdout?.on('data', (data) => {
+          console.log(data.toString());
+        });
+
+        python.stderr?.on('data', (data) => {
+          stderr += data.toString();
+          console.error(data.toString());
+        });
+
+        python.on('close', (code) => {
+          fs.unlink(tempOutputFile, () => {});
+          if (code !== 0) {
+            reject(new Error(`Windows Python script failed: ${stderr}`));
+          } else {
+            resolve(outputFile);
+          }
+        });
+
+        python.on('error', (err) => {
+          fs.unlink(tempOutputFile, () => {});
+          reject(err);
+        });
+      });
+    } catch (error) {
+      console.error('Error generating Windows PDF report:', error);
+      throw error;
+    }
   }
 
   /**

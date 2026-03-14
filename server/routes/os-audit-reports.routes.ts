@@ -59,9 +59,17 @@ router.post(
       };
 
       const outputDir = path.join(__dirname, '..', 'reports');
-      const pdfPath = await generator.generatePDFReport(reportData, {
-        outputDir
-      });
+      const isWindowsReport =
+        auditReport.osType === 'windows' ||
+        (auditReport.operatingSystem || '').toLowerCase().includes('windows');
+
+      const pdfPath = isWindowsReport
+        ? await generator.generateWindowsPDFReport(
+            reportData,
+            auditReport.logFileContent || auditReport.rawReport || '',
+            { outputDir }
+          )
+        : await generator.generatePDFReport(reportData, { outputDir });
 
       // Return PDF file
       res.download(pdfPath, `audit_report_${reportId}.pdf`, (err) => {

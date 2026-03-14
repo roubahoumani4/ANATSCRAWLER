@@ -18,7 +18,7 @@ interface AuthenticatedRequest extends Request {
  */
 router.post('/machines/register', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { machineName, ipAddress, ownerName, operatingSystem, machineHostname } = req.body;
+    const { machineName, ipAddress, ownerName, operatingSystem, machineHostname, osType } = req.body;
     const userId = req.user?._id || req.user?.id;
 
     // Validation
@@ -54,6 +54,7 @@ router.post('/machines/register', authenticate, async (req: AuthenticatedRequest
       machineHostname,
       ipAddress,
       operatingSystem,
+      osType: osType === 'windows' ? 'windows' : 'linux',
       agentInstallationToken,
       agentStatus: 'pending'
     });
@@ -150,7 +151,7 @@ router.put('/machines/:machineId', authenticate, async (req: AuthenticatedReques
   try {
     const { machineId } = req.params;
     const userId = req.user?._id || req.user?.id;
-    const { machineName, ownerName, operatingSystem, machineHostname } = req.body;
+    const { machineName, ownerName, operatingSystem, machineHostname, osType } = req.body;
 
     const machine = await OSAuditMachine.findOneAndUpdate(
       { _id: machineId, owner: userId },
@@ -160,6 +161,7 @@ router.put('/machines/:machineId', authenticate, async (req: AuthenticatedReques
           ownerName,
           operatingSystem,
           machineHostname,
+          osType,
           updatedAt: new Date()
         }
       },
@@ -335,6 +337,7 @@ router.post('/reports', async (req: AuthenticatedRequest, res: Response) => {
       ipAddress: machine.ipAddress,
       ownerName: machine.ownerName,
       operatingSystem: auditData?.operatingSystem || 'Unknown',
+      osType: machine.osType || 'linux',
       auditScore: auditScore,
       warnings: warnings,
       suggestions: suggestions,
