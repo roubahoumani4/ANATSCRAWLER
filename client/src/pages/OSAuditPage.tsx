@@ -334,7 +334,7 @@ function Install-AuditTool {
 function Invoke-WindowsAudit {
   Set-Location $KITTY_DIR
   Import-Module .\\HardeningKitty.psm1 -Force
-  $raw = Invoke-HardeningKitty -SkipRestartWarning -SkipCurrentDomainJoin 2>&1 | Out-String
+  $raw = Invoke-HardeningKitty -Mode Audit -Log -LogFile "$REPORT_DIR\\audit.log" -Report -ReportFile "$REPORT_DIR\\audit.csv" -SkipMachineInformation -SkipLanguageWarning 2>&1 | Out-String
   return $raw
 }
 
