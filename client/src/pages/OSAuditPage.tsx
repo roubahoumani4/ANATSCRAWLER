@@ -334,7 +334,26 @@ function Install-AuditTool {
 function Invoke-WindowsAudit {
   Set-Location $KITTY_DIR
   Import-Module .\\HardeningKitty.psm1 -Force
-  $raw = Invoke-HardeningKitty -Mode Audit -Log -LogFile "$REPORT_DIR\\audit.log" -Report -ReportFile "$REPORT_DIR\\audit.csv" -SkipMachineInformation 2>&1 | Out-String
+  Write-Log "Starting HardeningKitty audit..."
+  try {
+    Invoke-HardeningKitty -Mode Audit -Log -LogFile "$REPORT_DIR\\audit.log" -Report -ReportFile "$REPORT_DIR\\audit.csv" -SkipMachineInformation
+  } catch {
+    Write-Log "HardeningKitty error: $_"
+  }
+  Write-Log "HardeningKitty execution finished."
+  # Read the log file for raw output instead of piping
+  $raw = ""
+  if (Test-Path "$REPORT_DIR\\audit.log") {
+    $raw = Get-Content "$REPORT_DIR\\audit.log" -Raw
+    Write-Log "Read audit log: $($raw.Length) chars"
+  } else {
+    Write-Log "WARNING: audit.log not found"
+  }
+  if (Test-Path "$REPORT_DIR\\audit.csv") {
+    Write-Log "CSV report found at $REPORT_DIR\\audit.csv"
+  } else {
+    Write-Log "WARNING: audit.csv not found"
+  }
   return $raw
 }
 
@@ -466,16 +485,43 @@ function Submit-Report {
     }
   } | ConvertTo-Json -Depth 8
 
-  Invoke-RestMethod -Uri "$SERVER_URL/api/v1/os-audit/reports" -Method POST -ContentType "application/json" -Body $payload | Out-Null
-  Invoke-RestMethod -Uri "$SERVER_URL/api/v1/os-audit/agent/heartbeat" -Method POST -ContentType "application/json" -Body (@{agentInstallationToken=$AGENT_TOKEN} | ConvertTo-Json) | Out-Null
+  try {
+    Write-Log "Sending report payload ($($payload.Length) bytes)..."
+    $response = Invoke-RestMethod -Uri "$SERVER_URL/api/v1/os-audit/reports" -Method POST -ContentType "application/json" -Body $payload
+    Write-Log "Report submitted successfully."
+  } catch {
+    Write-Log "ERROR submitting report: $($_.Exception.Message)"
+    if ($_.Exception.Response) {
+      $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+      $body = $reader.ReadToEnd()
+      Write-Log "Server response: $body"
+    }
+    throw
+  }
+  try {
+    Invoke-RestMethod -Uri "$SERVER_URL/api/v1/os-audit/agent/heartbeat" -Method POST -ContentType "application/json" -Body (@{agentInstallationToken=$AGENT_TOKEN} | ConvertTo-Json) | Out-Null
+    Write-Log "Heartbeat sent."
+  } catch {
+    Write-Log "WARNING: Heartbeat failed: $($_.Exception.Message)"
+  }
 }
 
 Write-Log "Starting Windows audit setup..."
-Install-AuditTool
-$raw = Invoke-WindowsAudit
-$parsed = Parse-Findings -RawOutput $raw
-Submit-Report -Parsed $parsed -RawOutput $raw
-Write-Log "Audit complete. Score: $($parsed.score)/100"
+try {
+  Install-AuditTool
+  Write-Log "Audit tool installed. Running audit..."
+  $raw = Invoke-WindowsAudit
+  Write-Log "Audit finished. Parsing findings..."
+  $parsed = Parse-Findings -RawOutput $raw
+  Write-Log "Parsed: Score=$($parsed.score) Passed=$($parsed.passed) Critical=$($parsed.critical) High=$($parsed.high) Medium=$($parsed.medium) Low=$($parsed.low)"
+  Write-Log "Submitting report to $SERVER_URL ..."
+  Submit-Report -Parsed $parsed -RawOutput $raw
+  Write-Log "Audit complete. Score: $($parsed.score)/100"
+} catch {
+  Write-Log "FATAL ERROR: $($_.Exception.Message)"
+  Write-Log "Stack: $($_.ScriptStackTrace)"
+  throw
+}
 
 $scriptPath = "$AGENT_DIR\\agent.ps1"
 Set-Content -Path $scriptPath -Value $MyInvocation.MyCommand.Definition -Force
