@@ -66,7 +66,7 @@ router.post(
       const pdfPath = isWindowsReport
         ? await generator.generateWindowsPDFReport(
             reportData,
-            auditReport.logFileContent || auditReport.rawReport || '',
+            auditReport.reportFileContent || auditReport.logFileContent || auditReport.rawReport || '',
             { outputDir }
           )
         : await generator.generatePDFReport(reportData, { outputDir });

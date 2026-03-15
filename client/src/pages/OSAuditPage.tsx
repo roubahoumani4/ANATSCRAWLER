@@ -334,7 +334,7 @@ function Install-AuditTool {
 function Invoke-WindowsAudit {
   Set-Location $KITTY_DIR
   Import-Module .\\HardeningKitty.psm1 -Force
-  $raw = Invoke-HardeningKitty -Mode Audit -Log -LogFile "$REPORT_DIR\\audit.log" -Report -ReportFile "$REPORT_DIR\\audit.csv" -SkipMachineInformation -SkipLanguageWarning 2>&1 | Out-String
+  $raw = Invoke-HardeningKitty -Mode Audit -Log -LogFile "$REPORT_DIR\\audit.log" -Report -ReportFile "$REPORT_DIR\\audit.csv" -SkipMachineInformation 2>&1 | Out-String
   return $raw
 }
 
@@ -348,32 +348,59 @@ function Parse-Findings {
   $low = 0
   $passed = 0
 
-  foreach ($line in ($RawOutput -split [Environment]::NewLine)) {
-    if ($line -match "\\[PASS\\]") {
-      $passed += 1
-      continue
+  $csvPath = "$REPORT_DIR\\audit.csv"
+  if (Test-Path $csvPath) {
+    $csvData = Import-Csv -Path $csvPath -Delimiter ','
+    foreach ($row in $csvData) {
+      $testResult = $row.TestResult
+      $severity = if ($row.Severity) { $row.Severity.ToLower() } else { 'low' }
+      if ($severity -notin @('critical','high','medium','low')) { $severity = 'medium' }
+
+      if ($testResult -eq 'Passed') {
+        $passed += 1
+      } else {
+        switch ($severity) {
+          'critical' { $critical += 1 }
+          'high'     { $high += 1 }
+          'medium'   { $medium += 1 }
+          default    { $low += 1 }
+        }
+        $findings += @{
+          id = if ($row.ID) { $row.ID } else { [Guid]::NewGuid().ToString() }
+          test = if ($row.Category) { $row.Category } else { 'Windows Hardening' }
+          description = if ($row.Name) { $row.Name } else { $testResult }
+          result = 'WARNING'
+          severity = $severity
+          recommendation = if ($row.RecommendedValue) { "Set to: $($row.RecommendedValue)" } else { 'Apply recommended configuration.' }
+          currentValue = if ($row.DefaultValue) { $row.DefaultValue } else { '' }
+          recommendedValue = if ($row.RecommendedValue) { $row.RecommendedValue } else { '' }
+          category = if ($row.Category) { $row.Category } else { '' }
+          method = if ($row.Method) { $row.Method } else { '' }
+        }
+      }
     }
-    if ($line -notmatch "\\[FAIL\\]") { continue }
-
-    $sev = 'low'
-    if ($line -match 'Firewall|Defender|Credential|Admin|Password') { $sev = 'critical'; $critical += 1 }
-    elseif ($line -match 'UAC|SMB|RDP|WinRM|TLS|SSL|Encryption') { $sev = 'high'; $high += 1 }
-    elseif ($line -match 'Audit|Logging|Registry|Update|Patch') { $sev = 'medium'; $medium += 1 }
-    else { $low += 1 }
-
-    $findings += @{ 
-      id = [Guid]::NewGuid().ToString()
-      test = "Windows Hardening Check"
-      description = $line.Trim()
-      result = "WARNING"
-      severity = $sev
-      recommendation = "Apply the recommended hardening configuration and validate the control."
+  } else {
+    foreach ($line in ($RawOutput -split [Environment]::NewLine)) {
+      if ($line -match '\\[PASS\\]') { $passed += 1; continue }
+      if ($line -notmatch '\\[FAIL\\]') { continue }
+      $sev = 'low'
+      if ($line -match 'Firewall|Defender|Credential|Admin|Password') { $sev = 'critical'; $critical += 1 }
+      elseif ($line -match 'UAC|SMB|RDP|WinRM|TLS|SSL|Encryption') { $sev = 'high'; $high += 1 }
+      elseif ($line -match 'Audit|Logging|Registry|Update|Patch') { $sev = 'medium'; $medium += 1 }
+      else { $low += 1 }
+      $findings += @{
+        id = [Guid]::NewGuid().ToString()
+        test = 'Windows Hardening Check'
+        description = $line.Trim()
+        result = 'WARNING'
+        severity = $sev
+        recommendation = 'Apply the recommended hardening configuration.'
+      }
     }
   }
 
-  $score = 100 - ($critical * 15) - ($high * 10) - ($medium * 5) - ($low * 2)
-  if ($score -lt 0) { $score = 0 }
-  if ($score -gt 100) { $score = 100 }
+  $total = $passed + $critical + $high + $medium + $low
+  $score = if ($total -gt 0) { [math]::Round(($passed / $total) * 100) } else { 0 }
 
   return @{
     findings = $findings
@@ -395,7 +422,17 @@ function Submit-Report {
   $hostname = $env:COMPUTERNAME
   $ipAddress = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -ne '127.0.0.1' } | Select-Object -First 1 -ExpandProperty IPAddress)
   if (-not $ipAddress) { $ipAddress = "Unknown" }
-  $os = (Get-CimInstance Win32_OperatingSystem).Caption
+  $osInfo = Get-CimInstance Win32_OperatingSystem
+  $os = $osInfo.Caption
+  $osBuild = $osInfo.BuildNumber
+  $osVersion = $osInfo.Version
+  $osArch = $osInfo.OSArchitecture
+  $domain = (Get-CimInstance Win32_ComputerSystem).Domain
+  $lastBoot = $osInfo.LastBootUpTime.ToString('yyyy-MM-dd HH:mm:ss')
+
+  $csvContent = ""
+  $csvPath = "$REPORT_DIR\\audit.csv"
+  if (Test-Path $csvPath) { $csvContent = Get-Content $csvPath -Raw }
 
   $payload = @{
     agentInstallationToken = $AGENT_TOKEN
@@ -403,7 +440,7 @@ function Submit-Report {
     ipAddress = $ipAddress
     ownerName = $OWNER_NAME
     auditData = @{
-      operatingSystem = $os
+      operatingSystem = "$os (Build $osBuild)"
       auditScore = $Parsed.score
       warnings = $Parsed.high + $Parsed.critical
       suggestions = $Parsed.medium + $Parsed.low
@@ -415,10 +452,15 @@ function Submit-Report {
         medium = $Parsed.medium
         low = $Parsed.low
         passed = $Parsed.passed
+        osVersion = $osVersion
+        osBuild = $osBuild
+        osArch = $osArch
+        domain = $domain
+        lastBoot = $lastBoot
       }
       rawReport = $RawOutput
       logFileContent = $RawOutput
-      reportFileContent = ""
+      reportFileContent = $csvContent
       lynisVersion = "windows-audit"
       auditDuration = 60
     }
