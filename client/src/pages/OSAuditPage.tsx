@@ -451,7 +451,7 @@ function Submit-Report {
 
   $csvContent = ""
   $csvPath = "$REPORT_DIR\\audit.csv"
-  if (Test-Path $csvPath) { $csvContent = Get-Content $csvPath -Raw }
+  if (Test-Path $csvPath) { $csvContent = [System.IO.File]::ReadAllText($csvPath) }
 
   # Build findings as simple PSObjects (much faster JSON serialization than hashtables)
   Write-Log "Building payload..."
