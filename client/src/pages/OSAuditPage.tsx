@@ -160,16 +160,22 @@ const OSAuditPage: React.FC = () => {
     }
   };
 
-  const handleDeleteMachine = async (machineId: string) => {
-    if (window.confirm('Are you sure you want to delete this machine? This will also delete all associated reports.')) {
-      try {
-        await axios.delete(`/api/v1/os-audit/machines/${machineId}`, { withCredentials: true });
-        setMachines(machines.filter(m => m._id !== machineId));
-        await fetchData();
-      } catch (error: any) {
-        console.error('Error deleting machine:', error);
-        alert(error.response?.data?.error || 'Failed to delete machine');
+  const handleDeleteMachine = async (e: React.MouseEvent, machineId: string) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to delete this machine? This will also delete all associated reports.')) {
+      return;
+    }
+    try {
+      const res = await axios.delete(`/api/v1/os-audit/machines/${machineId}`, { withCredentials: true });
+      if (res.data?.success) {
+        setMachines(prev => prev.filter(m => m._id !== machineId));
+        setReports(prev => prev.filter(r => (r as any).machine !== machineId));
+      } else {
+        alert(res.data?.error || 'Failed to delete machine');
       }
+    } catch (error: any) {
+      console.error('Error deleting machine:', error);
+      alert(error.response?.data?.error || 'Failed to delete machine');
     }
   };
 
@@ -1116,7 +1122,7 @@ echo "Or manually run: sudo $AGENT_DIR/agent.sh"
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleDeleteMachine(machine._id)}
+                            onClick={(e) => handleDeleteMachine(e, machine._id)}
                             className="border-red-500/20 text-red-400 hover:bg-red-500/10"
                           >
                             <Trash2 className="w-4 h-4" />

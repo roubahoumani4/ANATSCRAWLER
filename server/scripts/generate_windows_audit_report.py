@@ -10,6 +10,7 @@ import argparse
 import csv
 import io
 import json
+import os
 import re
 import sys
 from collections import defaultdict
@@ -73,10 +74,345 @@ def _safe(text: str, max_len: int = 0) -> str:
     return t
 
 
+# ---------------------------------------------------------------------------
+# Knowledge base: maps categories / setting names to human-readable
+# explanations, impact descriptions, and remediation guidance.
+# Matching is keyword-based so it works for any HardeningKitty finding.
+# ---------------------------------------------------------------------------
+
+_WINDOWS_KB: list[dict] = [
+    # --- Account & Password Policies ---
+    {
+        "keywords": ["account lockout duration"],
+        "description": "Defines how long an account stays locked after exceeding failed login attempts.",
+        "impact": "Too short a duration allows brute-force attacks to retry quickly.",
+        "remediation": "Set via Group Policy: Computer Configuration > Policies > Windows Settings > Security Settings > Account Policies > Account Lockout Policy. Recommended: 15 minutes or more.",
+    },
+    {
+        "keywords": ["account lockout threshold"],
+        "description": "Number of failed logon attempts before the account is locked.",
+        "impact": "A high or disabled threshold makes brute-force attacks feasible.",
+        "remediation": "Set to 10 or fewer failed attempts via Group Policy > Account Lockout Policy.",
+    },
+    {
+        "keywords": ["reset account lockout counter"],
+        "description": "Time after which the failed-logon counter resets to zero.",
+        "impact": "If too short, attackers can space attempts to avoid lockout.",
+        "remediation": "Set to at least 15 minutes via Group Policy > Account Lockout Policy.",
+    },
+    {
+        "keywords": ["store passwords using reversible encryption"],
+        "description": "Controls whether Windows stores passwords in a reversible (recoverable) format.",
+        "impact": "Reversible encryption is nearly as insecure as plaintext; any compromise of the SAM database exposes all passwords.",
+        "remediation": "Ensure this policy is Disabled in Group Policy > Password Policy.",
+    },
+    {
+        "keywords": ["administrator account lockout"],
+        "description": "Whether the built-in Administrator account is subject to lockout.",
+        "impact": "If not lockable, the Administrator account can be brute-forced indefinitely.",
+        "remediation": "Enable via Group Policy or net accounts command.",
+    },
+    {
+        "keywords": ["block microsoft accounts"],
+        "description": "Prevents users from adding or logging in with Microsoft accounts.",
+        "impact": "Microsoft accounts bypass local password policies and may sync credentials externally.",
+        "remediation": "Set to 'Users can't add or log on with Microsoft accounts' via Security Options.",
+    },
+    # --- User Rights Assignment ---
+    {
+        "keywords": ["access this computer from the network"],
+        "description": "Determines which users/groups can connect to the computer over the network.",
+        "impact": "Excessive access allows unauthorized remote connections and lateral movement.",
+        "remediation": "Restrict to Administrators only via Group Policy > User Rights Assignment.",
+    },
+    {
+        "keywords": ["allow log on locally"],
+        "description": "Controls which users can interactively log on at the console.",
+        "impact": "Allowing too many accounts increases the attack surface for local exploitation.",
+        "remediation": "Limit to Users and Administrators via Group Policy > User Rights Assignment.",
+    },
+    {
+        "keywords": ["debug programs"],
+        "description": "Grants the ability to attach a debugger to any process, including system processes.",
+        "impact": "An attacker with this right can extract credentials from memory (e.g., LSASS) or inject code into privileged processes.",
+        "remediation": "Remove all entries or restrict to Administrators only via Group Policy > User Rights Assignment.",
+    },
+    {
+        "keywords": ["deny access to this computer from the network"],
+        "description": "Explicitly denies network logon to specified accounts/groups.",
+        "impact": "Without deny rules, compromised guest or local accounts can be used for lateral movement.",
+        "remediation": "Add Guests and 'NT AUTHORITY\\Local account' to the deny list via Group Policy.",
+    },
+    {
+        "keywords": ["deny log on as a batch job"],
+        "description": "Prevents specified accounts from logging on as a batch job (scheduled tasks).",
+        "impact": "Unrestricted batch logon rights let attackers schedule persistent malicious tasks.",
+        "remediation": "Add Guests to the deny list via Group Policy > User Rights Assignment.",
+    },
+    {
+        "keywords": ["deny log on as a service"],
+        "description": "Prevents specified accounts from registering a process as a service.",
+        "impact": "An attacker could install a malicious service running under a privileged account.",
+        "remediation": "Add Guests to the deny list via Group Policy > User Rights Assignment.",
+    },
+    {
+        "keywords": ["deny log on through remote desktop"],
+        "description": "Prevents specified accounts from connecting via RDP.",
+        "impact": "Without deny rules, compromised accounts can be used for remote access.",
+        "remediation": "Add Guests and 'NT AUTHORITY\\Local account' to the deny list via Group Policy.",
+    },
+    # --- Security Options ---
+    {
+        "keywords": ["do not require ctrl+alt+del"],
+        "description": "Controls whether Ctrl+Alt+Del is required before the logon screen.",
+        "impact": "Without it, a spoofed login screen could capture credentials.",
+        "remediation": "Set to Disabled (i.e., require Ctrl+Alt+Del) via Security Options.",
+    },
+    {
+        "keywords": ["don't display last signed-in", "don't display username"],
+        "description": "Controls whether the last logged-in username is shown on the logon screen.",
+        "impact": "Displaying usernames gives attackers valid account names for targeted attacks.",
+        "remediation": "Enable these settings via Group Policy > Security Options > Interactive logon.",
+    },
+    {
+        "keywords": ["digitally sign communications"],
+        "description": "Requires SMB packet signing between client and server.",
+        "impact": "Without signing, SMB traffic can be intercepted or modified (man-in-the-middle).",
+        "remediation": "Enable 'always' for both client and server via Group Policy > Security Options.",
+    },
+    {
+        "keywords": ["anonymous enumeration of sam"],
+        "description": "Controls whether anonymous users can enumerate SAM accounts and shares.",
+        "impact": "Anonymous enumeration reveals valid usernames and share names to attackers.",
+        "remediation": "Set both 'Do not allow anonymous enumeration' policies to Enabled.",
+    },
+    {
+        "keywords": ["storage of passwords and credentials for network"],
+        "description": "Controls caching of network authentication credentials.",
+        "impact": "Cached credentials can be extracted and used for pass-the-hash attacks.",
+        "remediation": "Set to Enabled (do not allow storage) via Group Policy > Security Options.",
+    },
+    {
+        "keywords": ["restrict clients allowed to make remote calls to sam"],
+        "description": "Restricts which accounts can remotely query the SAM database.",
+        "impact": "Unrestricted SAM access allows attackers to enumerate all local accounts remotely.",
+        "remediation": "Set to 'O:BAG:BAD:(A;;RC;;;BA)' (Administrators only) via Group Policy.",
+    },
+    {
+        "keywords": ["lan manager authentication level"],
+        "description": "Determines the challenge/response authentication protocol used for network logons.",
+        "impact": "LM and NTLMv1 are weak and susceptible to offline cracking attacks.",
+        "remediation": "Set to level 5 (Send NTLMv2 response only, refuse LM & NTLM) via Security Options.",
+    },
+    {
+        "keywords": ["minimum session security for ntlm"],
+        "description": "Defines minimum security requirements for NTLM SSP-based connections.",
+        "impact": "Without 128-bit encryption and NTLMv2 session security, traffic is vulnerable to interception.",
+        "remediation": "Enable 'Require NTLMv2 session security' and 'Require 128-bit encryption'.",
+    },
+    {
+        "keywords": ["restrict ntlm"],
+        "description": "Controls auditing and restriction of NTLM authentication traffic.",
+        "impact": "NTLM is vulnerable to relay attacks; unrestricted use exposes the network to credential theft.",
+        "remediation": "Enable auditing of all NTLM traffic first, then progressively restrict via Group Policy.",
+    },
+    {
+        "keywords": ["allow system to be shut down without"],
+        "description": "Controls whether the system can be shut down without requiring logon.",
+        "impact": "Allows anyone with physical access to shut down the system, causing denial of service.",
+        "remediation": "Set to Disabled via Group Policy > Security Options.",
+    },
+    {
+        "keywords": ["admin approval mode"],
+        "description": "Controls whether the built-in Administrator runs in Admin Approval Mode (UAC).",
+        "impact": "Without it, the built-in Administrator bypasses all UAC prompts, increasing malware risk.",
+        "remediation": "Set to Enabled via Group Policy > Security Options > User Account Control.",
+    },
+    {
+        "keywords": ["behavior of the elevation prompt for admin"],
+        "description": "Determines what happens when an admin needs elevated privileges.",
+        "impact": "Auto-elevation without prompting allows malware to silently gain admin privileges.",
+        "remediation": "Set to 'Prompt for consent on the secure desktop' via UAC settings.",
+    },
+    {
+        "keywords": ["behavior of the elevation prompt for standard"],
+        "description": "Determines what happens when a standard user needs elevated privileges.",
+        "impact": "Allowing auto-deny or no prompt can either frustrate users or bypass security.",
+        "remediation": "Set to 'Automatically deny elevation requests' via UAC settings.",
+    },
+    {
+        "keywords": ["do not store lan manager hash"],
+        "description": "Prevents Windows from storing the weak LAN Manager hash of passwords.",
+        "impact": "LM hashes are trivially crackable; storing them exposes all passwords.",
+        "remediation": "Ensure this is Enabled via Group Policy > Security Options.",
+    },
+    # --- Windows Firewall ---
+    {
+        "keywords": ["enablefirewall"],
+        "description": "Controls whether Windows Firewall is active for the given profile (Domain/Private/Public).",
+        "impact": "A disabled firewall exposes all network services to direct attack.",
+        "remediation": "Enable the firewall for all profiles via Group Policy or Windows Security settings.",
+    },
+    {
+        "keywords": ["inbound connections"],
+        "description": "Default action for unsolicited inbound network connections.",
+        "impact": "Allowing inbound connections by default exposes services to exploitation.",
+        "remediation": "Set to 'Block' for all profiles in Windows Firewall advanced settings.",
+    },
+    {
+        "keywords": ["outbound connections"],
+        "description": "Default action for outgoing network connections.",
+        "impact": "Unrestricted outbound traffic allows malware to communicate with C2 servers.",
+        "remediation": "Consider blocking outbound by default and whitelisting required applications.",
+    },
+    {
+        "keywords": ["log size limit"],
+        "description": "Maximum size (KB) for the Windows Firewall log file.",
+        "impact": "Small log files roll over quickly, destroying evidence needed for incident investigation.",
+        "remediation": "Set to at least 16384 KB (16 MB) for all profiles via Group Policy.",
+    },
+    {
+        "keywords": ["log dropped packets"],
+        "description": "Whether the firewall logs blocked (dropped) network packets.",
+        "impact": "Without logging, blocked attack attempts go undetected.",
+        "remediation": "Enable dropped-packet logging for all profiles via Group Policy.",
+    },
+    {
+        "keywords": ["log successful connections"],
+        "description": "Whether the firewall logs allowed connections.",
+        "impact": "Without connection logging, legitimate but suspicious traffic cannot be reviewed.",
+        "remediation": "Enable successful-connection logging for all profiles via Group Policy.",
+    },
+    # --- Audit Policy ---
+    {
+        "keywords": ["credential validation"],
+        "description": "Audits authentication events where credentials are validated.",
+        "impact": "Without this audit, failed logon attempts and credential attacks go undetected.",
+        "remediation": "Set to 'Success and Failure' via Advanced Audit Policy Configuration.",
+    },
+    {
+        "keywords": ["dpapi activity"],
+        "description": "Audits Data Protection API operations (credential encryption/decryption).",
+        "impact": "DPAPI is used to protect stored credentials; unaudited access hides credential theft.",
+        "remediation": "Set to 'Success and Failure' via Advanced Audit Policy Configuration.",
+    },
+    {
+        "keywords": ["process creation"],
+        "description": "Audits the creation of new processes on the system.",
+        "impact": "Without process auditing, malware execution and suspicious commands go unlogged.",
+        "remediation": "Set to 'Success' via Advanced Audit Policy; also enable command-line logging.",
+    },
+    {
+        "keywords": ["security group management"],
+        "description": "Audits changes to security groups (adding/removing members).",
+        "impact": "Unaudited group changes allow silent privilege escalation.",
+        "remediation": "Set to at least 'Success' via Advanced Audit Policy Configuration.",
+    },
+    {
+        "keywords": ["plug and play events"],
+        "description": "Audits when Plug and Play devices are connected.",
+        "impact": "Unaudited USB/device connections can introduce malware or data exfiltration.",
+        "remediation": "Set to 'Success' via Advanced Audit Policy Configuration.",
+    },
+    # --- SMB / Features ---
+    {
+        "keywords": ["smbv1"],
+        "description": "Controls whether the legacy SMBv1 protocol is enabled.",
+        "impact": "SMBv1 is vulnerable to EternalBlue (WannaCry/NotPetya) and other critical exploits.",
+        "remediation": "Disable SMBv1 via: Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol.",
+    },
+    # --- HardeningKitty Block rules ---
+    {
+        "keywords": ["hardeningkitty-block"],
+        "description": "Application execution control rules that block potentially dangerous executables.",
+        "impact": "Without execution blocking, attackers can use living-off-the-land binaries (LOLBins) for code execution.",
+        "remediation": "Deploy Application Control Policies (AppLocker or WDAC) to restrict executable access.",
+    },
+    # --- Windows Update / WSUS ---
+    {
+        "keywords": ["windows update", "wsus"],
+        "description": "Configuration for automatic Windows Update or WSUS patching.",
+        "impact": "Unpatched systems are vulnerable to known exploits with public attack tools.",
+        "remediation": "Enable automatic updates or configure WSUS via Group Policy.",
+    },
+    # --- Credential Guard / Device Guard ---
+    {
+        "keywords": ["credential guard", "lsa protection"],
+        "description": "Virtualization-based security protecting credentials from extraction.",
+        "impact": "Without Credential Guard, tools like Mimikatz can extract plaintext passwords from memory.",
+        "remediation": "Enable Credential Guard via Group Policy > Device Guard settings (requires VBS-capable hardware).",
+    },
+]
+
+
+# ── Gemini AI fallback for unmatched findings ──
+_gemini_cache: Dict[str, dict] = {}
+
+
+def _ask_gemini(name: str, category: str) -> Optional[dict]:
+    """Call Gemini API to explain an unknown Windows finding."""
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        return None
+    cache_key = f"{category}|{name}"
+    if cache_key in _gemini_cache:
+        return _gemini_cache[cache_key]
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-2.0-flash")
+        prompt = (
+            "You are a Windows security hardening expert. "
+            f"Explain this Windows audit finding in exactly 3 short lines:\n"
+            f"Category: {category}\nSetting: {name}\n\n"
+            "Line 1 - DESCRIPTION: What this setting does (1 sentence).\n"
+            "Line 2 - IMPACT: Security impact if misconfigured (1 sentence).\n"
+            "Line 3 - REMEDIATION: How to fix it (1 sentence).\n\n"
+            "Reply ONLY with 3 lines, no labels, no extra text."
+        )
+        resp = model.generate_content(prompt)
+        lines = [l.strip() for l in resp.text.strip().splitlines() if l.strip()]
+        if len(lines) >= 3:
+            result = {
+                "description": lines[0],
+                "impact": lines[1],
+                "remediation": lines[2],
+            }
+        else:
+            result = {
+                "description": lines[0] if lines else name,
+                "impact": lines[1] if len(lines) > 1 else "Non-compliance may weaken security.",
+                "remediation": lines[2] if len(lines) > 2 else "Apply the recommended value via Group Policy.",
+            }
+        _gemini_cache[cache_key] = result
+        return result
+    except Exception as e:
+        print(f"Gemini API warning (non-fatal): {e}", file=sys.stderr)
+        return None
+
+
+def _lookup_kb(name: str, category: str) -> dict:
+    """Find the best matching knowledge-base entry; fall back to Gemini AI."""
+    text = (name + " " + category).lower()
+    for entry in _WINDOWS_KB:
+        if any(kw in text for kw in entry["keywords"]):
+            return entry
+    # Try Gemini AI for unmatched findings
+    ai_result = _ask_gemini(name, category)
+    if ai_result:
+        return ai_result
+    return {
+        "description": "This setting controls a Windows security configuration parameter.",
+        "impact": "Non-compliance may weaken the system's security posture.",
+        "remediation": "Review the CIS Microsoft Windows Benchmark for the recommended value and apply via Group Policy or registry.",
+    }
+
+
 def parse_csv_report(csv_text: str) -> Dict:
     """Parse HardeningKitty CSV report into structured data."""
     findings: Dict[str, List[Dict]] = defaultdict(list)
     categories: Dict[str, Dict[str, int]] = defaultdict(lambda: {"passed": 0, "failed": 0})
+    seen_ids: set = set()
     passed = 0
     failed = 0
     total = 0
@@ -98,6 +434,11 @@ def parse_csv_report(csv_text: str) -> Dict:
         else:
             failed += 1
             categories[category]["failed"] += 1
+            # Deduplicate by ID (or by name if ID is empty)
+            dedup_key = finding_id or name
+            if dedup_key in seen_ids:
+                continue
+            seen_ids.add(dedup_key)
             findings[severity].append({
                 "id": finding_id,
                 "category": category,
@@ -404,14 +745,18 @@ class WindowsAuditPDFReport:
                 sev = "critical" if idx <= len(crit) else "high"
                 sev_label = sev.upper()
                 style = self.styles["CriticalFinding"] if sev == "critical" else self.styles["HighFinding"]
+                kb = _lookup_kb(f.get("name", ""), f.get("category", ""))
                 text = f"""
                 <b>{idx}. [{sev_label}] {_safe(f.get('id',''))} — {_safe(f.get('name',''), 120)}</b><br/>
-                Category: {_safe(f.get('category',''))}<br/>
-                Current Value: {_safe(f.get('current_value','N/A'))}<br/>
-                <i>Recommendation: Set to {_safe(f.get('recommended_value','recommended value'))}</i>
+                <b>Category:</b> {_safe(f.get('category',''))}<br/>
+                <b>What it means:</b> {_safe(kb['description'])}<br/>
+                <b>Security impact:</b> {_safe(kb['impact'])}<br/>
+                <b>Current Value:</b> {_safe(f.get('current_value','N/A'))}
+                &nbsp;&nbsp;|&nbsp;&nbsp;<b>Recommended:</b> {_safe(f.get('recommended_value','N/A'))}<br/>
+                <b>How to fix:</b> <i>{_safe(kb['remediation'])}</i>
                 """
                 self.story.append(Paragraph(text, style))
-                self.story.append(Spacer(1, 0.08 * inch))
+                self.story.append(Spacer(1, 0.1 * inch))
 
         self.story.append(Spacer(1, 0.2 * inch))
 
@@ -428,31 +773,21 @@ class WindowsAuditPDFReport:
                 f"<b>{severity.title()} Priority ({len(items)} findings)</b>",
                 self.styles["SubsectionTitle"]))
 
-            rows = [["ID", "Name", "Current", "Recommended"]]
-            for f in items:
-                rows.append([
-                    _safe(f.get("id", ""), 12),
-                    _safe(f.get("name", ""), 60),
-                    _safe(f.get("current_value", ""), 30),
-                    _safe(f.get("recommended_value", ""), 30),
-                ])
-            col_w = [0.8 * inch, 2.8 * inch, 1.2 * inch, 1.2 * inch]
-            t = Table(rows, colWidths=col_w, repeatRows=1)
-            t.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2c5282")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e0")),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1),
-                 [colors.white, colors.HexColor("#f7fafc")]),
-                ("FONTSIZE", (0, 0), (-1, -1), 7),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 4),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-                ("TOPPADDING", (0, 0), (-1, -1), 3),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-            ]))
-            self.story.append(t)
+            for idx, f in enumerate(items, 1):
+                kb = _lookup_kb(f.get("name", ""), f.get("category", ""))
+                name = _safe(f.get("name", ""), 100)
+                fid = _safe(f.get("id", ""), 12)
+                cur = _safe(f.get("current_value", "N/A"), 40)
+                rec = _safe(f.get("recommended_value", "N/A"), 40)
+                text = f"""
+                <b>{idx}. [{fid}] {name}</b><br/>
+                {_safe(kb['description'])}<br/>
+                <font color="#555555">Current: {cur} &#8594; Recommended: {rec}</font><br/>
+                <i>Fix: {_safe(kb['remediation'])}</i>
+                """
+                self.story.append(Paragraph(text, self.styles["Normal"]))
+                self.story.append(Spacer(1, 0.06 * inch))
+
             self.story.append(Spacer(1, 0.15 * inch))
 
     # ------------------------------------------------------------------

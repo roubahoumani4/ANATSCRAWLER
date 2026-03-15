@@ -127,6 +127,8 @@ jobs:
           VIRUSTOTAL_API_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}
           GREYNOISE_API_KEY: ${{ secrets.GREYNOISE_API_KEY }}
           IPINFO_API_KEY: ${{ secrets.IPINFO_API_KEY }}
+          # Gemini AI for PDF report explanations
+          GEMINI_API_KEY: ${{ secrets.GEMINI_PDF_GENERATOR }}
           # Frontend runtime hint (not strictly required)
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
         with:
@@ -135,7 +137,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.DEPLOY_PORT }}
           command_timeout: 6m
-          envs: APP_PORT,JWT_SECRET,COOKIE_SECRET,MONGODB_URL,ELASTICSEARCH_URL,REDIS_URL,MISP_URL,MISP_API_KEY,MISP_VERIFY_TLS,MISP_TIMEOUT_MS,ALIENVAULT_API_KEY,VIRUSTOTAL_API_KEY,GREYNOISE_API_KEY,IPINFO_API_KEY,VITE_API_URL
+          envs: APP_PORT,JWT_SECRET,COOKIE_SECRET,MONGODB_URL,ELASTICSEARCH_URL,REDIS_URL,MISP_URL,MISP_API_KEY,MISP_VERIFY_TLS,MISP_TIMEOUT_MS,ALIENVAULT_API_KEY,VIRUSTOTAL_API_KEY,GREYNOISE_API_KEY,IPINFO_API_KEY,GEMINI_API_KEY,VITE_API_URL
           script: |
             set -e
             BASE_DIR=/var/www/anatscrawler
@@ -282,6 +284,8 @@ jobs:
             VIRUSTOTAL_API_KEY=${VIRUSTOTAL_API_KEY:-}
             GREYNOISE_API_KEY=${GREYNOISE_API_KEY:-}
             IPINFO_API_KEY=${IPINFO_API_KEY:-}
+            # Gemini AI for PDF report generation
+            GEMINI_API_KEY=${GEMINI_API_KEY:-}
             # Embedded OSINT engine integration removed; no engine-specific env vars set
             # CORS Configuration
             CORS_ORIGIN=https://horus.anatsecurity.fr

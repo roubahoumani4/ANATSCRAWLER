@@ -6,6 +6,7 @@ Compliant with: ISO 27001, NIST, CIS Benchmarks, SANS Guidelines
 """
 
 import json
+import os
 import re
 import sys
 from datetime import datetime
@@ -27,6 +28,208 @@ try:
 except ImportError:
     print("Error: reportlab is required. Install with: pip install reportlab")
     sys.exit(1)
+
+
+_LINUX_KB = [
+    # ── Authentication & Access ──
+    {"keywords": ["password", "passwd", "pam_pwquality", "pam_cracklib", "minlen", "password strength"],
+     "description": "Controls how strong user passwords must be (length, complexity, history).",
+     "impact": "Weak password policies allow brute-force or credential-stuffing attacks.",
+     "remediation": "Configure /etc/security/pwquality.conf (minlen >= 12, dcredit, ucredit, lcredit, ocredit). Enforce via PAM."},
+    {"keywords": ["password aging", "pass_max_days", "pass_min_days", "pass_warn_age", "login.defs"],
+     "description": "Defines maximum/minimum password age and warning period before expiry.",
+     "impact": "Without aging, compromised credentials may remain valid indefinitely.",
+     "remediation": "Set PASS_MAX_DAYS=90, PASS_MIN_DAYS=7, PASS_WARN_AGE=14 in /etc/login.defs."},
+    {"keywords": ["account lockout", "pam_tally", "pam_faillock", "deny=", "failed login"],
+     "description": "Locks accounts after repeated authentication failures.",
+     "impact": "Without lockout, attackers can attempt unlimited password guesses.",
+     "remediation": "Enable pam_faillock with deny=5, unlock_time=900 in /etc/pam.d/common-auth."},
+    {"keywords": ["umask", "default umask"],
+     "description": "Sets default file-creation permission mask for new files.",
+     "impact": "A permissive umask (e.g. 002/022) may leave files world-readable.",
+     "remediation": "Set umask to 027 or 077 in /etc/profile, /etc/bashrc, and /etc/login.defs."},
+    {"keywords": ["root login", "permit root", "su access", "securetty"],
+     "description": "Controls whether root can log in directly via console or SSH.",
+     "impact": "Direct root login bypasses audit-trail accountability and increases attack surface.",
+     "remediation": "Set PermitRootLogin no in sshd_config. Use sudo for privilege escalation."},
+    {"keywords": ["sudoers", "sudo", "privilege escalation"],
+     "description": "Manages which users may execute commands as root via sudo.",
+     "impact": "Misconfigured sudoers can grant excessive privileges to unprivileged users.",
+     "remediation": "Audit /etc/sudoers with visudo. Remove NOPASSWD where possible. Use groups."},
+    {"keywords": ["uid", "gid", "duplicate", "user account", "group account", "empty password"],
+     "description": "Checks for duplicate UIDs/GIDs, accounts with empty passwords, or orphan accounts.",
+     "impact": "Duplicate IDs cause identity confusion; empty passwords allow unauthenticated access.",
+     "remediation": "Remove or lock duplicate/orphan accounts. Ensure all accounts have strong passwords."},
+    # ── SSH Hardening ──
+    {"keywords": ["ssh", "sshd", "openssh", "protocol", "allowusers", "maxauthtries", "permitemptypasswords",
+                   "x11forwarding", "clientaliveinterval", "loglevel", "banner"],
+     "description": "Evaluates SSH daemon configuration against security best practices.",
+     "impact": "Weak SSH settings can allow brute-force attacks, session hijacking, or unauthorized access.",
+     "remediation": "Harden /etc/ssh/sshd_config: Protocol 2, PermitRootLogin no, MaxAuthTries 3, "
+                    "PermitEmptyPasswords no, X11Forwarding no, ClientAliveInterval 300, LogLevel VERBOSE."},
+    # ── File System & Permissions ──
+    {"keywords": ["suid", "sgid", "sticky bit", "world-writable", "file permission"],
+     "description": "Detects files with dangerous permission bits (SUID/SGID/world-writable).",
+     "impact": "SUID/SGID binaries can be exploited for privilege escalation.",
+     "remediation": "Audit with: find / -perm /6000 -type f. Remove unnecessary SUID/SGID bits."},
+    {"keywords": ["tmp", "/tmp", "/var/tmp", "noexec", "nosuid", "nodev", "mount option"],
+     "description": "Checks that temporary directories are mounted with restrictive options.",
+     "impact": "Attackers can execute malicious code from /tmp if noexec/nosuid are missing.",
+     "remediation": "Add noexec,nosuid,nodev mount options for /tmp and /var/tmp in /etc/fstab."},
+    {"keywords": ["home directory", "home permission"],
+     "description": "Verifies that user home directories are not accessible by other users.",
+     "impact": "Readable home directories may expose SSH keys, credentials, or personal data.",
+     "remediation": "Set permissions to 750 or 700: chmod 750 /home/*."},
+    {"keywords": ["file integrity", "aide", "tripwire", "ossec", "samhain"],
+     "description": "Checks whether a file-integrity monitoring (FIM) tool is installed.",
+     "impact": "Without FIM, unauthorized or malicious modifications to critical files go undetected.",
+     "remediation": "Install and configure AIDE: apt install aide && aideinit. Schedule daily checks via cron."},
+    # ── Firewall & Network ──
+    {"keywords": ["firewall", "iptables", "nftables", "ufw", "firewalld"],
+     "description": "Verifies that a host-based firewall is active and configured.",
+     "impact": "Without a firewall, all network services are exposed to the network.",
+     "remediation": "Enable and configure ufw or iptables. Default-deny inbound traffic."},
+    {"keywords": ["open port", "listening", "network service", "tcp", "udp"],
+     "description": "Lists services listening on open ports that increase the attack surface.",
+     "impact": "Unnecessary open ports expose services to network attacks.",
+     "remediation": "Close unused ports. Review with: ss -tulnp. Disable unneeded services."},
+    {"keywords": ["ip forward", "packet redirect", "icmp", "syn cookie", "network parameter", "sysctl"],
+     "description": "Evaluates kernel network parameters for secure defaults.",
+     "impact": "IP forwarding or accepting redirects can enable man-in-the-middle attacks.",
+     "remediation": "Disable ip_forward, send_redirects, accept_redirects in /etc/sysctl.conf. Enable SYN cookies."},
+    {"keywords": ["dns", "nameserver", "resolv.conf"],
+     "description": "Checks DNS resolver configuration for security implications.",
+     "impact": "Untrustworthy DNS servers can redirect traffic via DNS poisoning.",
+     "remediation": "Use trusted DNS resolvers. Consider DNSSEC validation."},
+    # ── Kernel Hardening ──
+    {"keywords": ["kernel", "sysctl", "aslr", "randomize_va_space", "dmesg_restrict",
+                   "kptr_restrict", "core_dump", "core dump"],
+     "description": "Evaluates kernel hardening parameters (ASLR, dmesg restriction, etc.).",
+     "impact": "Disabled ASLR or unrestricted dmesg/kptr can aid exploitation of kernel vulnerabilities.",
+     "remediation": "Set kernel.randomize_va_space=2, kernel.dmesg_restrict=1, "
+                    "kernel.kptr_restrict=2, fs.suid_dumpable=0 in /etc/sysctl.conf."},
+    # ── Logging & Auditing ──
+    {"keywords": ["syslog", "rsyslog", "journald", "log", "logging"],
+     "description": "Checks that system logging is active and properly configured.",
+     "impact": "Without logging, security incidents cannot be detected or investigated.",
+     "remediation": "Ensure rsyslog or journald is running. Forward logs to a central SIEM."},
+    {"keywords": ["auditd", "audit daemon", "audit rule", "audit log"],
+     "description": "Verifies the Linux Audit Framework (auditd) is active with adequate rules.",
+     "impact": "Missing audit rules means changes to critical files/commands are not recorded.",
+     "remediation": "Install and enable auditd. Add rules for /etc/passwd, /etc/shadow, sudo, su."},
+    {"keywords": ["log rotation", "logrotate"],
+     "description": "Checks that log files are rotated to prevent disk exhaustion.",
+     "impact": "Unrotated logs can fill the disk, causing denial of service.",
+     "remediation": "Configure /etc/logrotate.conf with appropriate retention (e.g. 12 weeks)."},
+    # ── Software & Updates ──
+    {"keywords": ["update", "upgrade", "patch", "package", "apt", "yum", "dnf", "vulnerable package"],
+     "description": "Checks for available security updates and vulnerable packages.",
+     "impact": "Unpatched software contains known vulnerabilities that attackers actively exploit.",
+     "remediation": "Apply all pending security updates: apt update && apt upgrade (Debian/Ubuntu) "
+                    "or yum update (RHEL/CentOS). Enable unattended-upgrades."},
+    {"keywords": ["compiler", "gcc", "make", "development tool"],
+     "description": "Detects compilers and development tools installed on production systems.",
+     "impact": "Compilers allow attackers to build exploits directly on the compromised system.",
+     "remediation": "Remove compilers from production: apt remove gcc make (unless required)."},
+    # ── Malware & Integrity ──
+    {"keywords": ["malware", "antivirus", "clamav", "rkhunter", "chkrootkit", "rootkit"],
+     "description": "Checks for malware scanners and rootkit detection tools.",
+     "impact": "Without anti-malware tools, infections may go undetected.",
+     "remediation": "Install rkhunter and/or ClamAV. Schedule daily scans via cron."},
+    # ── Cryptography ──
+    {"keywords": ["ssl", "tls", "certificate", "cipher", "encryption", "cryptograph"],
+     "description": "Evaluates TLS/SSL configuration and certificate validity.",
+     "impact": "Weak ciphers or expired certificates allow traffic interception.",
+     "remediation": "Disable TLS 1.0/1.1. Use TLS 1.2+ with strong cipher suites. Renew expired certificates."},
+    # ── Boot & GRUB ──
+    {"keywords": ["grub", "boot", "bootloader", "single user", "recovery"],
+     "description": "Checks bootloader security (password protection, single-user mode).",
+     "impact": "Unprotected bootloaders allow attackers with physical access to gain root.",
+     "remediation": "Set a GRUB password: grub-mkpasswd-pbkdf2. Require authentication for single-user mode."},
+    # ── Banners & Legal ──
+    {"keywords": ["banner", "motd", "issue", "legal", "warning banner"],
+     "description": "Checks for login warning banners and legal notices.",
+     "impact": "Missing banners weaken legal standing for prosecuting unauthorized access.",
+     "remediation": "Configure /etc/issue and /etc/motd with an authorized-use-only warning."},
+    # ── NTP / Time ──
+    {"keywords": ["ntp", "chrony", "time sync", "time daemon"],
+     "description": "Verifies that time synchronization is active and correctly configured.",
+     "impact": "Clock drift breaks log correlation, Kerberos auth, and forensic timelines.",
+     "remediation": "Install and enable chrony or ntpd. Sync to trusted NTP servers."},
+    # ── Containers / Virtualization ──
+    {"keywords": ["docker", "container", "lxc", "virtualization"],
+     "description": "Checks container runtime security settings.",
+     "impact": "Misconfigured containers can lead to host escape or data exposure.",
+     "remediation": "Run containers as non-root. Use seccomp/AppArmor profiles. Limit capabilities."},
+    # ── USB / Storage ──
+    {"keywords": ["usb", "storage", "removable media", "usb-storage"],
+     "description": "Checks whether USB storage is restricted on the system.",
+     "impact": "Unrestricted USB allows data exfiltration and malware introduction.",
+     "remediation": "Blacklist usb-storage module: echo 'blacklist usb-storage' > /etc/modprobe.d/usb.conf."},
+]
+
+
+# ── Gemini AI fallback for unmatched findings ──
+_gemini_cache: Dict[str, dict] = {}
+
+
+def _ask_gemini(test_id: str, description: str) -> Optional[dict]:
+    """Call Gemini API to explain an unknown Linux/Lynis finding."""
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        return None
+    cache_key = f"{test_id}|{description}"
+    if cache_key in _gemini_cache:
+        return _gemini_cache[cache_key]
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-2.0-flash")
+        prompt = (
+            "You are a Linux security hardening expert. "
+            f"Explain this Lynis audit finding in exactly 3 short lines:\n"
+            f"Test ID: {test_id}\nDescription: {description}\n\n"
+            "Line 1 - DESCRIPTION: What this check does (1 sentence).\n"
+            "Line 2 - IMPACT: Security impact if not addressed (1 sentence).\n"
+            "Line 3 - REMEDIATION: How to fix it (1 sentence).\n\n"
+            "Reply ONLY with 3 lines, no labels, no extra text."
+        )
+        resp = model.generate_content(prompt)
+        lines = [l.strip() for l in resp.text.strip().splitlines() if l.strip()]
+        if len(lines) >= 3:
+            result = {
+                "description": lines[0],
+                "impact": lines[1],
+                "remediation": lines[2],
+            }
+        else:
+            result = {
+                "description": lines[0] if lines else description,
+                "impact": lines[1] if len(lines) > 1 else "Non-compliance may expose the system to threats.",
+                "remediation": lines[2] if len(lines) > 2 else "Review the Lynis documentation for this test ID.",
+            }
+        _gemini_cache[cache_key] = result
+        return result
+    except Exception as e:
+        print(f"Gemini API warning (non-fatal): {e}", file=sys.stderr)
+        return None
+
+
+def _lookup_linux_kb(test_id: str, description: str) -> dict:
+    """Match a Lynis finding against the KB; fall back to Gemini AI."""
+    text = f"{test_id} {description}".lower()
+    for entry in _LINUX_KB:
+        if any(kw in text for kw in entry["keywords"]):
+            return entry
+    # Try Gemini AI for unmatched findings
+    ai_result = _ask_gemini(test_id, description)
+    if ai_result:
+        return ai_result
+    return {
+        "description": "This finding relates to a system configuration that deviates from security best practices.",
+        "impact": "Non-compliant configurations may expose the system to security threats.",
+        "remediation": "Review the Lynis documentation for this test ID and apply the recommended configuration."
+    }
 
 
 class LynisReportParser:
@@ -72,18 +275,21 @@ class LynisReportParser:
         return list(set(values))  # Remove duplicates
     
     def get_suggestions(self) -> List[Dict[str, str]]:
-        """Extract suggestions from report"""
+        """Extract suggestions from report (deduplicated by test_id)"""
         suggestions = []
+        seen: set = set()
         for key, value in self.data.items():
             if key.startswith('suggestion['):
-                # Handle both single values and lists
                 values = value if isinstance(value, list) else [value]
                 for v in values:
-                    # Parse format: TEST_ID|Description|Details|Field|Solution
                     parts = v.split('|')
                     if len(parts) >= 2:
+                        tid = parts[0]
+                        if tid in seen:
+                            continue
+                        seen.add(tid)
                         suggestions.append({
-                            'test_id': parts[0],
+                            'test_id': tid,
                             'description': parts[1],
                             'details': parts[2] if len(parts) > 2 else '',
                             'solution': parts[4] if len(parts) > 4 else ''
@@ -91,17 +297,21 @@ class LynisReportParser:
         return suggestions
     
     def get_warnings(self) -> List[Dict[str, str]]:
-        """Extract warnings from report"""
+        """Extract warnings from report (deduplicated by test_id)"""
         warnings = []
+        seen: set = set()
         for key, value in self.data.items():
             if key.startswith('warning['):
-                # Handle both single values and lists
                 values = value if isinstance(value, list) else [value]
                 for v in values:
                     parts = v.split('|')
                     if len(parts) >= 2:
+                        tid = parts[0]
+                        if tid in seen:
+                            continue
+                        seen.add(tid)
                         warnings.append({
-                            'test_id': parts[0],
+                            'test_id': tid,
                             'description': parts[1],
                             'recommendation': parts[3] if len(parts) > 3 else ''
                         })
@@ -350,7 +560,7 @@ class AuditPDFReport:
         self.story.append(Spacer(1, 0.2*inch))
     
     def _create_critical_findings(self, warnings: List):
-        """Create critical findings section"""
+        """Create critical findings section with detailed explanations"""
         self.story.append(Paragraph("3. CRITICAL FINDINGS", self.styles['SectionTitle']))
         
         if not warnings:
@@ -359,18 +569,25 @@ class AuditPDFReport:
             )
         else:
             for idx, warning in enumerate(warnings, 1):
+                tid = warning.get('test_id', 'UNKNOWN')
+                desc = warning.get('description', '')
+                rec = warning.get('recommendation', '')
+                kb = _lookup_linux_kb(tid, desc)
+                
                 finding_text = f"""
-                <b>{idx}. {warning.get('test_id', 'UNKNOWN')}</b><br/>
-                {warning.get('description', '')}<br/>
-                <i>Recommendation: {warning.get('recommendation', 'See system recommendations')}</i>
+                <b>{idx}. [{tid}] {desc}</b><br/><br/>
+                <b>What it means:</b> {kb['description']}<br/><br/>
+                <b>Security impact:</b> {kb['impact']}<br/><br/>
+                <b>Recommendation:</b> <i>{rec if rec else kb['remediation']}</i><br/><br/>
+                <b>How to fix:</b> {kb['remediation']}
                 """
                 self.story.append(Paragraph(finding_text, self.styles['CriticalFinding']))
-                self.story.append(Spacer(1, 0.1*inch))
+                self.story.append(Spacer(1, 0.15*inch))
         
         self.story.append(Spacer(1, 0.2*inch))
     
     def _create_recommendations(self, suggestions: List):
-        """Create recommendations section"""
+        """Create recommendations section with detailed explanations"""
         self.story.append(Paragraph("4. SECURITY RECOMMENDATIONS", self.styles['SectionTitle']))
         
         # Categorize by severity
@@ -394,14 +611,22 @@ class AuditPDFReport:
                 self.story.append(
                     Paragraph(f"<b>{category} Priority</b>", self.styles['SubsectionTitle'])
                 )
-                for idx, item in enumerate(items, 1):  # Show all items, not limited to 5
+                for idx, item in enumerate(items, 1):
+                    tid = item.get('test_id', 'UNKNOWN')
+                    desc = item.get('description', '')
+                    solution = item.get('solution', '')
+                    details = item.get('details', '')
+                    kb = _lookup_linux_kb(tid, desc)
+                    
                     rec_text = f"""
-                    <b>{idx}. {item.get('test_id', 'UNKNOWN')}</b><br/>
-                    {item.get('description', '')}<br/>
-                    Solution: {item.get('solution', 'Review system configuration')}
+                    <b>{idx}. [{tid}] {desc}</b><br/><br/>
+                    <b>What it means:</b> {kb['description']}<br/><br/>
+                    <b>Security impact:</b> {kb['impact']}<br/><br/>
+                    {f'<b>Details:</b> {details}<br/><br/>' if details else ''}
+                    <b>How to fix:</b> {solution if solution else kb['remediation']}
                     """
                     self.story.append(Paragraph(rec_text, self.styles['Normal']))
-                    self.story.append(Spacer(1, 0.1*inch))
+                    self.story.append(Spacer(1, 0.15*inch))
                 
                 self.story.append(Spacer(1, 0.1*inch))
     

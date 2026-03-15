@@ -145,7 +145,9 @@ export class AuditReportGenerator {
           '-H', lynisReportData.hostname,
           '-I', lynisReportData.ipAddress,
           '-O', lynisReportData.ownerName
-        ]);
+        ], {
+          env: { ...process.env, GEMINI_API_KEY: process.env.GEMINI_API_KEY || '' }
+        });
 
         let stdout = '';
         let stderr = '';
@@ -241,7 +243,9 @@ export class AuditReportGenerator {
           '-H', reportData.hostname,
           '-I', reportData.ipAddress,
           '-O', reportData.ownerName,
-        ]);
+        ], {
+          env: { ...process.env, GEMINI_API_KEY: process.env.GEMINI_API_KEY || '' }
+        });
 
         let stderr = '';
 
