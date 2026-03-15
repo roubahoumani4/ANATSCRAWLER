@@ -976,14 +976,14 @@ echo "Or manually run: sudo $AGENT_DIR/agent.sh"
                       onClick={() => setRegistrationForm({ ...registrationForm, osType: 'linux' })}
                       className={registrationForm.osType === 'linux' ? 'bg-cyan-500 hover:bg-cyan-600' : 'bg-jetBlack border border-coolWhite/20 text-coolWhite'}
                     >
-                      Linux Agent (Lynis)
+                      Linux Agent
                     </Button>
                     <Button
                       type="button"
                       onClick={() => setRegistrationForm({ ...registrationForm, osType: 'windows' })}
                       className={registrationForm.osType === 'windows' ? 'bg-blue-500 hover:bg-blue-600' : 'bg-jetBlack border border-coolWhite/20 text-coolWhite'}
                     >
-                      Windows Agent (HardeningKitty)
+                      Windows Agent
                     </Button>
                   </div>
                 </div>
@@ -1245,7 +1245,7 @@ echo "Or manually run: sudo $AGENT_DIR/agent.sh"
           <DialogContent className="bg-jetBlack border border-coolWhite/10 max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-coolWhite">
-                {(selectedMachine.osType || 'linux') === 'windows' ? 'Install Windows Agent' : 'Install Linux Agent (Lynis)'}
+                {(selectedMachine.osType || 'linux') === 'windows' ? 'Install Windows Agent' : 'Install Linux Agent'}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">

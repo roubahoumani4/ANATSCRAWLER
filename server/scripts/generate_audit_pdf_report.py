@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Comprehensive PDF Report Generator for Lynis OS Audit
-Generates professional, international standard auditing reports from Lynis scan results
+Comprehensive PDF Report Generator for Linux OS Audit
+Generates professional, international standard auditing reports from ANATSCRAWLER scan results
 Compliant with: ISO 27001, NIST, CIS Benchmarks, SANS Guidelines
 """
 
@@ -174,7 +174,7 @@ _gemini_cache: Dict[str, dict] = {}
 
 
 def _ask_gemini(test_id: str, description: str) -> Optional[dict]:
-    """Call Gemini API to explain an unknown Linux/Lynis finding."""
+    """Call Gemini API to explain an unknown Linux audit finding."""
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not api_key:
         return None
@@ -187,7 +187,7 @@ def _ask_gemini(test_id: str, description: str) -> Optional[dict]:
         model = genai.GenerativeModel("gemini-2.0-flash")
         prompt = (
             "You are a Linux security hardening expert. "
-            f"Explain this Lynis audit finding in exactly 3 short lines:\n"
+            f"Explain this Linux audit finding in exactly 3 short lines:\n"
             f"Test ID: {test_id}\nDescription: {description}\n\n"
             "Line 1 - DESCRIPTION: What this check does (1 sentence).\n"
             "Line 2 - IMPACT: Security impact if not addressed (1 sentence).\n"
@@ -206,7 +206,7 @@ def _ask_gemini(test_id: str, description: str) -> Optional[dict]:
             result = {
                 "description": lines[0] if lines else description,
                 "impact": lines[1] if len(lines) > 1 else "Non-compliance may expose the system to threats.",
-                "remediation": lines[2] if len(lines) > 2 else "Review the Lynis documentation for this test ID.",
+                "remediation": lines[2] if len(lines) > 2 else "Review the audit documentation for this test ID.",
             }
         _gemini_cache[cache_key] = result
         return result
@@ -216,7 +216,7 @@ def _ask_gemini(test_id: str, description: str) -> Optional[dict]:
 
 
 def _lookup_linux_kb(test_id: str, description: str) -> dict:
-    """Match a Lynis finding against the KB; fall back to Gemini AI."""
+    """Match a Linux audit finding against the KB; fall back to Gemini AI."""
     text = f"{test_id} {description}".lower()
     for entry in _LINUX_KB:
         if any(kw in text for kw in entry["keywords"]):
@@ -228,7 +228,7 @@ def _lookup_linux_kb(test_id: str, description: str) -> dict:
     return {
         "description": "This finding relates to a system configuration that deviates from security best practices.",
         "impact": "Non-compliant configurations may expose the system to security threats.",
-        "remediation": "Review the Lynis documentation for this test ID and apply the recommended configuration."
+        "remediation": "Review the audit documentation for this test ID and apply the recommended configuration."
     }
 
 
@@ -460,7 +460,7 @@ class AuditPDFReport:
             Paragraph("SYSTEM SECURITY AUDIT REPORT", self.styles['ReportTitle'])
         )
         self.story.append(
-            Paragraph("Lynis Security Assessment", self.styles['ReportSubtitle'])
+            Paragraph("Linux OS Hardening Assessment", self.styles['ReportSubtitle'])
         )
         
         # Report metadata
@@ -527,7 +527,7 @@ class AuditPDFReport:
         indicating a <b>{risk_level}</b> risk level. The assessment identified {len(warnings)} critical 
         issue(s) requiring immediate attention and {len(suggestions)} recommendations for security improvement.
         <br/><br/>
-        The audit was conducted using Lynis, a comprehensive security auditing tool that evaluates 
+        The audit was conducted using ANATSCRAWLER, a comprehensive security auditing platform that evaluates 
         system configuration, security controls, and compliance against industry standards including 
         ISO 27001, NIST, and CIS Benchmarks.
         """
@@ -784,9 +784,9 @@ class AuditPDFReport:
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(
-        description='Generate comprehensive PDF report from Lynis audit results'
+        description='Generate comprehensive PDF report from Linux audit results'
     )
-    parser.add_argument('report_file', help='Path to Lynis .dat report file')
+    parser.add_argument('report_file', help='Path to audit .dat report file')
     parser.add_argument('-o', '--output', help='Output PDF file path', 
                        default='audit_report.pdf')
     parser.add_argument('-H', '--hostname', help='System hostname')
@@ -795,8 +795,8 @@ def main():
     
     args = parser.parse_args()
     
-    # Parse Lynis report
-    print(f"Parsing Lynis report: {args.report_file}")
+    # Parse audit report
+    print(f"Parsing audit report: {args.report_file}")
     parser_obj = LynisReportParser(args.report_file)
     
     # Prepare data
