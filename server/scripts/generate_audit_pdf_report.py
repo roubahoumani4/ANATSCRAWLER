@@ -527,7 +527,7 @@ class AuditPDFReport:
         indicating a <b>{risk_level}</b> risk level. The assessment identified {len(warnings)} critical 
         issue(s) requiring immediate attention and {len(suggestions)} recommendations for security improvement.
         <br/><br/>
-        The audit was conducted using ANATSCRAWLER, a comprehensive security auditing platform that evaluates 
+        The audit was conducted using an automated Linux hardening assessment tool that evaluates 
         system configuration, security controls, and compliance against industry standards including 
         ISO 27001, NIST, and CIS Benchmarks.
         """
