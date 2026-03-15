@@ -453,19 +453,36 @@ function Submit-Report {
   $csvPath = "$REPORT_DIR\\audit.csv"
   if (Test-Path $csvPath) { $csvContent = Get-Content $csvPath -Raw }
 
-  $payload = @{
+  # Build findings as simple PSObjects (much faster JSON serialization than hashtables)
+  Write-Log "Building payload..."
+  $findingsArray = @()
+  foreach ($f in $Parsed.findings) {
+    $findingsArray += [PSCustomObject]@{
+      id = $f.id
+      test = $f.test
+      description = $f.description
+      result = $f.result
+      severity = $f.severity
+      recommendation = $f.recommendation
+      currentValue = $f.currentValue
+      recommendedValue = $f.recommendedValue
+      category = $f.category
+    }
+  }
+
+  $payloadObj = [PSCustomObject]@{
     agentInstallationToken = $AGENT_TOKEN
     machineName = $hostname
     ipAddress = $ipAddress
     ownerName = $OWNER_NAME
-    auditData = @{
+    auditData = [PSCustomObject]@{
       operatingSystem = "$os (Build $osBuild)"
       auditScore = $Parsed.score
       warnings = $Parsed.high + $Parsed.critical
       suggestions = $Parsed.medium + $Parsed.low
       systemHardening = $Parsed.score
-      findings = $Parsed.findings
-      sections = @{
+      findings = $findingsArray
+      sections = [PSCustomObject]@{
         critical = $Parsed.critical
         high = $Parsed.high
         medium = $Parsed.medium
@@ -477,24 +494,30 @@ function Submit-Report {
         domain = $domain
         lastBoot = $lastBoot
       }
-      rawReport = $RawOutput
-      logFileContent = $RawOutput
+      rawReport = ""
+      logFileContent = ""
       reportFileContent = $csvContent
       lynisVersion = "windows-audit"
       auditDuration = 60
     }
-  } | ConvertTo-Json -Depth 8
+  }
+
+  Write-Log "Converting to JSON..."
+  $payload = $payloadObj | ConvertTo-Json -Depth 5 -Compress
+  Write-Log "Payload ready: $($payload.Length) bytes"
 
   try {
-    Write-Log "Sending report payload ($($payload.Length) bytes)..."
-    $response = Invoke-RestMethod -Uri "$SERVER_URL/api/v1/os-audit/reports" -Method POST -ContentType "application/json" -Body $payload
+    Write-Log "Sending report..."
+    $response = Invoke-RestMethod -Uri "$SERVER_URL/api/v1/os-audit/reports" -Method POST -ContentType "application/json; charset=utf-8" -Body ([System.Text.Encoding]::UTF8.GetBytes($payload)) -TimeoutSec 120
     Write-Log "Report submitted successfully."
   } catch {
     Write-Log "ERROR submitting report: $($_.Exception.Message)"
     if ($_.Exception.Response) {
-      $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
-      $body = $reader.ReadToEnd()
-      Write-Log "Server response: $body"
+      try {
+        $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+        $body = $reader.ReadToEnd()
+        Write-Log "Server response: $body"
+      } catch { }
     }
     throw
   }
