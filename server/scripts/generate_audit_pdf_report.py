@@ -7,7 +7,9 @@ All findings, descriptions, and remediation steps come directly from the scan re
 """
 
 import argparse
+import json
 import os
+import re
 import sys
 from collections import defaultdict
 from datetime import datetime
@@ -35,6 +37,120 @@ def _safe(text: str, max_len: int = 0) -> str:
     if max_len and len(t) > max_len:
         t = t[:max_len] + "..."
     return t
+
+
+# ---------------------------------------------------------------------------
+# AI enrichment for empty fields
+# ---------------------------------------------------------------------------
+
+_ai_cache: Dict[str, dict] = {}
+
+
+def _ai_enrich_findings(findings: List[Dict], finding_type: str) -> Dict[str, dict]:
+    """Use Gemini AI to fill empty recommendation/details fields.
+
+    Args:
+        findings: list of warning or suggestion dicts
+        finding_type: 'warning' or 'suggestion'
+    Returns:
+        dict keyed by test_id with enrichment data
+    """
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        return {}
+
+    # Identify findings that have empty fields
+    needs_fill: List[Dict] = []
+    for f in findings:
+        tid = f.get('test_id', '')
+        if tid in _ai_cache:
+            continue
+        if finding_type == 'warning':
+            if not f.get('recommendation', '').strip():
+                needs_fill.append(f)
+        else:  # suggestion
+            if (not f.get('details', '').strip()
+                    or not f.get('solution', '').strip()):
+                needs_fill.append(f)
+
+    if not needs_fill:
+        return {k: v for k, v in _ai_cache.items()}
+
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-2.0-flash")
+    except Exception as e:
+        print(f"AI initialisation failed: {e}", file=sys.stderr)
+        return {}
+
+    results: Dict[str, dict] = dict(_ai_cache)
+    batch_size = 15
+
+    for batch_start in range(0, len(needs_fill), batch_size):
+        batch = needs_fill[batch_start:batch_start + batch_size]
+
+        findings_text = ""
+        for j, f in enumerate(batch, 1):
+            findings_text += (
+                f"\n{j}. Test ID: {f.get('test_id', 'N/A')}\n"
+                f"   Description: {f.get('description', 'N/A')}\n"
+            )
+            if finding_type == 'suggestion':
+                findings_text += (
+                    f"   Details: {f.get('details', '')}\n"
+                    f"   Solution: {f.get('solution', '')}\n"
+                )
+
+        if finding_type == 'warning':
+            prompt = (
+                "You are a Linux security hardening expert. These are Lynis "
+                "security audit WARNINGS (critical issues). For each one, "
+                "provide the missing recommendation.\n\n"
+                f"WARNINGS:{findings_text}\n\n"
+                "Respond with a JSON array where each object has:\n"
+                '{\n'
+                '  "index": <finding number>,\n'
+                '  "recommendation": "<specific Linux remediation step, '
+                '1-2 sentences>"\n'
+                '}\n\n'
+                "Respond ONLY with a valid JSON array. No markdown, no extra text."
+            )
+        else:
+            prompt = (
+                "You are a Linux security hardening expert. These are Lynis "
+                "security audit SUGGESTIONS. For each one, fill in the missing "
+                "details and/or recommendation.\n\n"
+                f"SUGGESTIONS:{findings_text}\n\n"
+                "Respond with a JSON array where each object has:\n"
+                '{\n'
+                '  "index": <finding number>,\n'
+                '  "details": "<what this finding means, 1-2 sentences>",\n'
+                '  "recommendation": "<specific Linux fix, 1-2 sentences>"\n'
+                '}\n\n'
+                "Respond ONLY with a valid JSON array. No markdown, no extra text."
+            )
+
+        try:
+            resp = model.generate_content(prompt)
+            text = resp.text.strip()
+            if text.startswith("```"):
+                text = re.sub(r"^```(?:json)?\s*", "", text)
+                text = re.sub(r"\s*```$", "", text)
+            parsed = json.loads(text)
+            if isinstance(parsed, list):
+                for entry in parsed:
+                    idx = entry.get("index", 0)
+                    if 1 <= idx <= len(batch):
+                        tid = batch[idx - 1].get('test_id', '')
+                        results[tid] = entry
+                        _ai_cache[tid] = entry
+        except Exception as e:
+            batch_num = batch_start // batch_size + 1
+            print(f"AI enrichment error (batch {batch_num}): {e}",
+                  file=sys.stderr)
+
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -342,9 +458,22 @@ class AuditPDFReport:
 
     # ------------------------------------------------------------------
     def _section_detailed_findings(self, warnings: List, suggestions: List):
-        """Section 4 – every finding with its scan data."""
+        """Section 4 – every finding with its scan data.
+        Empty recommendation/details fields are filled by AI when available."""
         self.story.append(
             Paragraph("4. DETAILED FINDINGS", self.styles['SectionTitle']))
+
+        # Run AI enrichment for findings with empty fields
+        warn_ai = _ai_enrich_findings(warnings, 'warning')
+        sugg_ai = _ai_enrich_findings(suggestions, 'suggestion')
+
+        ai_used = bool(warn_ai or sugg_ai)
+        if ai_used:
+            self.story.append(Paragraph(
+                '<font size=8 color="#666666"><i>Fields marked with '
+                '(*) were generated by AI analysis.</i></font>',
+                self.styles['Normal']))
+            self.story.append(Spacer(1, 0.1 * inch))
 
         # 4.1 Warnings
         self.story.append(Paragraph(
@@ -357,13 +486,20 @@ class AuditPDFReport:
                 self.styles['Normal']))
         else:
             for idx, w in enumerate(warnings, 1):
-                tid = _safe(w.get('test_id', ''))
+                tid = w.get('test_id', '')
                 desc = _safe(w.get('description', ''))
-                rec = _safe(w.get('recommendation', ''))
+                rec = w.get('recommendation', '').strip()
 
-                text = f"<b>{idx}. [{tid}] {desc}</b>"
+                # Fill empty recommendation from AI
+                ai_marker = ''
+                if not rec and tid in warn_ai:
+                    rec = warn_ai[tid].get('recommendation', '')
+                    ai_marker = ' (*)'
+
+                text = f"<b>{idx}. [{_safe(tid)}] {desc}</b>"
                 if rec:
-                    text += f"<br/><b>Recommendation:</b> {rec}"
+                    text += (f"<br/><b>Recommendation{ai_marker}:</b> "
+                             f"{_safe(rec)}")
 
                 self.story.append(
                     Paragraph(text, self.styles['FindingWarning']))
@@ -382,16 +518,30 @@ class AuditPDFReport:
                 self.styles['Normal']))
         else:
             for idx, s in enumerate(suggestions, 1):
-                tid = _safe(s.get('test_id', ''))
+                tid = s.get('test_id', '')
                 desc = _safe(s.get('description', ''))
-                details = _safe(s.get('details', ''))
-                solution = _safe(s.get('solution', ''))
+                details = s.get('details', '').strip()
+                solution = s.get('solution', '').strip()
 
-                text = f"<b>{idx}. [{tid}] {desc}</b>"
+                # Fill empty fields from AI
+                det_marker = ''
+                sol_marker = ''
+                if tid in sugg_ai:
+                    ai_data = sugg_ai[tid]
+                    if not details:
+                        details = ai_data.get('details', '')
+                        det_marker = ' (*)'
+                    if not solution:
+                        solution = ai_data.get('recommendation', '')
+                        sol_marker = ' (*)'
+
+                text = f"<b>{idx}. [{_safe(tid)}] {desc}</b>"
                 if details:
-                    text += f"<br/><b>Details:</b> {details}"
+                    text += (f"<br/><b>Details{det_marker}:</b> "
+                             f"{_safe(details)}")
                 if solution:
-                    text += f"<br/><b>Recommendation:</b> {solution}"
+                    text += (f"<br/><b>Recommendation{sol_marker}:</b> "
+                             f"{_safe(solution)}")
 
                 self.story.append(
                     Paragraph(text, self.styles['FindingSuggestion']))

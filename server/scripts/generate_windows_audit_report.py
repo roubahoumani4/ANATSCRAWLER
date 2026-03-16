@@ -418,6 +418,16 @@ class WindowsAuditPDFReport:
             "security_recommendation": ai.get("security_recommendation", ""),
         }
 
+    def _get_warnings(self) -> List[Dict]:
+        """Critical + High findings = Warnings (matching Lynis)."""
+        return (self.parsed["findings"].get("critical", [])
+                + self.parsed["findings"].get("high", []))
+
+    def _get_suggestions(self) -> List[Dict]:
+        """Medium + Low findings = Suggestions (matching Lynis)."""
+        return (self.parsed["findings"].get("medium", [])
+                + self.parsed["findings"].get("low", []))
+
     # ========================== Sections ==============================
 
     def _section_report_overview(self):
@@ -505,10 +515,8 @@ class WindowsAuditPDFReport:
         p = self.parsed
         score = p["score"]
         risk, _ = self._risk_level(score)
-        crit = len(p["findings"].get("critical", []))
-        high = len(p["findings"].get("high", []))
-        med = len(p["findings"].get("medium", []))
-        low = len(p["findings"].get("low", []))
+        warnings = self._get_warnings()
+        suggestions = self._get_suggestions()
 
         rows = [
             ["Metric", "Value"],
@@ -517,10 +525,8 @@ class WindowsAuditPDFReport:
             ["Total Checks", str(p["total"])],
             ["Passed", str(p["passed"])],
             ["Failed", str(p["failed"])],
-            ["Critical", str(crit)],
-            ["High", str(high)],
-            ["Medium", str(med)],
-            ["Low", str(low)],
+            ["Warnings (Critical Issues)", str(len(warnings))],
+            ["Suggestions (Recommendations)", str(len(suggestions))],
         ]
         t = Table(rows, colWidths=[3 * inch, 3 * inch])
         t.setStyle(TableStyle([
@@ -540,93 +546,135 @@ class WindowsAuditPDFReport:
         narrative = f"""
         This security audit assessed the Windows system using the HardeningKitty tool.
         The system achieved a compliance score of <b>{score}/100</b>, indicating a
-        <b>{risk}</b> risk level. Out of <b>{p['total']}</b> checks, <b>{p['passed']}</b>
-        passed and <b>{p['failed']}</b> failed. The assessment identified
-        <b>{crit + high}</b> critical/high issue(s) and <b>{med + low}</b> medium/low findings.
+        <b>{risk}</b> risk level. The scan identified <b>{len(warnings)}</b> warning(s)
+        requiring immediate attention and <b>{len(suggestions)}</b> suggestion(s) for
+        security improvement.
         """
         self.story.append(Paragraph(narrative, self.styles["Normal"]))
         self.story.append(Spacer(1, 0.3 * inch))
 
     # ------------------------------------------------------------------
     def _section_findings_overview(self):
-        """Section 3 – severity distribution table."""
+        """Section 3 – warnings vs suggestions breakdown."""
         self.story.append(Paragraph(
             "3. FINDINGS OVERVIEW", self.styles["SectionTitle"]))
 
-        rows = [["Severity", "Count"]]
-        for sev in ["critical", "high", "medium", "low"]:
-            count = len(self.parsed["findings"].get(sev, []))
-            if count > 0:
-                rows.append([sev.title(), str(count)])
-        rows.append(["Total Failed", str(self.parsed["failed"])])
+        warnings = self._get_warnings()
+        suggestions = self._get_suggestions()
 
-        t = Table(rows, colWidths=[3 * inch, 3 * inch])
+        rows = [
+            ["Category", "Warnings", "Suggestions", "Total"],
+        ]
+
+        # Group by category
+        cats: Dict[str, Dict[str, int]] = defaultdict(
+            lambda: {'warnings': 0, 'suggestions': 0})
+        for f in warnings:
+            cat = f.get('category', 'Uncategorized') or 'Uncategorized'
+            cats[cat]['warnings'] += 1
+        for f in suggestions:
+            cat = f.get('category', 'Uncategorized') or 'Uncategorized'
+            cats[cat]['suggestions'] += 1
+
+        for cat in sorted(cats.keys()):
+            c = cats[cat]
+            rows.append([
+                _safe(cat, 50), str(c['warnings']), str(c['suggestions']),
+                str(c['warnings'] + c['suggestions'])
+            ])
+        rows.append([
+            'TOTAL', str(len(warnings)), str(len(suggestions)),
+            str(len(warnings) + len(suggestions))
+        ])
+
+        t = Table(rows, colWidths=[2 * inch, 1.5 * inch, 1.5 * inch, 1 * inch])
         t.setStyle(self._std_table_style())
         self.story.append(t)
         self.story.append(Spacer(1, 0.3 * inch))
 
     # ------------------------------------------------------------------
     def _section_detailed_findings(self):
-        """Section 4 – every failed finding with AI-generated analysis."""
+        """Section 4 – Warnings + Suggestions layout matching the Lynis report.
+        AI provides recommendation and details for each finding."""
         self.story.append(Paragraph(
             "4. DETAILED FINDINGS", self.styles["SectionTitle"]))
 
-        style_map = {
-            "critical": "FindingCritical",
-            "high": "FindingHigh",
-            "medium": "FindingMedium",
-            "low": "FindingLow",
-        }
-
-        subsection = 0
-        for sev in ["critical", "high", "medium", "low"]:
-            items = self.parsed["findings"].get(sev, [])
-            if not items:
-                continue
-
-            subsection += 1
+        ai_used = bool(self.ai_results)
+        if ai_used:
             self.story.append(Paragraph(
-                f"4.{subsection}. {sev.title()} Severity ({len(items)} findings)",
-                self.styles["SubsectionTitle"],
-            ))
+                '<font size=8 color="#666666"><i>Fields marked with '
+                '(*) were generated by AI analysis.</i></font>',
+                self.styles["Normal"]))
+            self.story.append(Spacer(1, 0.1 * inch))
 
-            style_name = style_map.get(sev, "Normal")
+        warnings = self._get_warnings()
+        suggestions = self._get_suggestions()
 
-            for idx, f in enumerate(items, 1):
+        # 4.1 Warnings (critical + high)
+        self.story.append(Paragraph(
+            f"4.1 Warnings ({len(warnings)} findings)",
+            self.styles["SubsectionTitle"]))
+
+        if not warnings:
+            self.story.append(Paragraph(
+                "No warnings were identified during the scan.",
+                self.styles["Normal"]))
+        else:
+            for idx, f in enumerate(warnings, 1):
+                ai = self._get_finding_analysis(f)
                 name = _safe(f.get("name", ""), 120)
                 fid = _safe(f.get("id", ""))
-                cat = _safe(f.get("category", ""))
-                cur = _safe(f.get("current_value", "N/A"), 60)
-                rec = _safe(f.get("recommended_value", "N/A"), 60)
-
-                ai = self._get_finding_analysis(f)
 
                 text = f"<b>{idx}. [{fid}] {name}</b>"
-                if cat:
-                    text += f"<br/><b>Category:</b> {cat}"
 
-                if ai.get("description"):
-                    text += (f"<br/><b>Description:</b> "
-                             f"{_safe(ai['description'])}")
-                if ai.get("security_impact"):
-                    text += (f"<br/><b>Security Impact:</b> "
-                             f"{_safe(ai['security_impact'])}")
-
-                text += f"<br/><b>Current Value:</b> {cur}"
-                text += f"<br/><b>Recommended Value:</b> {rec}"
-
-                if ai.get("recommended_fix"):
-                    text += (f"<br/><b>Recommended Fix:</b> "
-                             f"{_safe(ai['recommended_fix'])}")
-                if ai.get("security_recommendation"):
-                    text += (f"<br/><b>Security Recommendation:</b> "
-                             f"{_safe(ai['security_recommendation'])}")
+                # Recommendation from AI
+                rec = ai.get("recommended_fix", "")
+                if rec:
+                    text += (f"<br/><b>Recommendation (*):</b> "
+                             f"{_safe(rec)}")
 
                 self.story.append(
-                    Paragraph(text, self.styles[style_name]))
+                    Paragraph(text, self.styles["FindingCritical"]))
                 self.story.append(Spacer(1, 0.08 * inch))
 
-            self.story.append(Spacer(1, 0.15 * inch))
+        self.story.append(Spacer(1, 0.2 * inch))
+
+        # 4.2 Suggestions (medium + low)
+        self.story.append(Paragraph(
+            f"4.2 Suggestions ({len(suggestions)} findings)",
+            self.styles["SubsectionTitle"]))
+
+        if not suggestions:
+            self.story.append(Paragraph(
+                "No suggestions were identified during the scan.",
+                self.styles["Normal"]))
+        else:
+            for idx, f in enumerate(suggestions, 1):
+                ai = self._get_finding_analysis(f)
+                name = _safe(f.get("name", ""), 120)
+                fid = _safe(f.get("id", ""))
+
+                text = f"<b>{idx}. [{fid}] {name}</b>"
+
+                # Details from AI description + security_impact
+                details = ai.get("description", "")
+                impact = ai.get("security_impact", "")
+                detail_text = ". ".join(filter(None, [details, impact]))
+                if detail_text:
+                    text += (f"<br/><b>Details (*):</b> "
+                             f"{_safe(detail_text)}")
+
+                # Recommendation from AI
+                rec = ai.get("recommended_fix", "")
+                if rec:
+                    text += (f"<br/><b>Recommendation (*):</b> "
+                             f"{_safe(rec)}")
+
+                self.story.append(
+                    Paragraph(text, self.styles["FindingLow"]))
+                self.story.append(Spacer(1, 0.08 * inch))
+
+        self.story.append(Spacer(1, 0.2 * inch))
 
     # ------------------------------------------------------------------
     def _section_security_posture(self):
@@ -636,6 +684,8 @@ class WindowsAuditPDFReport:
 
         score = self.parsed["score"]
         risk, _ = self._risk_level(score)
+        warnings = self._get_warnings()
+        suggestions = self._get_suggestions()
 
         ai_note = (
             "Findings have been enriched with AI-generated security analysis, "
@@ -650,12 +700,11 @@ class WindowsAuditPDFReport:
         The HardeningKitty security audit of <b>{_safe(self.hostname)}</b> resulted
         in a compliance score of <b>{score}/100</b>, placing the system at a
         <b>{risk}</b> risk level.<br/><br/>
-        Out of <b>{self.parsed['total']}</b> configuration checks,
-        <b>{self.parsed['passed']}</b> passed and <b>{self.parsed['failed']}</b>
-        require remediation.<br/><br/>
-        {ai_note}<br/><br/>
-        Remediation should be prioritised by severity, starting with critical
-        and high findings.
+        The scan identified <b>{len(warnings)}</b> warning(s) and
+        <b>{len(suggestions)}</b> suggestion(s). Warnings represent critical security
+        issues that should be prioritised for remediation. Suggestions are recommended
+        improvements to strengthen the system's security posture.<br/><br/>
+        {ai_note}
         """
         self.story.append(Paragraph(text, self.styles["Normal"]))
         self.story.append(Spacer(1, 0.3 * inch))
