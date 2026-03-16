@@ -32,6 +32,10 @@ const osAuditMachineSchema = new Schema({
     required: true,
     description: 'IP address of the machine'
   },
+  companyName: {
+    type: String,
+    description: 'Company name associated with this machine'
+  },
   operatingSystem: {
     type: String,
     description: 'Operating system type and version'

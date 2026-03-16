@@ -468,6 +468,7 @@ class AuditPDFReport:
         metadata = f"""
         <font size=9>
         <b>Report Generated:</b> {report_date}<br/>
+        <b>Company:</b> {self.data.get('company_name', '') or 'N/A'}<br/>
         <b>System:</b> {self.data.get('hostname', 'Unknown')}<br/>
         <b>IP Address:</b> {self.data.get('ip_address', 'N/A')}<br/>
         <b>OS:</b> {self.data.get('os_name', 'Unknown')} {self.data.get('os_version', '')}<br/>
@@ -792,6 +793,8 @@ def main():
     parser.add_argument('-H', '--hostname', help='System hostname')
     parser.add_argument('-I', '--ip', help='System IP address')
     parser.add_argument('-O', '--owner', help='System owner name')
+    parser.add_argument('-K', '--kernel', help='Kernel version')
+    parser.add_argument('-C', '--company', help='Company name')
     
     args = parser.parse_args()
     
@@ -804,10 +807,11 @@ def main():
         'hostname': args.hostname or parser_obj.get_value('hostname', 'Unknown'),
         'ip_address': args.ip or parser_obj.get_value('nameserver', 'N/A'),
         'owner_name': args.owner or parser_obj.get_value('auditor', 'Not Specified'),
+        'company_name': args.company or '',
         'os_name': parser_obj.get_value('os_name', 'Unknown'),
         'os_version': parser_obj.get_value('os_version', ''),
-        'kernel_version': parser_obj.get_value('linux_kernel_release', 'Unknown'),
-        'kernel_version_full': parser_obj.get_value('linux_kernel_version_full', 'Unknown'),
+        'kernel_version': args.kernel or parser_obj.get_value('linux_kernel_release', 'Unknown'),
+        'kernel_version_full': args.kernel or parser_obj.get_value('linux_kernel_version_full', 'Unknown'),
         'hardware_platform': parser_obj.get_value('hardware_platform', 'Unknown'),
         'vm': parser_obj.get_value('vm', 'Unknown'),
         'uptime_days': parser_obj.get_value('uptime_in_days', 'Unknown'),

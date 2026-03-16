@@ -38,6 +38,18 @@ const osAuditReportSchema = new Schema({
     type: String,
     description: 'OS information from the audit'
   },
+  kernelVersion: {
+    type: String,
+    description: 'Kernel version from the audited machine'
+  },
+  hostname: {
+    type: String,
+    description: 'Hostname of the audited machine'
+  },
+  companyName: {
+    type: String,
+    description: 'Company name for the audit report'
+  },
   osType: {
     type: String,
     enum: ['linux', 'windows'],

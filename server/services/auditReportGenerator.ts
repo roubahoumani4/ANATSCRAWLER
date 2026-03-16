@@ -15,6 +15,7 @@ interface LynisReportData {
   hostname: string;
   ipAddress: string;
   ownerName: string;
+  companyName?: string;
   osName: string;
   osVersion: string;
   kernelVersion: string;
@@ -144,7 +145,9 @@ export class AuditReportGenerator {
           '-o', outputFile,
           '-H', lynisReportData.hostname,
           '-I', lynisReportData.ipAddress,
-          '-O', lynisReportData.ownerName
+          '-O', lynisReportData.ownerName,
+          '-K', lynisReportData.kernelVersion || 'Unknown',
+          '-C', lynisReportData.companyName || ''
         ], {
           env: { ...process.env, GEMINI_API_KEY: process.env.GEMINI_API_KEY || '' }
         });
@@ -243,6 +246,8 @@ export class AuditReportGenerator {
           '-H', reportData.hostname,
           '-I', reportData.ipAddress,
           '-O', reportData.ownerName,
+          '-K', reportData.kernelVersion || 'Unknown',
+          '-C', reportData.companyName || '',
         ], {
           env: { ...process.env, GEMINI_API_KEY: process.env.GEMINI_API_KEY || '' }
         });

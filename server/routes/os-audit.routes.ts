@@ -18,28 +18,30 @@ interface AuthenticatedRequest extends Request {
  */
 router.post('/machines/register', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { machineName, ipAddress, ownerName, operatingSystem, machineHostname, osType } = req.body;
+    const { machineName, ipAddress, ownerName, operatingSystem, machineHostname, osType, companyName } = req.body;
     const userId = req.user?._id || req.user?.id;
 
     // Validation
-    if (!machineName || !ipAddress || !ownerName) {
+    if (!ownerName) {
       return res.status(400).json({
         success: false,
-        error: 'machineName, ipAddress, and ownerName are required'
+        error: 'ownerName is required'
       });
     }
 
-    // Check if machine already exists for this IP
-    const existingMachine = await OSAuditMachine.findOne({
-      ipAddress,
-      owner: userId
-    });
-
-    if (existingMachine) {
-      return res.status(409).json({
-        success: false,
-        error: 'Machine with this IP address already registered'
+    // Check if machine already exists for this IP (skip placeholder IPs)
+    if (ipAddress && ipAddress !== '0.0.0.0') {
+      const existingMachine = await OSAuditMachine.findOne({
+        ipAddress,
+        owner: userId
       });
+
+      if (existingMachine) {
+        return res.status(409).json({
+          success: false,
+          error: 'Machine with this IP address already registered'
+        });
+      }
     }
 
     // Create new machine
@@ -50,10 +52,11 @@ router.post('/machines/register', authenticate, async (req: AuthenticatedRequest
       machineId,
       owner: userId,
       ownerName,
-      machineName,
-      machineHostname,
-      ipAddress,
-      operatingSystem,
+      machineName: machineName || 'Pending Agent Audit',
+      machineHostname: machineHostname || '',
+      ipAddress: ipAddress || '0.0.0.0',
+      operatingSystem: operatingSystem || '',
+      companyName: companyName || '',
       osType: osType === 'windows' ? 'windows' : 'linux',
       agentInstallationToken,
       agentStatus: 'pending'
@@ -298,12 +301,24 @@ router.post('/reports', async (req: AuthenticatedRequest, res: Response) => {
 
     console.log('✅ Machine found:', machine.machineName);
 
-    // Update machine status if not already active
+    // Update machine with agent-collected system info
+    if (machineName && machineName !== 'Pending Agent Audit') {
+      machine.machineName = machineName;
+    }
+    if (ipAddress && ipAddress !== '0.0.0.0') {
+      machine.ipAddress = ipAddress;
+    }
+    if (auditData?.operatingSystem) {
+      machine.operatingSystem = auditData.operatingSystem;
+    }
+    if (auditData?.hostname) {
+      machine.machineHostname = auditData.hostname;
+    }
     if (machine.agentStatus !== 'active') {
       machine.agentStatus = 'active';
       machine.agentInstalledDate = new Date();
-      await machine.save();
     }
+    await machine.save();
 
     // Validate audit data
     if (!auditData) {
@@ -333,9 +348,12 @@ router.post('/reports', async (req: AuthenticatedRequest, res: Response) => {
       reportId,
       machine: machine._id,
       owner: machine.owner,
-      machineName: machine.machineName,
-      ipAddress: machine.ipAddress,
+      machineName: machineName || machine.machineName,
+      ipAddress: ipAddress || machine.ipAddress,
       ownerName: machine.ownerName,
+      companyName: machine.companyName || '',
+      hostname: auditData?.hostname || machineName || machine.machineName,
+      kernelVersion: auditData?.kernelVersion || 'Unknown',
       operatingSystem: auditData?.operatingSystem || 'Unknown',
       osType: machine.osType || 'linux',
       auditScore: auditScore,

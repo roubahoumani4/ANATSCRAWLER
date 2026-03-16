@@ -47,8 +47,10 @@ interface Machine {
   _id: string;
   machineId: string;
   machineName: string;
+  machineHostname?: string;
   ipAddress: string;
   ownerName: string;
+  companyName?: string;
   operatingSystem?: string;
   osType?: 'linux' | 'windows';
   agentStatus: 'active' | 'inactive' | 'pending';
@@ -61,10 +63,13 @@ interface AuditReport {
   _id: string;
   reportId: string;
   machineName: string;
+  hostname?: string;
   ipAddress: string;
   ownerName: string;
+  companyName?: string;
   osType?: 'linux' | 'windows';
   operatingSystem?: string;
+  kernelVersion?: string;
   auditDate: string;
   auditScore?: number;
   warnings: number;
@@ -489,6 +494,8 @@ function Submit-Report {
     ownerName = $OWNER_NAME
     auditData = [PSCustomObject]@{
       operatingSystem = "$os (Build $osBuild)"
+      kernelVersion = $osVersion
+      hostname = $hostname
       auditScore = $Parsed.score
       warnings = $Parsed.high + $Parsed.critical
       suggestions = $Parsed.medium + $Parsed.low
@@ -690,9 +697,7 @@ fi
 echo "⏱️  Running Lynis security audit..."
 lynis audit system 2>&1 || true
 
-# Get system information
-OS_INFO=$(lsb_release -d 2>/dev/null | sed 's/Description://' | xargs || uname -s || echo "Unknown")
-IP_ADDRESS=$(hostname -I | awk '{print $1}')
+# System information already collected at top of script
 
 # Define log file paths
 LYNIS_LOG="/var/log/lynis.log"
@@ -728,6 +733,8 @@ MACHINE_JSON=$(json_escape "$MACHINE_NAME")
 OWNER_JSON=$(json_escape "$OWNER_NAME")
 IP_JSON=$(json_escape "$IP_ADDRESS")
 OS_JSON=$(json_escape "$OS_INFO")
+KERNEL_JSON=$(json_escape "$KERNEL_VERSION")
+HOSTNAME_JSON=$(json_escape "$HOSTNAME")
 LYNIS_JSON=$(json_escape "$(lynis --version 2>/dev/null || echo 'unknown')")
 LOG_JSON=$(json_escape "$(cat "$LYNIS_LOG" 2>/dev/null)")
 REPORT_JSON=$(json_escape "$(cat "$LYNIS_REPORT" 2>/dev/null)")
@@ -770,6 +777,8 @@ cat > "$TEMP_JSON" << EOF_JSON
   "ownerName": $OWNER_JSON,
   "auditData": {
     "operatingSystem": $OS_JSON,
+    "kernelVersion": $KERNEL_JSON,
+    "hostname": $HOSTNAME_JSON,
     "auditScore": $SCORE,
     "warnings": $WARNINGS,
     "suggestions": $SUGGESTIONS,
@@ -931,8 +940,8 @@ echo "Or manually run: sudo $AGENT_DIR/agent.sh"
                 <div>
                   <label className="block text-sm font-medium text-coolWhite/80 mb-2">Company Name</label>
                   <Input
-                    value={(registrationForm as any).companyName || ''}
-                    onChange={(e) => setRegistrationForm({ ...registrationForm, companyName: e.target.value } as any)}
+                    value={registrationForm.companyName}
+                    onChange={(e) => setRegistrationForm({ ...registrationForm, companyName: e.target.value })}
                     placeholder="e.g., Acme Corp"
                     required
                     className="bg-jetBlack border-coolWhite/10"
@@ -1055,13 +1064,19 @@ echo "Or manually run: sudo $AGENT_DIR/agent.sh"
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-3">
-                            <h3 className="text-lg font-semibold text-coolWhite">{machine.machineName}</h3>
+                            <h3 className="text-lg font-semibold text-coolWhite">{machine.machineHostname || machine.machineName}</h3>
                             <span className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${getStatusColor(machine.agentStatus)}`}>
                               {getStatusIcon(machine.agentStatus)}
                               {machine.agentStatus.charAt(0).toUpperCase() + machine.agentStatus.slice(1)}
                             </span>
                           </div>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            {machine.companyName && (
+                              <div>
+                                <p className="text-coolWhite/60">Company</p>
+                                <p className="text-coolWhite">{machine.companyName}</p>
+                              </div>
+                            )}
                             <div>
                               <p className="text-coolWhite/60">IP Address</p>
                               <p className="text-coolWhite font-mono">{machine.ipAddress}</p>
@@ -1133,7 +1148,7 @@ echo "Or manually run: sudo $AGENT_DIR/agent.sh"
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-3">
-                            <h3 className="text-lg font-semibold text-coolWhite">{report.machineName}</h3>
+                            <h3 className="text-lg font-semibold text-coolWhite">{report.hostname || report.machineName}</h3>
                             {report.auditScore && (
                               <span className="px-3 py-1 bg-cyan-500/20 text-cyan-400 rounded-full font-semibold">
                                 Score: {report.auditScore}
@@ -1141,6 +1156,12 @@ echo "Or manually run: sudo $AGENT_DIR/agent.sh"
                             )}
                           </div>
                           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                            {report.companyName && (
+                              <div>
+                                <p className="text-coolWhite/60">Company</p>
+                                <p className="text-coolWhite">{report.companyName}</p>
+                              </div>
+                            )}
                             <div>
                               <p className="text-coolWhite/60">IP Address</p>
                               <p className="text-coolWhite font-mono">{report.ipAddress}</p>
@@ -1267,8 +1288,9 @@ echo "Or manually run: sudo $AGENT_DIR/agent.sh"
                     <p className="font-semibold text-coolWhite mb-2">Machine Details</p>
                     <div className="bg-jetBlack border border-coolWhite/10 p-3 rounded text-sm space-y-1">
                       <p className="text-coolWhite/60">Machine ID: <span className="text-coolWhite font-mono">{selectedMachine.machineId}</span></p>
-                      <p className="text-coolWhite/60">IP Address: <span className="text-coolWhite font-mono">{selectedMachine.ipAddress}</span></p>
+                      {selectedMachine.companyName && <p className="text-coolWhite/60">Company: <span className="text-coolWhite">{selectedMachine.companyName}</span></p>}
                       <p className="text-coolWhite/60">Owner: <span className="text-coolWhite">{selectedMachine.ownerName}</span></p>
+                      <p className="text-coolWhite/60 text-xs mt-1">System info (hostname, IP, OS) will be collected automatically by the agent</p>
                     </div>
                   </div>
 

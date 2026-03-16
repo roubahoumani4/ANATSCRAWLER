@@ -529,11 +529,14 @@ class WindowsAuditPDFReport:
     }
 
     def __init__(self, output_path: str, hostname: str, ip_address: str,
-                 owner_name: str, parsed: Dict):
+                 owner_name: str, parsed: Dict, kernel_version: str = 'Unknown',
+                 company_name: str = ''):
         self.output_path = output_path
         self.hostname = hostname
         self.ip_address = ip_address
         self.owner_name = owner_name
+        self.kernel_version = kernel_version
+        self.company_name = company_name
         self.parsed = parsed
         self.styles = self._create_styles()
         self.doc = SimpleDocTemplate(
@@ -627,8 +630,10 @@ class WindowsAuditPDFReport:
         meta = f"""
         <font size=9>
         <b>Report Generated:</b> {now}<br/>
+        <b>Company:</b> {_safe(self.company_name) or 'N/A'}<br/>
         <b>System:</b> {_safe(self.hostname)}<br/>
         <b>IP Address:</b> {_safe(self.ip_address)}<br/>
+        <b>OS Version:</b> {_safe(self.kernel_version)}<br/>
         <b>Owner:</b> {_safe(self.owner_name)}<br/>
         <b>Audit Standard:</b> ISO 27001 / NIST / CIS Benchmarks
         </font>
@@ -712,6 +717,7 @@ class WindowsAuditPDFReport:
         <br/>
         <b>Operating System:</b><br/>
         Platform: Microsoft Windows<br/>
+        OS Version: {_safe(self.kernel_version)}<br/>
         <br/>
         <b>Audit Scope:</b><br/>
         Total Configuration Checks: {self.parsed['total']}<br/>
@@ -981,6 +987,8 @@ def main() -> int:
     parser.add_argument("-H", "--hostname", required=True, help="System hostname")
     parser.add_argument("-I", "--ip", required=True, help="System IP address")
     parser.add_argument("-O", "--owner", required=True, help="Owner name")
+    parser.add_argument("-K", "--kernel", default="Unknown", help="Kernel/OS version")
+    parser.add_argument("-C", "--company", default="", help="Company name")
 
     args = parser.parse_args()
 
@@ -1005,6 +1013,8 @@ def main() -> int:
         hostname=args.hostname,
         ip_address=args.ip,
         owner_name=args.owner,
+        kernel_version=args.kernel,
+        company_name=args.company,
         parsed=parsed,
     )
     report.generate()
