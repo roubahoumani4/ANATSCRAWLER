@@ -102,9 +102,10 @@ const OSAuditPage: React.FC = () => {
   const [showInstallDialog, setShowInstallDialog] = useState(false);
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [registrationForm, setRegistrationForm] = useState({
-    machineName: '',
-    ipAddress: '',
+    companyName: '',
     ownerName: '',
+    machineName: 'Pending Agent Audit',
+    ipAddress: '0.0.0.0',
     operatingSystem: '',
     machineHostname: '',
     osType: 'linux' as 'linux' | 'windows'
@@ -143,9 +144,10 @@ const OSAuditPage: React.FC = () => {
       if (response.data.success) {
         setMachines([...machines, response.data.machine]);
         setRegistrationForm({
-          machineName: '',
-          ipAddress: '',
+          companyName: '',
           ownerName: '',
+          machineName: 'Pending Agent Audit',
+          ipAddress: '0.0.0.0',
           operatingSystem: '',
           machineHostname: '',
           osType: 'linux' as 'linux' | 'windows'
@@ -302,7 +304,11 @@ $ErrorActionPreference = "Continue"
 $AGENT_TOKEN = "${token}"
 $SERVER_URL = "https://horus.anatsecurity.fr"
 $MACHINE_ID = "${machineId}"
-$MACHINE_NAME = "${machineName}"
+$MACHINE_NAME = $env:COMPUTERNAME
+$HOSTNAME = $env:COMPUTERNAME
+$OS_INFO = (Get-CimInstance Win32_OperatingSystem).Caption
+$KERNEL_VERSION = (Get-CimInstance Win32_OperatingSystem).Version
+$IP_ADDRESS = @((Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias Ethernet, Wi* -ErrorAction SilentlyContinue).IPAddress, (Get-NetIPAddress -AddressFamily IPv4).IPAddress)[0]
 $OWNER_NAME = "${ownerName}"
 $AGENT_DIR = "C:\\anat-os-audit"
 $KITTY_DIR = "$AGENT_DIR\\HardeningKitty"
@@ -661,7 +667,11 @@ cat > "$AGENT_DIR/agent.sh" << 'AGENT_SCRIPT_END'
 AGENT_TOKEN="${token}"
 SERVER_URL="https://horus.anatsecurity.fr"
 MACHINE_ID="${machineId}"
-MACHINE_NAME="${machineName}"
+MACHINE_NAME="\$(hostname)"
+HOSTNAME="\$(hostname)"
+KERNEL_VERSION="\$(uname -r)"
+OS_INFO="\$(cat /etc/os-release | grep '^PRETTY_NAME=' | cut -d'=' -f2 | tr -d '"' || uname -s)"
+IP_ADDRESS="\$(hostname -I | awk '{print \$1}')"
 OWNER_NAME="${ownerName}"
 
 echo ""
@@ -919,7 +929,17 @@ echo "Or manually run: sudo $AGENT_DIR/agent.sh"
               </DialogHeader>
               <form onSubmit={handleRegisterMachine} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-coolWhite/80 mb-2">Your Name</label>
+                  <label className="block text-sm font-medium text-coolWhite/80 mb-2">Company Name</label>
+                  <Input
+                    value={(registrationForm as any).companyName || ''}
+                    onChange={(e) => setRegistrationForm({ ...registrationForm, companyName: e.target.value } as any)}
+                    placeholder="e.g., Acme Corp"
+                    required
+                    className="bg-jetBlack border-coolWhite/10"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-coolWhite/80 mb-2">Person Name (Auditor / Responsible)</label>
                   <Input
                     value={registrationForm.ownerName}
                     onChange={(e) => setRegistrationForm({ ...registrationForm, ownerName: e.target.value })}
@@ -928,45 +948,6 @@ echo "Or manually run: sudo $AGENT_DIR/agent.sh"
                     className="bg-jetBlack border-coolWhite/10"
                   />
                   <p className="text-xs text-coolWhite/50 mt-1">This name will appear in all audit reports for this machine</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-coolWhite/80 mb-2">Machine Name</label>
-                  <Input
-                    value={registrationForm.machineName}
-                    onChange={(e) => setRegistrationForm({ ...registrationForm, machineName: e.target.value })}
-                    placeholder="e.g., Production Server 1"
-                    required
-                    className="bg-jetBlack border-coolWhite/10"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-coolWhite/80 mb-2">IP Address</label>
-                  <Input
-                    value={registrationForm.ipAddress}
-                    onChange={(e) => setRegistrationForm({ ...registrationForm, ipAddress: e.target.value })}
-                    placeholder="e.g., 192.168.1.100"
-                    required
-                    type="text"
-                    className="bg-jetBlack border-coolWhite/10"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-coolWhite/80 mb-2">Operating System (Optional)</label>
-                  <Input
-                    value={registrationForm.operatingSystem}
-                    onChange={(e) => setRegistrationForm({ ...registrationForm, operatingSystem: e.target.value })}
-                    placeholder="e.g., Ubuntu 22.04 LTS"
-                    className="bg-jetBlack border-coolWhite/10"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-coolWhite/80 mb-2">Machine Hostname (Optional)</label>
-                  <Input
-                    value={registrationForm.machineHostname}
-                    onChange={(e) => setRegistrationForm({ ...registrationForm, machineHostname: e.target.value })}
-                    placeholder="e.g., prod-server-01"
-                    className="bg-jetBlack border-coolWhite/10"
-                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-coolWhite/80 mb-2">Agent Type</label>

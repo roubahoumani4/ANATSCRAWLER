@@ -434,8 +434,19 @@ def parse_csv_report(csv_text: str) -> Dict:
         else:
             failed += 1
             categories[category]["failed"] += 1
-            # Deduplicate by ID (or by name if ID is empty)
-            dedup_key = finding_id or name
+            # Better deduplication for ASR, Policy, and Intune
+            def get_dedup_key(i, n):
+                nl = n.lower()
+                if "asr" in nl or "attack surface reduction" in nl:
+                    m = __import__('re').search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', nl)
+                    if m: return "asr_" + m.group(1)
+                # Remove spaces/punctuation for Intune or Policy to catch duplicates
+                if "intune" in nl or "policy" in nl:
+                    base = __import__('re').sub(r'[^a-z0-9]', '', nl)
+                    return base
+                return i or n
+
+            dedup_key = get_dedup_key(finding_id, name)
             if dedup_key in seen_ids:
                 continue
             seen_ids.add(dedup_key)
