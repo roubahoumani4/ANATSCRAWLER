@@ -47,12 +47,13 @@ router.post(
 
       const reportData = {
         reportId: auditReport.reportId,
-        hostname: auditReport.machineName,
+        hostname: (auditReport as any).hostname || auditReport.machineName,
         ipAddress: auditReport.ipAddress,
         ownerName: auditReport.ownerName,
         osName: auditReport.operatingSystem || 'Unknown',
         osVersion: 'Unknown',
-        kernelVersion: 'Unknown',
+        kernelVersion: (auditReport as any).kernelVersion || 'Unknown',
+        companyName: (auditReport as any).companyName || '',
         auditDate: auditReport.auditDate,
         logFileContent: auditReport.logFileContent || '',
         reportFileContent: auditReport.reportFileContent || ''
@@ -121,12 +122,13 @@ router.post(
 
       const reportData = {
         reportId: auditReport.reportId,
-        hostname: auditReport.machineName,
+        hostname: (auditReport as any).hostname || auditReport.machineName,
         ipAddress: auditReport.ipAddress,
         ownerName: auditReport.ownerName,
         osName: auditReport.operatingSystem || 'Unknown',
         osVersion: 'Unknown',
-        kernelVersion: 'Unknown',
+        kernelVersion: (auditReport as any).kernelVersion || 'Unknown',
+        companyName: (auditReport as any).companyName || '',
         auditDate: auditReport.auditDate,
         logFileContent: auditReport.logFileContent || '',
         reportFileContent: auditReport.reportFileContent || ''
@@ -259,12 +261,13 @@ router.post(
         try {
           const reportData = {
             reportId: auditReport.reportId,
-            hostname: auditReport.machineName,
+            hostname: (auditReport as any).hostname || auditReport.machineName,
             ipAddress: auditReport.ipAddress,
             ownerName: auditReport.ownerName,
             osName: auditReport.operatingSystem || 'Unknown',
             osVersion: 'Unknown',
-            kernelVersion: 'Unknown',
+            kernelVersion: (auditReport as any).kernelVersion || 'Unknown',
+            companyName: (auditReport as any).companyName || '',
             auditDate: auditReport.auditDate,
             logFileContent: auditReport.logFileContent || '',
             reportFileContent: auditReport.reportFileContent || ''
