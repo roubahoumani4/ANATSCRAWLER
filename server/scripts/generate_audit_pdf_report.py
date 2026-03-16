@@ -46,6 +46,11 @@ def _safe(text: str, max_len: int = 0) -> str:
 _ai_cache: Dict[str, dict] = {}
 
 
+def _is_empty(val: str) -> bool:
+    """Return True if a Lynis field value is effectively empty."""
+    return not val or val.strip() in ('', '-', '--', 'N/A')
+
+
 def _ai_enrich_findings(findings: List[Dict], finding_type: str) -> Dict[str, dict]:
     """Use Gemini AI to fill empty recommendation/details fields.
 
@@ -66,11 +71,11 @@ def _ai_enrich_findings(findings: List[Dict], finding_type: str) -> Dict[str, di
         if tid in _ai_cache:
             continue
         if finding_type == 'warning':
-            if not f.get('recommendation', '').strip():
+            if _is_empty(f.get('recommendation', '')):
                 needs_fill.append(f)
         else:  # suggestion
-            if (not f.get('details', '').strip()
-                    or not f.get('solution', '').strip()):
+            if (_is_empty(f.get('details', ''))
+                    or _is_empty(f.get('solution', ''))):
                 needs_fill.append(f)
 
     if not needs_fill:
@@ -492,9 +497,11 @@ class AuditPDFReport:
 
                 # Fill empty recommendation from AI
                 ai_marker = ''
-                if not rec and tid in warn_ai:
+                if _is_empty(rec) and tid in warn_ai:
                     rec = warn_ai[tid].get('recommendation', '')
                     ai_marker = ' (*)'
+                elif _is_empty(rec):
+                    rec = ''
 
                 text = f"<b>{idx}. [{_safe(tid)}] {desc}</b>"
                 if rec:
@@ -522,6 +529,12 @@ class AuditPDFReport:
                 desc = _safe(s.get('description', ''))
                 details = s.get('details', '').strip()
                 solution = s.get('solution', '').strip()
+
+                # Treat '-' placeholders as empty
+                if _is_empty(details):
+                    details = ''
+                if _is_empty(solution):
+                    solution = ''
 
                 # Fill empty fields from AI
                 det_marker = ''

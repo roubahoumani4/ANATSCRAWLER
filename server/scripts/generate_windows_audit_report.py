@@ -104,9 +104,11 @@ def _analyze_with_ai(findings: List[Dict]) -> Dict[str, dict]:
         # Build prompt
         findings_text = ""
         for j, f in enumerate(uncached, 1):
+            sev = f.get('severity', '') or 'unknown'
             findings_text += (
                 f"\n{j}. Setting: {f.get('name', 'Unknown')}\n"
                 f"   Category: {f.get('category', 'Unknown')}\n"
+                f"   Severity: {sev}\n"
                 f"   Current Value: {f.get('current_value', 'N/A')}\n"
                 f"   Recommended Value: {f.get('recommended_value', 'N/A')}\n"
             )
@@ -114,18 +116,24 @@ def _analyze_with_ai(findings: List[Dict]) -> Dict[str, dict]:
         prompt = (
             "You are a Windows security hardening expert. Analyse these Windows "
             "security audit findings from a HardeningKitty scan. These settings "
-            "FAILED the compliance check.\n\n"
+            "FAILED the compliance check. Pay attention to the Severity level "
+            "of each finding — critical and high findings need urgent, detailed "
+            "remediation steps, while medium and low findings need clear "
+            "explanations of what the setting does and why it matters.\n\n"
             f"FINDINGS:{findings_text}\n\n"
             "For each finding provide Windows-specific analysis. Include Group "
             "Policy paths, PowerShell commands, or registry keys as applicable.\n\n"
             "Respond with a JSON array where each object has:\n"
             "{\n"
             '  "index": <finding number>,\n'
-            '  "description": "<what this setting controls, 1-2 sentences>",\n'
-            '  "security_impact": "<security risk if misconfigured, 1-2 sentences>",\n'
+            '  "description": "<what this setting controls and why it matters, '
+            '2-3 sentences>",\n'
+            '  "security_impact": "<specific security risk if misconfigured, '
+            '1-2 sentences>",\n'
             '  "recommended_fix": "<specific Windows fix: Group Policy path, '
-            'PowerShell, or registry, 1-3 sentences>",\n'
-            '  "security_recommendation": "<best practice, 1 sentence>"\n'
+            'PowerShell command, or registry key with exact values, '
+            '2-4 sentences>",\n'
+            '  "security_recommendation": "<best practice summary, 1 sentence>"\n'
             "}\n\n"
             "Respond ONLY with a valid JSON array. No markdown, no extra text."
         )
@@ -219,6 +227,7 @@ def parse_csv_report(csv_text: str) -> Dict:
                 "id": finding_id,
                 "category": category,
                 "name": name,
+                "severity": severity,
                 "current_value": cur_value,
                 "recommended_value": rec_value,
                 "method": row.get("Method") or "",
@@ -270,6 +279,7 @@ def parse_console_output(raw_output: str) -> Dict:
                 "id": "",
                 "category": "",
                 "name": re.sub(r"\s+", " ", line)[:200],
+                "severity": sev,
                 "current_value": "",
                 "recommended_value": "",
                 "method": "",
@@ -626,6 +636,14 @@ class WindowsAuditPDFReport:
                 fid = _safe(f.get("id", ""))
 
                 text = f"<b>{idx}. [{fid}] {name}</b>"
+
+                # Details from AI
+                desc = ai.get("description", "")
+                impact = ai.get("security_impact", "")
+                detail_text = ". ".join(filter(None, [desc, impact]))
+                if detail_text:
+                    text += (f"<br/><b>Details (*):</b> "
+                             f"{_safe(detail_text)}")
 
                 # Recommendation from AI
                 rec = ai.get("recommended_fix", "")
