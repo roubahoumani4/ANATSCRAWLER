@@ -53,7 +53,7 @@ def _is_empty(val: str) -> bool:
 
 
 def _ai_enrich_findings(findings: List[Dict], finding_type: str) -> Dict[str, dict]:
-    """Use Gemini AI to fill empty recommendation/details fields.
+    """Use Groq AI to fill empty recommendation/details fields.
 
     Args:
         findings: list of warning or suggestion dicts
@@ -63,7 +63,7 @@ def _ai_enrich_findings(findings: List[Dict], finding_type: str) -> Dict[str, di
     """
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not api_key:
-        print("WARNING: GEMINI_API_KEY not set — AI enrichment disabled",
+        print("WARNING: GEMINI_API_KEY (Groq) not set — AI enrichment disabled",
               file=sys.stderr)
         return {}
 
@@ -85,13 +85,13 @@ def _ai_enrich_findings(findings: List[Dict], finding_type: str) -> Dict[str, di
         return {k: v for k, v in _ai_cache.items()}
 
     try:
-        from google import genai
-        client = genai.Client(api_key=api_key)
+        from groq import Groq
+        client = Groq(api_key=api_key)
     except Exception as e:
         print(f"AI initialisation failed: {e}", file=sys.stderr)
         return {}
 
-    model = "gemini-2.0-flash-lite"
+    model = "llama-3.3-70b-versatile"
     results: Dict[str, dict] = dict(_ai_cache)
     batch_size = 15
 
@@ -146,10 +146,12 @@ def _ai_enrich_findings(findings: List[Dict], finding_type: str) -> Dict[str, di
         batch_num = batch_start // batch_size + 1
         for attempt in range(4):
             try:
-                resp = client.models.generate_content(
-                    model=model, contents=prompt
+                resp = client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.3,
                 )
-                text = resp.text.strip()
+                text = resp.choices[0].message.content.strip()
                 if text.startswith("```"):
                     text = re.sub(r"^```(?:json)?\s*", "", text)
                     text = re.sub(r"\s*```$", "", text)

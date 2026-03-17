@@ -66,7 +66,7 @@ _ai_cache: Dict[str, dict] = {}
 
 
 def _analyze_with_ai(findings: List[Dict]) -> Dict[str, dict]:
-    """Batch-analyse Windows findings using Gemini AI.
+    """Batch-analyse Windows findings using Groq AI.
 
     Returns a dict keyed by finding name with analysis results:
       {description, security_impact, recommended_fix, security_recommendation}
@@ -75,18 +75,18 @@ def _analyze_with_ai(findings: List[Dict]) -> Dict[str, dict]:
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not api_key or not findings:
         if not api_key:
-            print("WARNING: GEMINI_API_KEY not set — AI analysis disabled",
+            print("WARNING: GEMINI_API_KEY (Groq) not set — AI analysis disabled",
                   file=sys.stderr)
         return {}
 
     try:
-        from google import genai
-        client = genai.Client(api_key=api_key)
+        from groq import Groq
+        client = Groq(api_key=api_key)
     except Exception as e:
         print(f"AI initialisation failed: {e}", file=sys.stderr)
         return {}
 
-    model = "gemini-2.0-flash-lite"
+    model = "llama-3.3-70b-versatile"
     results: Dict[str, dict] = {}
     batch_size = 15
 
@@ -149,10 +149,12 @@ def _analyze_with_ai(findings: List[Dict]) -> Dict[str, dict]:
         batch_num = batch_start // batch_size + 1
         for attempt in range(4):
             try:
-                resp = client.models.generate_content(
-                    model=model, contents=prompt
+                resp = client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.3,
                 )
-                text = resp.text.strip()
+                text = resp.choices[0].message.content.strip()
 
                 # Strip markdown code fence if present
                 if text.startswith("```"):
