@@ -105,6 +105,7 @@ def _analyze_with_ai(findings: List[Dict]) -> Dict[str, dict]:
         findings_text = ""
         for j, f in enumerate(uncached, 1):
             sev = f.get('severity', '') or 'unknown'
+            result = f.get('result', '') or ''
             findings_text += (
                 f"\n{j}. Setting: {f.get('name', 'Unknown')}\n"
                 f"   Category: {f.get('category', 'Unknown')}\n"
@@ -112,6 +113,8 @@ def _analyze_with_ai(findings: List[Dict]) -> Dict[str, dict]:
                 f"   Current Value: {f.get('current_value', 'N/A')}\n"
                 f"   Recommended Value: {f.get('recommended_value', 'N/A')}\n"
             )
+            if result:
+                findings_text += f"   Scan Result: {result}\n"
 
         prompt = (
             "You are a Windows security hardening expert. Analyse these Windows "
@@ -230,6 +233,7 @@ def parse_csv_report(csv_text: str) -> Dict:
                 "severity": severity,
                 "current_value": cur_value,
                 "recommended_value": rec_value,
+                "result": (row.get("Result") or "").strip(),
                 "method": row.get("Method") or "",
             })
 
@@ -282,6 +286,7 @@ def parse_console_output(raw_output: str) -> Dict:
                 "severity": sev,
                 "current_value": "",
                 "recommended_value": "",
+                "result": "",
                 "method": "",
             })
 
@@ -634,8 +639,14 @@ class WindowsAuditPDFReport:
                 ai = self._get_finding_analysis(f)
                 name = _safe(f.get("name", ""), 120)
                 fid = _safe(f.get("id", ""))
+                result = f.get("result", "").strip()
 
                 text = f"<b>{idx}. [{fid}] {name}</b>"
+
+                # Result from CSV scan
+                if result:
+                    text += (f"<br/><b>Result:</b> "
+                             f"{_safe(result, 200)}")
 
                 # Details from AI
                 desc = ai.get("description", "")
@@ -645,10 +656,10 @@ class WindowsAuditPDFReport:
                     text += (f"<br/><b>Details (*):</b> "
                              f"{_safe(detail_text)}")
 
-                # Recommendation from AI
+                # Suggestion from AI
                 rec = ai.get("recommended_fix", "")
                 if rec:
-                    text += (f"<br/><b>Recommendation (*):</b> "
+                    text += (f"<br/><b>Suggestion (*):</b> "
                              f"{_safe(rec)}")
 
                 self.story.append(
@@ -671,8 +682,14 @@ class WindowsAuditPDFReport:
                 ai = self._get_finding_analysis(f)
                 name = _safe(f.get("name", ""), 120)
                 fid = _safe(f.get("id", ""))
+                result = f.get("result", "").strip()
 
                 text = f"<b>{idx}. [{fid}] {name}</b>"
+
+                # Result from CSV scan
+                if result:
+                    text += (f"<br/><b>Result:</b> "
+                             f"{_safe(result, 200)}")
 
                 # Details from AI description + security_impact
                 details = ai.get("description", "")
@@ -682,10 +699,10 @@ class WindowsAuditPDFReport:
                     text += (f"<br/><b>Details (*):</b> "
                              f"{_safe(detail_text)}")
 
-                # Recommendation from AI
+                # Suggestion from AI
                 rec = ai.get("recommended_fix", "")
                 if rec:
-                    text += (f"<br/><b>Recommendation (*):</b> "
+                    text += (f"<br/><b>Suggestion (*):</b> "
                              f"{_safe(rec)}")
 
                 self.story.append(

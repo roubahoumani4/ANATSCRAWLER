@@ -64,15 +64,15 @@ def _ai_enrich_findings(findings: List[Dict], finding_type: str) -> Dict[str, di
     if not api_key:
         return {}
 
-    # Identify findings that have empty fields
+    # Identify findings that need AI enrichment
     needs_fill: List[Dict] = []
     for f in findings:
         tid = f.get('test_id', '')
         if tid in _ai_cache:
             continue
         if finding_type == 'warning':
-            if _is_empty(f.get('recommendation', '')):
-                needs_fill.append(f)
+            # Always enrich warnings — they need a suggestion
+            needs_fill.append(f)
         else:  # suggestion
             if (_is_empty(f.get('details', ''))
                     or _is_empty(f.get('solution', ''))):
@@ -111,13 +111,16 @@ def _ai_enrich_findings(findings: List[Dict], finding_type: str) -> Dict[str, di
             prompt = (
                 "You are a Linux security hardening expert. These are Lynis "
                 "security audit WARNINGS (critical issues). For each one, "
-                "provide the missing recommendation.\n\n"
+                "provide a recommendation and an actionable suggestion on "
+                "what the administrator should do to fix or mitigate it.\n\n"
                 f"WARNINGS:{findings_text}\n\n"
                 "Respond with a JSON array where each object has:\n"
                 '{\n'
                 '  "index": <finding number>,\n'
-                '  "recommendation": "<specific Linux remediation step, '
-                '1-2 sentences>"\n'
+                '  "recommendation": "<what this warning means and why it '
+                'matters, 1-2 sentences>",\n'
+                '  "suggestion": "<specific Linux command, config change, '
+                'or remediation step to fix this, 2-3 sentences>"\n'
                 '}\n\n'
                 "Respond ONLY with a valid JSON array. No markdown, no extra text."
             )
@@ -507,6 +510,14 @@ class AuditPDFReport:
                 if rec:
                     text += (f"<br/><b>Recommendation{ai_marker}:</b> "
                              f"{_safe(rec)}")
+
+                # Always show AI suggestion for what to do
+                suggestion = ''
+                if tid in warn_ai:
+                    suggestion = warn_ai[tid].get('suggestion', '')
+                if suggestion:
+                    text += (f"<br/><b>Suggestion (*):</b> "
+                             f"{_safe(suggestion)}")
 
                 self.story.append(
                     Paragraph(text, self.styles['FindingWarning']))
