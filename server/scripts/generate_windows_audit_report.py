@@ -73,6 +73,9 @@ def _analyze_with_ai(findings: List[Dict]) -> Dict[str, dict]:
     """
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not api_key or not findings:
+        if not api_key:
+            print("WARNING: GEMINI_API_KEY not set — AI analysis disabled",
+                  file=sys.stderr)
         return {}
 
     try:

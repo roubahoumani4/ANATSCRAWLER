@@ -62,6 +62,8 @@ def _ai_enrich_findings(findings: List[Dict], finding_type: str) -> Dict[str, di
     """
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not api_key:
+        print("WARNING: GEMINI_API_KEY not set — AI enrichment disabled",
+              file=sys.stderr)
         return {}
 
     # Identify findings that need AI enrichment
