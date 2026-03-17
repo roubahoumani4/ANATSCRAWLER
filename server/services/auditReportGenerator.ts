@@ -1,6 +1,7 @@
 /**
- * Lynis Report PDF Generator Service
- * Integrates with Node.js backend to generate comprehensive audit reports
+ * Audit Report PDF Generator Service
+ * Supports background pre-generation for both Linux (Lynis) and Windows (HardeningKitty).
+ * AI enrichment runs asynchronously after scan submission so PDFs are ready for instant download.
  */
 
 import { spawn } from 'child_process';
@@ -28,16 +29,16 @@ interface GenerateReportOptions {
   outputDir?: string;
   format?: 'pdf' | 'html' | 'json';
   includeRawData?: boolean;
+  aiCachePath?: string;  // Path to pre-computed AI enrichment JSON
 }
 
 export class AuditReportGenerator {
   private pythonScriptPath: string;
   private windowsPythonScriptPath: string;
   private tempDir: string;
+  private reportsDir: string;
 
   constructor() {
-    // The Python report generator script is deployed to /var/www/anatscrawler/scripts
-    // Check both locations for compatibility
     const deployedScriptPath = path.join(__dirname, '..', '..', 'scripts', 'generate_audit_pdf_report.py');
     const localScriptPath = path.join(__dirname, '..', 'scripts', 'generate_audit_pdf_report.py');
     const deployedWindowsScriptPath = path.join(__dirname, '..', '..', 'scripts', 'generate_windows_audit_report.py');
@@ -48,10 +49,18 @@ export class AuditReportGenerator {
       ? deployedWindowsScriptPath
       : localWindowsScriptPath;
     this.tempDir = path.join(__dirname, '..', '..', 'temp');
+    this.reportsDir = path.join(__dirname, '..', 'reports');
 
-    if (!fs.existsSync(this.tempDir)) {
-      fs.mkdirSync(this.tempDir, { recursive: true });
+    for (const dir of [this.tempDir, this.reportsDir]) {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
     }
+  }
+
+  private getPythonExecutable(): string {
+    const venvPython = path.join(__dirname, '..', '..', '.venv', 'bin', 'python3');
+    return fs.existsSync(venvPython) ? venvPython : 'python3';
   }
 
   /**
@@ -59,10 +68,7 @@ export class AuditReportGenerator {
    */
   async checkDependencies(): Promise<boolean> {
     try {
-      // Use virtual environment Python if available
-      const venvPython = path.join(__dirname, '..', '..', '.venv', 'bin', 'python3');
-      const pythonCmd = fs.existsSync(venvPython) ? venvPython : 'python3';
-
+      const pythonCmd = this.getPythonExecutable();
       const { stdout } = await exec(
         `${pythonCmd} -c "import reportlab; print(reportlab.__version__)"`
       );
@@ -74,30 +80,97 @@ export class AuditReportGenerator {
     }
   }
 
-  /**
-   * Save Lynis report data to temporary file
-   */
   private async saveTempReportFile(reportContent: string): Promise<string> {
     const tempFile = path.join(
       this.tempDir,
       `lynis_report_${Date.now()}.dat`
     );
-    
     await promisify(fs.writeFile)(tempFile, reportContent, 'utf-8');
     return tempFile;
   }
 
-  /**
-   * Save Windows scanner output to temporary file
-   */
   private async saveTempWindowsOutputFile(outputContent: string): Promise<string> {
     const tempFile = path.join(
       this.tempDir,
       `windows_audit_output_${Date.now()}.txt`
     );
-
     await promisify(fs.writeFile)(tempFile, outputContent, 'utf-8');
     return tempFile;
+  }
+
+  /**
+   * Run AI enrichment only (without PDF generation) and return the cache file path.
+   * Used during background pre-processing after scan submission.
+   */
+  async runAiEnrichment(
+    reportData: LynisReportData,
+    isWindows: boolean
+  ): Promise<string> {
+    const pythonExecutable = this.getPythonExecutable();
+    const aiCacheFile = path.join(this.tempDir, `ai_cache_${reportData.reportId}_${Date.now()}.json`);
+
+    const inputContent = isWindows
+      ? (reportData.reportFileContent || reportData.logFileContent)
+      : reportData.reportFileContent;
+
+    const tempInputFile = isWindows
+      ? await this.saveTempWindowsOutputFile(inputContent)
+      : await this.saveTempReportFile(inputContent);
+
+    const scriptPath = isWindows ? this.windowsPythonScriptPath : this.pythonScriptPath;
+
+    const args = [
+      scriptPath,
+      tempInputFile,
+      '-o', aiCacheFile,
+      '-H', reportData.hostname,
+      '-I', reportData.ipAddress,
+      '-O', reportData.ownerName,
+      '-K', reportData.kernelVersion || 'Unknown',
+      '-C', reportData.companyName || '',
+      '--enrich-only'
+    ];
+
+    console.log(`[AI-ENRICH] Starting AI enrichment for report ${reportData.reportId} (${isWindows ? 'Windows' : 'Linux'})`);
+
+    return new Promise((resolve, reject) => {
+      const python = spawn(pythonExecutable, args, {
+        env: { ...process.env, GEMINI_API_KEY: process.env.GEMINI_API_KEY || '' }
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      python.stdout?.on('data', (data) => {
+        stdout += data.toString();
+        console.log(`[AI-ENRICH] ${data.toString().trim()}`);
+      });
+
+      python.stderr?.on('data', (data) => {
+        stderr += data.toString();
+        // Log chunking/rate limit info at info level
+        const msg = data.toString().trim();
+        if (msg.includes('[CHUNK]') || msg.includes('[ENRICH]')) {
+          console.log(`[AI-ENRICH] ${msg}`);
+        } else {
+          console.error(`[AI-ENRICH] ${msg}`);
+        }
+      });
+
+      python.on('close', (code) => {
+        fs.unlink(tempInputFile, () => {});
+        if (code !== 0) {
+          reject(new Error(`AI enrichment failed (exit ${code}): ${stderr}`));
+        } else {
+          resolve(aiCacheFile);
+        }
+      });
+
+      python.on('error', (err) => {
+        fs.unlink(tempInputFile, () => {});
+        reject(err);
+      });
+    });
   }
 
   /**
@@ -108,19 +181,16 @@ export class AuditReportGenerator {
     options: GenerateReportOptions = {}
   ): Promise<string> {
     try {
-      // Check dependencies
       const depsOk = await this.checkDependencies();
       if (!depsOk) {
         throw new Error('Required dependencies not installed');
       }
 
-      // Save report to temp file
       const tempReportFile = await this.saveTempReportFile(
         lynisReportData.reportFileContent
       );
 
-      // Prepare output path
-      const outputDir = options.outputDir || path.join(__dirname, '..', 'reports');
+      const outputDir = options.outputDir || this.reportsDir;
       if (!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir, { recursive: true });
       }
@@ -130,25 +200,29 @@ export class AuditReportGenerator {
         `audit_report_${lynisReportData.reportId}_${Date.now()}.pdf`
       );
 
-      // Build command
-      const venvPython = path.join(__dirname, '..', '..', '.venv', 'bin', 'python3');
-      const pythonExecutable = fs.existsSync(venvPython) ? venvPython : 'python3';
+      const pythonExecutable = this.getPythonExecutable();
 
-      console.log(`Generating PDF report: ${outputFile}`);
-      console.log(`Using Python: ${pythonExecutable}`);
+      console.log(`[PDF-GEN] Generating PDF report: ${outputFile}`);
 
-      // Execute Python script
+      const args = [
+        this.pythonScriptPath,
+        tempReportFile,
+        '-o', outputFile,
+        '-H', lynisReportData.hostname,
+        '-I', lynisReportData.ipAddress,
+        '-O', lynisReportData.ownerName,
+        '-K', lynisReportData.kernelVersion || 'Unknown',
+        '-C', lynisReportData.companyName || ''
+      ];
+
+      // Use pre-computed AI cache if available
+      if (options.aiCachePath && fs.existsSync(options.aiCachePath)) {
+        args.push('--ai-cache', options.aiCachePath);
+        console.log(`[PDF-GEN] Using pre-computed AI cache: ${options.aiCachePath}`);
+      }
+
       return await new Promise((resolve, reject) => {
-        const python = spawn(pythonExecutable, [
-          this.pythonScriptPath,
-          tempReportFile,
-          '-o', outputFile,
-          '-H', lynisReportData.hostname,
-          '-I', lynisReportData.ipAddress,
-          '-O', lynisReportData.ownerName,
-          '-K', lynisReportData.kernelVersion || 'Unknown',
-          '-C', lynisReportData.companyName || ''
-        ], {
+        const python = spawn(pythonExecutable, args, {
           env: { ...process.env, GEMINI_API_KEY: process.env.GEMINI_API_KEY || '' }
         });
 
@@ -166,9 +240,7 @@ export class AuditReportGenerator {
         });
 
         python.on('close', (code) => {
-          // Clean up temp file
           fs.unlink(tempReportFile, () => {});
-
           if (code !== 0) {
             reject(new Error(`Python script failed: ${stderr}`));
           } else {
@@ -182,7 +254,7 @@ export class AuditReportGenerator {
         });
       });
     } catch (error) {
-      console.error('Error generating PDF report:', error);
+      console.error('[PDF-GEN] Error generating PDF report:', error);
       throw error;
     }
   }
@@ -194,7 +266,7 @@ export class AuditReportGenerator {
     lynisReportData: LynisReportData,
     options: GenerateReportOptions = {}
   ): Promise<string> {
-    const outputDir = options.outputDir || path.join(__dirname, '..', 'reports');
+    const outputDir = options.outputDir || this.reportsDir;
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
     }
@@ -225,7 +297,7 @@ export class AuditReportGenerator {
 
       const tempOutputFile = await this.saveTempWindowsOutputFile(windowsOutputContent);
 
-      const outputDir = options.outputDir || path.join(__dirname, '..', 'reports');
+      const outputDir = options.outputDir || this.reportsDir;
       if (!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir, { recursive: true });
       }
@@ -235,20 +307,29 @@ export class AuditReportGenerator {
         `audit_report_${reportData.reportId}_${Date.now()}.pdf`
       );
 
-      const venvPython = path.join(__dirname, '..', '..', '.venv', 'bin', 'python3');
-      const pythonExecutable = fs.existsSync(venvPython) ? venvPython : 'python3';
+      const pythonExecutable = this.getPythonExecutable();
+
+      console.log(`[PDF-GEN] Generating Windows PDF report: ${outputFile}`);
+
+      const args = [
+        this.windowsPythonScriptPath,
+        tempOutputFile,
+        '-o', outputFile,
+        '-H', reportData.hostname,
+        '-I', reportData.ipAddress,
+        '-O', reportData.ownerName,
+        '-K', reportData.kernelVersion || 'Unknown',
+        '-C', reportData.companyName || '',
+      ];
+
+      // Use pre-computed AI cache if available
+      if (options.aiCachePath && fs.existsSync(options.aiCachePath)) {
+        args.push('--ai-cache', options.aiCachePath);
+        console.log(`[PDF-GEN] Using pre-computed AI cache: ${options.aiCachePath}`);
+      }
 
       return await new Promise((resolve, reject) => {
-        const python = spawn(pythonExecutable, [
-          this.windowsPythonScriptPath,
-          tempOutputFile,
-          '-o', outputFile,
-          '-H', reportData.hostname,
-          '-I', reportData.ipAddress,
-          '-O', reportData.ownerName,
-          '-K', reportData.kernelVersion || 'Unknown',
-          '-C', reportData.companyName || '',
-        ], {
+        const python = spawn(pythonExecutable, args, {
           env: { ...process.env, GEMINI_API_KEY: process.env.GEMINI_API_KEY || '' }
         });
 
@@ -278,8 +359,87 @@ export class AuditReportGenerator {
         });
       });
     } catch (error) {
-      console.error('Error generating Windows PDF report:', error);
+      console.error('[PDF-GEN] Error generating Windows PDF report:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Background PDF pre-generation pipeline:
+   * 1. Run AI enrichment (chunked for large datasets)
+   * 2. Generate PDF using cached AI results
+   * 3. Store result in database
+   *
+   * This runs asynchronously after report submission, so the PDF is ready
+   * when the user clicks Download.
+   */
+  async backgroundGeneratePDF(
+    reportData: LynisReportData,
+    isWindows: boolean,
+    windowsOutputContent: string,
+    onStatusUpdate: (status: string, pdfPath?: string, error?: string) => Promise<void>
+  ): Promise<void> {
+    let aiCachePath: string | undefined;
+
+    try {
+      // Step 1: Update status to processing
+      await onStatusUpdate('processing');
+      console.log(`[BG-PDF] Starting background PDF generation for ${reportData.reportId}`);
+
+      // Step 2: Run AI enrichment
+      console.log(`[BG-PDF] Step 1/2: AI enrichment...`);
+      try {
+        aiCachePath = await this.runAiEnrichment(reportData, isWindows);
+        console.log(`[BG-PDF] AI enrichment complete, cache at: ${aiCachePath}`);
+      } catch (aiErr) {
+        console.warn(`[BG-PDF] AI enrichment failed, proceeding without AI: ${aiErr}`);
+        // Continue — PDF will be generated with raw scan data only
+      }
+
+      // Step 3: Generate PDF with AI cache
+      console.log(`[BG-PDF] Step 2/2: Generating PDF...`);
+      const outputDir = this.reportsDir;
+      const options: GenerateReportOptions = { outputDir, aiCachePath };
+
+      let pdfPath: string;
+      if (isWindows) {
+        pdfPath = await this.generateWindowsPDFReport(
+          reportData, windowsOutputContent, options
+        );
+      } else {
+        pdfPath = await this.generatePDFReport(reportData, options);
+      }
+
+      console.log(`[BG-PDF] PDF generated successfully: ${pdfPath}`);
+
+      // Step 4: Update status to completed
+      await onStatusUpdate('completed', pdfPath);
+
+      // Cleanup AI cache file
+      if (aiCachePath && fs.existsSync(aiCachePath)) {
+        fs.unlink(aiCachePath, () => {});
+      }
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      console.error(`[BG-PDF] PDF generation failed: ${errMsg}`);
+      await onStatusUpdate('failed', undefined, errMsg);
+
+      if (aiCachePath && fs.existsSync(aiCachePath)) {
+        fs.unlink(aiCachePath, () => {});
+      }
+    }
+  }
+
+  /**
+   * Check if a pre-generated PDF exists and is valid
+   */
+  isPdfReady(pdfFilePath: string | undefined | null): boolean {
+    if (!pdfFilePath) return false;
+    try {
+      const stat = fs.statSync(pdfFilePath);
+      return stat.isFile() && stat.size > 0;
+    } catch {
+      return false;
     }
   }
 

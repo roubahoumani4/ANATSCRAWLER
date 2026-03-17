@@ -1,6 +1,7 @@
 /**
  * OS Audit Report Generation Routes
- * Endpoints for generating PDF audit reports from Lynis scan results
+ * Endpoints for generating PDF audit reports from Lynis/HardeningKitty scan results.
+ * PDFs are pre-generated in the background after scan submission for instant download.
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
@@ -18,7 +19,8 @@ interface AuthenticatedRequest extends Request {
 
 /**
  * @route POST /api/v1/os-audit/reports/generate-pdf/:reportId
- * @desc Generate PDF report from audit results
+ * @desc Download PDF report. Serves pre-generated PDF instantly if available,
+ *       otherwise generates on-demand (fallback).
  * @access Private - Requires authentication
  */
 router.post(
@@ -29,7 +31,6 @@ router.post(
       const { reportId } = req.params;
       const userId = req.user?._id || req.user?.id;
 
-      // Find the audit report
       const auditReport = await OSAuditReport.findOne({
         reportId,
         owner: userId
@@ -42,8 +43,35 @@ router.post(
         });
       }
 
-      // Generate PDF report
       const generator = new AuditReportGenerator();
+
+      // Try to serve pre-generated PDF
+      if (
+        auditReport.pdfGenerationStatus === 'completed' &&
+        auditReport.pdfFilePath &&
+        generator.isPdfReady(auditReport.pdfFilePath)
+      ) {
+        console.log(`[DOWNLOAD] Serving pre-generated PDF for ${reportId}`);
+        return res.download(
+          auditReport.pdfFilePath,
+          `audit_report_${reportId}.pdf`,
+          (err) => {
+            if (err) console.error('Error sending PDF:', err);
+          }
+        );
+      }
+
+      // If still processing, inform the client
+      if (auditReport.pdfGenerationStatus === 'processing') {
+        return res.status(202).json({
+          success: false,
+          error: 'PDF report is still being generated. Please try again shortly.',
+          status: 'processing'
+        });
+      }
+
+      // Fallback: generate on-demand (for old reports or failed background gen)
+      console.log(`[DOWNLOAD] Fallback: generating PDF on-demand for ${reportId}`);
 
       const reportData = {
         reportId: auditReport.reportId,
@@ -72,13 +100,16 @@ router.post(
           )
         : await generator.generatePDFReport(reportData, { outputDir });
 
-      // Return PDF file
+      // Store the generated path for future requests
+      await OSAuditReport.updateOne(
+        { reportId },
+        { $set: { pdfFilePath: pdfPath, pdfGenerationStatus: 'completed' } }
+      );
+
       res.download(pdfPath, `audit_report_${reportId}.pdf`, (err) => {
         if (err) {
           console.error('Error sending PDF:', err);
         }
-        // Optionally cleanup file after download
-        // fs.unlink(pdfPath, () => {});
       });
     } catch (error) {
       console.error('Error generating PDF report:', error);
@@ -86,6 +117,46 @@ router.post(
         success: false,
         error: 'Failed to generate PDF report',
         details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+);
+
+/**
+ * @route GET /api/v1/os-audit/reports/pdf-status/:reportId
+ * @desc Check PDF generation status for a report
+ * @access Private - Requires authentication
+ */
+router.get(
+  '/reports/pdf-status/:reportId',
+  authenticate,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { reportId } = req.params;
+      const userId = req.user?._id || req.user?.id;
+
+      const report = await OSAuditReport.findOne({
+        reportId,
+        owner: userId
+      }).select('reportId pdfGenerationStatus pdfGenerationError');
+
+      if (!report) {
+        return res.status(404).json({
+          success: false,
+          error: 'Report not found'
+        });
+      }
+
+      res.json({
+        success: true,
+        reportId: report.reportId,
+        pdfStatus: report.pdfGenerationStatus || 'pending',
+        error: report.pdfGenerationError || null
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to check PDF status'
       });
     }
   }

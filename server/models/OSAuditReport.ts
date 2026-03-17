@@ -135,6 +135,24 @@ const osAuditReportSchema = new Schema({
     type: String,
     description: 'Version of Lynis used'
   },
+  pdfFilePath: {
+    type: String,
+    description: 'Path to pre-generated PDF report file'
+  },
+  pdfGenerationStatus: {
+    type: String,
+    enum: ['pending', 'processing', 'completed', 'failed'],
+    default: 'pending',
+    description: 'Status of background PDF generation'
+  },
+  pdfGenerationError: {
+    type: String,
+    description: 'Error message if PDF generation failed'
+  },
+  aiEnrichmentData: {
+    type: Schema.Types.Mixed,
+    description: 'Cached AI enrichment results for findings'
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -188,6 +206,10 @@ export interface IOSAuditReport extends mongoose.Document {
   errorMessage?: string;
   auditDuration?: number;
   lynisVersion?: string;
+  pdfFilePath?: string;
+  pdfGenerationStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+  pdfGenerationError?: string;
+  aiEnrichmentData?: any;
   createdAt: Date;
   updatedAt: Date;
 }

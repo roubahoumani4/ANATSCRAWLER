@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import authenticate from '../middleware/auth';
 import { OSAuditMachine, IOSAuditMachine } from '../models/OSAuditMachine';
 import { OSAuditReport, IOSAuditReport } from '../models/OSAuditReport';
+import AuditReportGenerator from '../services/auditReportGenerator';
 
 const router = Router();
 
@@ -377,6 +378,50 @@ router.post('/reports', async (req: AuthenticatedRequest, res: Response) => {
     // Update machine with last audit date
     machine.lastAuditDate = new Date();
     await machine.save();
+
+    // --- Background PDF pre-generation ---
+    // Fire-and-forget: AI enrichment → PDF generation runs asynchronously
+    // so the PDF is ready when the user clicks "Download PDF"
+    const isWindows = (machine.osType === 'windows');
+    const reportDataForPdf = {
+      reportId: savedReport.reportId,
+      hostname: savedReport.hostname || savedReport.machineName,
+      ipAddress: savedReport.ipAddress,
+      ownerName: savedReport.ownerName,
+      companyName: (savedReport as any).companyName || '',
+      osName: savedReport.operatingSystem || 'Unknown',
+      osVersion: 'Unknown',
+      kernelVersion: (savedReport as any).kernelVersion || 'Unknown',
+      auditDate: savedReport.auditDate,
+      logFileContent: savedReport.logFileContent || '',
+      reportFileContent: savedReport.reportFileContent || ''
+    };
+    const windowsContent = isWindows
+      ? (savedReport.reportFileContent || savedReport.logFileContent || (savedReport as any).rawReport || '')
+      : '';
+
+    const generator = new AuditReportGenerator();
+    generator.backgroundGeneratePDF(
+      reportDataForPdf,
+      isWindows,
+      windowsContent,
+      async (status: string, pdfPath?: string, error?: string) => {
+        try {
+          const update: any = { pdfGenerationStatus: status };
+          if (pdfPath) update.pdfFilePath = pdfPath;
+          if (error) update.pdfGenerationError = error;
+          await OSAuditReport.updateOne(
+            { reportId: savedReport.reportId },
+            { $set: update }
+          );
+          console.log(`[BG-PDF] Report ${savedReport.reportId} status → ${status}`);
+        } catch (dbErr) {
+          console.error(`[BG-PDF] Failed to update report status: ${dbErr}`);
+        }
+      }
+    ).catch((err) => {
+      console.error(`[BG-PDF] Unhandled error for ${savedReport.reportId}:`, err);
+    });
 
     res.status(201).json({
       success: true,

@@ -200,6 +200,12 @@ const OSAuditPage: React.FC = () => {
         }
       );
 
+      // PDF is still being generated in the background
+      if (response.status === 202) {
+        alert('PDF report is still being generated. Please wait a moment and try again.');
+        return;
+      }
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to generate report: ${response.status} ${response.statusText} ${errorText}`);

@@ -133,12 +133,12 @@ def _ai_enrich_findings(findings: List[Dict], finding_type: str) -> Dict[str, di
 
     model = "llama-3.1-8b-instant"
     results: Dict[str, dict] = dict(_ai_cache)
-    batch_size = 10
+    batch_size = 20
 
     for batch_start in range(0, len(needs_fill), batch_size):
-        # Pace requests to stay under Groq free-tier rate limits
+        # Pace requests to stay under Groq free-tier rate limits (30 req/min)
         if batch_start > 0:
-            time.sleep(5)
+            time.sleep(3)
         batch = needs_fill[batch_start:batch_start + batch_size]
 
         findings_text = ""
@@ -726,6 +726,9 @@ def main():
     parser.add_argument('-O', '--owner', help='System owner name')
     parser.add_argument('-K', '--kernel', help='Kernel version')
     parser.add_argument('-C', '--company', help='Company name')
+    parser.add_argument('--ai-cache', help='Path to JSON file with pre-computed AI enrichment data')
+    parser.add_argument('--enrich-only', action='store_true',
+                        help='Only run AI enrichment and output JSON (no PDF)')
 
     args = parser.parse_args()
 
@@ -754,6 +757,34 @@ def main():
 
     warnings = parser_obj.get_warnings()
     suggestions = parser_obj.get_suggestions()
+
+    # Load pre-computed AI cache if provided
+    if args.ai_cache and os.path.exists(args.ai_cache):
+        try:
+            with open(args.ai_cache, 'r') as f:
+                cached = json.load(f)
+            for k, v in cached.items():
+                _ai_cache[k] = v
+            print(f"Loaded {len(cached)} cached AI enrichments")
+        except Exception as e:
+            print(f"Warning: Could not load AI cache: {e}", file=sys.stderr)
+
+    # Enrich-only mode: run AI and output JSON
+    if args.enrich_only:
+        print("Running AI enrichment only (no PDF generation)")
+        warn_ai = _ai_enrich_findings(warnings, 'warning')
+        sugg_ai = _ai_enrich_findings(suggestions, 'suggestion')
+        all_ai = {}
+        all_ai.update(warn_ai)
+        all_ai.update(sugg_ai)
+        output = json.dumps(all_ai, indent=2)
+        if args.output and args.output != 'audit_report.pdf':
+            with open(args.output, 'w') as f:
+                f.write(output)
+            print(f"AI enrichment data written to: {args.output}")
+        else:
+            print(output)
+        return
 
     print(f"Generating PDF report: {args.output}")
     pdf_gen = AuditPDFReport(report_data, args.output)

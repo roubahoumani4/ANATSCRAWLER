@@ -102,7 +102,10 @@ def _parse_ai_json(text: str) -> list:
 
 
 def _analyze_with_ai(findings: List[Dict]) -> Dict[str, dict]:
-    """Batch-analyse Windows findings using Groq AI.
+    """Batch-analyse Windows findings using Groq AI with chunked processing.
+
+    Splits large finding sets into manageable chunks to avoid timeouts and
+    rate limiting. Each chunk is processed independently.
 
     Returns a dict keyed by finding name with analysis results:
       {description, security_impact, recommended_fix, security_recommendation}
@@ -124,12 +127,12 @@ def _analyze_with_ai(findings: List[Dict]) -> Dict[str, dict]:
 
     model = "llama-3.1-8b-instant"
     results: Dict[str, dict] = {}
-    batch_size = 10
+    batch_size = 15  # Smaller batches to avoid timeouts with large CSVs
 
     for batch_start in range(0, len(findings), batch_size):
-        # Pace requests to stay under Groq free-tier rate limits
+        # Pace requests to stay under Groq free-tier rate limits (30 req/min)
         if batch_start > 0:
-            time.sleep(5)
+            time.sleep(4)
         batch = findings[batch_start:batch_start + batch_size]
 
         # Filter out already-cached items
@@ -140,6 +143,14 @@ def _analyze_with_ai(findings: List[Dict]) -> Dict[str, dict]:
                 results[cache_key] = _ai_cache[cache_key]
             else:
                 uncached.append(f)
+
+        if not uncached:
+            continue
+
+        batch_num = batch_start // batch_size + 1
+        total_batches = (len(findings) + batch_size - 1) // batch_size
+        print(f"[CHUNK] Processing batch {batch_num}/{total_batches} "
+              f"({len(uncached)} uncached findings)", file=sys.stderr)
 
         if not uncached:
             continue
@@ -188,8 +199,7 @@ def _analyze_with_ai(findings: List[Dict]) -> Dict[str, dict]:
         )
 
         # Retry with exponential backoff for rate-limit (429) and parse errors
-        batch_num = batch_start // batch_size + 1
-        for attempt in range(4):
+        for attempt in range(5):
             try:
                 resp = client.chat.completions.create(
                     model=model,
@@ -212,20 +222,25 @@ def _analyze_with_ai(findings: List[Dict]) -> Dict[str, dict]:
                         }
                         results[name] = ai_result
                         _ai_cache[name] = ai_result
+                print(f"[CHUNK] Batch {batch_num} complete: "
+                      f"{len([e for e in parsed if 1 <= e.get('index', 0) <= len(uncached)])} enriched",
+                      file=sys.stderr)
                 break  # success
             except Exception as e:
                 err_str = str(e)
-                if '429' in err_str and attempt < 3:
-                    wait = (2 ** attempt) * 15  # 15s, 30s, 60s
-                    print(f"Rate limited (batch {batch_num}), retrying in {wait}s...",
+                if '429' in err_str and attempt < 4:
+                    wait = (2 ** attempt) * 10  # 10s, 20s, 40s, 80s
+                    print(f"[CHUNK] Rate limited (batch {batch_num}), "
+                          f"retrying in {wait}s (attempt {attempt+1}/5)...",
                           file=sys.stderr)
                     time.sleep(wait)
-                elif 'JSON' in err_str and attempt < 2:
-                    print(f"JSON parse retry (batch {batch_num}, attempt {attempt+1})",
+                elif 'JSON' in err_str and attempt < 3:
+                    print(f"[CHUNK] JSON parse retry (batch {batch_num}, "
+                          f"attempt {attempt+1})",
                           file=sys.stderr)
-                    time.sleep(2)
+                    time.sleep(3)
                 else:
-                    print(f"AI analysis error (batch {batch_num}): {e}",
+                    print(f"[CHUNK] AI analysis error (batch {batch_num}): {e}",
                           file=sys.stderr)
                     break
 
@@ -698,24 +713,22 @@ class WindowsAuditPDFReport:
 
                 text = f"<b>{idx}. [{fid}] {name}</b>"
 
-                # Result from CSV scan
-                if result:
+                # Recommendation from AI (description + security_impact)
+                desc = ai.get("description", "")
+                impact = ai.get("security_impact", "")
+                rec_text = ". ".join(filter(None, [desc, impact]))
+                if rec_text:
+                    text += (f"<br/><b>Recommendation (*):</b> "
+                             f"{_safe(rec_text)}")
+                elif result:
                     text += (f"<br/><b>Result:</b> "
                              f"{_safe(result, 200)}")
 
-                # Details from AI
-                desc = ai.get("description", "")
-                impact = ai.get("security_impact", "")
-                detail_text = ". ".join(filter(None, [desc, impact]))
-                if detail_text:
-                    text += (f"<br/><b>Details (*):</b> "
-                             f"{_safe(detail_text)}")
-
-                # Suggestion from AI
-                rec = ai.get("recommended_fix", "")
-                if rec:
+                # Suggestion from AI (recommended_fix)
+                fix = ai.get("recommended_fix", "")
+                if fix:
                     text += (f"<br/><b>Suggestion (*):</b> "
-                             f"{_safe(rec)}")
+                             f"{_safe(fix)}")
 
                 self.story.append(
                     Paragraph(text, self.styles["FindingCritical"]))
@@ -741,23 +754,21 @@ class WindowsAuditPDFReport:
 
                 text = f"<b>{idx}. [{fid}] {name}</b>"
 
-                # Result from CSV scan
-                if result:
-                    text += (f"<br/><b>Result:</b> "
-                             f"{_safe(result, 200)}")
-
-                # Details from AI description + security_impact
+                # Details from AI (description + security_impact)
                 details = ai.get("description", "")
                 impact = ai.get("security_impact", "")
                 detail_text = ". ".join(filter(None, [details, impact]))
                 if detail_text:
                     text += (f"<br/><b>Details (*):</b> "
                              f"{_safe(detail_text)}")
+                elif result:
+                    text += (f"<br/><b>Result:</b> "
+                             f"{_safe(result, 200)}")
 
-                # Suggestion from AI
+                # Recommendation from AI (recommended_fix)
                 rec = ai.get("recommended_fix", "")
                 if rec:
-                    text += (f"<br/><b>Suggestion (*):</b> "
+                    text += (f"<br/><b>Recommendation (*):</b> "
                              f"{_safe(rec)}")
 
                 self.story.append(
@@ -856,6 +867,10 @@ def main() -> int:
                         help="Kernel/OS version")
     parser.add_argument("-C", "--company", default="",
                         help="Company name")
+    parser.add_argument("--ai-cache",
+                        help="Path to JSON file with pre-computed AI enrichment data")
+    parser.add_argument("--enrich-only", action="store_true",
+                        help="Only run AI enrichment and output JSON (no PDF)")
 
     args = parser.parse_args()
 
@@ -874,6 +889,35 @@ def main() -> int:
     else:
         print("Using console output parser (fallback)")
         parsed = parse_console_output(raw)
+
+    # Load pre-computed AI cache if provided
+    if args.ai_cache and os.path.exists(args.ai_cache):
+        try:
+            with open(args.ai_cache, 'r') as f:
+                cached = json.load(f)
+            for k, v in cached.items():
+                _ai_cache[k] = v
+            print(f"Loaded {len(cached)} cached AI enrichments")
+        except Exception as e:
+            print(f"Warning: Could not load AI cache: {e}", file=sys.stderr)
+
+    # Enrich-only mode: run AI analysis and output JSON
+    if args.enrich_only:
+        print("[ENRICH] Running AI enrichment only (no PDF generation)")
+        all_findings: List[Dict] = []
+        for sev in ["critical", "high", "medium", "low"]:
+            all_findings.extend(parsed["findings"].get(sev, []))
+        print(f"[ENRICH] Total findings to analyse: {len(all_findings)}")
+        ai_results = _analyze_with_ai(all_findings)
+        print(f"[ENRICH] AI analysis complete: {len(ai_results)}/{len(all_findings)} enriched")
+        output = json.dumps(ai_results, indent=2)
+        if args.output and args.output != "windows_audit_report.pdf":
+            with open(args.output, 'w') as f:
+                f.write(output)
+            print(f"[ENRICH] AI enrichment data written to: {args.output}")
+        else:
+            print(output)
+        return 0
 
     report = WindowsAuditPDFReport(
         output_path=args.output,
