@@ -8,11 +8,18 @@ const configFile =
   process.env.CONFIG_FILE || path.resolve(__dirname, isDev ? 'config.dev.env' : 'config.env');
 dotenv.config({ path: configFile });
 
+// Also load .env (deploy script writes secrets here) — won't override existing vars
+const deployEnvFile = path.resolve(__dirname, '..', '.env');
+dotenv.config({ path: deployEnvFile });
+
 // Ensure required directories exist
 ensureDirectories();
 
 console.log(`🔧 Loading configuration from: ${configFile}`);
 console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+console.log(`🤖 GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? 'SET (' + process.env.GEMINI_API_KEY.slice(0, 4) + '...)' : 'NOT SET'}`);
+
+
 
 // Timeout configurations to prevent hanging
 export const TIMEOUT_CONFIG = {

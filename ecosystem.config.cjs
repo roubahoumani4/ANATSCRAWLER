@@ -18,6 +18,17 @@ if (fs.existsSync(configPath)) {
   console.warn(`Config file not found: ${configPath}`);
 }
 
+// Also load .env (created by deploy script with secrets)
+const dotEnvPath = path.resolve(__dirname, '.env');
+if (fs.existsSync(dotEnvPath)) {
+  console.log(`Loading secrets from: ${dotEnvPath}`);
+  const dotEnvFile = fs.readFileSync(dotEnvPath, 'utf8');
+  const dotEnvConfig = dotenv.parse(dotEnvFile);
+  // Merge — .env values override config.env (secrets take priority)
+  Object.assign(envConfig, dotEnvConfig);
+  console.log(`Merged ${Object.keys(dotEnvConfig).length} variables from .env`);
+}
+
 module.exports = {
   apps: [{
     name: 'anatscrawler',
