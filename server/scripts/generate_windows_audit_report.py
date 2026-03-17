@@ -65,6 +65,11 @@ def _severity_bucket(sev: str) -> str:
 _ai_cache: Dict[str, dict] = {}
 
 
+def _fix_json_escapes(text: str) -> str:
+    """Fix invalid JSON escape sequences (e.g. \\S, \\P from registry paths)."""
+    return re.sub(r'\\(?!["\\\\bfnrtu/])', r'\\\\', text)
+
+
 def _analyze_with_ai(findings: List[Dict]) -> Dict[str, dict]:
     """Batch-analyse Windows findings using Groq AI.
 
@@ -161,7 +166,10 @@ def _analyze_with_ai(findings: List[Dict]) -> Dict[str, dict]:
                     text = re.sub(r"^```(?:json)?\s*", "", text)
                     text = re.sub(r"\s*```$", "", text)
 
-                parsed = json.loads(text)
+                try:
+                    parsed = json.loads(text)
+                except json.JSONDecodeError:
+                    parsed = json.loads(_fix_json_escapes(text))
                 if isinstance(parsed, list):
                     for entry in parsed:
                         idx = entry.get("index", 0)

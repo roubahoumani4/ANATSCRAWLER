@@ -47,6 +47,11 @@ def _safe(text: str, max_len: int = 0) -> str:
 _ai_cache: Dict[str, dict] = {}
 
 
+def _fix_json_escapes(text: str) -> str:
+    """Fix invalid JSON escape sequences (e.g. \\S, \\P from registry paths)."""
+    return re.sub(r'\\(?!["\\\\bfnrtu/])', r'\\\\', text)
+
+
 def _is_empty(val: str) -> bool:
     """Return True if a Lynis field value is effectively empty."""
     return not val or val.strip() in ('', '-', '--', 'N/A')
@@ -155,7 +160,10 @@ def _ai_enrich_findings(findings: List[Dict], finding_type: str) -> Dict[str, di
                 if text.startswith("```"):
                     text = re.sub(r"^```(?:json)?\s*", "", text)
                     text = re.sub(r"\s*```$", "", text)
-                parsed = json.loads(text)
+                try:
+                    parsed = json.loads(text)
+                except json.JSONDecodeError:
+                    parsed = json.loads(_fix_json_escapes(text))
                 if isinstance(parsed, list):
                     for entry in parsed:
                         idx = entry.get("index", 0)
