@@ -373,18 +373,50 @@ def parse_console_output(raw_output: str) -> Dict:
 
 
 # ---------------------------------------------------------------------------
-# PDF Report Builder – unified structure mirroring the Lynis report
+# Compliance framework mapping for Windows audit categories
+# ---------------------------------------------------------------------------
+
+_WIN_COMPLIANCE_MAP = {
+    'Account Policies': {'cis': '1.x Account Policies', 'nist': 'AC, IA', 'iso': 'A.9 Access Control'},
+    'Audit Policies': {'cis': '17.x Advanced Audit Policy', 'nist': 'AU', 'iso': 'A.12.4 Logging'},
+    'Security Options': {'cis': '2.3 Security Options', 'nist': 'AC, CM', 'iso': 'A.9 Access Control'},
+    'User Rights Assignment': {'cis': '2.2 User Rights Assignment', 'nist': 'AC', 'iso': 'A.9 Access Control'},
+    'Windows Firewall': {'cis': '9.x Windows Firewall', 'nist': 'SC', 'iso': 'A.13 Communications Security'},
+    'Administrative Templates': {'cis': '18.x Administrative Templates', 'nist': 'CM', 'iso': 'A.12 Operations Security'},
+    'Registry': {'cis': '18.x Administrative Templates', 'nist': 'CM, SI', 'iso': 'A.12 Operations Security'},
+    'BitLocker': {'cis': '18.9 BitLocker Drive Encryption', 'nist': 'SC', 'iso': 'A.10 Cryptography'},
+    'Windows Defender': {'cis': '18.9 Windows Defender', 'nist': 'SI', 'iso': 'A.12.2 Malware Protection'},
+    'Network': {'cis': '18.4 Network', 'nist': 'SC', 'iso': 'A.13 Communications Security'},
+    'Microsoft Edge': {'cis': '18.x Administrative Templates', 'nist': 'CM', 'iso': 'A.12 Operations Security'},
+    'Windows Update': {'cis': '18.9 Windows Update', 'nist': 'SI', 'iso': 'A.12.6 Technical Vulnerability Management'},
+    'Credential Guard': {'cis': '18.8 Device Guard', 'nist': 'IA', 'iso': 'A.9 Access Control'},
+    'Remote Desktop': {'cis': '18.9 Remote Desktop Services', 'nist': 'AC, SC', 'iso': 'A.9 Access Control'},
+    'PowerShell': {'cis': '18.9 PowerShell', 'nist': 'CM, AU', 'iso': 'A.12 Operations Security'},
+    'SMB': {'cis': '18.4 SMB', 'nist': 'SC', 'iso': 'A.13 Communications Security'},
+    'Uncategorized': {'cis': 'General Hardening', 'nist': 'CM', 'iso': 'A.12 Operations Security'},
+}
+
+
+# ---------------------------------------------------------------------------
+# PDF Report Builder - Professional Security Audit Report
 # ---------------------------------------------------------------------------
 
 class WindowsAuditPDFReport:
-    """Generate unified PDF audit report from HardeningKitty data with AI analysis.
+    """Generate professional PDF audit report from Windows scan data.
 
     Sections:
-      1. System Information
-      2. Audit Summary
-      3. Findings Overview
-      4. Detailed Findings  (AI-enriched)
-      5. Overall Security Posture
+      1. Executive Summary
+      2. Audit Scope & Methodology
+      3. System Information
+      4. Risk Classification
+      5. Prioritized Remediation Roadmap
+      6. Detailed Findings
+      7. Risk Heat Map
+      8. Compliance Mapping
+      9. Before & After Success Criteria
+      10. Appendices
+      11. Auditor Sign-off
+      12. Document Metadata
     """
 
     def __init__(self, output_path: str, hostname: str, ip_address: str,
@@ -488,10 +520,11 @@ class WindowsAuditPDFReport:
             all_findings.extend(self.parsed["findings"].get(sev, []))
 
         if all_findings:
-            print(f"Analysing {len(all_findings)} findings with AI...")
+            print("Analysing " + str(len(all_findings)) + " findings with AI...")
             self.ai_results = _analyze_with_ai(all_findings)
-            print(f"AI analysis complete: "
-                  f"{len(self.ai_results)}/{len(all_findings)} findings enriched")
+            print("AI analysis complete: "
+                  + str(len(self.ai_results)) + "/" + str(len(all_findings))
+                  + " findings enriched")
 
     def _get_finding_analysis(self, finding: Dict) -> Dict[str, str]:
         """Return AI analysis for a finding, empty strings when unavailable."""
@@ -504,71 +537,152 @@ class WindowsAuditPDFReport:
         }
 
     def _get_warnings(self) -> List[Dict]:
-        """Critical + High findings = Warnings (matching Lynis)."""
+        """Critical + High findings = Warnings."""
         return (self.parsed["findings"].get("critical", [])
                 + self.parsed["findings"].get("high", []))
 
     def _get_suggestions(self) -> List[Dict]:
-        """Medium + Low findings = Suggestions (matching Lynis)."""
+        """Medium + Low findings = Suggestions."""
         return (self.parsed["findings"].get("medium", [])
                 + self.parsed["findings"].get("low", []))
 
     # ========================== Sections ==============================
 
-    def _section_report_overview(self):
-        """Report header with title and metadata."""
+    def _section_cover_page(self):
+        """Cover page with title, metadata, and confidentiality notice."""
         self.story.append(Paragraph(
             "SYSTEM SECURITY AUDIT REPORT", self.styles["ReportTitle"]))
         self.story.append(Paragraph(
             "Windows OS Hardening Assessment", self.styles["ReportSubtitle"]))
 
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-        meta = f"""
-        <font size=9>
-        <b>Report Generated:</b> {now}<br/>
-        <b>Company:</b> {_safe(self.company_name) or 'N/A'}<br/>
-        <b>System:</b> {_safe(self.hostname)}<br/>
-        <b>IP Address:</b> {_safe(self.ip_address)}<br/>
-        <b>OS Version:</b> {_safe(self.kernel_version)}<br/>
-        <b>Owner:</b> {_safe(self.owner_name)}<br/>
-        </font>
-        """
+        meta = (
+            '<font size=9>'
+            '<b>Report Generated:</b> ' + now + '<br/>'
+            '<b>Company:</b> ' + (_safe(self.company_name) or 'N/A') + '<br/>'
+            '<b>System:</b> ' + _safe(self.hostname) + '<br/>'
+            '<b>IP Address:</b> ' + _safe(self.ip_address) + '<br/>'
+            '<b>OS Version:</b> ' + _safe(self.kernel_version) + '<br/>'
+            '<b>Owner:</b> ' + _safe(self.owner_name) + '<br/>'
+            '</font>'
+        )
         self.story.append(Paragraph(meta, self.styles["Normal"]))
         self.story.append(Spacer(1, 0.25 * inch))
 
-        ai_note = ("Findings are enriched with AI-generated analysis."
-                   if self.ai_results
-                   else "AI analysis unavailable; showing raw scan data.")
-        disclaimer = f"""
-        <font size=8 color="#666666">
-        <i>This report contains confidential security audit information.
-        Unauthorized access, use, or distribution is prohibited.
-        {ai_note}</i>
-        </font>
-        """
+        disclaimer = (
+            '<font size=8 color="#666666"><i>'
+            'This report contains confidential security audit information. '
+            'Unauthorized access, use, or distribution is prohibited. '
+            'This assessment was performed using an automated security auditing tool '
+            'conducted by ANATSECURITY. All findings and recommendations are based on '
+            'the scan output and AI-assisted analysis.'
+            '</i></font>'
+        )
         self.story.append(Paragraph(disclaimer, self.styles["Normal"]))
         self.story.append(Spacer(1, 0.2 * inch))
 
     # ------------------------------------------------------------------
-    def _section_system_information(self):
-        """Section 1 – system details and category breakdown."""
+    def _section_executive_summary(self):
+        """Section 1 - executive-level summary."""
         self.story.append(Paragraph(
-            "1. SYSTEM INFORMATION", self.styles["SectionTitle"]))
+            "1. EXECUTIVE SUMMARY", self.styles["SectionTitle"]))
 
-        info = f"""
-        <b>System Identification:</b><br/>
-        Hostname: {_safe(self.hostname)}<br/>
-        IP Address: {_safe(self.ip_address)}<br/>
-        Owner: {_safe(self.owner_name)}<br/>
-        <br/>
-        <b>Operating System:</b><br/>
-        Platform: Microsoft Windows<br/>
-        OS Version: {_safe(self.kernel_version)}<br/>
-        <br/>
-        <b>Audit Scope:</b><br/>
-        Total Configuration Checks: {self.parsed['total']}<br/>
-        Categories Evaluated: {len(self.parsed.get('categories', {}))}<br/>
-        """
+        p = self.parsed
+        score = p["score"]
+        risk, _ = self._risk_level(score)
+        warnings = self._get_warnings()
+        suggestions = self._get_suggestions()
+
+        rows = [
+            ["Metric", "Value"],
+            ["Compliance Score", str(score) + "/100"],
+            ["Risk Level", risk],
+            ["Total Checks", str(p["total"])],
+            ["Passed", str(p["passed"])],
+            ["Failed", str(p["failed"])],
+            ["Critical/High Priority Findings", str(len(warnings))],
+            ["Medium/Low Priority Findings", str(len(suggestions))],
+        ]
+        t = Table(rows, colWidths=[3.5 * inch, 2.5 * inch])
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a365d")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, 0), 11),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+            ("GRID", (0, 0), (-1, -1), 1, colors.HexColor("#cbd5e0")),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1),
+             [colors.white, colors.HexColor("#f7fafc")]),
+        ]))
+        self.story.append(t)
+        self.story.append(Spacer(1, 0.15 * inch))
+
+        if warnings:
+            top_priority = ('Address ' + str(len(warnings))
+                            + ' critical warning(s) immediately '
+                            'to reduce security exposure.')
+        else:
+            top_priority = ('No critical warnings identified. Focus on '
+                            'implementing suggested improvements.')
+
+        narrative = (
+            'An automated security audit was conducted by ANATSECURITY on '
+            '<b>' + _safe(self.hostname) + '</b>. '
+            'The system achieved a compliance score of <b>' + str(score) + '/100</b>, '
+            'indicating a <b>' + risk + '</b> risk level.<br/><br/>'
+            'The assessment identified <b>' + str(len(warnings)) + '</b> critical/high '
+            'priority finding(s) requiring immediate attention and '
+            '<b>' + str(len(suggestions)) + '</b> medium/low priority finding(s) '
+            'recommended for security improvement.<br/><br/>'
+            '<b>Top Priority:</b> ' + top_priority
+        )
+        self.story.append(Paragraph(narrative, self.styles["Normal"]))
+        self.story.append(Spacer(1, 0.2 * inch))
+
+    # ------------------------------------------------------------------
+    def _section_audit_scope(self):
+        """Section 2 - audit scope and methodology."""
+        self.story.append(Paragraph(
+            "2. AUDIT SCOPE &amp; METHODOLOGY", self.styles["SectionTitle"]))
+
+        text = (
+            '<b>Scope:</b> This assessment evaluated the security configuration '
+            'and hardening posture of the Windows operating system on '
+            '<b>' + _safe(self.hostname) + '</b>.<br/><br/>'
+            '<b>Methodology:</b> The audit was performed using an automated '
+            'security auditing tool conducted by ANATSECURITY. The tool performs '
+            'comprehensive checks across multiple security domains including '
+            'account policies, audit policies, security options, user rights, '
+            'firewall configuration, and registry settings.<br/><br/>'
+            '<b>Assessment Criteria:</b> Findings are evaluated against '
+            'industry-standard security benchmarks including CIS Benchmarks, '
+            'NIST 800-53, and ISO 27001 controls. Each finding is classified '
+            'by severity and accompanied by specific remediation guidance.'
+        )
+        self.story.append(Paragraph(text, self.styles["Normal"]))
+        self.story.append(Spacer(1, 0.2 * inch))
+
+    # ------------------------------------------------------------------
+    def _section_system_information(self):
+        """Section 3 - system details and category breakdown."""
+        self.story.append(Paragraph(
+            "3. SYSTEM INFORMATION", self.styles["SectionTitle"]))
+
+        info = (
+            '<b>System Identification:</b><br/>'
+            'Hostname: ' + _safe(self.hostname) + '<br/>'
+            'IP Address: ' + _safe(self.ip_address) + '<br/>'
+            'Owner: ' + _safe(self.owner_name) + '<br/>'
+            '<br/>'
+            '<b>Operating System:</b><br/>'
+            'Platform: Microsoft Windows<br/>'
+            'OS Version: ' + _safe(self.kernel_version) + '<br/>'
+            '<br/>'
+            '<b>Audit Scope:</b><br/>'
+            'Total Configuration Checks: ' + str(self.parsed['total']) + '<br/>'
+            'Categories Evaluated: ' + str(len(self.parsed.get('categories', {}))) + '<br/>'
+        )
         self.story.append(Paragraph(info, self.styles["Normal"]))
         self.story.append(Spacer(1, 0.2 * inch))
 
@@ -583,7 +697,7 @@ class WindowsAuditPDFReport:
                 pct = round((c["passed"] / t_count) * 100) if t_count > 0 else 0
                 rows.append([
                     _safe(cat, 50), str(c["passed"]),
-                    str(c["failed"]), f"{pct}%"
+                    str(c["failed"]), str(pct) + "%"
                 ])
             t = Table(rows, colWidths=[2.8 * inch, 1.0 * inch,
                                        1.0 * inch, 1.2 * inch])
@@ -592,117 +706,119 @@ class WindowsAuditPDFReport:
             self.story.append(Spacer(1, 0.2 * inch))
 
     # ------------------------------------------------------------------
-    def _section_audit_summary(self):
-        """Section 2 – executive summary with score and counts."""
+    def _section_risk_classification(self):
+        """Section 4 - four-tier risk classification."""
         self.story.append(Paragraph(
-            "2. AUDIT SUMMARY", self.styles["SectionTitle"]))
+            "4. RISK CLASSIFICATION", self.styles["SectionTitle"]))
 
-        p = self.parsed
-        score = p["score"]
-        risk, _ = self._risk_level(score)
-        warnings = self._get_warnings()
-        suggestions = self._get_suggestions()
+        text = (
+            'Findings are classified into four severity tiers based on their '
+            'potential security impact and urgency of remediation:'
+        )
+        self.story.append(Paragraph(text, self.styles["Normal"]))
+        self.story.append(Spacer(1, 0.1 * inch))
+
+        crit_count = len(self.parsed["findings"].get("critical", []))
+        high_count = len(self.parsed["findings"].get("high", []))
+        med_count = len(self.parsed["findings"].get("medium", []))
+        low_count = len(self.parsed["findings"].get("low", []))
 
         rows = [
-            ["Metric", "Value"],
-            ["Compliance Score", f"{score}/100"],
-            ["Risk Level", risk],
-            ["Total Checks", str(p["total"])],
-            ["Passed", str(p["passed"])],
-            ["Failed", str(p["failed"])],
-            ["Warnings (Critical Issues)", str(len(warnings))],
-            ["Suggestions (Recommendations)", str(len(suggestions))],
+            ['Risk Tier', 'Description', 'Count', 'Action Required'],
+            ['Critical', 'Security vulnerabilities requiring immediate remediation',
+             str(crit_count), 'Immediate (0-48h)'],
+            ['High', 'Significant issues requiring urgent attention',
+             str(high_count), 'Short-term (1-2 weeks)'],
+            ['Medium', 'Recommended security improvements',
+             str(med_count), 'Medium-term (1-3 months)'],
+            ['Low', 'Best practice enhancements',
+             str(low_count), 'Long-term (3-6 months)'],
         ]
-        t = Table(rows, colWidths=[3 * inch, 3 * inch])
+        t = Table(rows, colWidths=[1.0 * inch, 2.5 * inch, 0.8 * inch, 1.7 * inch])
         t.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a365d")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("ALIGN", (0, 0), (-1, -1), "LEFT"),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, 0), 11),
-            ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
-            ("GRID", (0, 0), (-1, -1), 1, colors.HexColor("#cbd5e0")),
+            ("FONTSIZE", (0, 0), (-1, 0), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 10),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e0")),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1),
              [colors.white, colors.HexColor("#f7fafc")]),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("FONTSIZE", (0, 1), (-1, -1), 9),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 1), (-1, -1), 4),
+            ("TEXTCOLOR", (0, 1), (0, 1), colors.HexColor("#cc3333")),
+            ("TEXTCOLOR", (0, 2), (0, 2), colors.HexColor("#d9534f")),
+            ("TEXTCOLOR", (0, 3), (0, 3), colors.HexColor("#f0ad4e")),
+            ("TEXTCOLOR", (0, 4), (0, 4), colors.HexColor("#22863a")),
+            ("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"),
         ]))
         self.story.append(t)
         self.story.append(Spacer(1, 0.2 * inch))
 
-        narrative = f"""
-        This security audit assessed the Windows system using the HardeningKitty tool.
-        The system achieved a compliance score of <b>{score}/100</b>, indicating a
-        <b>{risk}</b> risk level. The scan identified <b>{len(warnings)}</b> warning(s)
-        requiring immediate attention and <b>{len(suggestions)}</b> suggestion(s) for
-        security improvement.
-        """
-        self.story.append(Paragraph(narrative, self.styles["Normal"]))
-        self.story.append(Spacer(1, 0.3 * inch))
-
     # ------------------------------------------------------------------
-    def _section_findings_overview(self):
-        """Section 3 – warnings vs suggestions breakdown."""
+    def _section_remediation_roadmap(self):
+        """Section 5 - prioritized remediation timeline."""
         self.story.append(Paragraph(
-            "3. FINDINGS OVERVIEW", self.styles["SectionTitle"]))
+            "5. PRIORITIZED REMEDIATION ROADMAP", self.styles["SectionTitle"]))
 
-        warnings = self._get_warnings()
-        suggestions = self._get_suggestions()
+        crit_count = len(self.parsed["findings"].get("critical", []))
+        high_count = len(self.parsed["findings"].get("high", []))
+        med_count = len(self.parsed["findings"].get("medium", []))
+        low_count = len(self.parsed["findings"].get("low", []))
 
         rows = [
-            ["Category", "Warnings", "Suggestions", "Total"],
+            ['Timeline', 'Priority', 'Actions Required', 'Count'],
+            ['Immediate\n(0-48 hours)', 'Critical',
+             'Address all critical security\nvulnerabilities immediately',
+             str(crit_count)],
+            ['Short-term\n(1-2 weeks)', 'High',
+             'Resolve high-priority configuration\nweaknesses that could be exploited',
+             str(high_count)],
+            ['Medium-term\n(1-3 months)', 'Medium',
+             'Implement suggested security\nimprovements and hardening measures',
+             str(med_count)],
+            ['Long-term\n(3-6 months)', 'Low',
+             'Apply best practice enhancements\nand continuous monitoring',
+             str(low_count)],
         ]
-
-        # Group by category
-        cats: Dict[str, Dict[str, int]] = defaultdict(
-            lambda: {'warnings': 0, 'suggestions': 0})
-        for f in warnings:
-            cat = f.get('category', 'Uncategorized') or 'Uncategorized'
-            cats[cat]['warnings'] += 1
-        for f in suggestions:
-            cat = f.get('category', 'Uncategorized') or 'Uncategorized'
-            cats[cat]['suggestions'] += 1
-
-        for cat in sorted(cats.keys()):
-            c = cats[cat]
-            rows.append([
-                _safe(cat, 50), str(c['warnings']), str(c['suggestions']),
-                str(c['warnings'] + c['suggestions'])
-            ])
-        rows.append([
-            'TOTAL', str(len(warnings)), str(len(suggestions)),
-            str(len(warnings) + len(suggestions))
-        ])
-
-        t = Table(rows, colWidths=[2 * inch, 1.5 * inch, 1.5 * inch, 1 * inch])
+        t = Table(rows, colWidths=[1.2 * inch, 0.8 * inch, 2.5 * inch, 1.0 * inch])
         t.setStyle(self._std_table_style())
         self.story.append(t)
-        self.story.append(Spacer(1, 0.3 * inch))
+        self.story.append(Spacer(1, 0.15 * inch))
+
+        text = (
+            'Remediation should follow the priority order above. Critical findings '
+            'must be addressed first as they represent the most significant security '
+            'risks. Each subsequent tier should be addressed as resources permit, '
+            'with regular reassessment to track improvement progress.'
+        )
+        self.story.append(Paragraph(text, self.styles["Normal"]))
+        self.story.append(Spacer(1, 0.2 * inch))
 
     # ------------------------------------------------------------------
     def _section_detailed_findings(self):
-        """Section 4 – Warnings + Suggestions layout matching the Lynis report.
-        AI provides recommendation and details for each finding."""
+        """Section 6 - all findings with AI-enriched analysis.
+        Labels: Warnings use Details/Recommendation; Suggestions use Details/Recommendation.
+        No AI markers are shown."""
         self.story.append(Paragraph(
-            "4. DETAILED FINDINGS", self.styles["SectionTitle"]))
-
-        ai_used = bool(self.ai_results)
-        if ai_used:
-            self.story.append(Paragraph(
-                '<font size=8 color="#666666"><i>Fields marked with '
-                '(*) were generated by AI analysis.</i></font>',
-                self.styles["Normal"]))
-            self.story.append(Spacer(1, 0.1 * inch))
+            "6. DETAILED FINDINGS", self.styles["SectionTitle"]))
 
         warnings = self._get_warnings()
         suggestions = self._get_suggestions()
 
-        # 4.1 Warnings (critical + high)
+        # 6.1 Warnings (Critical/High Priority)
         self.story.append(Paragraph(
-            f"4.1 Warnings ({len(warnings)} findings)",
+            "6.1 Critical &amp; High Priority Findings (" + str(len(warnings)) + " findings)",
             self.styles["SubsectionTitle"]))
 
         if not warnings:
             self.story.append(Paragraph(
-                "No warnings were identified during the scan.",
+                "No critical or high priority findings were identified during the scan.",
                 self.styles["Normal"]))
         else:
             for idx, f in enumerate(warnings, 1):
@@ -711,39 +827,39 @@ class WindowsAuditPDFReport:
                 fid = _safe(f.get("id", ""))
                 result = f.get("result", "").strip()
 
-                text = f"<b>{idx}. [{fid}] {name}</b>"
+                text = '<b>' + str(idx) + '. [' + fid + '] ' + name + '</b>'
 
-                # Recommendation from AI (description + security_impact)
+                # "Recommendation" relabeled as "Details" for warnings
                 desc = ai.get("description", "")
                 impact = ai.get("security_impact", "")
-                rec_text = ". ".join(filter(None, [desc, impact]))
-                if rec_text:
-                    text += (f"<br/><b>Recommendation (*):</b> "
-                             f"{_safe(rec_text)}")
+                detail_text = ". ".join(filter(None, [desc, impact]))
+                if detail_text:
+                    text += '<br/><b>Details:</b> ' + _safe(detail_text)
                 elif result:
-                    text += (f"<br/><b>Result:</b> "
-                             f"{_safe(result, 200)}")
+                    text += '<br/><b>Result:</b> ' + _safe(result, 200)
 
-                # Suggestion from AI (recommended_fix)
+                # "Suggestion" relabeled as "Recommendation" for warnings
                 fix = ai.get("recommended_fix", "")
                 if fix:
-                    text += (f"<br/><b>Suggestion (*):</b> "
-                             f"{_safe(fix)}")
+                    text += '<br/><b>Recommendation:</b> ' + _safe(fix)
 
+                sev = f.get("severity", "high")
+                style_name = ("FindingCritical" if sev == "critical"
+                              else "FindingHigh")
                 self.story.append(
-                    Paragraph(text, self.styles["FindingCritical"]))
+                    Paragraph(text, self.styles[style_name]))
                 self.story.append(Spacer(1, 0.08 * inch))
 
         self.story.append(Spacer(1, 0.2 * inch))
 
-        # 4.2 Suggestions (medium + low)
+        # 6.2 Suggestions (Medium/Low Priority)
         self.story.append(Paragraph(
-            f"4.2 Suggestions ({len(suggestions)} findings)",
+            "6.2 Medium &amp; Low Priority Findings (" + str(len(suggestions)) + " findings)",
             self.styles["SubsectionTitle"]))
 
         if not suggestions:
             self.story.append(Paragraph(
-                "No suggestions were identified during the scan.",
+                "No medium or low priority findings were identified during the scan.",
                 self.styles["Normal"]))
         else:
             for idx, f in enumerate(suggestions, 1):
@@ -752,97 +868,329 @@ class WindowsAuditPDFReport:
                 fid = _safe(f.get("id", ""))
                 result = f.get("result", "").strip()
 
-                text = f"<b>{idx}. [{fid}] {name}</b>"
+                text = '<b>' + str(idx) + '. [' + fid + '] ' + name + '</b>'
 
-                # Details from AI (description + security_impact)
+                # Details
                 details = ai.get("description", "")
                 impact = ai.get("security_impact", "")
                 detail_text = ". ".join(filter(None, [details, impact]))
                 if detail_text:
-                    text += (f"<br/><b>Details (*):</b> "
-                             f"{_safe(detail_text)}")
+                    text += '<br/><b>Details:</b> ' + _safe(detail_text)
                 elif result:
-                    text += (f"<br/><b>Result:</b> "
-                             f"{_safe(result, 200)}")
+                    text += '<br/><b>Result:</b> ' + _safe(result, 200)
 
-                # Recommendation from AI (recommended_fix)
+                # Recommendation
                 rec = ai.get("recommended_fix", "")
                 if rec:
-                    text += (f"<br/><b>Recommendation (*):</b> "
-                             f"{_safe(rec)}")
+                    text += '<br/><b>Recommendation:</b> ' + _safe(rec)
 
+                sev = f.get("severity", "low")
+                style_name = ("FindingMedium" if sev == "medium"
+                              else "FindingLow")
                 self.story.append(
-                    Paragraph(text, self.styles["FindingLow"]))
+                    Paragraph(text, self.styles[style_name]))
                 self.story.append(Spacer(1, 0.08 * inch))
 
         self.story.append(Spacer(1, 0.2 * inch))
 
     # ------------------------------------------------------------------
-    def _section_security_posture(self):
-        """Section 5 – data-driven conclusion."""
+    def _section_risk_heat_map(self):
+        """Section 7 - category vs severity matrix."""
         self.story.append(Paragraph(
-            "5. OVERALL SECURITY POSTURE", self.styles["SectionTitle"]))
+            "7. RISK HEAT MAP", self.styles["SectionTitle"]))
+
+        categories: Dict[str, Dict[str, int]] = defaultdict(
+            lambda: {'critical': 0, 'high': 0, 'medium': 0, 'low': 0})
+
+        for sev in ["critical", "high", "medium", "low"]:
+            for f in self.parsed["findings"].get(sev, []):
+                cat = f.get('category', 'Uncategorized') or 'Uncategorized'
+                categories[cat][sev] += 1
+
+        if categories:
+            rows = [['Category', 'Critical', 'High', 'Medium', 'Low', 'Total']]
+            for cat in sorted(categories.keys()):
+                c = categories[cat]
+                total = c['critical'] + c['high'] + c['medium'] + c['low']
+                rows.append([
+                    _safe(cat, 40), str(c['critical']), str(c['high']),
+                    str(c['medium']), str(c['low']), str(total)
+                ])
+            crit_total = len(self.parsed["findings"].get("critical", []))
+            high_total = len(self.parsed["findings"].get("high", []))
+            med_total = len(self.parsed["findings"].get("medium", []))
+            low_total = len(self.parsed["findings"].get("low", []))
+            rows.append([
+                'TOTAL', str(crit_total), str(high_total),
+                str(med_total), str(low_total),
+                str(crit_total + high_total + med_total + low_total)
+            ])
+            t = Table(rows, colWidths=[1.5 * inch, 0.8 * inch, 0.8 * inch,
+                                       0.8 * inch, 0.8 * inch, 0.8 * inch])
+            t.setStyle(self._std_table_style())
+            self.story.append(t)
+        else:
+            self.story.append(Paragraph(
+                "No findings to display.", self.styles["Normal"]))
+
+        self.story.append(Spacer(1, 0.2 * inch))
+
+    # ------------------------------------------------------------------
+    def _section_compliance_mapping(self):
+        """Section 8 - map finding categories to compliance frameworks."""
+        self.story.append(Paragraph(
+            "8. COMPLIANCE MAPPING", self.styles["SectionTitle"]))
+
+        text = (
+            'The following table maps audit finding categories to recognized '
+            'security frameworks and benchmarks for compliance tracking purposes:'
+        )
+        self.story.append(Paragraph(text, self.styles["Normal"]))
+        self.story.append(Spacer(1, 0.1 * inch))
+
+        # Collect categories present in findings
+        found_cats: set = set()
+        for sev in ["critical", "high", "medium", "low"]:
+            for f in self.parsed["findings"].get(sev, []):
+                cat = f.get('category', 'Uncategorized') or 'Uncategorized'
+                found_cats.add(cat)
+
+        rows = [['Audit Category', 'CIS Benchmark', 'NIST 800-53', 'ISO 27001']]
+        for cat in sorted(found_cats):
+            mapping = _WIN_COMPLIANCE_MAP.get(cat, {
+                'cis': 'General Hardening',
+                'nist': 'CM',
+                'iso': 'A.12 Operations Security'
+            })
+            rows.append([_safe(cat, 40), mapping['cis'], mapping['nist'], mapping['iso']])
+
+        if len(rows) > 1:
+            t = Table(rows, colWidths=[1.5 * inch, 1.8 * inch, 1.2 * inch, 1.5 * inch])
+            t.setStyle(self._std_table_style())
+            self.story.append(t)
+        else:
+            self.story.append(Paragraph(
+                "No categories to map.", self.styles["Normal"]))
+
+        self.story.append(Spacer(1, 0.2 * inch))
+
+    # ------------------------------------------------------------------
+    def _section_before_after(self):
+        """Section 9 - current state and target success criteria."""
+        self.story.append(Paragraph(
+            "9. BEFORE &amp; AFTER SUCCESS CRITERIA", self.styles["SectionTitle"]))
 
         score = self.parsed["score"]
         risk, _ = self._risk_level(score)
+        target_score = min(100, score + max(10, (100 - score) // 2))
+        target_risk, _ = self._risk_level(target_score)
         warnings = self._get_warnings()
         suggestions = self._get_suggestions()
 
-        ai_note = (
-            "Findings have been enriched with AI-generated security analysis, "
-            "including descriptions, impact assessments, and Windows-specific "
-            "remediation steps."
-            if self.ai_results
-            else "AI analysis was not available for this report. Findings show "
-                 "raw scan data only."
-        )
+        self.story.append(Paragraph(
+            "<b>Current Assessment:</b>", self.styles["SubsectionTitle"]))
 
-        text = f"""
-        The HardeningKitty security audit of <b>{_safe(self.hostname)}</b> resulted
-        in a compliance score of <b>{score}/100</b>, placing the system at a
-        <b>{risk}</b> risk level.<br/><br/>
-        The scan identified <b>{len(warnings)}</b> warning(s) and
-        <b>{len(suggestions)}</b> suggestion(s). Warnings represent critical security
-        issues that should be prioritised for remediation. Suggestions are recommended
-        improvements to strengthen the system's security posture.<br/><br/>
-        {ai_note}
-        """
+        rows = [
+            ['Metric', 'Current Value'],
+            ['Compliance Score', str(score) + '/100'],
+            ['Risk Level', risk],
+            ['Active Warnings (Critical/High)', str(len(warnings))],
+            ['Pending Suggestions (Medium/Low)', str(len(suggestions))],
+        ]
+        t = Table(rows, colWidths=[3 * inch, 3 * inch])
+        t.setStyle(self._std_table_style())
+        self.story.append(t)
+        self.story.append(Spacer(1, 0.15 * inch))
+
+        self.story.append(Paragraph(
+            "<b>Target Metrics (Post-Remediation):</b>", self.styles["SubsectionTitle"]))
+
+        target_suggestions = max(0, len(suggestions) - len(suggestions) // 2)
+        rows = [
+            ['Metric', 'Target Value'],
+            ['Compliance Score', str(target_score) + '/100'],
+            ['Risk Level', target_risk],
+            ['Active Warnings', '0'],
+            ['Pending Suggestions', str(target_suggestions)],
+        ]
+        t = Table(rows, colWidths=[3 * inch, 3 * inch])
+        t.setStyle(self._std_table_style())
+        self.story.append(t)
+        self.story.append(Spacer(1, 0.15 * inch))
+
+        text = (
+            'Achieving the target metrics requires completing all critical '
+            'remediation actions outlined in the Prioritized Remediation Roadmap. '
+            'Regular reassessment is recommended to track progress toward the '
+            'target compliance score of <b>' + str(target_score) + '/100</b>.'
+        )
         self.story.append(Paragraph(text, self.styles["Normal"]))
-        self.story.append(Spacer(1, 0.3 * inch))
+        self.story.append(Spacer(1, 0.2 * inch))
 
     # ------------------------------------------------------------------
-    def _footer(self):
-        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        text = f"""
-        <font size=8 color="#999999">
-        Report Generated: {ts}<br/>
-        Document Classification: Internal Use<br/>
-        Generated by ANATSCRAWLER Security Audit System
-        </font>
-        """
+    def _section_appendices(self):
+        """Section 10 - supplementary data."""
+        self.story.append(Paragraph(
+            "10. APPENDICES", self.styles["SectionTitle"]))
+
+        self.story.append(Paragraph(
+            "<b>A. Scan Statistics</b>", self.styles["SubsectionTitle"]))
+
+        rows = [
+            ['Parameter', 'Value'],
+            ['Target System', _safe(self.hostname)],
+            ['Total Configuration Checks', str(self.parsed['total'])],
+            ['Passed', str(self.parsed['passed'])],
+            ['Failed', str(self.parsed['failed'])],
+            ['Scan Tool', 'Automated security auditing tool conducted by ANATSECURITY'],
+        ]
+        t = Table(rows, colWidths=[2.5 * inch, 3.5 * inch])
+        t.setStyle(self._std_table_style())
+        self.story.append(t)
+        self.story.append(Spacer(1, 0.15 * inch))
+
+        self.story.append(Paragraph(
+            "<b>B. Categories Assessed</b>", self.styles["SubsectionTitle"]))
+
+        cats = self.parsed.get("categories", {})
+        if cats:
+            cat_text = ', '.join(sorted(cats.keys()))
+            self.story.append(Paragraph(cat_text, self.styles["Normal"]))
+        else:
+            self.story.append(Paragraph("N/A", self.styles["Normal"]))
+
+        self.story.append(Spacer(1, 0.15 * inch))
+
+        if self.ai_results:
+            self.story.append(Paragraph(
+                "<b>C. AI Analysis Summary</b>", self.styles["SubsectionTitle"]))
+            all_findings = sum(
+                len(self.parsed["findings"].get(s, []))
+                for s in ["critical", "high", "medium", "low"])
+            ai_text = (
+                'AI-assisted analysis enriched '
+                + str(len(self.ai_results)) + ' of '
+                + str(all_findings) + ' findings with detailed descriptions, '
+                'security impact assessments, and specific remediation guidance.'
+            )
+            self.story.append(Paragraph(ai_text, self.styles["Normal"]))
+
+        self.story.append(Spacer(1, 0.2 * inch))
+
+    # ------------------------------------------------------------------
+    def _section_auditor_signoff(self):
+        """Section 11 - auditor sign-off placeholders."""
+        self.story.append(Paragraph(
+            "11. AUDITOR SIGN-OFF", self.styles["SectionTitle"]))
+
+        rows = [
+            ['Field', 'Value'],
+            ['Auditor Name', ''],
+            ['Title / Role', ''],
+            ['Organization', 'ANATSECURITY'],
+            ['Date', ''],
+            ['Signature', ''],
+        ]
+        t = Table(rows, colWidths=[2 * inch, 4 * inch])
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a365d")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+            ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, 0), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 10),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e0")),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1),
+             [colors.white, colors.HexColor("#f7fafc")]),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("FONTSIZE", (0, 1), (-1, -1), 10),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 1), (-1, -1), 18),
+        ]))
+        self.story.append(t)
+        self.story.append(Spacer(1, 0.15 * inch))
+
+        text = (
+            '<font size=8 color="#666666"><i>'
+            'By signing this document, the auditor confirms that the findings '
+            'presented in this report accurately reflect the results of the '
+            'security assessment conducted on the date specified above.'
+            '</i></font>'
+        )
         self.story.append(Paragraph(text, self.styles["Normal"]))
+        self.story.append(Spacer(1, 0.2 * inch))
+
+    # ------------------------------------------------------------------
+    def _section_document_metadata(self):
+        """Section 12 - document metadata and footer."""
+        self.story.append(Paragraph(
+            "12. DOCUMENT METADATA", self.styles["SectionTitle"]))
+
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        rows = [
+            ['Property', 'Value'],
+            ['Document Title', 'System Security Audit Report'],
+            ['Report Type', 'Windows OS Hardening Assessment'],
+            ['Generation Timestamp', ts],
+            ['Document Classification', 'Confidential - Internal Use'],
+            ['Generated By', 'ANATSCRAWLER Security Audit System'],
+            ['Report Version', '2.0'],
+        ]
+        t = Table(rows, colWidths=[2.5 * inch, 3.5 * inch])
+        t.setStyle(self._std_table_style())
+        self.story.append(t)
+        self.story.append(Spacer(1, 0.3 * inch))
+
+        footer = (
+            '<font size=8 color="#999999">'
+            'Report Generated: ' + ts + '<br/>'
+            'Document Classification: Confidential - Internal Use<br/>'
+            'Generated by ANATSCRAWLER Security Audit System<br/>'
+            '\xa9 ANATSECURITY - All Rights Reserved'
+            '</font>'
+        )
+        self.story.append(Paragraph(footer, self.styles["Normal"]))
 
     # ========================== Build =================================
     def generate(self) -> str:
         # Run AI analysis before building the PDF
         self._run_ai_analysis()
 
-        self._section_report_overview()
-        self._section_system_information()
-        self._section_audit_summary()
+        # Cover Page
+        self._section_cover_page()
 
+        # Sections 1-3
         self.story.append(PageBreak())
-        self._section_findings_overview()
+        self._section_executive_summary()
+        self._section_audit_scope()
+        self._section_system_information()
 
+        # Sections 4-5
+        self.story.append(PageBreak())
+        self._section_risk_classification()
+        self._section_remediation_roadmap()
+
+        # Section 6
         self.story.append(PageBreak())
         self._section_detailed_findings()
 
+        # Sections 7-9
         self.story.append(PageBreak())
-        self._section_security_posture()
-        self._footer()
+        self._section_risk_heat_map()
+        self._section_compliance_mapping()
+        self._section_before_after()
+
+        # Sections 10-12
+        self.story.append(PageBreak())
+        self._section_appendices()
+        self._section_auditor_signoff()
+        self._section_document_metadata()
 
         self.doc.build(self.story)
         return self.output_path
+
 
 
 # ---------------------------------------------------------------------------
