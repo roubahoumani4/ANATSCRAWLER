@@ -441,6 +441,24 @@ class AuditPDFReport:
             ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
         ])
 
+    def _cell(self, text: str, bold: bool = False, font_size: int = 8) -> Paragraph:
+        """Wrap text in a Paragraph for proper word-wrapping inside table cells."""
+        if bold:
+            t = '<b>' + _safe(str(text)) + '</b>'
+        else:
+            t = _safe(str(text))
+        style = ParagraphStyle('cell', parent=self.styles['Normal'],
+                               fontSize=font_size, leading=font_size + 2)
+        return Paragraph(t, style)
+
+    def _hdr(self, text: str, font_size: int = 9) -> Paragraph:
+        """Header cell with white bold text for table headers."""
+        style = ParagraphStyle('hdr', parent=self.styles['Normal'],
+                               fontSize=font_size, leading=font_size + 2,
+                               textColor=colors.whitesmoke,
+                               fontName='Helvetica-Bold')
+        return Paragraph('<b>' + _safe(str(text)) + '</b>', style)
+
     # =============================== Sections ===============================
 
     def _section_cover_page(self):
@@ -597,15 +615,15 @@ class AuditPDFReport:
         self.story.append(Spacer(1, 0.1 * inch))
 
         rows = [
-            ['Risk Tier', 'Description', 'Count', 'Action Required'],
-            ['Critical', 'Security vulnerabilities requiring immediate remediation',
-             str(len(warnings)), 'Immediate (0-48h)'],
-            ['High', 'Significant issues requiring urgent attention',
-             '0', 'Short-term (1-2 weeks)'],
-            ['Medium', 'Recommended security improvements',
-             str(len(suggestions)), 'Medium-term (1-3 months)'],
-            ['Low', 'Best practice enhancements',
-             '0', 'Long-term (3-6 months)'],
+            [self._hdr('Risk Tier'), self._hdr('Description'), self._hdr('Count'), self._hdr('Action Required')],
+            [self._cell('Critical', bold=True), self._cell('Security vulnerabilities requiring immediate remediation'),
+             self._cell(str(len(warnings))), self._cell('Immediate (0-48h)')],
+            [self._cell('High', bold=True), self._cell('Significant issues requiring urgent attention'),
+             self._cell('0'), self._cell('Short-term (1-2 weeks)')],
+            [self._cell('Medium', bold=True), self._cell('Recommended security improvements'),
+             self._cell(str(len(suggestions))), self._cell('Medium-term (1-3 months)')],
+            [self._cell('Low', bold=True), self._cell('Best practice enhancements'),
+             self._cell('0'), self._cell('Long-term (3-6 months)')],
         ]
         t = Table(rows, colWidths=[1.0 * inch, 2.5 * inch, 0.8 * inch, 1.7 * inch])
         t.setStyle(TableStyle([
@@ -640,17 +658,19 @@ class AuditPDFReport:
             Paragraph("5. PRIORITIZED REMEDIATION ROADMAP", self.styles['SectionTitle']))
 
         rows = [
-            ['Timeline', 'Priority', 'Actions Required', 'Count'],
-            ['Immediate\n(0-48 hours)', 'Critical',
-             'Address all security warnings\nthat expose the system to active threats',
-             str(len(warnings))],
-            ['Short-term\n(1-2 weeks)', 'High',
-             'Resolve configuration weaknesses\nthat could be exploited', '0'],
-            ['Medium-term\n(1-3 months)', 'Medium',
-             'Implement suggested security\nimprovements and hardening measures',
-             str(len(suggestions))],
-            ['Long-term\n(3-6 months)', 'Low',
-             'Apply best practice enhancements\nand continuous monitoring', '0'],
+            [self._hdr('Timeline'), self._hdr('Priority'), self._hdr('Actions Required'), self._hdr('Count')],
+            [self._cell('Immediate (0-48 hours)'), self._cell('Critical', bold=True),
+             self._cell('Address all security warnings that expose the system to active threats'),
+             self._cell(str(len(warnings)))],
+            [self._cell('Short-term (1-2 weeks)'), self._cell('High', bold=True),
+             self._cell('Resolve configuration weaknesses that could be exploited'),
+             self._cell('0')],
+            [self._cell('Medium-term (1-3 months)'), self._cell('Medium', bold=True),
+             self._cell('Implement suggested security improvements and hardening measures'),
+             self._cell(str(len(suggestions)))],
+            [self._cell('Long-term (3-6 months)'), self._cell('Low', bold=True),
+             self._cell('Apply best practice enhancements and continuous monitoring'),
+             self._cell('0')],
         ]
         t = Table(rows, colWidths=[1.2 * inch, 0.8 * inch, 2.5 * inch, 1.0 * inch])
         t.setStyle(self._std_table_style())
@@ -776,18 +796,20 @@ class AuditPDFReport:
             categories[cat]['medium'] += 1
 
         if categories:
-            rows = [['Category', 'Critical', 'High', 'Medium', 'Low', 'Total']]
+            rows = [[self._hdr('Category'), self._hdr('Critical'), self._hdr('High'),
+                     self._hdr('Medium'), self._hdr('Low'), self._hdr('Total')]]
             for cat in sorted(categories.keys()):
                 c = categories[cat]
                 total = c['critical'] + c['high'] + c['medium'] + c['low']
                 rows.append([
-                    cat, str(c['critical']), str(c['high']),
-                    str(c['medium']), str(c['low']), str(total)
+                    self._cell(cat), self._cell(str(c['critical'])),
+                    self._cell(str(c['high'])), self._cell(str(c['medium'])),
+                    self._cell(str(c['low'])), self._cell(str(total))
                 ])
             rows.append([
-                'TOTAL', str(len(warnings)), '0',
-                str(len(suggestions)), '0',
-                str(len(warnings) + len(suggestions))
+                self._cell('TOTAL', bold=True), self._cell(str(len(warnings))),
+                self._cell('0'), self._cell(str(len(suggestions))),
+                self._cell('0'), self._cell(str(len(warnings) + len(suggestions)))
             ])
             t = Table(rows, colWidths=[1.3 * inch, 0.9 * inch, 0.9 * inch,
                                        0.9 * inch, 0.9 * inch, 0.9 * inch])
@@ -821,14 +843,16 @@ class AuditPDFReport:
             cat = s['test_id'].split('-')[0] if '-' in s['test_id'] else 'OTHER'
             found_cats.add(cat)
 
-        rows = [['Audit Category', 'CIS Benchmark', 'NIST 800-53', 'ISO 27001']]
+        rows = [[self._hdr('Audit Category'), self._hdr('CIS Benchmark'),
+                 self._hdr('NIST 800-53'), self._hdr('ISO 27001')]]
         for cat in sorted(found_cats):
             mapping = _COMPLIANCE_MAP.get(cat, {
                 'cis': 'General Hardening',
                 'nist': 'CM',
                 'iso': 'A.12 Operations Security'
             })
-            rows.append([cat, mapping['cis'], mapping['nist'], mapping['iso']])
+            rows.append([self._cell(cat), self._cell(mapping['cis']),
+                         self._cell(mapping['nist']), self._cell(mapping['iso'])])
 
         if len(rows) > 1:
             t = Table(rows, colWidths=[1.2 * inch, 2.0 * inch, 1.2 * inch, 1.6 * inch])
