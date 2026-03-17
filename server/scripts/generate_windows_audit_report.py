@@ -122,11 +122,14 @@ def _analyze_with_ai(findings: List[Dict]) -> Dict[str, dict]:
         print(f"AI initialisation failed: {e}", file=sys.stderr)
         return {}
 
-    model = "llama-3.3-70b-versatile"
+    model = "llama-3.1-8b-instant"
     results: Dict[str, dict] = {}
-    batch_size = 15
+    batch_size = 10
 
     for batch_start in range(0, len(findings), batch_size):
+        # Pace requests to stay under Groq free-tier rate limits
+        if batch_start > 0:
+            time.sleep(5)
         batch = findings[batch_start:batch_start + batch_size]
 
         # Filter out already-cached items
