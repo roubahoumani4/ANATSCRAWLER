@@ -13,6 +13,7 @@ import json
 import os
 import re
 import sys
+import time
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -79,13 +80,13 @@ def _analyze_with_ai(findings: List[Dict]) -> Dict[str, dict]:
         return {}
 
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-2.0-flash")
+        from google import genai
+        client = genai.Client(api_key=api_key)
     except Exception as e:
         print(f"AI initialisation failed: {e}", file=sys.stderr)
         return {}
 
+    model = "gemini-2.0-flash-lite"
     results: Dict[str, dict] = {}
     batch_size = 15
 
@@ -144,38 +145,47 @@ def _analyze_with_ai(findings: List[Dict]) -> Dict[str, dict]:
             "Respond ONLY with a valid JSON array. No markdown, no extra text."
         )
 
-        try:
-            resp = model.generate_content(prompt)
-            text = resp.text.strip()
+        # Retry with exponential backoff for rate-limit (429) errors
+        batch_num = batch_start // batch_size + 1
+        for attempt in range(4):
+            try:
+                resp = client.models.generate_content(
+                    model=model, contents=prompt
+                )
+                text = resp.text.strip()
 
-            # Strip markdown code fence if present
-            if text.startswith("```"):
-                text = re.sub(r"^```(?:json)?\s*", "", text)
-                text = re.sub(r"\s*```$", "", text)
+                # Strip markdown code fence if present
+                if text.startswith("```"):
+                    text = re.sub(r"^```(?:json)?\s*", "", text)
+                    text = re.sub(r"\s*```$", "", text)
 
-            parsed = json.loads(text)
-            if isinstance(parsed, list):
-                for entry in parsed:
-                    idx = entry.get("index", 0)
-                    if 1 <= idx <= len(uncached):
-                        name = uncached[idx - 1].get("name", "")
-                        result = {
-                            "description": entry.get("description", ""),
-                            "security_impact": entry.get("security_impact", ""),
-                            "recommended_fix": entry.get("recommended_fix", ""),
-                            "security_recommendation": entry.get(
-                                "security_recommendation", ""),
-                        }
-                        results[name] = result
-                        _ai_cache[name] = result
-        except json.JSONDecodeError as e:
-            batch_num = batch_start // batch_size + 1
-            print(f"AI response parse error (batch {batch_num}): {e}",
-                  file=sys.stderr)
-        except Exception as e:
-            batch_num = batch_start // batch_size + 1
-            print(f"AI analysis error (batch {batch_num}): {e}",
-                  file=sys.stderr)
+                parsed = json.loads(text)
+                if isinstance(parsed, list):
+                    for entry in parsed:
+                        idx = entry.get("index", 0)
+                        if 1 <= idx <= len(uncached):
+                            name = uncached[idx - 1].get("name", "")
+                            ai_result = {
+                                "description": entry.get("description", ""),
+                                "security_impact": entry.get("security_impact", ""),
+                                "recommended_fix": entry.get("recommended_fix", ""),
+                                "security_recommendation": entry.get(
+                                    "security_recommendation", ""),
+                            }
+                            results[name] = ai_result
+                            _ai_cache[name] = ai_result
+                break  # success
+            except Exception as e:
+                err_str = str(e)
+                if '429' in err_str and attempt < 3:
+                    wait = (2 ** attempt) * 15  # 15s, 30s, 60s
+                    print(f"Rate limited (batch {batch_num}), retrying in {wait}s...",
+                          file=sys.stderr)
+                    time.sleep(wait)
+                else:
+                    print(f"AI analysis error (batch {batch_num}): {e}",
+                          file=sys.stderr)
+                    break
 
     return results
 

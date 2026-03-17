@@ -11,6 +11,7 @@ import json
 import os
 import re
 import sys
+import time
 from collections import defaultdict
 from datetime import datetime
 from typing import Dict, List, Optional, Any
@@ -84,13 +85,13 @@ def _ai_enrich_findings(findings: List[Dict], finding_type: str) -> Dict[str, di
         return {k: v for k, v in _ai_cache.items()}
 
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-2.0-flash")
+        from google import genai
+        client = genai.Client(api_key=api_key)
     except Exception as e:
         print(f"AI initialisation failed: {e}", file=sys.stderr)
         return {}
 
+    model = "gemini-2.0-flash-lite"
     results: Dict[str, dict] = dict(_ai_cache)
     batch_size = 15
 
@@ -141,24 +142,37 @@ def _ai_enrich_findings(findings: List[Dict], finding_type: str) -> Dict[str, di
                 "Respond ONLY with a valid JSON array. No markdown, no extra text."
             )
 
-        try:
-            resp = model.generate_content(prompt)
-            text = resp.text.strip()
-            if text.startswith("```"):
-                text = re.sub(r"^```(?:json)?\s*", "", text)
-                text = re.sub(r"\s*```$", "", text)
-            parsed = json.loads(text)
-            if isinstance(parsed, list):
-                for entry in parsed:
-                    idx = entry.get("index", 0)
-                    if 1 <= idx <= len(batch):
-                        tid = batch[idx - 1].get('test_id', '')
-                        results[tid] = entry
-                        _ai_cache[tid] = entry
-        except Exception as e:
-            batch_num = batch_start // batch_size + 1
-            print(f"AI enrichment error (batch {batch_num}): {e}",
-                  file=sys.stderr)
+        # Retry with exponential backoff for rate-limit (429) errors
+        batch_num = batch_start // batch_size + 1
+        for attempt in range(4):
+            try:
+                resp = client.models.generate_content(
+                    model=model, contents=prompt
+                )
+                text = resp.text.strip()
+                if text.startswith("```"):
+                    text = re.sub(r"^```(?:json)?\s*", "", text)
+                    text = re.sub(r"\s*```$", "", text)
+                parsed = json.loads(text)
+                if isinstance(parsed, list):
+                    for entry in parsed:
+                        idx = entry.get("index", 0)
+                        if 1 <= idx <= len(batch):
+                            tid = batch[idx - 1].get('test_id', '')
+                            results[tid] = entry
+                            _ai_cache[tid] = entry
+                break  # success
+            except Exception as e:
+                err_str = str(e)
+                if '429' in err_str and attempt < 3:
+                    wait = (2 ** attempt) * 15  # 15s, 30s, 60s
+                    print(f"Rate limited (batch {batch_num}), retrying in {wait}s...",
+                          file=sys.stderr)
+                    time.sleep(wait)
+                else:
+                    print(f"AI enrichment error (batch {batch_num}): {e}",
+                          file=sys.stderr)
+                    break
 
     return results
 
