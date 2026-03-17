@@ -52,6 +52,41 @@ def _fix_json_escapes(text: str) -> str:
     return re.sub(r'\\(?!["\\\\bfnrtu/])', r'\\\\', text)
 
 
+def _parse_ai_json(text: str) -> list:
+    """Robustly parse AI response as a JSON array."""
+    # Strip markdown code fences
+    t = text.strip()
+    if t.startswith("```"):
+        t = re.sub(r"^```(?:json)?\s*", "", t)
+        t = re.sub(r"\s*```$", "", t)
+
+    # Try direct parse
+    for attempt_text in [t, _fix_json_escapes(t)]:
+        try:
+            parsed = json.loads(attempt_text)
+            if isinstance(parsed, list):
+                return parsed
+            if isinstance(parsed, dict):
+                # Groq json_object mode wraps in {"results": [...]}
+                for key in ('results', 'findings', 'data', 'items'):
+                    if key in parsed and isinstance(parsed[key], list):
+                        return parsed[key]
+                return [parsed]
+        except json.JSONDecodeError:
+            continue
+
+    # Last resort: extract array via regex
+    match = re.search(r'\[\s*\{.*\}\s*\]', t, re.DOTALL)
+    if match:
+        for attempt_text in [match.group(), _fix_json_escapes(match.group())]:
+            try:
+                return json.loads(attempt_text)
+            except json.JSONDecodeError:
+                continue
+
+    raise json.JSONDecodeError("No valid JSON array found", t, 0)
+
+
 def _is_empty(val: str) -> bool:
     """Return True if a Lynis field value is effectively empty."""
     return not val or val.strip() in ('', '-', '--', 'N/A')
@@ -122,7 +157,8 @@ def _ai_enrich_findings(findings: List[Dict], finding_type: str) -> Dict[str, di
                 "provide a recommendation and an actionable suggestion on "
                 "what the administrator should do to fix or mitigate it.\n\n"
                 f"WARNINGS:{findings_text}\n\n"
-                "Respond with a JSON array where each object has:\n"
+                "Respond with a JSON object containing a \"results\" key "
+                "whose value is an array. Each element has:\n"
                 '{\n'
                 '  "index": <finding number>,\n'
                 '  "recommendation": "<what this warning means and why it '
@@ -130,7 +166,9 @@ def _ai_enrich_findings(findings: List[Dict], finding_type: str) -> Dict[str, di
                 '  "suggestion": "<specific Linux command, config change, '
                 'or remediation step to fix this, 2-3 sentences>"\n'
                 '}\n\n'
-                "Respond ONLY with a valid JSON array. No markdown, no extra text."
+                "IMPORTANT: Use forward slashes (/) in file paths. "
+                "Escape all backslashes as \\\\\\\\ in JSON strings. "
+                "Do NOT use unescaped backslashes."
             )
         else:
             prompt = (
@@ -138,39 +176,36 @@ def _ai_enrich_findings(findings: List[Dict], finding_type: str) -> Dict[str, di
                 "security audit SUGGESTIONS. For each one, fill in the missing "
                 "details and/or recommendation.\n\n"
                 f"SUGGESTIONS:{findings_text}\n\n"
-                "Respond with a JSON array where each object has:\n"
+                "Respond with a JSON object containing a \"results\" key "
+                "whose value is an array. Each element has:\n"
                 '{\n'
                 '  "index": <finding number>,\n'
                 '  "details": "<what this finding means, 1-2 sentences>",\n'
                 '  "recommendation": "<specific Linux fix, 1-2 sentences>"\n'
                 '}\n\n'
-                "Respond ONLY with a valid JSON array. No markdown, no extra text."
+                "IMPORTANT: Use forward slashes (/) in file paths. "
+                "Escape all backslashes as \\\\\\\\ in JSON strings. "
+                "Do NOT use unescaped backslashes."
             )
 
-        # Retry with exponential backoff for rate-limit (429) errors
+        # Retry with exponential backoff for rate-limit (429) and parse errors
         batch_num = batch_start // batch_size + 1
         for attempt in range(4):
             try:
                 resp = client.chat.completions.create(
                     model=model,
                     messages=[{"role": "user", "content": prompt}],
-                    temperature=0.3,
+                    temperature=0.2,
+                    response_format={"type": "json_object"},
                 )
                 text = resp.choices[0].message.content.strip()
-                if text.startswith("```"):
-                    text = re.sub(r"^```(?:json)?\s*", "", text)
-                    text = re.sub(r"\s*```$", "", text)
-                try:
-                    parsed = json.loads(text)
-                except json.JSONDecodeError:
-                    parsed = json.loads(_fix_json_escapes(text))
-                if isinstance(parsed, list):
-                    for entry in parsed:
-                        idx = entry.get("index", 0)
-                        if 1 <= idx <= len(batch):
-                            tid = batch[idx - 1].get('test_id', '')
-                            results[tid] = entry
-                            _ai_cache[tid] = entry
+                parsed = _parse_ai_json(text)
+                for entry in parsed:
+                    idx = entry.get("index", 0)
+                    if 1 <= idx <= len(batch):
+                        tid = batch[idx - 1].get('test_id', '')
+                        results[tid] = entry
+                        _ai_cache[tid] = entry
                 break  # success
             except Exception as e:
                 err_str = str(e)
@@ -179,6 +214,10 @@ def _ai_enrich_findings(findings: List[Dict], finding_type: str) -> Dict[str, di
                     print(f"Rate limited (batch {batch_num}), retrying in {wait}s...",
                           file=sys.stderr)
                     time.sleep(wait)
+                elif 'JSON' in err_str and attempt < 2:
+                    print(f"JSON parse retry (batch {batch_num}, attempt {attempt+1})",
+                          file=sys.stderr)
+                    time.sleep(2)
                 else:
                     print(f"AI enrichment error (batch {batch_num}): {e}",
                           file=sys.stderr)

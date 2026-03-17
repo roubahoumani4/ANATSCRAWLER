@@ -70,6 +70,37 @@ def _fix_json_escapes(text: str) -> str:
     return re.sub(r'\\(?!["\\\\bfnrtu/])', r'\\\\', text)
 
 
+def _parse_ai_json(text: str) -> list:
+    """Robustly parse AI response as a JSON array."""
+    t = text.strip()
+    if t.startswith("```"):
+        t = re.sub(r"^```(?:json)?\s*", "", t)
+        t = re.sub(r"\s*```$", "", t)
+
+    for attempt_text in [t, _fix_json_escapes(t)]:
+        try:
+            parsed = json.loads(attempt_text)
+            if isinstance(parsed, list):
+                return parsed
+            if isinstance(parsed, dict):
+                for key in ('results', 'findings', 'data', 'items'):
+                    if key in parsed and isinstance(parsed[key], list):
+                        return parsed[key]
+                return [parsed]
+        except json.JSONDecodeError:
+            continue
+
+    match = re.search(r'\[\s*\{.*\}\s*\]', t, re.DOTALL)
+    if match:
+        for attempt_text in [match.group(), _fix_json_escapes(match.group())]:
+            try:
+                return json.loads(attempt_text)
+            except json.JSONDecodeError:
+                continue
+
+    raise json.JSONDecodeError("No valid JSON array found", t, 0)
+
+
 def _analyze_with_ai(findings: List[Dict]) -> Dict[str, dict]:
     """Batch-analyse Windows findings using Groq AI.
 
@@ -135,7 +166,8 @@ def _analyze_with_ai(findings: List[Dict]) -> Dict[str, dict]:
             f"FINDINGS:{findings_text}\n\n"
             "For each finding provide Windows-specific analysis. Include Group "
             "Policy paths, PowerShell commands, or registry keys as applicable.\n\n"
-            "Respond with a JSON array where each object has:\n"
+            "Respond with a JSON object containing a \"results\" key "
+            "whose value is an array. Each element has:\n"
             "{\n"
             '  "index": <finding number>,\n'
             '  "description": "<what this setting controls and why it matters, '
@@ -147,43 +179,36 @@ def _analyze_with_ai(findings: List[Dict]) -> Dict[str, dict]:
             '2-4 sentences>",\n'
             '  "security_recommendation": "<best practice summary, 1 sentence>"\n'
             "}\n\n"
-            "Respond ONLY with a valid JSON array. No markdown, no extra text."
+            "IMPORTANT: Escape all backslashes as \\\\\\\\ in JSON strings "
+            "(e.g. HKLM\\\\\\\\SOFTWARE\\\\\\\\Policies). "
+            "Do NOT use unescaped backslashes."
         )
 
-        # Retry with exponential backoff for rate-limit (429) errors
+        # Retry with exponential backoff for rate-limit (429) and parse errors
         batch_num = batch_start // batch_size + 1
         for attempt in range(4):
             try:
                 resp = client.chat.completions.create(
                     model=model,
                     messages=[{"role": "user", "content": prompt}],
-                    temperature=0.3,
+                    temperature=0.2,
+                    response_format={"type": "json_object"},
                 )
                 text = resp.choices[0].message.content.strip()
-
-                # Strip markdown code fence if present
-                if text.startswith("```"):
-                    text = re.sub(r"^```(?:json)?\s*", "", text)
-                    text = re.sub(r"\s*```$", "", text)
-
-                try:
-                    parsed = json.loads(text)
-                except json.JSONDecodeError:
-                    parsed = json.loads(_fix_json_escapes(text))
-                if isinstance(parsed, list):
-                    for entry in parsed:
-                        idx = entry.get("index", 0)
-                        if 1 <= idx <= len(uncached):
-                            name = uncached[idx - 1].get("name", "")
-                            ai_result = {
-                                "description": entry.get("description", ""),
-                                "security_impact": entry.get("security_impact", ""),
-                                "recommended_fix": entry.get("recommended_fix", ""),
-                                "security_recommendation": entry.get(
-                                    "security_recommendation", ""),
-                            }
-                            results[name] = ai_result
-                            _ai_cache[name] = ai_result
+                parsed = _parse_ai_json(text)
+                for entry in parsed:
+                    idx = entry.get("index", 0)
+                    if 1 <= idx <= len(uncached):
+                        name = uncached[idx - 1].get("name", "")
+                        ai_result = {
+                            "description": entry.get("description", ""),
+                            "security_impact": entry.get("security_impact", ""),
+                            "recommended_fix": entry.get("recommended_fix", ""),
+                            "security_recommendation": entry.get(
+                                "security_recommendation", ""),
+                        }
+                        results[name] = ai_result
+                        _ai_cache[name] = ai_result
                 break  # success
             except Exception as e:
                 err_str = str(e)
@@ -192,6 +217,10 @@ def _analyze_with_ai(findings: List[Dict]) -> Dict[str, dict]:
                     print(f"Rate limited (batch {batch_num}), retrying in {wait}s...",
                           file=sys.stderr)
                     time.sleep(wait)
+                elif 'JSON' in err_str and attempt < 2:
+                    print(f"JSON parse retry (batch {batch_num}, attempt {attempt+1})",
+                          file=sys.stderr)
+                    time.sleep(2)
                 else:
                     print(f"AI analysis error (batch {batch_num}): {e}",
                           file=sys.stderr)
