@@ -49,6 +49,22 @@ interface Company {
   activeDevices?: number;
 }
 
+interface Report {
+  _id: string;
+  reportId: string;
+  machineName: string;
+  ipAddress: string;
+  ownerName: string;
+  companyName?: string;
+  operatingSystem?: string;
+  auditScore: number;
+  warnings: number;
+  suggestions: number;
+  auditDate: string;
+  pdfGenerationStatus?: string;
+  pdfFilePath?: string;
+}
+
 interface Device {
   _id: string;
   machineId: string;
@@ -75,6 +91,9 @@ const NetworkPage: React.FC = () => {
   const [loadingDevices, setLoadingDevices] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [showDeviceDetail, setShowDeviceDetail] = useState(false);
+  const [deviceReports, setDeviceReports] = useState<Report[]>([]);
+  const [loadingReports, setLoadingReports] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState<string | null>(null);
 
   useEffect(() => { fetchCompanies(); }, []);
 
@@ -137,6 +156,51 @@ const NetworkPage: React.FC = () => {
     }
   };
 
+  const fetchReports = async (machineId: string) => {
+    try {
+      setLoadingReports(true);
+      const res = await axios.get(`/api/v1/os-audit/reports/${machineId}`, { withCredentials: true });
+      setDeviceReports(res.data.reports || []);
+    } catch (error) {
+      console.error("Error fetching reports:", error);
+      setDeviceReports([]);
+    } finally {
+      setLoadingReports(false);
+    }
+  };
+
+  const handleDownloadPdf = async (reportId: string) => {
+    try {
+      setDownloadingPdf(reportId);
+      const res = await axios.post(`/api/v1/os-audit/reports/generate-pdf/${reportId}`, {}, {
+        withCredentials: true,
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `audit_report_${reportId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error: any) {
+      if (error.response?.status === 202) {
+        alert("PDF is still being generated. Please try again shortly.");
+      } else {
+        alert("Failed to download PDF report");
+      }
+    } finally {
+      setDownloadingPdf(null);
+    }
+  };
+
+  const handleViewDevice = (device: Device) => {
+    setSelectedDevice(device);
+    setShowDeviceDetail(true);
+    fetchReports(device._id);
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'active': return <CheckCircle className="text-emerald-400" size={16} />;
@@ -196,10 +260,20 @@ const NetworkPage: React.FC = () => {
 
       <div className="flex gap-2 pt-3 border-t border-gray-800">
         <Button variant="outline" size="sm"
-          onClick={() => { setSelectedDevice(device); setShowDeviceDetail(true); }}
+          onClick={() => handleViewDevice(device)}
           className="border-gray-600 text-gray-300 hover:bg-gray-800 flex-1">
           <Eye size={14} className="mr-1" /> Details
         </Button>
+        {!isDeleted && device.lastAuditDate && (
+          <Button variant="outline" size="sm"
+            onClick={() => fetchReports(device._id).then(() => {
+              if (deviceReports.length > 0) handleDownloadPdf(deviceReports[0].reportId);
+              else handleViewDevice(device);
+            })}
+            className="border-cyan-600 text-cyan-400 hover:bg-cyan-900/30">
+            <Download size={14} className="mr-1" /> PDF
+          </Button>
+        )}
         {isDeleted ? (
           <Button variant="outline" size="sm" onClick={() => handleRestore(device._id)}
             className="border-emerald-600 text-emerald-400 hover:bg-emerald-900/30">
@@ -373,8 +447,8 @@ const NetworkPage: React.FC = () => {
       </div>
 
       {/* Device Detail Dialog */}
-      <Dialog open={showDeviceDetail} onOpenChange={setShowDeviceDetail}>
-        <DialogContent className="bg-gray-900 border-gray-700 text-coolWhite max-w-lg">
+      <Dialog open={showDeviceDetail} onOpenChange={(open) => { setShowDeviceDetail(open); if (!open) setDeviceReports([]); }}>
+        <DialogContent className="bg-gray-900 border-gray-700 text-coolWhite max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-2">
               <Monitor className="text-cyan-400" size={24} />
@@ -433,6 +507,64 @@ const NetworkPage: React.FC = () => {
               <div className="bg-gray-800/50 rounded-lg p-3">
                 <span className="text-xs text-gray-500">Machine ID</span>
                 <p className="text-sm font-medium text-white font-mono break-all">{selectedDevice.machineId}</p>
+              </div>
+
+              {/* Audit Reports Section */}
+              <div className="border-t border-gray-700 pt-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2 mb-3">
+                  <FileText className="text-amber-400" size={20} />
+                  Audit Reports
+                </h3>
+                {loadingReports ? (
+                  <div className="flex items-center justify-center py-6">
+                    <div className="w-8 h-8 border-4 border-coolWhite/10 border-t-cyan-400 rounded-full animate-spin"></div>
+                  </div>
+                ) : deviceReports.length === 0 ? (
+                  <div className="text-center py-6 text-gray-500 text-sm">
+                    No audit reports available for this device
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {deviceReports.map((report) => (
+                      <div key={report._id} className="bg-gray-800/60 rounded-lg border border-gray-700 p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                              report.auditScore >= 70 ? 'bg-emerald-500/20' :
+                              report.auditScore >= 40 ? 'bg-amber-500/20' : 'bg-red-500/20'
+                            }`}>
+                              <span className={`text-sm font-bold ${
+                                report.auditScore >= 70 ? 'text-emerald-400' :
+                                report.auditScore >= 40 ? 'text-amber-400' : 'text-red-400'
+                              }`}>{report.auditScore}</span>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-white">
+                                {new Date(report.auditDate).toLocaleDateString()} — {new Date(report.auditDate).toLocaleTimeString()}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {report.warnings} warnings · {report.suggestions} suggestions
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="outline" size="sm"
+                            onClick={() => handleDownloadPdf(report.reportId)}
+                            disabled={downloadingPdf === report.reportId}
+                            className="border-cyan-600 text-cyan-400 hover:bg-cyan-900/30"
+                          >
+                            {downloadingPdf === report.reportId ? (
+                              <div className="w-4 h-4 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin mr-1" />
+                            ) : (
+                              <Download size={14} className="mr-1" />
+                            )}
+                            Download PDF
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
