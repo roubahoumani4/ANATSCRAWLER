@@ -32,6 +32,9 @@ import PerformanceOptimizationPage from '@/pages/PerformanceOptimizationPage';
 import DataManagementPage from '@/pages/DataManagementPage';
 import AdminLogsPage from '@/pages/AdminLogsPage';
 import OSAuditPage from '@/pages/OSAuditPage';
+import CompanyPage from '@/pages/CompanyPage';
+import NetworkPage from '@/pages/NetworkPage';
+import InstallationPackagesPage from '@/pages/InstallationPackagesPage';
 
 // Layout Component
 import Layout from '@/components/layout/Layout';
@@ -112,6 +115,9 @@ export default function AppContent() {
           
           {/* OS Audit Routes - Authenticated Users */}
           <Route path="/os-audit" element={<ProtectedRoute><OSAuditPage /></ProtectedRoute>} />
+          <Route path="/os-audit/companies" element={<ProtectedRoute><CompanyPage /></ProtectedRoute>} />
+          <Route path="/os-audit/network" element={<ProtectedRoute><NetworkPage /></ProtectedRoute>} />
+          <Route path="/os-audit/packages" element={<ProtectedRoute><InstallationPackagesPage /></ProtectedRoute>} />
           
           {/* Index Management Routes - Admin Only */}
           <Route path="/index" element={<AdminRoute><IndexManagementDashboardPage /></AdminRoute>} />

@@ -23,6 +23,7 @@ import historyRoutes from './history.routes';
 import analyticsRoutes from './analytics.routes';
 import osAuditRoutes from './os-audit.routes';
 import osAuditReportsRoutes from './os-audit-reports.routes';
+import osAuditCompaniesRoutes from './os-audit-companies.routes';
 
 /**
  * Register all application routes with proper organization and authentication
@@ -88,6 +89,9 @@ export async function registerRoutes(app: Express): Promise<void> {
   // OS Audit Report Generation routes - authenticated users only
   // PDF/HTML report generation from audit results
   app.use(`${apiV1}/os-audit`, osAuditReportsRoutes);
+
+  // OS Audit Companies, Network, and Packages routes
+  app.use(`${apiV1}/os-audit`, osAuditCompaniesRoutes);
 
   // Threat Intelligence routes - authenticated users only
   app.use(`${apiV1}/threat-intel`, authenticate, threatIntelRoutes);

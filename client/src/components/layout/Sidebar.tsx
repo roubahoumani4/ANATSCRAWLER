@@ -34,6 +34,9 @@ import {
   Database,
   ClipboardList,
   Shield,
+  Building2,
+  Network,
+  Package,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -103,7 +106,13 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggle }) => {
       path: "/os-audit",
       icon: <Shield size={20} />,
       label: "OS Audit",
-      color: "text-white"
+      color: "text-white",
+      hasSubmenu: true,
+      features: [
+        { path: "/os-audit/companies", label: "Companies", icon: <Building2 size={16} />, color: "text-white" },
+        { path: "/os-audit/network", label: "Network", icon: <Network size={16} />, color: "text-white" },
+        { path: "/os-audit/packages", label: "Installation Packages", icon: <Package size={16} />, color: "text-white" }
+      ]
     },
     // User Management - Only visible for admin users
     ...(isAdmin ? [{
