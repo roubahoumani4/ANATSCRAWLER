@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import authenticate from '../middleware/auth';
 import { OSAuditMachine, IOSAuditMachine } from '../models/OSAuditMachine';
 import { OSAuditReport, IOSAuditReport } from '../models/OSAuditReport';
+import { InstallationPackage } from '../models/InstallationPackage';
 import AuditReportGenerator from '../services/auditReportGenerator';
 
 const router = Router();
@@ -245,6 +246,7 @@ router.post('/reports', async (req: AuthenticatedRequest, res: Response) => {
       machineName, 
       ipAddress, 
       ownerName,
+      companyName,
       auditData 
     } = req.body;
 
@@ -275,6 +277,43 @@ router.post('/reports', async (req: AuthenticatedRequest, res: Response) => {
       machine = await OSAuditMachine.findOne({
         agentInstallationToken: String(agentInstallationToken).trim()
       });
+    }
+
+    // If still not found, check if this token is from an InstallationPackage
+    // and auto-register the machine
+    if (!machine) {
+      console.log('🔍 Checking InstallationPackage for token...');
+      const pkg = await InstallationPackage.findOne({
+        agentToken: String(agentInstallationToken).trim()
+      }).populate('company');
+
+      if (pkg) {
+        console.log('✅ Found InstallationPackage:', pkg.name);
+        const pkgCompanyName = (pkg.company as any)?.name || companyName || '';
+        const newMachineId = uuidv4();
+        const newAgentToken = String(agentInstallationToken).trim();
+
+        const newMachine = new OSAuditMachine({
+          machineId: newMachineId,
+          owner: pkg.owner,
+          ownerName: ownerName || 'Agent',
+          machineName: machineName || 'Pending Agent Audit',
+          machineHostname: auditData?.hostname || machineName || '',
+          ipAddress: ipAddress || '0.0.0.0',
+          operatingSystem: auditData?.operatingSystem || '',
+          companyName: pkgCompanyName,
+          osType: pkg.osType || 'linux',
+          agentInstallationToken: newAgentToken,
+          agentStatus: 'active',
+          agentInstalledDate: new Date()
+        });
+
+        machine = await newMachine.save();
+        console.log('✅ Auto-registered machine:', machine.machineName, 'for company:', pkgCompanyName);
+
+        // Increment download count
+        await InstallationPackage.updateOne({ _id: pkg._id }, { $inc: { downloadCount: 1 } });
+      }
     }
 
     if (!machine) {

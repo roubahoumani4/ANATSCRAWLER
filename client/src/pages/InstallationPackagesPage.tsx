@@ -235,7 +235,7 @@ lynis audit system 2>&1 || true
 
 # Collect system info
 MACHINE_NAME="$(hostname)"
-IP_ADDRESS="$(hostname -I | awk '{print \\$1}')"
+IP_ADDRESS="$(hostname -I | awk '{print \$1}')"
 OS_INFO="$(grep '^PRETTY_NAME=' /etc/os-release | cut -d= -f2 | tr -d '\"')"
 KERNEL="$(uname -r)"
 
