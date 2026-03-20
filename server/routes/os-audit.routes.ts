@@ -6,6 +6,7 @@ import { OSAuditReport, IOSAuditReport } from '../models/OSAuditReport';
 import { InstallationPackage } from '../models/InstallationPackage';
 import { Company } from '../models/Company';
 import AuditReportGenerator from '../services/auditReportGenerator';
+import { logActivity } from '../utils/activityLogger';
 
 const router = Router();
 
@@ -86,6 +87,13 @@ router.post('/machines/register', authenticate, async (req: AuthenticatedRequest
     console.log('  Token:', savedMachine.agentInstallationToken);
     console.log('  Name:', savedMachine.machineName);
     console.log('  Owner ID:', savedMachine.owner);
+
+    await logActivity(
+      userId, 'scan', 'Registered new machine for OS audit',
+      'Assessment',
+      `Machine: ${savedMachine.machineName} (${savedMachine.ipAddress}), Company: ${savedMachine.companyName || 'N/A'}`,
+      'success', { machineId: savedMachine.machineId, machineName: savedMachine.machineName }, req
+    );
 
     res.status(201).json({
       success: true,
@@ -195,6 +203,13 @@ router.put('/machines/:machineId', authenticate, async (req: AuthenticatedReques
       });
     }
 
+    await logActivity(
+      userId, 'settings_change', 'Updated OS audit machine details',
+      'Assessment',
+      `Machine: ${machine.machineName} (${machine.ipAddress})`,
+      'success', { machineId: machine.machineId }, req
+    );
+
     res.json({
       success: true,
       message: 'Machine updated successfully',
@@ -235,6 +250,13 @@ router.delete('/machines/:machineId', authenticate, async (req: AuthenticatedReq
     await OSAuditReport.deleteMany({
       machine: machineId
     });
+
+    await logActivity(
+      userId, 'other', 'Deleted OS audit machine',
+      'Assessment',
+      `Machine ID: ${machineId}`,
+      'success', { machineId }, req
+    );
 
     res.json({
       success: true,
@@ -512,6 +534,14 @@ router.post('/reports', async (req: AuthenticatedRequest, res: Response) => {
     ).catch((err) => {
       console.error(`[BG-PDF] Unhandled error for ${savedReport.reportId}:`, err);
     });
+
+    // Log audit report submission under the machine owner
+    await logActivity(
+      machine.owner, 'scan', 'Audit report submitted by agent',
+      'Assessment',
+      `Machine: ${machine.machineName} (${machine.ipAddress}), Score: ${auditScore}/100, Warnings: ${warnings}, Suggestions: ${suggestions}`,
+      'success', { reportId: savedReport.reportId, machineName: machine.machineName, auditScore }, req
+    );
 
     res.status(201).json({
       success: true,
@@ -839,6 +869,13 @@ router.get('/reports/:reportId/lynis-log', authenticate, async (req: Authenticat
     // Return the log file content
     const fileName = `${report.machineName}_lynis_${report.auditDate.toISOString().split('T')[0]}.log`;
     
+    await logActivity(
+      userId, 'export', 'Downloaded Lynis log file',
+      'Assessment',
+      `Report: ${reportId}, Machine: ${report.machineName}`,
+      'success', { reportId }, req
+    );
+
     res.setHeader('Content-Type', 'text/plain');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
     res.send(report.logFileContent || '');
@@ -876,6 +913,13 @@ router.get('/reports/:reportId/lynis-report', authenticate, async (req: Authenti
 
     // Return the report data file
     const fileName = `${report.machineName}_lynis_report_${report.auditDate.toISOString().split('T')[0]}.dat`;
+
+    await logActivity(
+      userId, 'export', 'Downloaded Lynis report data file',
+      'Assessment',
+      `Report: ${reportId}, Machine: ${report.machineName}`,
+      'success', { reportId }, req
+    );
     
     res.setHeader('Content-Type', 'text/plain');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);

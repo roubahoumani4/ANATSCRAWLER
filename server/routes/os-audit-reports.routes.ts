@@ -10,6 +10,7 @@ import fs from 'fs';
 import authenticate from '../middleware/auth';
 import { OSAuditReport } from '../models/OSAuditReport';
 import AuditReportGenerator from '../services/auditReportGenerator';
+import { logActivity } from '../utils/activityLogger';
 
 const router = Router();
 
@@ -52,6 +53,12 @@ router.post(
         generator.isPdfReady(auditReport.pdfFilePath)
       ) {
         console.log(`[DOWNLOAD] Serving pre-generated PDF for ${reportId}`);
+        await logActivity(
+          userId, 'export', 'Downloaded PDF audit report',
+          'Assessment',
+          `Report: ${reportId}, Machine: ${auditReport.machineName}`,
+          'success', { reportId, machineName: auditReport.machineName }, req
+        );
         return res.download(
           auditReport.pdfFilePath,
           `audit_report_${reportId}.pdf`,
@@ -104,6 +111,13 @@ router.post(
       await OSAuditReport.updateOne(
         { reportId },
         { $set: { pdfFilePath: pdfPath, pdfGenerationStatus: 'completed' } }
+      );
+
+      await logActivity(
+        userId, 'export', 'Downloaded PDF audit report',
+        'Assessment',
+        `Report: ${reportId}, Machine: ${auditReport.machineName}`,
+        'success', { reportId, machineName: auditReport.machineName }, req
       );
 
       res.download(pdfPath, `audit_report_${reportId}.pdf`, (err) => {
@@ -209,6 +223,13 @@ router.post(
       const htmlPath = await generator.generateHTMLReport(reportData, {
         outputDir
       });
+
+      await logActivity(
+        userId, 'export', 'Downloaded HTML audit report',
+        'Assessment',
+        `Report: ${reportId}, Machine: ${auditReport.machineName}`,
+        'success', { reportId, machineName: auditReport.machineName }, req
+      );
 
       // Return HTML file
       res.download(htmlPath, `audit_report_${reportId}.html`);
@@ -358,6 +379,13 @@ router.post(
           console.error(`Error generating PDF for ${auditReport.reportId}:`, error);
         }
       }
+
+      await logActivity(
+        userId, 'export', 'Bulk generated PDF audit reports',
+        'Assessment',
+        `Generated ${generatedReports.length} of ${reportIds.length} requested reports`,
+        'success', { generated: generatedReports.length, requested: reportIds.length }, req
+      );
 
       res.json({
         success: true,

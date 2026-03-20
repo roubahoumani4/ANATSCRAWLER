@@ -5,6 +5,7 @@ import { Company } from '../models/Company';
 import { InstallationPackage } from '../models/InstallationPackage';
 import { OSAuditMachine } from '../models/OSAuditMachine';
 import { OSAuditReport } from '../models/OSAuditReport';
+import { logActivity } from '../utils/activityLogger';
 
 const router = Router();
 
@@ -61,6 +62,13 @@ router.post('/companies', authenticate, async (req: AuthenticatedRequest, res: R
     });
 
     const saved = await company.save();
+
+    await logActivity(
+      userId, 'settings_change', 'Created new company',
+      'Assessment',
+      `Company: ${saved.name}, Type: ${saved.companyType || 'N/A'}`,
+      'success', { companyId: saved._id, companyName: saved.name }, req
+    );
 
     res.status(201).json({
       success: true,
@@ -183,6 +191,13 @@ router.put('/companies/:id', authenticate, async (req: AuthenticatedRequest, res
       return res.status(404).json({ success: false, error: 'Company not found' });
     }
 
+    await logActivity(
+      userId, 'settings_change', 'Updated company details',
+      'Assessment',
+      `Company: ${company.name}`,
+      'success', { companyId: company._id, companyName: company.name }, req
+    );
+
     res.json({ success: true, message: 'Company updated', company });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
@@ -218,6 +233,13 @@ router.delete('/companies/:id', authenticate, async (req: AuthenticatedRequest, 
     await InstallationPackage.deleteMany({ company: company._id });
 
     await Company.deleteOne({ _id: company._id });
+
+    await logActivity(
+      userId, 'other', 'Deleted company and all associated data',
+      'Assessment',
+      `Company: ${company.name} (${machineIds.length} devices, associated reports and packages removed)`,
+      'success', { companyId: company._id, companyName: company.name, devicesDeleted: machineIds.length }, req
+    );
 
     res.json({ success: true, message: 'Company, packages, devices, and reports deleted' });
   } catch (error: any) {
@@ -275,6 +297,13 @@ router.put('/network/devices/:machineId/soft-delete', authenticate, async (req: 
       return res.status(404).json({ success: false, error: 'Device not found' });
     }
 
+    await logActivity(
+      userId, 'other', 'Soft-deleted network device',
+      'Assessment',
+      `Device: ${machine.machineName} (${machine.ipAddress}), Company: ${machine.companyName || 'N/A'}`,
+      'success', { machineId: machine._id, machineName: machine.machineName }, req
+    );
+
     res.json({ success: true, message: 'Device moved to deleted', machine });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
@@ -297,6 +326,13 @@ router.put('/network/devices/:machineId/restore', authenticate, async (req: Auth
     if (!machine) {
       return res.status(404).json({ success: false, error: 'Device not found' });
     }
+
+    await logActivity(
+      userId, 'other', 'Restored deleted network device',
+      'Assessment',
+      `Device: ${machine.machineName} (${machine.ipAddress}), Company: ${machine.companyName || 'N/A'}`,
+      'success', { machineId: machine._id, machineName: machine.machineName }, req
+    );
 
     res.json({ success: true, message: 'Device restored', machine });
   } catch (error: any) {
@@ -322,6 +358,13 @@ router.delete('/network/devices/:machineId', authenticate, async (req: Authentic
 
     // Delete the machine
     await OSAuditMachine.deleteOne({ _id: machine._id });
+
+    await logActivity(
+      userId, 'other', 'Permanently deleted network device',
+      'Assessment',
+      `Device: ${machine.machineName} (${machine.ipAddress}), Company: ${machine.companyName || 'N/A'}`,
+      'success', { machineId: machine._id, machineName: machine.machineName }, req
+    );
 
     res.json({ success: true, message: 'Device and reports permanently deleted' });
   } catch (error: any) {
@@ -370,6 +413,13 @@ router.post('/packages', authenticate, async (req: AuthenticatedRequest, res: Re
     });
 
     const saved = await pkg.save();
+
+    await logActivity(
+      userId, 'settings_change', 'Created installation package',
+      'Assessment',
+      `Package: ${saved.name}, OS: ${saved.osType}, Company: ${company.name}`,
+      'success', { packageId: saved.packageId, packageName: saved.name, companyName: company.name }, req
+    );
 
     res.status(201).json({
       success: true,
@@ -441,6 +491,13 @@ router.delete('/packages/:id', authenticate, async (req: AuthenticatedRequest, r
     // Delete the package
     await InstallationPackage.deleteOne({ _id: pkg._id });
 
+    await logActivity(
+      userId, 'other', 'Deleted installation package',
+      'Assessment',
+      `Package: ${pkg.name} (${machineIds.length} devices and associated reports removed)`,
+      'success', { packageId: pkg.packageId, packageName: pkg.name, devicesDeleted: machineIds.length }, req
+    );
+
     res.json({ success: true, message: 'Package, devices, and reports deleted' });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
@@ -465,6 +522,13 @@ router.get('/packages/:id/download-script', authenticate, async (req: Authentica
     await pkg.save();
 
     const companyName = (pkg.company as any)?.name || 'Unknown';
+
+    await logActivity(
+      userId, 'export', 'Downloaded agent installation script',
+      'Assessment',
+      `Package: ${pkg.name}, OS: ${pkg.osType}, Company: ${companyName}`,
+      'success', { packageId: pkg.packageId, packageName: pkg.name, osType: pkg.osType }, req
+    );
 
     res.json({
       success: true,
