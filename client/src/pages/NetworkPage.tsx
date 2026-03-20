@@ -1,45 +1,28 @@
-import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useState, useEffect, useMemo } from "react";
 import {
-  Network,
-  Building2,
-  Server,
-  Wifi,
-  WifiOff,
-  Trash2,
-  RotateCcw,
   Search,
-  Shield,
   Monitor,
   ChevronDown,
   ChevronRight,
-  Clock,
-  Activity,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  Eye,
   Download,
-  FileText
+  FileText,
+  Building2,
+  Trash2,
+  RotateCcw,
+  Filter,
+  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import axios from "axios";
-
-const fadeIn = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0 }
-};
-
-const staggerContainer = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1 }
-  }
-};
 
 interface Company {
   _id: string;
@@ -75,10 +58,12 @@ interface Device {
   companyName?: string;
   operatingSystem?: string;
   osType?: string;
-  agentStatus: 'active' | 'inactive' | 'pending';
+  agentStatus: "active" | "inactive" | "pending";
   lastAuditDate?: string;
   registrationDate: string;
   isActive: boolean;
+  latestAuditScore?: number;
+  latestWarnings?: number;
 }
 
 const NetworkPage: React.FC = () => {
@@ -95,14 +80,27 @@ const NetworkPage: React.FC = () => {
   const [loadingReports, setLoadingReports] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState<string | null>(null);
 
-  useEffect(() => { fetchCompanies(); }, []);
+  // Table state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [nameFilter, setNameFilter] = useState("");
+  const [ipFilter, setIpFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [entityTypeFilter, setEntityTypeFilter] = useState("All");
+  const [showDeleted, setShowDeleted] = useState(false);
+  const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
+  const [itemsPerPage, setItemsPerPage] = useState(100);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    fetchCompanies();
+  }, []);
 
   const fetchCompanies = async () => {
     try {
       setLoading(true);
       const res = await axios.get(`/api/v1/os-audit/companies`, {
         params: { search: searchQuery },
-        withCredentials: true
+        withCredentials: true,
       });
       setCompanies(res.data.companies || []);
     } catch (error) {
@@ -120,9 +118,10 @@ const NetworkPage: React.FC = () => {
   const fetchDevices = async (companyName: string) => {
     try {
       setLoadingDevices(true);
-      const res = await axios.get(`/api/v1/os-audit/network/${encodeURIComponent(companyName)}/devices`, {
-        withCredentials: true
-      });
+      const res = await axios.get(
+        `/api/v1/os-audit/network/${encodeURIComponent(companyName)}/devices`,
+        { withCredentials: true }
+      );
       setActiveDevices(res.data.activeDevices || []);
       setDeletedDevices(res.data.deletedDevices || []);
     } catch (error) {
@@ -134,13 +133,19 @@ const NetworkPage: React.FC = () => {
 
   const handleSelectCompany = (company: Company) => {
     setSelectedCompany(company);
+    setSelectedIds(new Set());
+    setCurrentPage(1);
     fetchDevices(company.name);
   };
 
   const handleSoftDelete = async (deviceId: string) => {
     if (!window.confirm("Move this device to deleted devices?")) return;
     try {
-      await axios.put(`/api/v1/os-audit/network/devices/${deviceId}/soft-delete`, {}, { withCredentials: true });
+      await axios.put(
+        `/api/v1/os-audit/network/devices/${deviceId}/soft-delete`,
+        {},
+        { withCredentials: true }
+      );
       if (selectedCompany) fetchDevices(selectedCompany.name);
     } catch (error: any) {
       alert(error.response?.data?.error || "Failed to delete device");
@@ -149,7 +154,11 @@ const NetworkPage: React.FC = () => {
 
   const handleRestore = async (deviceId: string) => {
     try {
-      await axios.put(`/api/v1/os-audit/network/devices/${deviceId}/restore`, {}, { withCredentials: true });
+      await axios.put(
+        `/api/v1/os-audit/network/devices/${deviceId}/restore`,
+        {},
+        { withCredentials: true }
+      );
       if (selectedCompany) fetchDevices(selectedCompany.name);
     } catch (error: any) {
       alert(error.response?.data?.error || "Failed to restore device");
@@ -157,9 +166,12 @@ const NetworkPage: React.FC = () => {
   };
 
   const handlePermanentDelete = async (deviceId: string) => {
-    if (!window.confirm("Permanently delete this device and all its reports? This cannot be undone.")) return;
+    if (!window.confirm("Permanently delete this device and all its reports? This cannot be undone."))
+      return;
     try {
-      await axios.delete(`/api/v1/os-audit/network/devices/${deviceId}`, { withCredentials: true });
+      await axios.delete(`/api/v1/os-audit/network/devices/${deviceId}`, {
+        withCredentials: true,
+      });
       if (selectedCompany) fetchDevices(selectedCompany.name);
     } catch (error: any) {
       alert(error.response?.data?.error || "Failed to delete device");
@@ -169,7 +181,9 @@ const NetworkPage: React.FC = () => {
   const fetchReports = async (machineId: string) => {
     try {
       setLoadingReports(true);
-      const res = await axios.get(`/api/v1/os-audit/reports/${machineId}`, { withCredentials: true });
+      const res = await axios.get(`/api/v1/os-audit/reports/${machineId}`, {
+        withCredentials: true,
+      });
       setDeviceReports(res.data.reports || []);
     } catch (error) {
       console.error("Error fetching reports:", error);
@@ -182,12 +196,15 @@ const NetworkPage: React.FC = () => {
   const handleDownloadPdf = async (reportId: string) => {
     try {
       setDownloadingPdf(reportId);
-      const res = await axios.post(`/api/v1/os-audit/reports/generate-pdf/${reportId}`, {}, {
-        withCredentials: true,
-        responseType: 'blob'
-      });
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
-      const a = document.createElement('a');
+      const res = await axios.post(
+        `/api/v1/os-audit/reports/generate-pdf/${reportId}`,
+        {},
+        { withCredentials: true, responseType: "blob" }
+      );
+      const url = window.URL.createObjectURL(
+        new Blob([res.data], { type: "application/pdf" })
+      );
+      const a = document.createElement("a");
       a.href = url;
       a.download = `audit_report_${reportId}.pdf`;
       document.body.appendChild(a);
@@ -211,260 +228,512 @@ const NetworkPage: React.FC = () => {
     fetchReports(device._id);
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'active': return <CheckCircle className="text-emerald-400" size={16} />;
-      case 'inactive': return <XCircle className="text-red-400" size={16} />;
-      default: return <Clock className="text-yellow-400" size={16} />;
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Move ${selectedIds.size} device(s) to deleted?`)) return;
+    for (const id of selectedIds) {
+      try {
+        await axios.put(`/api/v1/os-audit/network/devices/${id}/soft-delete`, {}, { withCredentials: true });
+      } catch (e) {}
     }
+    setSelectedIds(new Set());
+    if (selectedCompany) fetchDevices(selectedCompany.name);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30';
-      case 'inactive': return 'text-red-400 bg-red-400/10 border-red-400/30';
-      default: return 'text-yellow-400 bg-yellow-400/10 border-yellow-400/30';
-    }
+  const toggleCompanyExpand = (companyId: string) => {
+    setExpandedCompanies((prev) => {
+      const next = new Set(prev);
+      if (next.has(companyId)) next.delete(companyId);
+      else next.add(companyId);
+      return next;
+    });
   };
 
-  const DeviceCard = ({ device, isDeleted = false }: { device: Device; isDeleted?: boolean }) => (
-    <motion.div
-      variants={fadeIn}
-      className={`bg-gray-900/60 rounded-xl border ${isDeleted ? 'border-red-800/50' : 'border-gray-800'} p-5 hover:border-cyan-400/30 transition-all duration-300`}
-    >
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-lg ${device.osType === 'windows' ? 'bg-blue-500/10' : 'bg-orange-500/10'}`}>
-            <Monitor className={device.osType === 'windows' ? 'text-blue-400' : 'text-orange-400'} size={20} />
-          </div>
-          <div>
-            <h4 className="font-semibold text-white">{device.machineName}</h4>
-            <p className="text-xs text-gray-500">{device.machineHostname || device.machineId}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border ${getStatusColor(device.agentStatus)}`}>
-            {getStatusIcon(device.agentStatus)} {device.agentStatus}
-          </span>
-        </div>
-      </div>
+  // Current device list based on active/deleted toggle
+  const currentDevices = showDeleted ? deletedDevices : activeDevices;
 
-      <div className="grid grid-cols-2 gap-3 text-sm mb-4">
-        <div>
-          <span className="text-gray-500 text-xs">IP Address</span>
-          <p className="text-gray-300 font-mono">{device.ipAddress}</p>
-        </div>
-        <div>
-          <span className="text-gray-500 text-xs">OS</span>
-          <p className="text-gray-300">{device.operatingSystem || 'Unknown'}</p>
-        </div>
-        <div>
-          <span className="text-gray-500 text-xs">Owner</span>
-          <p className="text-gray-300">{device.ownerName}</p>
-        </div>
-        <div>
-          <span className="text-gray-500 text-xs">Last Audit</span>
-          <p className="text-gray-300">{device.lastAuditDate ? new Date(device.lastAuditDate).toLocaleDateString() : 'Never'}</p>
-        </div>
-      </div>
+  // Filtered devices
+  const filteredDevices = useMemo(() => {
+    return currentDevices.filter((d) => {
+      if (nameFilter && !d.machineName.toLowerCase().includes(nameFilter.toLowerCase())) return false;
+      if (ipFilter && !d.ipAddress.includes(ipFilter)) return false;
+      if (statusFilter !== "All") {
+        const managed = d.agentStatus === "active" ? "Managed" : "Unmanaged";
+        if (managed !== statusFilter) return false;
+      }
+      if (entityTypeFilter !== "All") {
+        const entityType = d.osType === "windows" ? "Physical machine" : "Virtual machine";
+        if (entityType !== entityTypeFilter) return false;
+      }
+      return true;
+    });
+  }, [currentDevices, nameFilter, ipFilter, statusFilter, entityTypeFilter]);
 
-      <div className="flex gap-2 pt-3 border-t border-gray-800">
-        <Button variant="outline" size="sm"
-          onClick={() => handleViewDevice(device)}
-          className="border-gray-600 text-gray-300 hover:bg-gray-800 flex-1">
-          <Eye size={14} className="mr-1" /> Details
-        </Button>
-        {!isDeleted && device.lastAuditDate && (
-          <Button variant="outline" size="sm"
-            onClick={() => fetchReports(device._id).then(() => {
-              if (deviceReports.length > 0) handleDownloadPdf(deviceReports[0].reportId);
-              else handleViewDevice(device);
-            })}
-            className="border-cyan-600 text-cyan-400 hover:bg-cyan-900/30">
-            <Download size={14} className="mr-1" /> PDF
-          </Button>
-        )}
-        {isDeleted ? (
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => handleRestore(device._id)}
-              className="border-emerald-600 text-emerald-400 hover:bg-emerald-900/30">
-              <RotateCcw size={14} className="mr-1" /> Restore
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => handlePermanentDelete(device._id)}
-              className="border-red-600 text-red-400 hover:bg-red-900/30">
-              <Trash2 size={14} className="mr-1" /> Delete
-            </Button>
-          </div>
-        ) : (
-          <Button variant="outline" size="sm" onClick={() => handleSoftDelete(device._id)}
-            className="border-red-600 text-red-400 hover:bg-red-900/30">
-            <Trash2 size={14} className="mr-1" /> Remove
-          </Button>
-        )}
-      </div>
-    </motion.div>
+  // Pagination
+  const totalItems = filteredDevices.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+  const paginatedDevices = filteredDevices.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
+  const startItem = totalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
+  const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+
+  const allSelected = paginatedDevices.length > 0 && paginatedDevices.every((d) => selectedIds.has(d._id));
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedDevices.map((d) => d._id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const formatLastSeen = (dateStr?: string) => {
+    if (!dateStr) return "-";
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    if (diffHours < 24) return `${diffHours} hours ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `${diffDays} days ago`;
+    const timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const dateFormatted = date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    return `At ${timeStr}, on ${dateFormatted}`;
+  };
+
+  const getSecurityIssues = (device: Device) => {
+    if (!device.lastAuditDate) return "-";
+    if ((device.latestWarnings ?? 0) > 0 || (device.latestAuditScore ?? 100) < 70) return "With issues";
+    return "Without issues";
+  };
+
+  const resetFilters = () => {
+    setNameFilter("");
+    setIpFilter("");
+    setStatusFilter("All");
+    setEntityTypeFilter("All");
+  };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-jetBlack flex items-center justify-center">
+      <div className="min-h-screen bg-[#1a1d23] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-coolWhite/10 border-t-crimsonRed rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-coolWhite/60">Loading network...</p>
+          <div className="w-16 h-16 border-4 border-gray-700 border-t-cyan-500 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-400">Loading network...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <motion.div initial="hidden" animate="visible" className="min-h-screen bg-jetBlack text-coolWhite p-6">
-      {/* Header */}
-      <motion.div variants={fadeIn} className="mb-8">
-        <h1 className="text-3xl font-bold flex items-center gap-3">
-          <Network className="text-cyan-400" size={36} />
-          Network Devices
-        </h1>
-        <p className="text-gray-400 mt-2">View and manage devices across all companies</p>
-      </motion.div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Companies Sidebar */}
-        <div className="lg:col-span-1">
-          <div className="bg-gray-900/60 rounded-xl border border-gray-800 p-4">
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Building2 className="text-cyan-400" size={20} />
-              Companies
-            </h3>
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-              <Input
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 bg-gray-800 border-gray-700 text-coolWhite text-sm placeholder:text-gray-500"
-              />
-            </div>
-            <div className="space-y-2 max-h-[calc(100vh-350px)] overflow-y-auto">
-              {companies.map((company) => (
-                <button
-                  key={company._id}
-                  onClick={() => handleSelectCompany(company)}
-                  className={`w-full text-left p-3 rounded-lg transition-all duration-200 ${
-                    selectedCompany?._id === company._id
-                      ? 'bg-gradient-to-r from-cyan-600/20 to-purple-600/20 border border-cyan-400/50'
-                      : 'hover:bg-gray-800 border border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium text-sm text-white">{company.name}</div>
-                      <div className="text-xs text-gray-500">{company.sector}</div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-400">{company.deviceCount || 0}</span>
-                      <Server size={14} className="text-gray-500" />
-                    </div>
-                  </div>
-                </button>
-              ))}
-              {companies.length === 0 && (
-                <div className="text-center py-8 text-gray-500 text-sm">
-                  No companies found
-                </div>
-              )}
-            </div>
+    <div className="min-h-screen bg-[#1a1d23] text-gray-200 flex">
+      {/* ── Left Tree Panel ── */}
+      <div className="w-64 min-w-[16rem] border-r border-gray-700/50 flex flex-col bg-[#1e2128]">
+        <div className="px-4 pt-5 pb-3">
+          <p className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold mb-2">Tree View</p>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
+            <Input
+              placeholder="Search in tree view"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 h-8 bg-[#2a2d35] border-gray-600 text-gray-300 text-xs placeholder:text-gray-500"
+            />
           </div>
         </div>
 
-        {/* Devices Content */}
-        <div className="lg:col-span-3">
-          {!selectedCompany ? (
-            <div className="bg-gray-900/60 rounded-xl border border-gray-800 p-12 text-center">
-              <Network className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-400 mb-2">Select a Company</h3>
-              <p className="text-gray-500">Choose a company from the left panel to view its network devices</p>
-            </div>
-          ) : loadingDevices ? (
-            <div className="bg-gray-900/60 rounded-xl border border-gray-800 p-12 text-center">
-              <div className="w-12 h-12 border-4 border-coolWhite/10 border-t-cyan-400 rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-gray-400">Loading devices...</p>
-            </div>
-          ) : (
-            <>
-              {/* Company Header */}
-              <div className="bg-gray-900/60 rounded-xl border border-gray-800 p-6 mb-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-2xl font-bold text-white">{selectedCompany.name}</h2>
-                    <p className="text-gray-400 text-sm">{selectedCompany.sector}</p>
-                  </div>
-                  <div className="flex gap-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-emerald-400">{activeDevices.length}</div>
-                      <div className="text-xs text-gray-500">Active Network</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-red-400">{deletedDevices.length}</div>
-                      <div className="text-xs text-gray-500">Deleted</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+        <div className="flex-1 overflow-y-auto px-2 pb-4">
+          {/* Root level */}
+          <div className="mb-1">
+            <button
+              onClick={() => {
+                setSelectedCompany(null);
+                setActiveDevices([]);
+                setDeletedDevices([]);
+              }}
+              className="flex items-center gap-1.5 px-2 py-1.5 w-full text-left text-sm font-medium text-gray-200 hover:bg-gray-700/40 rounded"
+            >
+              <Building2 size={14} className="text-gray-400" />
+              Companies
+            </button>
+          </div>
 
-              {/* Tabs */}
-              <Tabs defaultValue="active">
-                <TabsList className="bg-gray-900/60 border border-gray-800 mb-6">
-                  <TabsTrigger value="active" className="data-[state=active]:bg-cyan-600/20 data-[state=active]:text-cyan-400">
-                    <Wifi size={16} className="mr-2" />
-                    Active Network ({activeDevices.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="deleted" className="data-[state=active]:bg-red-600/20 data-[state=active]:text-red-400">
-                    <WifiOff size={16} className="mr-2" />
-                    Deleted Devices ({deletedDevices.length})
-                  </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="active">
-                  {activeDevices.length === 0 ? (
-                    <div className="bg-gray-900/60 rounded-xl border border-gray-800 p-12 text-center">
-                      <Wifi className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                      <p className="text-gray-400">No active devices for this company</p>
-                      <p className="text-sm text-gray-500 mt-1">Register machines and install the audit agent</p>
-                    </div>
-                  ) : (
-                    <motion.div variants={staggerContainer} initial="hidden" animate="visible"
-                      className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {activeDevices.map(device => (
-                        <DeviceCard key={device._id} device={device} />
-                      ))}
-                    </motion.div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="deleted">
-                  {deletedDevices.length === 0 ? (
-                    <div className="bg-gray-900/60 rounded-xl border border-gray-800 p-12 text-center">
-                      <WifiOff className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                      <p className="text-gray-400">No deleted devices</p>
-                    </div>
-                  ) : (
-                    <motion.div variants={staggerContainer} initial="hidden" animate="visible"
-                      className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {deletedDevices.map(device => (
-                        <DeviceCard key={device._id} device={device} isDeleted />
-                      ))}
-                    </motion.div>
-                  )}
-                </TabsContent>
-              </Tabs>
-            </>
-          )}
+          {/* Company list */}
+          <div className="ml-2 space-y-0.5">
+            {companies.map((company) => (
+              <button
+                key={company._id}
+                onClick={() => handleSelectCompany(company)}
+                className={`flex items-center gap-1.5 px-2 py-1.5 w-full text-left text-[13px] rounded transition-colors ${
+                  selectedCompany?._id === company._id
+                    ? "bg-cyan-600/15 text-cyan-400"
+                    : "text-gray-400 hover:bg-gray-700/30 hover:text-gray-200"
+                }`}
+              >
+                <ChevronRight
+                  size={12}
+                  className={`transition-transform flex-shrink-0 ${
+                    selectedCompany?._id === company._id ? "rotate-90" : ""
+                  }`}
+                />
+                <span className="truncate">{company.name}</span>
+              </button>
+            ))}
+            {companies.length === 0 && (
+              <p className="text-xs text-gray-600 px-2 py-3 text-center">No companies found</p>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Device Detail Dialog */}
+      {/* ── Main Content ── */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Page Header */}
+        <div className="px-6 pt-5 pb-2">
+          <h1 className="text-2xl font-bold text-white">Network</h1>
+          {selectedCompany && (
+            <p className="text-sm text-gray-400 mt-0.5">{selectedCompany.name}</p>
+          )}
+        </div>
+
+        {!selectedCompany ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <Monitor className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-400 mb-2">Select a Company</h3>
+              <p className="text-gray-500 text-sm">Choose a company from the tree view to see its network devices</p>
+            </div>
+          </div>
+        ) : loadingDevices ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="w-12 h-12 border-4 border-gray-700 border-t-cyan-400 rounded-full animate-spin" />
+          </div>
+        ) : (
+          <>
+            {/* Action Bar */}
+            <div className="px-6 py-2 flex items-center gap-3 border-b border-gray-700/50">
+              {/* Active / Deleted toggle */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-700 text-sm font-medium h-9 px-4">
+                    {showDeleted ? "DELETED DEVICES" : "ACTIVE DEVICES"} <ChevronDown className="ml-2 h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="bg-[#2a2d35] border-gray-600 text-gray-200">
+                  <DropdownMenuItem onClick={() => { setShowDeleted(false); setSelectedIds(new Set()); }} className="hover:bg-gray-700 cursor-pointer">
+                    Active Devices ({activeDevices.length})
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => { setShowDeleted(true); setSelectedIds(new Set()); }} className="hover:bg-gray-700 cursor-pointer">
+                    Deleted Devices ({deletedDevices.length})
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {showDeleted && selectedIds.size > 0 && (
+                <>
+                  <Button
+                    onClick={async () => {
+                      if (!window.confirm(`Restore ${selectedIds.size} device(s)?`)) return;
+                      for (const id of selectedIds) {
+                        try { await axios.put(`/api/v1/os-audit/network/devices/${id}/restore`, {}, { withCredentials: true }); } catch (e) {}
+                      }
+                      setSelectedIds(new Set());
+                      if (selectedCompany) fetchDevices(selectedCompany.name);
+                    }}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm h-9 px-4"
+                  >
+                    RESTORE
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      if (!window.confirm(`Permanently delete ${selectedIds.size} device(s)? This cannot be undone.`)) return;
+                      for (const id of selectedIds) {
+                        try { await axios.delete(`/api/v1/os-audit/network/devices/${id}`, { withCredentials: true }); } catch (e) {}
+                      }
+                      setSelectedIds(new Set());
+                      if (selectedCompany) fetchDevices(selectedCompany.name);
+                    }}
+                    className="bg-red-600 hover:bg-red-700 text-white text-sm h-9 px-4"
+                  >
+                    DELETE PERMANENTLY
+                  </Button>
+                </>
+              )}
+
+              {!showDeleted && selectedIds.size > 0 && (
+                <Button
+                  onClick={handleBulkDelete}
+                  className="bg-red-600 hover:bg-red-700 text-white text-sm h-9 px-4"
+                >
+                  DELETE
+                </Button>
+              )}
+            </div>
+
+            {/* Filter Bar */}
+            <div className="px-6 py-3 flex items-center gap-3 flex-wrap border-b border-gray-700/50">
+              <div className="relative">
+                <Input
+                  placeholder="Name"
+                  value={nameFilter}
+                  onChange={(e) => { setNameFilter(e.target.value); setCurrentPage(1); }}
+                  className="h-8 w-40 bg-[#2a2d35] border-gray-600 text-gray-300 text-xs placeholder:text-gray-500 pr-7"
+                />
+                <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500" size={13} />
+              </div>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-700 text-xs h-8 px-3">
+                    Entity type{entityTypeFilter !== "All" ? `: ${entityTypeFilter}` : ""} <ChevronDown className="ml-1.5 h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="bg-[#2a2d35] border-gray-600 text-gray-200">
+                  {["All", "Physical machine", "Virtual machine"].map((t) => (
+                    <DropdownMenuItem key={t} onClick={() => { setEntityTypeFilter(t); setCurrentPage(1); }} className="hover:bg-gray-700 cursor-pointer text-xs">
+                      {t}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <div className="relative">
+                <Input
+                  placeholder="IP"
+                  value={ipFilter}
+                  onChange={(e) => { setIpFilter(e.target.value); setCurrentPage(1); }}
+                  className="h-8 w-36 bg-[#2a2d35] border-gray-600 text-gray-300 text-xs placeholder:text-gray-500 pr-7"
+                />
+                <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500" size={13} />
+              </div>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-700 text-xs h-8 px-3">
+                    Management status{statusFilter !== "All" ? `: ${statusFilter}` : ""} <ChevronDown className="ml-1.5 h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="bg-[#2a2d35] border-gray-600 text-gray-200">
+                  {["All", "Managed", "Unmanaged"].map((s) => (
+                    <DropdownMenuItem key={s} onClick={() => { setStatusFilter(s); setCurrentPage(1); }} className="hover:bg-gray-700 cursor-pointer text-xs">
+                      {s}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {(nameFilter || ipFilter || statusFilter !== "All" || entityTypeFilter !== "All") && (
+                <button onClick={resetFilters} className="text-cyan-400 hover:text-cyan-300 text-xs ml-1">
+                  Reset filters
+                </button>
+              )}
+            </div>
+
+            {/* Table */}
+            <div className="flex-1 overflow-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-[#1e2128] border-b border-gray-700/60 text-gray-400 text-xs">
+                    <th className="w-10 px-3 py-2.5 text-center">
+                      <Checkbox
+                        checked={allSelected}
+                        onCheckedChange={toggleSelectAll}
+                        className="border-gray-500 data-[state=checked]:bg-cyan-600"
+                      />
+                    </th>
+                    <th className="px-3 py-2.5 text-left font-medium">Name</th>
+                    <th className="px-3 py-2.5 text-left font-medium">Company</th>
+                    <th className="px-3 py-2.5 text-left font-medium">IP</th>
+                    <th className="px-3 py-2.5 text-left font-medium">Last seen</th>
+                    <th className="px-3 py-2.5 text-left font-medium">Entity type</th>
+                    <th className="px-3 py-2.5 text-left font-medium">Management status</th>
+                    <th className="px-3 py-2.5 text-left font-medium">Security issues</th>
+                    <th className="w-10 px-3 py-2.5"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedDevices.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="text-center py-16 text-gray-500">
+                        {showDeleted ? "No deleted devices" : "No devices found"}
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedDevices.map((device) => {
+                      const isManaged = device.agentStatus === "active";
+                      const entityType = device.osType === "windows" ? "Physical machine" : "Virtual machine";
+                      const securityIssues = getSecurityIssues(device);
+
+                      return (
+                        <tr
+                          key={device._id}
+                          className={`border-b border-gray-800/50 hover:bg-[#252830] transition-colors ${
+                            selectedIds.has(device._id) ? "bg-cyan-900/10" : ""
+                          }`}
+                        >
+                          <td className="px-3 py-2.5 text-center">
+                            <Checkbox
+                              checked={selectedIds.has(device._id)}
+                              onCheckedChange={() => toggleSelect(device._id)}
+                              className="border-gray-500 data-[state=checked]:bg-cyan-600"
+                            />
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <button
+                              onClick={() => handleViewDevice(device)}
+                              className="text-cyan-400 hover:text-cyan-300 hover:underline text-left font-medium"
+                            >
+                              {device.machineName}
+                            </button>
+                          </td>
+                          <td className="px-3 py-2.5 text-gray-300">
+                            {device.companyName || selectedCompany?.name || "-"}
+                          </td>
+                          <td className="px-3 py-2.5 text-gray-300 font-mono text-xs">
+                            {device.ipAddress}
+                          </td>
+                          <td className="px-3 py-2.5 text-gray-400 text-xs">
+                            {formatLastSeen(device.lastAuditDate)}
+                          </td>
+                          <td className="px-3 py-2.5 text-gray-300">{entityType}</td>
+                          <td className="px-3 py-2.5">
+                            <span className={isManaged ? "text-gray-300" : "text-yellow-400"}>
+                              {isManaged ? "Managed" : "Unmanaged"}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <span
+                              className={
+                                securityIssues === "With issues"
+                                  ? "text-red-400"
+                                  : securityIssues === "Without issues"
+                                  ? "text-emerald-400"
+                                  : "text-gray-500"
+                              }
+                            >
+                              {securityIssues}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2.5 text-center">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button className="p-1 text-gray-500 hover:text-gray-300 rounded hover:bg-gray-700/50">
+                                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                    <circle cx="8" cy="3" r="1.5" />
+                                    <circle cx="8" cy="8" r="1.5" />
+                                    <circle cx="8" cy="13" r="1.5" />
+                                  </svg>
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent className="bg-[#2a2d35] border-gray-600 text-gray-200">
+                                <DropdownMenuItem onClick={() => handleViewDevice(device)} className="hover:bg-gray-700 cursor-pointer text-xs">
+                                  <Eye size={13} className="mr-2" /> View Details
+                                </DropdownMenuItem>
+                                {showDeleted ? (
+                                  <>
+                                    <DropdownMenuItem onClick={() => handleRestore(device._id)} className="hover:bg-gray-700 cursor-pointer text-xs text-emerald-400">
+                                      <RotateCcw size={13} className="mr-2" /> Restore
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handlePermanentDelete(device._id)} className="hover:bg-gray-700 cursor-pointer text-xs text-red-400">
+                                      <Trash2 size={13} className="mr-2" /> Delete Permanently
+                                    </DropdownMenuItem>
+                                  </>
+                                ) : (
+                                  <DropdownMenuItem onClick={() => handleSoftDelete(device._id)} className="hover:bg-gray-700 cursor-pointer text-xs text-red-400">
+                                    <Trash2 size={13} className="mr-2" /> Remove Device
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="px-6 py-3 border-t border-gray-700/50 flex items-center justify-between text-xs text-gray-400">
+              <span>
+                {startItem}-{endItem} of {totalItems} items
+              </span>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span>Items per page:</span>
+                  <select
+                    value={itemsPerPage}
+                    onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                    className="bg-[#2a2d35] border border-gray-600 rounded px-2 py-1 text-gray-300 text-xs"
+                  >
+                    {[25, 50, 100].map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    className="px-1.5 py-1 rounded hover:bg-gray-700 disabled:opacity-30"
+                  >
+                    «
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-1.5 py-1 rounded hover:bg-gray-700 disabled:opacity-30"
+                  >
+                    ‹
+                  </button>
+                  <input
+                    type="number"
+                    min={1}
+                    max={totalPages}
+                    value={currentPage}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      if (v >= 1 && v <= totalPages) setCurrentPage(v);
+                    }}
+                    className="w-10 text-center bg-[#2a2d35] border border-gray-600 rounded py-1 text-gray-300 text-xs"
+                  />
+                  <span>of {totalPages} pages</span>
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-1.5 py-1 rounded hover:bg-gray-700 disabled:opacity-30"
+                  >
+                    ›
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                    className="px-1.5 py-1 rounded hover:bg-gray-700 disabled:opacity-30"
+                  >
+                    »
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ── Device Detail Dialog ── */}
       <Dialog open={showDeviceDetail} onOpenChange={(open) => { setShowDeviceDetail(open); if (!open) setDeviceReports([]); }}>
-        <DialogContent className="bg-gray-900 border-gray-700 text-coolWhite max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="bg-[#1e2128] border-gray-700 text-gray-200 max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-2">
               <Monitor className="text-cyan-400" size={24} />
@@ -473,110 +742,85 @@ const NetworkPage: React.FC = () => {
           </DialogHeader>
           {selectedDevice && (
             <div className="space-y-4 mt-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gray-800/50 rounded-lg p-3">
-                  <span className="text-xs text-gray-500">Machine Name</span>
-                  <p className="text-sm font-medium text-white">{selectedDevice.machineName}</p>
-                </div>
-                <div className="bg-gray-800/50 rounded-lg p-3">
-                  <span className="text-xs text-gray-500">Hostname</span>
-                  <p className="text-sm font-medium text-white">{selectedDevice.machineHostname || 'N/A'}</p>
-                </div>
-                <div className="bg-gray-800/50 rounded-lg p-3">
-                  <span className="text-xs text-gray-500">IP Address</span>
-                  <p className="text-sm font-medium text-white font-mono">{selectedDevice.ipAddress}</p>
-                </div>
-                <div className="bg-gray-800/50 rounded-lg p-3">
-                  <span className="text-xs text-gray-500">Status</span>
-                  <p className={`text-sm font-medium inline-flex items-center gap-1 ${
-                    selectedDevice.agentStatus === 'active' ? 'text-emerald-400' :
-                    selectedDevice.agentStatus === 'inactive' ? 'text-red-400' : 'text-yellow-400'
-                  }`}>
-                    {getStatusIcon(selectedDevice.agentStatus)} {selectedDevice.agentStatus}
-                  </p>
-                </div>
-                <div className="bg-gray-800/50 rounded-lg p-3">
-                  <span className="text-xs text-gray-500">Operating System</span>
-                  <p className="text-sm font-medium text-white">{selectedDevice.operatingSystem || 'Unknown'}</p>
-                </div>
-                <div className="bg-gray-800/50 rounded-lg p-3">
-                  <span className="text-xs text-gray-500">OS Type</span>
-                  <p className="text-sm font-medium text-white capitalize">{selectedDevice.osType || 'linux'}</p>
-                </div>
-                <div className="bg-gray-800/50 rounded-lg p-3">
-                  <span className="text-xs text-gray-500">Owner</span>
-                  <p className="text-sm font-medium text-white">{selectedDevice.ownerName}</p>
-                </div>
-                <div className="bg-gray-800/50 rounded-lg p-3">
-                  <span className="text-xs text-gray-500">Company</span>
-                  <p className="text-sm font-medium text-white">{selectedDevice.companyName || 'N/A'}</p>
-                </div>
-                <div className="bg-gray-800/50 rounded-lg p-3">
-                  <span className="text-xs text-gray-500">Registration Date</span>
-                  <p className="text-sm font-medium text-white">{new Date(selectedDevice.registrationDate).toLocaleDateString()}</p>
-                </div>
-                <div className="bg-gray-800/50 rounded-lg p-3">
-                  <span className="text-xs text-gray-500">Last Audit</span>
-                  <p className="text-sm font-medium text-white">{selectedDevice.lastAuditDate ? new Date(selectedDevice.lastAuditDate).toLocaleDateString() : 'Never'}</p>
-                </div>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  ["Machine Name", selectedDevice.machineName],
+                  ["Hostname", selectedDevice.machineHostname || "N/A"],
+                  ["IP Address", selectedDevice.ipAddress],
+                  ["Status", selectedDevice.agentStatus],
+                  ["Operating System", selectedDevice.operatingSystem || "Unknown"],
+                  ["OS Type", selectedDevice.osType || "linux"],
+                  ["Owner", selectedDevice.ownerName],
+                  ["Company", selectedDevice.companyName || "N/A"],
+                  ["Registration Date", new Date(selectedDevice.registrationDate).toLocaleDateString()],
+                  ["Last Audit", selectedDevice.lastAuditDate ? new Date(selectedDevice.lastAuditDate).toLocaleDateString() : "Never"],
+                ].map(([label, value]) => (
+                  <div key={label} className="bg-[#2a2d35] rounded-lg p-3">
+                    <span className="text-[11px] text-gray-500 uppercase">{label}</span>
+                    <p className={`text-sm font-medium mt-0.5 ${
+                      label === "Status"
+                        ? value === "active" ? "text-emerald-400" : value === "inactive" ? "text-red-400" : "text-yellow-400"
+                        : "text-white"
+                    }`}>{value}</p>
+                  </div>
+                ))}
               </div>
-              <div className="bg-gray-800/50 rounded-lg p-3">
-                <span className="text-xs text-gray-500">Machine ID</span>
-                <p className="text-sm font-medium text-white font-mono break-all">{selectedDevice.machineId}</p>
+              <div className="bg-[#2a2d35] rounded-lg p-3">
+                <span className="text-[11px] text-gray-500 uppercase">Machine ID</span>
+                <p className="text-sm font-medium text-white font-mono break-all mt-0.5">{selectedDevice.machineId}</p>
               </div>
 
-              {/* Audit Reports Section */}
+              {/* Reports */}
               <div className="border-t border-gray-700 pt-4">
-                <h3 className="text-lg font-semibold flex items-center gap-2 mb-3">
-                  <FileText className="text-amber-400" size={20} />
+                <h3 className="text-base font-semibold flex items-center gap-2 mb-3">
+                  <FileText className="text-amber-400" size={18} />
                   Audit Reports
                 </h3>
                 {loadingReports ? (
                   <div className="flex items-center justify-center py-6">
-                    <div className="w-8 h-8 border-4 border-coolWhite/10 border-t-cyan-400 rounded-full animate-spin"></div>
+                    <div className="w-8 h-8 border-4 border-gray-700 border-t-cyan-400 rounded-full animate-spin" />
                   </div>
                 ) : deviceReports.length === 0 ? (
-                  <div className="text-center py-6 text-gray-500 text-sm">
-                    No audit reports available for this device
-                  </div>
+                  <p className="text-center py-6 text-gray-500 text-sm">No audit reports available</p>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {deviceReports.map((report) => (
-                      <div key={report._id} className="bg-gray-800/60 rounded-lg border border-gray-700 p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                              report.auditScore >= 70 ? 'bg-emerald-500/20' :
-                              report.auditScore >= 40 ? 'bg-amber-500/20' : 'bg-red-500/20'
-                            }`}>
-                              <span className={`text-sm font-bold ${
-                                report.auditScore >= 70 ? 'text-emerald-400' :
-                                report.auditScore >= 40 ? 'text-amber-400' : 'text-red-400'
-                              }`}>{report.auditScore}</span>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-white">
-                                {new Date(report.auditDate).toLocaleDateString()} — {new Date(report.auditDate).toLocaleTimeString()}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                {report.warnings} warnings · {report.suggestions} suggestions
-                              </p>
-                            </div>
-                          </div>
-                          <Button
-                            variant="outline" size="sm"
-                            onClick={() => handleDownloadPdf(report.reportId)}
-                            disabled={downloadingPdf === report.reportId}
-                            className="border-cyan-600 text-cyan-400 hover:bg-cyan-900/30"
+                      <div key={report._id} className="bg-[#2a2d35] rounded-lg border border-gray-700/60 p-3 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm font-bold ${
+                              report.auditScore >= 70
+                                ? "bg-emerald-500/20 text-emerald-400"
+                                : report.auditScore >= 40
+                                ? "bg-amber-500/20 text-amber-400"
+                                : "bg-red-500/20 text-red-400"
+                            }`}
                           >
-                            {downloadingPdf === report.reportId ? (
-                              <div className="w-4 h-4 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin mr-1" />
-                            ) : (
-                              <Download size={14} className="mr-1" />
-                            )}
-                            Download PDF
-                          </Button>
+                            {report.auditScore}
+                          </div>
+                          <div>
+                            <p className="text-sm text-white">
+                              {new Date(report.auditDate).toLocaleDateString()} — {new Date(report.auditDate).toLocaleTimeString()}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {report.warnings} warnings · {report.suggestions} suggestions
+                            </p>
+                          </div>
                         </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDownloadPdf(report.reportId)}
+                          disabled={downloadingPdf === report.reportId}
+                          className="border-cyan-600 text-cyan-400 hover:bg-cyan-900/30 text-xs"
+                        >
+                          {downloadingPdf === report.reportId ? (
+                            <div className="w-3.5 h-3.5 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin mr-1" />
+                          ) : (
+                            <Download size={13} className="mr-1" />
+                          )}
+                          PDF
+                        </Button>
                       </div>
                     ))}
                   </div>
@@ -586,7 +830,7 @@ const NetworkPage: React.FC = () => {
           )}
         </DialogContent>
       </Dialog>
-    </motion.div>
+    </div>
   );
 };
 

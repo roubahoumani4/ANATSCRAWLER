@@ -622,8 +622,20 @@ const CompanyPage: React.FC = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="bg-[#2a2d35] border-gray-600 text-gray-200">
-              <DropdownMenuItem className="hover:bg-gray-700 cursor-pointer">Export to CSV</DropdownMenuItem>
-              <DropdownMenuItem className="hover:bg-gray-700 cursor-pointer">Import Companies</DropdownMenuItem>
+              <DropdownMenuItem className="hover:bg-gray-700 cursor-pointer" onClick={() => {
+                const headers = ["Name","Company Type","Country","Industry","Status","Payment Plan","Product Name","License Key","License Count","Used Seats","Available Seats","Expiry Date","Phone","Email","Address","Website","Contact Person"];
+                const rows = filteredCompanies.map(c => [
+                  c.name, c.companyType, c.country || "", c.industry || "", c.companyStatus, c.paymentPlan, c.productName, c.licenseKey || "", c.licenseCount, c.usedSeats, c.availableSeats, c.expiryDate, c.phone || "", c.email || "", c.address || "", c.website || "", c.contactPerson || ""
+                ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(","));
+                const csv = [headers.join(","), ...rows].join("\n");
+                const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `companies_export_${new Date().toISOString().slice(0,10)}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}>Export to CSV</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
