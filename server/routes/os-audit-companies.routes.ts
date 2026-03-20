@@ -20,7 +20,7 @@ interface AuthenticatedRequest extends Request {
  */
 router.post('/companies', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { name, companyType, country, industry, sector, phone, email, address, website, contactPerson, notes, managedEndpointSecurity, usedSeats, availableSeats, companyStatus, paymentPlan, productName, expiryDate } = req.body;
+    const { name, companyType, country, industry, sector, phone, email, address, website, contactPerson, notes, managedEndpointSecurity, licenseCount, companyStatus, paymentPlan } = req.body;
     const userId = req.user?._id || req.user?.id;
 
     if (!name) {
@@ -38,6 +38,7 @@ router.post('/companies', authenticate, async (req: AuthenticatedRequest, res: R
       });
     }
 
+    const plan = paymentPlan || 'Monthly';
     const company = new Company({
       name: name.trim(),
       companyType: companyType || 'Customer',
@@ -51,12 +52,11 @@ router.post('/companies', authenticate, async (req: AuthenticatedRequest, res: R
       contactPerson: contactPerson?.trim() || '',
       notes: notes?.trim() || '',
       managedEndpointSecurity: managedEndpointSecurity !== undefined ? managedEndpointSecurity : true,
-      usedSeats: usedSeats || 0,
-      availableSeats: availableSeats || 0,
+      licenseCount: licenseCount || 1,
       companyStatus: companyStatus || 'Active',
-      paymentPlan: paymentPlan || 'Monthly',
-      productName: productName || 'Monthly Subscription',
-      expiryDate: expiryDate || 'Never',
+      paymentPlan: plan,
+      productName: plan === 'Yearly' ? 'Yearly Subscription' : 'Monthly Subscription',
+      expiryDate: 'Never',
       owner: userId
     });
 
@@ -102,11 +102,17 @@ router.get('/companies', authenticate, async (req: AuthenticatedRequest, res: Re
         const deviceCount = await OSAuditMachine.countDocuments({ companyName: company.name, owner: userId });
         const activeDevices = await OSAuditMachine.countDocuments({ companyName: company.name, owner: userId, agentStatus: 'active' });
         const packageCount = await InstallationPackage.countDocuments({ company: company._id, owner: userId });
+        const licenses = company.licenseCount || 0;
+        const usedSeats = deviceCount;
+        const availableSeats = Math.max(0, licenses - usedSeats);
         return {
           ...company.toObject(),
           deviceCount,
           activeDevices,
-          packageCount
+          packageCount,
+          totalSeats: licenses,
+          usedSeats,
+          availableSeats
         };
       })
     );
@@ -144,7 +150,7 @@ router.get('/companies/:id', authenticate, async (req: AuthenticatedRequest, res
 router.put('/companies/:id', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?._id || req.user?.id;
-    const { name, companyType, country, industry, sector, phone, email, address, website, contactPerson, notes, managedEndpointSecurity, usedSeats, availableSeats, companyStatus, paymentPlan, productName, expiryDate } = req.body;
+    const { name, companyType, country, industry, sector, phone, email, address, website, contactPerson, notes, managedEndpointSecurity, licenseCount, companyStatus, paymentPlan } = req.body;
 
     const updateData: any = { updatedAt: new Date() };
     if (name !== undefined) updateData.name = name;
@@ -159,16 +165,13 @@ router.put('/companies/:id', authenticate, async (req: AuthenticatedRequest, res
     if (contactPerson !== undefined) updateData.contactPerson = contactPerson;
     if (notes !== undefined) updateData.notes = notes;
     if (managedEndpointSecurity !== undefined) updateData.managedEndpointSecurity = managedEndpointSecurity;
-    if (usedSeats !== undefined) updateData.usedSeats = usedSeats;
-    if (availableSeats !== undefined) updateData.availableSeats = availableSeats;
+    if (licenseCount !== undefined) updateData.licenseCount = licenseCount;
     if (companyStatus !== undefined) updateData.companyStatus = companyStatus;
-    if (paymentPlan !== undefined) updateData.paymentPlan = paymentPlan;
-    if (productName !== undefined) updateData.productName = productName;
-    if (expiryDate !== undefined) updateData.expiryDate = expiryDate;
-    // Recalculate totalSeats
-    if (usedSeats !== undefined || availableSeats !== undefined) {
-      updateData.totalSeats = (usedSeats || 0) + (availableSeats || 0);
+    if (paymentPlan !== undefined) {
+      updateData.paymentPlan = paymentPlan;
+      updateData.productName = paymentPlan === 'Yearly' ? 'Yearly Subscription' : 'Monthly Subscription';
     }
+    updateData.expiryDate = 'Never';
 
     const company = await Company.findOneAndUpdate(
       { _id: req.params.id, owner: userId },

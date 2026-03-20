@@ -13,7 +13,11 @@ import {
   RotateCcw,
   Upload,
   AlertTriangle,
-  MoreHorizontal
+  MoreHorizontal,
+  ArrowRight,
+  ArrowLeft,
+  Key,
+  CreditCard
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +44,7 @@ interface Company {
   contactPerson?: string;
   notes?: string;
   managedEndpointSecurity: boolean;
+  licenseCount: number;
   totalSeats: number;
   usedSeats: number;
   availableSeats: number;
@@ -79,7 +84,7 @@ const industries = [
   "Insurance", "Banking", "Food & Beverage", "Non-profit", "Other"
 ];
 
-const productStatuses = ["All", "Active", "Inactive", "Suspended"];
+const productStatuses = ["All", "Active", "Inactive"];
 
 interface EditFormData {
   name: string;
@@ -88,7 +93,9 @@ interface EditFormData {
   industry: string;
   phone: string;
   address: string;
-  managedEndpointSecurity: boolean;
+  companyStatus: string;
+  licenseCount: number;
+  paymentPlan: string;
 }
 
 const CompanyPage: React.FC = () => {
@@ -100,11 +107,13 @@ const CompanyPage: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [formStep, setFormStep] = useState<1 | 2>(1);
   const [itemsPerPage, setItemsPerPage] = useState(100);
   const [currentPage, setCurrentPage] = useState(1);
   const [form, setForm] = useState<EditFormData>({
     name: "", companyType: "Customer", country: "", industry: "",
-    phone: "", address: "", managedEndpointSecurity: true
+    phone: "", address: "", companyStatus: "Active",
+    licenseCount: 1, paymentPlan: "Monthly"
   });
 
   useEffect(() => { fetchCompanies(); }, []);
@@ -125,22 +134,31 @@ const CompanyPage: React.FC = () => {
   };
 
   const resetForm = () => {
-    setForm({ name: "", companyType: "Customer", country: "", industry: "", phone: "", address: "", managedEndpointSecurity: true });
+    setForm({
+      name: "", companyType: "Customer", country: "", industry: "",
+      phone: "", address: "", companyStatus: "Active",
+      licenseCount: 1, paymentPlan: "Monthly"
+    });
     setEditingCompany(null);
+    setFormStep(1);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     try {
+      const payload = {
+        ...form,
+        productName: form.paymentPlan === "Yearly" ? "Yearly Subscription" : "Monthly Subscription",
+        expiryDate: "Never"
+      };
       if (editingCompany) {
-        const res = await axios.put(`/api/v1/os-audit/companies/${editingCompany._id}`, form, { withCredentials: true });
+        const res = await axios.put(`/api/v1/os-audit/companies/${editingCompany._id}`, payload, { withCredentials: true });
         if (res.data.success) {
           setShowEditDialog(false);
           resetForm();
           fetchCompanies();
         }
       } else {
-        const res = await axios.post("/api/v1/os-audit/companies", form, { withCredentials: true });
+        const res = await axios.post("/api/v1/os-audit/companies", payload, { withCredentials: true });
         if (res.data.success) {
           setShowEditDialog(false);
           resetForm();
@@ -161,8 +179,11 @@ const CompanyPage: React.FC = () => {
       industry: company.industry || "",
       phone: company.phone || "",
       address: company.address || "",
-      managedEndpointSecurity: company.managedEndpointSecurity !== false
+      companyStatus: company.companyStatus || "Active",
+      licenseCount: company.licenseCount || company.totalSeats || 1,
+      paymentPlan: company.paymentPlan || "Monthly"
     });
+    setFormStep(1);
     setShowEditDialog(true);
   };
 
@@ -216,7 +237,6 @@ const CompanyPage: React.FC = () => {
     setCurrentPage(1);
   };
 
-  // Filter companies
   const filteredCompanies = useMemo(() => {
     return companies.filter(c => {
       const matchesSearch = !searchQuery || c.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -226,7 +246,6 @@ const CompanyPage: React.FC = () => {
     });
   }, [companies, searchQuery, companyTypeFilter, productStatusFilter]);
 
-  // Pagination
   const totalPages = Math.max(1, Math.ceil(filteredCompanies.length / itemsPerPage));
   const paginatedCompanies = filteredCompanies.slice(
     (currentPage - 1) * itemsPerPage,
@@ -236,10 +255,12 @@ const CompanyPage: React.FC = () => {
   useEffect(() => { setCurrentPage(1); }, [searchQuery, companyTypeFilter, productStatusFilter, itemsPerPage]);
 
   const getUsageBreakdown = (c: Company) => {
-    const used = c.usedSeats || c.deviceCount || 0;
-    const available = c.availableSeats || 0;
+    const used = c.usedSeats ?? c.deviceCount ?? 0;
+    const available = c.availableSeats ?? 0;
     return `${used} used reserved seats, ${available} available reserved seats`;
   };
+
+  const isStep1Valid = form.name.trim() !== "" && form.companyType !== "" && form.country !== "" && form.industry !== "";
 
   if (loading) {
     return (
@@ -254,7 +275,7 @@ const CompanyPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#1a1d23] text-gray-200">
-      {/* Edit Company Full-Screen Dialog */}
+      {/* Add/Edit Company Full-Screen Dialog */}
       {showEditDialog && (
         <div className="fixed inset-0 z-50 bg-[#1a1d23] overflow-y-auto">
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
@@ -269,141 +290,313 @@ const CompanyPage: React.FC = () => {
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="max-w-2xl mx-auto px-6 py-6">
-            {/* BASIC DETAILS */}
-            <div className="mb-8">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Basic Details</h3>
-              <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <label className="w-40 text-sm text-gray-300 shrink-0">Company name*:</label>
-                  <Input
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    required
-                    className="flex-1 bg-[#2a2d35] border-gray-600 text-white"
-                  />
-                </div>
-                <div className="flex items-center gap-4">
-                  <label className="w-40 text-sm text-gray-300 shrink-0">Company type*:</label>
-                  <select
-                    value={form.companyType}
-                    onChange={(e) => setForm({ ...form, companyType: e.target.value })}
-                    required
-                    className="flex-1 rounded-md bg-[#2a2d35] border border-gray-600 text-white px-3 py-2 text-sm"
-                  >
-                    {companyTypes.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-                <div className="flex items-center gap-4">
-                  <label className="w-40 text-sm text-gray-300 shrink-0">Country*:</label>
-                  <select
-                    value={form.country}
-                    onChange={(e) => setForm({ ...form, country: e.target.value })}
-                    required
-                    className="flex-1 rounded-md bg-[#2a2d35] border border-gray-600 text-white px-3 py-2 text-sm"
-                  >
-                    <option value="">Select country</option>
-                    {countries.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div className="flex items-center gap-4">
-                  <label className="w-40 text-sm text-gray-300 shrink-0">Industry*:</label>
-                  <div className="flex-1">
-                    <select
-                      value={form.industry}
-                      onChange={(e) => setForm({ ...form, industry: e.target.value })}
-                      required
-                      className={`w-full rounded-md bg-[#2a2d35] border text-sm px-3 py-2 ${
-                        !form.industry ? "border-yellow-500 text-gray-400" : "border-gray-600 text-white"
-                      }`}
-                    >
-                      <option value="">Select industry</option>
-                      {industries.map(i => <option key={i} value={i}>{i}</option>)}
-                    </select>
-                    {!form.industry && (
-                      <div className="flex items-center gap-1 mt-1">
-                        <AlertTriangle size={12} className="text-yellow-500" />
-                        <span className="text-xs text-red-400">Required field</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+          {/* Step indicator */}
+          <div className="max-w-2xl mx-auto px-6 pt-6">
+            <div className="flex items-center gap-4 mb-8">
+              <button
+                onClick={() => setFormStep(1)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  formStep === 1
+                    ? "bg-blue-600/20 text-blue-400 border border-blue-500/40"
+                    : "text-gray-400 hover:text-gray-200"
+                }`}
+              >
+                <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">1</span>
+                Company Details
+              </button>
+              <ChevronRight size={16} className="text-gray-600" />
+              <button
+                onClick={() => { if (isStep1Valid) setFormStep(2); }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  formStep === 2
+                    ? "bg-blue-600/20 text-blue-400 border border-blue-500/40"
+                    : "text-gray-400 hover:text-gray-200"
+                } ${!isStep1Valid ? "opacity-50 cursor-not-allowed" : ""}`}
+              >
+                <span className={`w-6 h-6 rounded-full text-white text-xs flex items-center justify-center font-bold ${formStep === 2 ? "bg-blue-600" : "bg-gray-600"}`}>2</span>
+                Subscription
+              </button>
             </div>
+          </div>
 
-            {/* MANAGEMENT PERMISSIONS */}
-            <div className="mb-8">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Management Permissions</h3>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <Checkbox
-                  checked={form.managedEndpointSecurity}
-                  onCheckedChange={(checked) => setForm({ ...form, managedEndpointSecurity: checked === true })}
-                  className="border-gray-500 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                />
-                <span className="text-sm text-gray-300">The company manages endpoint security</span>
-              </label>
-            </div>
-
-            {/* ADDITIONAL DETAILS */}
-            <div className="mb-8">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Additional Details</h3>
-              <div className="space-y-4">
-                <div className="flex items-start gap-4">
-                  <label className="w-40 text-sm text-gray-300 shrink-0 mt-2">Registered address:</label>
-                  <textarea
-                    value={form.address}
-                    onChange={(e) => setForm({ ...form, address: e.target.value })}
-                    className="flex-1 rounded-md bg-[#2a2d35] border border-gray-600 text-white px-3 py-2 text-sm min-h-[80px] resize-y"
-                  />
-                </div>
-                <div className="flex items-center gap-4">
-                  <label className="w-40 text-sm text-gray-300 shrink-0">Phone number:</label>
-                  <Input
-                    value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                    className="flex-1 bg-[#2a2d35] border-gray-600 text-white"
-                    placeholder=""
-                  />
-                </div>
-                <div className="flex items-start gap-4">
-                  <label className="w-40 text-sm text-gray-300 shrink-0 mt-2">Logo in Control Center:</label>
-                  <div className="flex-1">
-                    <div className="w-[200px] h-[60px] bg-[#2a2d35] border border-gray-600 rounded flex items-center justify-center mb-1">
-                      <span className="text-xs text-gray-500">No logo uploaded</span>
+          <div className="max-w-2xl mx-auto px-6 pb-6">
+            {/* STEP 1: Company Details */}
+            {formStep === 1 && (
+              <div>
+                {/* BASIC DETAILS */}
+                <div className="mb-8">
+                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Basic Details</h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-4">
+                      <label className="w-40 text-sm text-gray-300 shrink-0">Company name*:</label>
+                      <Input
+                        value={form.name}
+                        onChange={(e) => setForm({ ...form, name: e.target.value })}
+                        required
+                        className="flex-1 bg-[#2a2d35] border-gray-600 text-white"
+                      />
                     </div>
-                    <p className="text-xs text-gray-500 mb-1">200px x 30px size, png or jpg format</p>
-                    <button type="button" className="text-xs text-blue-400 hover:text-blue-300 underline">
-                      Upload logo
-                    </button>
+                    <div className="flex items-center gap-4">
+                      <label className="w-40 text-sm text-gray-300 shrink-0">Company type*:</label>
+                      <select
+                        value={form.companyType}
+                        onChange={(e) => setForm({ ...form, companyType: e.target.value })}
+                        required
+                        className="flex-1 rounded-md bg-[#2a2d35] border border-gray-600 text-white px-3 py-2 text-sm"
+                      >
+                        {companyTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <label className="w-40 text-sm text-gray-300 shrink-0">Country*:</label>
+                      <select
+                        value={form.country}
+                        onChange={(e) => setForm({ ...form, country: e.target.value })}
+                        required
+                        className="flex-1 rounded-md bg-[#2a2d35] border border-gray-600 text-white px-3 py-2 text-sm"
+                      >
+                        <option value="">Select country</option>
+                        {countries.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <label className="w-40 text-sm text-gray-300 shrink-0">Industry*:</label>
+                      <div className="flex-1">
+                        <select
+                          value={form.industry}
+                          onChange={(e) => setForm({ ...form, industry: e.target.value })}
+                          required
+                          className={`w-full rounded-md bg-[#2a2d35] border text-sm px-3 py-2 ${
+                            !form.industry ? "border-yellow-500 text-gray-400" : "border-gray-600 text-white"
+                          }`}
+                        >
+                          <option value="">Select industry</option>
+                          {industries.map(i => <option key={i} value={i}>{i}</option>)}
+                        </select>
+                        {!form.industry && (
+                          <div className="flex items-center gap-1 mt-1">
+                            <AlertTriangle size={12} className="text-yellow-500" />
+                            <span className="text-xs text-red-400">Required field</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* COMPANY STATUS */}
+                <div className="mb-8">
+                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Company Status</h3>
+                  <div className="flex items-center gap-4">
+                    <label className="w-40 text-sm text-gray-300 shrink-0">Status:</label>
+                    <div className="flex-1 flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setForm({ ...form, companyStatus: form.companyStatus === "Active" ? "Inactive" : "Active" })}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          form.companyStatus === "Active" ? "bg-emerald-600" : "bg-gray-600"
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            form.companyStatus === "Active" ? "translate-x-6" : "translate-x-1"
+                          }`}
+                        />
+                      </button>
+                      <span className={`text-sm font-medium ${form.companyStatus === "Active" ? "text-emerald-400" : "text-gray-400"}`}>
+                        {form.companyStatus}
+                      </span>
+                    </div>
+                  </div>
+                  {form.companyStatus === "Inactive" && (
+                    <p className="text-xs text-yellow-400 mt-2 ml-44">Inactive companies cannot be used to download agents.</p>
+                  )}
+                </div>
+
+                {/* ADDITIONAL DETAILS */}
+                <div className="mb-8">
+                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Additional Details</h3>
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-4">
+                      <label className="w-40 text-sm text-gray-300 shrink-0 mt-2">Registered address:</label>
+                      <textarea
+                        value={form.address}
+                        onChange={(e) => setForm({ ...form, address: e.target.value })}
+                        className="flex-1 rounded-md bg-[#2a2d35] border border-gray-600 text-white px-3 py-2 text-sm min-h-[80px] resize-y"
+                      />
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <label className="w-40 text-sm text-gray-300 shrink-0">Phone number:</label>
+                      <Input
+                        value={form.phone}
+                        onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                        className="flex-1 bg-[#2a2d35] border-gray-600 text-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 1 Actions */}
+                <div className="flex items-center justify-between pt-6 border-t border-gray-700">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => { setShowEditDialog(false); resetForm(); }}
+                    className="border-gray-500 text-gray-300 hover:bg-gray-700 px-6"
+                  >
+                    CANCEL
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => setFormStep(2)}
+                    disabled={!isStep1Valid}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6"
+                  >
+                    NEXT <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 2: Subscription */}
+            {formStep === 2 && (
+              <div>
+                {/* LICENSE */}
+                <div className="mb-8">
+                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <Key size={14} className="text-blue-400" />
+                    License
+                  </h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-4">
+                      <label className="w-48 text-sm text-gray-300 shrink-0">Number of licenses*:</label>
+                      <div className="flex-1">
+                        <Input
+                          type="number"
+                          min={1}
+                          value={form.licenseCount}
+                          onChange={(e) => setForm({ ...form, licenseCount: Math.max(1, parseInt(e.target.value) || 1) })}
+                          className="w-32 bg-[#2a2d35] border-gray-600 text-white"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Maximum number of agents that can be installed for this company.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <label className="w-48 text-sm text-gray-300 shrink-0">Total seats:</label>
+                      <span className="text-sm text-white font-medium">{form.licenseCount}</span>
+                      <span className="text-xs text-gray-500">(equals license count)</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* PAYMENT PLAN */}
+                <div className="mb-8">
+                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <CreditCard size={14} className="text-blue-400" />
+                    Payment Plan
+                  </h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-4">
+                      <label className="w-48 text-sm text-gray-300 shrink-0">Plan*:</label>
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setForm({ ...form, paymentPlan: "Monthly" })}
+                          className={`px-5 py-2.5 rounded-lg text-sm font-medium border transition-colors ${
+                            form.paymentPlan === "Monthly"
+                              ? "bg-blue-600/20 border-blue-500 text-blue-400"
+                              : "bg-[#2a2d35] border-gray-600 text-gray-400 hover:border-gray-500"
+                          }`}
+                        >
+                          Monthly
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setForm({ ...form, paymentPlan: "Yearly" })}
+                          className={`px-5 py-2.5 rounded-lg text-sm font-medium border transition-colors ${
+                            form.paymentPlan === "Yearly"
+                              ? "bg-blue-600/20 border-blue-500 text-blue-400"
+                              : "bg-[#2a2d35] border-gray-600 text-gray-400 hover:border-gray-500"
+                          }`}
+                        >
+                          Yearly
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <label className="w-48 text-sm text-gray-300 shrink-0">Product name:</label>
+                      <span className="text-sm text-white">
+                        {form.paymentPlan === "Yearly" ? "Yearly Subscription" : "Monthly Subscription"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <label className="w-48 text-sm text-gray-300 shrink-0">License key:</label>
+                      <span className="text-sm text-gray-400 font-mono">
+                        {editingCompany?.licenseKey || "Auto-generated on save"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <label className="w-48 text-sm text-gray-300 shrink-0">Expiry date:</label>
+                      <span className="text-sm text-white">Never</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Summary preview */}
+                <div className="mb-8 bg-[#22252d] border border-gray-700 rounded-lg p-4">
+                  <h4 className="text-xs text-gray-400 uppercase tracking-wider mb-3">Summary</h4>
+                  <div className="grid grid-cols-2 gap-y-2 text-sm">
+                    <span className="text-gray-400">Company:</span>
+                    <span className="text-white">{form.name}</span>
+                    <span className="text-gray-400">Status:</span>
+                    <span className={form.companyStatus === "Active" ? "text-emerald-400" : "text-yellow-400"}>{form.companyStatus}</span>
+                    <span className="text-gray-400">Licenses:</span>
+                    <span className="text-white">{form.licenseCount}</span>
+                    <span className="text-gray-400">Payment plan:</span>
+                    <span className="text-white">{form.paymentPlan}</span>
+                    <span className="text-gray-400">Product:</span>
+                    <span className="text-white">{form.paymentPlan === "Yearly" ? "Yearly Subscription" : "Monthly Subscription"}</span>
+                  </div>
+                </div>
+
+                {/* Step 2 Actions */}
+                <div className="flex items-center justify-between pt-6 border-t border-gray-700">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setFormStep(1)}
+                    className="border-gray-500 text-gray-300 hover:bg-gray-700 px-6"
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" /> BACK
+                  </Button>
+                  <div className="flex gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => { setShowEditDialog(false); resetForm(); }}
+                      className="border-gray-500 text-gray-300 hover:bg-gray-700 px-6"
+                    >
+                      CANCEL
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={handleSubmit}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-6"
+                    >
+                      {editingCompany ? "UPDATE" : "SAVE"}
+                    </Button>
                   </div>
                 </div>
               </div>
-            </div>
-
-            {/* Bottom Actions */}
-            <div className="flex items-center justify-between pt-6 border-t border-gray-700">
-              <Button
-                type="submit"
-                className="bg-gray-600 hover:bg-gray-500 text-white px-6"
-              >
-                SAVE
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => { setShowEditDialog(false); resetForm(); }}
-                className="border-gray-500 text-gray-300 hover:bg-gray-700 px-6"
-              >
-                CANCEL
-              </Button>
-            </div>
-          </form>
+            )}
+          </div>
         </div>
       )}
 
       {/* Main Content */}
       <div className="p-6">
-        {/* Page Title */}
         <h1 className="text-2xl font-semibold text-white mb-6">Companies</h1>
 
         {/* Action Buttons Row */}
@@ -436,7 +629,6 @@ const CompanyPage: React.FC = () => {
 
           <div className="flex-1" />
 
-          {/* Right-side icons placeholder */}
           <button className="p-2 text-gray-400 hover:text-white transition-colors">
             <Filter size={18} />
           </button>
@@ -520,7 +712,6 @@ const CompanyPage: React.FC = () => {
                   <th className="text-left p-3 font-medium text-gray-300 whitespace-nowrap">Total seats</th>
                   <th className="text-left p-3 font-medium text-gray-300 whitespace-nowrap">Company type</th>
                   <th className="text-left p-3 font-medium text-gray-300 whitespace-nowrap">Company status</th>
-                  <th className="text-left p-3 font-medium text-gray-300 whitespace-nowrap">Managed</th>
                   <th className="text-left p-3 font-medium text-gray-300 whitespace-nowrap">Payment plan</th>
                   <th className="text-left p-3 font-medium text-gray-300 whitespace-nowrap">Product name</th>
                   <th className="text-left p-3 font-medium text-gray-300 whitespace-nowrap">License key</th>
@@ -530,7 +721,7 @@ const CompanyPage: React.FC = () => {
               <tbody>
                 {paginatedCompanies.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="p-12 text-center text-gray-500">
+                    <td colSpan={10} className="p-12 text-center text-gray-500">
                       No companies found. Click "ADD COMPANY" to create one.
                     </td>
                   </tr>
@@ -556,10 +747,13 @@ const CompanyPage: React.FC = () => {
                         </button>
                       </td>
                       <td className="p-3 text-gray-300 text-sm whitespace-nowrap">{getUsageBreakdown(company)}</td>
-                      <td className="p-3 text-gray-300 text-sm">{company.totalSeats || (company.usedSeats || 0) + (company.availableSeats || 0)}</td>
+                      <td className="p-3 text-gray-300 text-sm">{company.totalSeats || company.licenseCount || 0}</td>
                       <td className="p-3 text-gray-300 text-sm">{company.companyType || "Customer"}</td>
-                      <td className="p-3 text-gray-300 text-sm">{company.companyStatus || "Active"}</td>
-                      <td className="p-3 text-gray-300 text-sm">{company.managedEndpointSecurity !== false ? "Yes" : "No"}</td>
+                      <td className="p-3 text-sm">
+                        <span className={company.companyStatus === "Active" ? "text-emerald-400" : "text-yellow-400"}>
+                          {company.companyStatus || "Active"}
+                        </span>
+                      </td>
                       <td className="p-3 text-gray-300 text-sm">{company.paymentPlan || "Monthly"}</td>
                       <td className="p-3 text-gray-300 text-sm">{company.productName || "Monthly Subscription"}</td>
                       <td className="p-3 text-gray-300 text-sm font-mono">{company.licenseKey || "—"}</td>

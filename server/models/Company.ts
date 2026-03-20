@@ -66,20 +66,10 @@ const companySchema = new Schema({
     default: true,
     description: 'The company manages endpoint security'
   },
-  totalSeats: {
+  licenseCount: {
     type: Number,
-    default: 0,
-    description: 'Total number of seats'
-  },
-  usedSeats: {
-    type: Number,
-    default: 0,
-    description: 'Number of used reserved seats'
-  },
-  availableSeats: {
-    type: Number,
-    default: 0,
-    description: 'Number of available reserved seats'
+    default: 1,
+    description: 'Number of licenses (max agents that can be installed)'
   },
   companyStatus: {
     type: String,
@@ -142,8 +132,14 @@ companySchema.pre('save', function (next) {
     }
     this.licenseKey = key;
   }
-  // Calculate total seats
-  this.totalSeats = (this.usedSeats || 0) + (this.availableSeats || 0);
+  // Auto-derive product name from payment plan
+  if (this.paymentPlan === 'Yearly') {
+    this.productName = 'Yearly Subscription';
+  } else {
+    this.productName = 'Monthly Subscription';
+  }
+  // Expiry is always Never
+  this.expiryDate = 'Never';
   next();
 });
 
@@ -160,9 +156,7 @@ export interface ICompany extends mongoose.Document {
   contactPerson?: string;
   notes?: string;
   managedEndpointSecurity: boolean;
-  totalSeats: number;
-  usedSeats: number;
-  availableSeats: number;
+  licenseCount: number;
   companyStatus: string;
   paymentPlan: string;
   productName: string;

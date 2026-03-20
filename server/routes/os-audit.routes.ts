@@ -4,6 +4,7 @@ import authenticate from '../middleware/auth';
 import { OSAuditMachine, IOSAuditMachine } from '../models/OSAuditMachine';
 import { OSAuditReport, IOSAuditReport } from '../models/OSAuditReport';
 import { InstallationPackage } from '../models/InstallationPackage';
+import { Company } from '../models/Company';
 import AuditReportGenerator from '../services/auditReportGenerator';
 
 const router = Router();
@@ -43,6 +44,20 @@ router.post('/machines/register', authenticate, async (req: AuthenticatedRequest
           success: false,
           error: 'Machine with this IP address already registered'
         });
+      }
+    }
+
+    // Enforce license count limit
+    if (companyName) {
+      const company = await Company.findOne({ name: companyName, owner: userId });
+      if (company) {
+        const currentMachineCount = await OSAuditMachine.countDocuments({ companyName, owner: userId });
+        if (currentMachineCount >= (company.licenseCount || 1)) {
+          return res.status(403).json({
+            success: false,
+            error: `License limit reached. This company has ${company.licenseCount || 1} license(s) and ${currentMachineCount} agent(s) already registered. Please upgrade your license to add more agents.`
+          });
+        }
       }
     }
 
@@ -297,6 +312,21 @@ router.post('/reports', async (req: AuthenticatedRequest, res: Response) => {
       if (pkg) {
         console.log('✅ Found InstallationPackage:', pkg.name);
         const pkgCompanyName = (pkg.company as any)?.name || companyName || '';
+
+        // Enforce license count limit before auto-registering
+        if (pkgCompanyName) {
+          const company = await Company.findOne({ name: pkgCompanyName, owner: pkg.owner });
+          if (company) {
+            const currentMachineCount = await OSAuditMachine.countDocuments({ companyName: pkgCompanyName, owner: pkg.owner });
+            if (currentMachineCount >= (company.licenseCount || 1)) {
+              return res.status(403).json({
+                success: false,
+                error: `License limit reached for company "${pkgCompanyName}". Licensed for ${company.licenseCount || 1} agent(s), ${currentMachineCount} already registered.`
+              });
+            }
+          }
+        }
+
         const newMachineId = uuidv4();
         const newAgentToken = String(agentInstallationToken).trim();
 
