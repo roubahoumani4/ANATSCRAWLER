@@ -342,7 +342,8 @@ router.post('/reports', async (req: AuthenticatedRequest, res: Response) => {
           osType: pkg.osType || 'linux',
           agentInstallationToken: newAgentToken,
           agentStatus: 'active',
-          agentInstalledDate: new Date()
+          agentInstalledDate: new Date(),
+          lastSeen: new Date()
         });
 
         machine = await newMachine.save();
@@ -453,6 +454,7 @@ router.post('/reports', async (req: AuthenticatedRequest, res: Response) => {
 
     // Update machine with last audit date
     machine.lastAuditDate = new Date();
+    machine.lastSeen = new Date();
     await machine.save();
 
     // --- Background PDF pre-generation ---
@@ -688,7 +690,7 @@ router.get('/reports', authenticate, async (req: AuthenticatedRequest, res: Resp
  */
 router.post('/agent/heartbeat', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { agentInstallationToken } = req.body;
+    const { agentInstallationToken, machineName } = req.body;
 
     if (!agentInstallationToken) {
       return res.status(400).json({
@@ -697,14 +699,21 @@ router.post('/agent/heartbeat', async (req: AuthenticatedRequest, res: Response)
       });
     }
 
-    // Try to find machine with expanded logging
-    let machine = await OSAuditMachine.findOne({
-      agentInstallationToken: agentInstallationToken
-    });
+    const trimmedToken = String(agentInstallationToken).trim();
+    let machine: any = null;
 
+    // Find by token + machineName for multi-machine support
+    if (machineName) {
+      machine = await OSAuditMachine.findOne({
+        agentInstallationToken: trimmedToken,
+        machineName: machineName
+      });
+    }
+
+    // Fallback: find any machine with this token
     if (!machine) {
       machine = await OSAuditMachine.findOne({
-        agentInstallationToken: String(agentInstallationToken).trim()
+        agentInstallationToken: trimmedToken
       });
     }
 
@@ -716,8 +725,9 @@ router.post('/agent/heartbeat', async (req: AuthenticatedRequest, res: Response)
       });
     }
 
-    // Update agent status
+    // Update agent status and lastSeen
     machine.agentStatus = 'active';
+    machine.lastSeen = new Date();
     machine.lastAuditDate = new Date();
     await machine.save();
 

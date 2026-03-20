@@ -70,9 +70,12 @@ const osAuditMachineSchema = new Schema({
   },
   agentInstallationToken: {
     type: String,
-    unique: true,
-    sparse: true,
-    description: 'Unique token for agent installation'
+    index: true,
+    description: 'Token from installation package (shared across machines)'
+  },
+  lastSeen: {
+    type: Date,
+    description: 'Last time the agent was seen online'
   },
   agentInstalledDate: {
     type: Date,
@@ -115,6 +118,7 @@ export interface IOSAuditMachine extends mongoose.Document {
   isActive: boolean;
   agentInstallationToken?: string;
   agentInstalledDate?: Date;
+  lastSeen?: Date;
   metadata?: any;
   createdAt: Date;
   updatedAt: Date;
@@ -122,3 +126,8 @@ export interface IOSAuditMachine extends mongoose.Document {
 
 export const OSAuditMachine = mongoose.models.OSAuditMachine || 
   mongoose.model<IOSAuditMachine>('OSAuditMachine', osAuditMachineSchema, 'os_audit_machines');
+
+// Drop the legacy unique index on agentInstallationToken if it exists
+OSAuditMachine.collection.dropIndex('agentInstallationToken_1').catch(() => {
+  // Index may not exist — safe to ignore
+});

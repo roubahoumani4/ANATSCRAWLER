@@ -11,6 +11,8 @@ import {
   RotateCcw,
   Filter,
   Eye,
+  Folder,
+  FolderOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,17 +62,23 @@ interface Device {
   osType?: string;
   agentStatus: "active" | "inactive" | "pending";
   lastAuditDate?: string;
+  lastSeen?: string;
   registrationDate: string;
   isActive: boolean;
   latestAuditScore?: number;
   latestWarnings?: number;
 }
 
+type TreeSelection = {
+  company: Company;
+  folder: "computers" | "deleted";
+};
+
 const NetworkPage: React.FC = () => {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [treeSelection, setTreeSelection] = useState<TreeSelection | null>(null);
   const [activeDevices, setActiveDevices] = useState<Device[]>([]);
   const [deletedDevices, setDeletedDevices] = useState<Device[]>([]);
   const [loadingDevices, setLoadingDevices] = useState(false);
@@ -86,7 +94,6 @@ const NetworkPage: React.FC = () => {
   const [ipFilter, setIpFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [entityTypeFilter, setEntityTypeFilter] = useState("All");
-  const [showDeleted, setShowDeleted] = useState(false);
   const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
   const [itemsPerPage, setItemsPerPage] = useState(100);
   const [currentPage, setCurrentPage] = useState(1);
@@ -132,10 +139,26 @@ const NetworkPage: React.FC = () => {
   };
 
   const handleSelectCompany = (company: Company) => {
-    setSelectedCompany(company);
+    // Expand company and auto-select "Computers and Groups"
+    setExpandedCompanies((prev) => {
+      const next = new Set(prev);
+      next.add(company._id);
+      return next;
+    });
+    setTreeSelection({ company, folder: "computers" });
     setSelectedIds(new Set());
     setCurrentPage(1);
     fetchDevices(company.name);
+  };
+
+  const handleSelectFolder = (company: Company, folder: "computers" | "deleted") => {
+    setTreeSelection({ company, folder });
+    setSelectedIds(new Set());
+    setCurrentPage(1);
+    // Only fetch if company changed
+    if (!treeSelection || treeSelection.company._id !== company._id) {
+      fetchDevices(company.name);
+    }
   };
 
   const handleSoftDelete = async (deviceId: string) => {
@@ -146,7 +169,7 @@ const NetworkPage: React.FC = () => {
         {},
         { withCredentials: true }
       );
-      if (selectedCompany) fetchDevices(selectedCompany.name);
+      if (treeSelection) fetchDevices(treeSelection.company.name);
     } catch (error: any) {
       alert(error.response?.data?.error || "Failed to delete device");
     }
@@ -159,7 +182,7 @@ const NetworkPage: React.FC = () => {
         {},
         { withCredentials: true }
       );
-      if (selectedCompany) fetchDevices(selectedCompany.name);
+      if (treeSelection) fetchDevices(treeSelection.company.name);
     } catch (error: any) {
       alert(error.response?.data?.error || "Failed to restore device");
     }
@@ -172,7 +195,7 @@ const NetworkPage: React.FC = () => {
       await axios.delete(`/api/v1/os-audit/network/devices/${deviceId}`, {
         withCredentials: true,
       });
-      if (selectedCompany) fetchDevices(selectedCompany.name);
+      if (treeSelection) fetchDevices(treeSelection.company.name);
     } catch (error: any) {
       alert(error.response?.data?.error || "Failed to delete device");
     }
@@ -237,7 +260,7 @@ const NetworkPage: React.FC = () => {
       } catch (e) {}
     }
     setSelectedIds(new Set());
-    if (selectedCompany) fetchDevices(selectedCompany.name);
+    if (treeSelection) fetchDevices(treeSelection.company.name);
   };
 
   const toggleCompanyExpand = (companyId: string) => {
@@ -249,7 +272,8 @@ const NetworkPage: React.FC = () => {
     });
   };
 
-  // Current device list based on active/deleted toggle
+  // Current device list based on tree folder selection
+  const showDeleted = treeSelection?.folder === "deleted";
   const currentDevices = showDeleted ? deletedDevices : activeDevices;
 
   // Filtered devices
@@ -258,7 +282,7 @@ const NetworkPage: React.FC = () => {
       if (nameFilter && !d.machineName.toLowerCase().includes(nameFilter.toLowerCase())) return false;
       if (ipFilter && !d.ipAddress.includes(ipFilter)) return false;
       if (statusFilter !== "All") {
-        const managed = d.agentStatus === "active" ? "Managed" : "Unmanaged";
+        const managed = getManagementStatus(d);
         if (managed !== statusFilter) return false;
       }
       if (entityTypeFilter !== "All") {
@@ -298,18 +322,36 @@ const NetworkPage: React.FC = () => {
     });
   };
 
-  const formatLastSeen = (dateStr?: string) => {
+  const formatLastSeen = (device: Device) => {
+    const dateStr = device.lastSeen || device.lastAuditDate;
     if (!dateStr) return "-";
     const date = new Date(dateStr);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins} minutes ago`;
+    const diffHours = Math.floor(diffMins / 60);
     if (diffHours < 24) return `${diffHours} hours ago`;
     const diffDays = Math.floor(diffHours / 24);
     if (diffDays < 7) return `${diffDays} days ago`;
     const timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     const dateFormatted = date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
     return `At ${timeStr}, on ${dateFormatted}`;
+  };
+
+  const getManagementStatus = (device: Device) => {
+    if (device.agentStatus === "active" && device.lastSeen) {
+      const lastSeen = new Date(device.lastSeen);
+      const now = new Date();
+      const diffMs = now.getTime() - lastSeen.getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+      // If agent was seen within the last 48 hours, it's managed
+      if (diffHours <= 48) return "Managed";
+      return "Unmanaged";
+    }
+    if (device.agentStatus === "active") return "Managed";
+    return "Unmanaged";
   };
 
   const getSecurityIssues = (device: Device) => {
@@ -354,46 +396,79 @@ const NetworkPage: React.FC = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto px-2 pb-4">
-          {/* Root level */}
-          <div className="mb-1">
-            <button
-              onClick={() => {
-                setSelectedCompany(null);
-                setActiveDevices([]);
-                setDeletedDevices([]);
-              }}
-              className="flex items-center gap-1.5 px-2 py-1.5 w-full text-left text-sm font-medium text-gray-200 hover:bg-gray-700/40 rounded"
-            >
-              <Building2 size={14} className="text-gray-400" />
-              Companies
-            </button>
-          </div>
+          {/* Company list as tree */}
+          {companies.map((company) => {
+            const isExpanded = expandedCompanies.has(company._id);
+            const isComputersSelected = treeSelection?.company._id === company._id && treeSelection?.folder === "computers";
+            const isDeletedSelected = treeSelection?.company._id === company._id && treeSelection?.folder === "deleted";
 
-          {/* Company list */}
-          <div className="ml-2 space-y-0.5">
-            {companies.map((company) => (
-              <button
-                key={company._id}
-                onClick={() => handleSelectCompany(company)}
-                className={`flex items-center gap-1.5 px-2 py-1.5 w-full text-left text-[13px] rounded transition-colors ${
-                  selectedCompany?._id === company._id
-                    ? "bg-cyan-600/15 text-cyan-400"
-                    : "text-gray-400 hover:bg-gray-700/30 hover:text-gray-200"
-                }`}
-              >
-                <ChevronRight
-                  size={12}
-                  className={`transition-transform flex-shrink-0 ${
-                    selectedCompany?._id === company._id ? "rotate-90" : ""
+            return (
+              <div key={company._id} className="mb-0.5">
+                {/* Company root node */}
+                <button
+                  onClick={() => {
+                    toggleCompanyExpand(company._id);
+                    if (!isExpanded) handleSelectCompany(company);
+                  }}
+                  className={`flex items-center gap-1.5 px-2 py-1.5 w-full text-left text-[13px] rounded transition-colors ${
+                    treeSelection?.company._id === company._id && !isComputersSelected && !isDeletedSelected
+                      ? "bg-cyan-600/15 text-cyan-400"
+                      : "text-gray-300 hover:bg-gray-700/30 hover:text-gray-200"
                   }`}
-                />
-                <span className="truncate">{company.name}</span>
-              </button>
-            ))}
-            {companies.length === 0 && (
-              <p className="text-xs text-gray-600 px-2 py-3 text-center">No companies found</p>
-            )}
-          </div>
+                >
+                  {isExpanded ? (
+                    <ChevronDown size={12} className="flex-shrink-0 text-gray-400" />
+                  ) : (
+                    <ChevronRight size={12} className="flex-shrink-0 text-gray-400" />
+                  )}
+                  <Building2 size={14} className="flex-shrink-0 text-gray-400" />
+                  <span className="truncate">{company.name}</span>
+                </button>
+
+                {/* Sub-folders */}
+                {isExpanded && (
+                  <div className="ml-5 space-y-0.5 mt-0.5">
+                    {/* Computers and Groups */}
+                    <button
+                      onClick={() => handleSelectFolder(company, "computers")}
+                      className={`flex items-center gap-1.5 px-2 py-1.5 w-full text-left text-[12px] rounded transition-colors ${
+                        isComputersSelected
+                          ? "bg-cyan-600/15 text-cyan-400"
+                          : "text-gray-400 hover:bg-gray-700/30 hover:text-gray-200"
+                      }`}
+                    >
+                      {isComputersSelected ? (
+                        <FolderOpen size={13} className="flex-shrink-0" />
+                      ) : (
+                        <Folder size={13} className="flex-shrink-0" />
+                      )}
+                      <span>Computers and Groups</span>
+                    </button>
+
+                    {/* Deleted */}
+                    <button
+                      onClick={() => handleSelectFolder(company, "deleted")}
+                      className={`flex items-center gap-1.5 px-2 py-1.5 w-full text-left text-[12px] rounded transition-colors ${
+                        isDeletedSelected
+                          ? "bg-cyan-600/15 text-cyan-400"
+                          : "text-gray-400 hover:bg-gray-700/30 hover:text-gray-200"
+                      }`}
+                    >
+                      {isDeletedSelected ? (
+                        <FolderOpen size={13} className="flex-shrink-0" />
+                      ) : (
+                        <Folder size={13} className="flex-shrink-0" />
+                      )}
+                      <span>Deleted</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {companies.length === 0 && (
+            <p className="text-xs text-gray-600 px-2 py-3 text-center">No companies found</p>
+          )}
         </div>
       </div>
 
@@ -402,12 +477,14 @@ const NetworkPage: React.FC = () => {
         {/* Page Header */}
         <div className="px-6 pt-5 pb-2">
           <h1 className="text-2xl font-bold text-white">Network</h1>
-          {selectedCompany && (
-            <p className="text-sm text-gray-400 mt-0.5">{selectedCompany.name}</p>
+          {treeSelection && (
+            <p className="text-sm text-gray-400 mt-0.5">
+              {treeSelection.company.name} &gt; {treeSelection.folder === "computers" ? "Computers and Groups" : "Deleted"}
+            </p>
           )}
         </div>
 
-        {!selectedCompany ? (
+        {!treeSelection ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
               <Monitor className="w-16 h-16 text-gray-600 mx-auto mb-4" />
@@ -423,23 +500,6 @@ const NetworkPage: React.FC = () => {
           <>
             {/* Action Bar */}
             <div className="px-6 py-2 flex items-center gap-3 border-b border-gray-700/50">
-              {/* Active / Deleted toggle */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-700 text-sm font-medium h-9 px-4">
-                    {showDeleted ? "DELETED DEVICES" : "ACTIVE DEVICES"} <ChevronDown className="ml-2 h-3.5 w-3.5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="bg-[#2a2d35] border-gray-600 text-gray-200">
-                  <DropdownMenuItem onClick={() => { setShowDeleted(false); setSelectedIds(new Set()); }} className="hover:bg-gray-700 cursor-pointer">
-                    Active Devices ({activeDevices.length})
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => { setShowDeleted(true); setSelectedIds(new Set()); }} className="hover:bg-gray-700 cursor-pointer">
-                    Deleted Devices ({deletedDevices.length})
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
               {showDeleted && selectedIds.size > 0 && (
                 <>
                   <Button
@@ -449,7 +509,7 @@ const NetworkPage: React.FC = () => {
                         try { await axios.put(`/api/v1/os-audit/network/devices/${id}/restore`, {}, { withCredentials: true }); } catch (e) {}
                       }
                       setSelectedIds(new Set());
-                      if (selectedCompany) fetchDevices(selectedCompany.name);
+                      if (treeSelection) fetchDevices(treeSelection.company.name);
                     }}
                     className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm h-9 px-4"
                   >
@@ -462,7 +522,7 @@ const NetworkPage: React.FC = () => {
                         try { await axios.delete(`/api/v1/os-audit/network/devices/${id}`, { withCredentials: true }); } catch (e) {}
                       }
                       setSelectedIds(new Set());
-                      if (selectedCompany) fetchDevices(selectedCompany.name);
+                      if (treeSelection) fetchDevices(treeSelection.company.name);
                     }}
                     className="bg-red-600 hover:bg-red-700 text-white text-sm h-9 px-4"
                   >
@@ -478,6 +538,12 @@ const NetworkPage: React.FC = () => {
                 >
                   DELETE
                 </Button>
+              )}
+
+              {selectedIds.size === 0 && (
+                <span className="text-xs text-gray-500">
+                  {showDeleted ? `${deletedDevices.length} deleted device(s)` : `${activeDevices.length} device(s)`}
+                </span>
               )}
             </div>
 
@@ -571,7 +637,8 @@ const NetworkPage: React.FC = () => {
                     </tr>
                   ) : (
                     paginatedDevices.map((device) => {
-                      const isManaged = device.agentStatus === "active";
+                      const managementStatus = getManagementStatus(device);
+                      const isManaged = managementStatus === "Managed";
                       const entityType = device.osType === "windows" ? "Physical machine" : "Virtual machine";
                       const securityIssues = getSecurityIssues(device);
 
@@ -598,18 +665,18 @@ const NetworkPage: React.FC = () => {
                             </button>
                           </td>
                           <td className="px-3 py-2.5 text-gray-300">
-                            {device.companyName || selectedCompany?.name || "-"}
+                            {device.companyName || treeSelection?.company.name || "-"}
                           </td>
                           <td className="px-3 py-2.5 text-gray-300 font-mono text-xs">
                             {device.ipAddress}
                           </td>
                           <td className="px-3 py-2.5 text-gray-400 text-xs">
-                            {formatLastSeen(device.lastAuditDate)}
+                            {formatLastSeen(device)}
                           </td>
                           <td className="px-3 py-2.5 text-gray-300">{entityType}</td>
                           <td className="px-3 py-2.5">
                             <span className={isManaged ? "text-gray-300" : "text-yellow-400"}>
-                              {isManaged ? "Managed" : "Unmanaged"}
+                              {managementStatus}
                             </span>
                           </td>
                           <td className="px-3 py-2.5">

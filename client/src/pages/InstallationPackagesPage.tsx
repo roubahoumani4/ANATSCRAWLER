@@ -135,13 +135,14 @@ const InstallationPackagesPage: React.FC = () => {
     fetchData();
   };
 
-  const handleDownloadScript = async (pkg: InstallPackage) => {
+  const handleDownloadScript = async (pkg: InstallPackage, overrideOsType?: "linux" | "windows") => {
     try {
       const res = await axios.get(`/api/v1/os-audit/packages/${pkg._id}/download-script`, {
         withCredentials: true,
       });
       if (res.data.success) {
-        const { agentToken, osType, companyName, packageId } = res.data;
+        const { agentToken, companyName, packageId } = res.data;
+        const osType = overrideOsType || res.data.osType;
         const script = generateScript(agentToken, osType, companyName, packageId);
         const ext = osType === "windows" ? "ps1" : "sh";
         const blob = new Blob([script], { type: "text/plain" });
@@ -156,6 +157,14 @@ const InstallationPackagesPage: React.FC = () => {
       }
     } catch (error: any) {
       alert(error.response?.data?.error || "Failed to download script");
+    }
+  };
+
+  const handleDownloadForOS = async (osType: "linux" | "windows") => {
+    const ids = selectedIds.size > 0 ? Array.from(selectedIds) : packages.map((p) => p._id);
+    for (const id of ids) {
+      const pkg = packages.find((p) => p._id === id);
+      if (pkg) await handleDownloadScript(pkg, osType);
     }
   };
 
@@ -438,6 +447,25 @@ $action = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-Executio
 $trigger = New-ScheduledTaskTrigger -Daily -At 2am
 Register-ScheduledTask -TaskName "ANATSCRAWLER-OSAudit" -Action $action -Trigger $trigger -RunLevel Highest -Force | Out-Null
 Write-Log "Scheduled task created (daily at 02:00)."
+
+# Heartbeat script
+$heartbeatScript = @"
+while (\$true) {
+  try {
+    \$body = @{ agentInstallationToken = '$AGENT_TOKEN'; machineName = \$env:COMPUTERNAME } | ConvertTo-Json
+    Invoke-RestMethod -Uri '$SERVER_URL/api/v1/os-audit/agent/heartbeat' -Method POST -ContentType 'application/json' -Body \$body -TimeoutSec 30 | Out-Null
+  } catch { }
+  Start-Sleep -Seconds 300
+}
+"@
+$heartbeatPath = "$AGENT_DIR\\heartbeat.ps1"
+Set-Content -Path $heartbeatPath -Value $heartbeatScript -Force
+
+$hbAction = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-ExecutionPolicy Bypass -WindowStyle Hidden -File $heartbeatPath"
+$hbTrigger = New-ScheduledTaskTrigger -AtStartup
+Register-ScheduledTask -TaskName "ANATSCRAWLER-Heartbeat" -Action $hbAction -Trigger $hbTrigger -RunLevel Highest -Force | Out-Null
+Start-Process -FilePath "PowerShell.exe" -ArgumentList "-ExecutionPolicy Bypass -WindowStyle Hidden -File $heartbeatPath" -WindowStyle Hidden
+Write-Log "Heartbeat service started."
 `;
     }
 
@@ -535,6 +563,22 @@ curl -s -X POST "$SERVER_URL/api/v1/os-audit/reports" \\
 
 rm -f "$TEMP_JSON"
 echo "Audit complete for $COMPANY_NAME!"
+
+# Setup heartbeat cron job (every 5 minutes)
+HEARTBEAT_SCRIPT="$AGENT_DIR/heartbeat.sh"
+cat > "$HEARTBEAT_SCRIPT" << 'HEARTBEAT_EOF'
+#!/bin/bash
+curl -s -X POST "$SERVER_URL/api/v1/os-audit/agent/heartbeat" \\
+  -H "Content-Type: application/json" \\
+  -d "{\\"agentInstallationToken\\":\\"$AGENT_TOKEN\\",\\"machineName\\":\\"$(hostname)\\"}" > /dev/null 2>&1
+HEARTBEAT_EOF
+sed -i "s|\\$SERVER_URL|$SERVER_URL|g" "$HEARTBEAT_SCRIPT"
+sed -i "s|\\$AGENT_TOKEN|$AGENT_TOKEN|g" "$HEARTBEAT_SCRIPT"
+chmod +x "$HEARTBEAT_SCRIPT"
+
+# Add cron job for heartbeat every 5 minutes and daily audit at 2 AM
+(crontab -l 2>/dev/null | grep -v "anat-os-audit"; echo "*/5 * * * * $HEARTBEAT_SCRIPT"; echo "0 2 * * * $0") | crontab -
+echo "Heartbeat and scheduled audit configured."
 `;
   };
 
@@ -641,24 +685,18 @@ echo "Audit complete for $COMPANY_NAME!"
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="bg-[#2a2d35] border-gray-600 text-gray-200">
-            {selectedIds.size > 0 ? (
-              Array.from(selectedIds).map((id) => {
-                const pkg = packages.find((p) => p._id === id);
-                return pkg ? (
-                  <DropdownMenuItem
-                    key={id}
-                    onClick={() => handleDownloadScript(pkg)}
-                    className="hover:bg-gray-700 cursor-pointer text-xs"
-                  >
-                    <Download size={13} className="mr-2" /> {pkg.name}
-                  </DropdownMenuItem>
-                ) : null;
-              })
-            ) : (
-              <DropdownMenuItem disabled className="text-gray-500 text-xs">
-                Select packages to download
-              </DropdownMenuItem>
-            )}
+            <DropdownMenuItem
+              onClick={() => handleDownloadForOS("linux")}
+              className="hover:bg-gray-700 cursor-pointer text-xs"
+            >
+              <Server size={13} className="mr-2" /> Linux
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleDownloadForOS("windows")}
+              className="hover:bg-gray-700 cursor-pointer text-xs"
+            >
+              <Monitor size={13} className="mr-2" /> Windows
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
