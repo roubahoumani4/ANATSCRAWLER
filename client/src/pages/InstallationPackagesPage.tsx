@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Package,
   Plus,
@@ -10,26 +9,21 @@ import {
   Building2,
   Monitor,
   CheckCircle,
-  Server
+  Server,
+  ChevronDown,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import axios from "axios";
-
-const fadeIn = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0 }
-};
-
-const staggerContainer = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1 }
-  }
-};
 
 interface Company {
   _id: string;
@@ -42,7 +36,7 @@ interface InstallPackage {
   packageId: string;
   name: string;
   company: { _id: string; name: string; sector: string } | string;
-  osType: 'linux' | 'windows';
+  osType: "linux" | "windows";
   supportedVersions: string[];
   agentToken: string;
   description?: string;
@@ -62,10 +56,18 @@ const InstallationPackagesPage: React.FC = () => {
   const [form, setForm] = useState({
     name: "",
     companyId: "",
-    osType: "linux" as 'linux' | 'windows',
+    osType: "linux" as "linux" | "windows",
     description: "",
-    supportedVersions: [] as string[]
+    supportedVersions: [] as string[],
   });
+
+  // Table state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [nameFilter, setNameFilter] = useState("");
+  const [descFilter, setDescFilter] = useState("");
+  const [companyFilter, setCompanyFilter] = useState("All recursively");
+  const [itemsPerPage, setItemsPerPage] = useState(50);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     fetchData();
@@ -75,8 +77,11 @@ const InstallationPackagesPage: React.FC = () => {
     try {
       setLoading(true);
       const [pkgRes, compRes] = await Promise.all([
-        axios.get("/api/v1/os-audit/packages", { params: { search: searchQuery }, withCredentials: true }),
-        axios.get("/api/v1/os-audit/companies", { withCredentials: true })
+        axios.get("/api/v1/os-audit/packages", {
+          params: { search: searchQuery },
+          withCredentials: true,
+        }),
+        axios.get("/api/v1/os-audit/companies", { withCredentials: true }),
       ]);
       setPackages(pkgRes.data.packages || []);
       setCompanies(compRes.data.companies || []);
@@ -95,7 +100,9 @@ const InstallationPackagesPage: React.FC = () => {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await axios.post("/api/v1/os-audit/packages", form, { withCredentials: true });
+      const res = await axios.post("/api/v1/os-audit/packages", form, {
+        withCredentials: true,
+      });
       if (res.data.success) {
         setShowCreateDialog(false);
         setForm({ name: "", companyId: "", osType: "linux", description: "", supportedVersions: [] });
@@ -116,16 +123,30 @@ const InstallationPackagesPage: React.FC = () => {
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Delete ${selectedIds.size} installation package(s)?`)) return;
+    for (const id of selectedIds) {
+      try {
+        await axios.delete(`/api/v1/os-audit/packages/${id}`, { withCredentials: true });
+      } catch (e) {}
+    }
+    setSelectedIds(new Set());
+    fetchData();
+  };
+
   const handleDownloadScript = async (pkg: InstallPackage) => {
     try {
-      const res = await axios.get(`/api/v1/os-audit/packages/${pkg._id}/download-script`, { withCredentials: true });
+      const res = await axios.get(`/api/v1/os-audit/packages/${pkg._id}/download-script`, {
+        withCredentials: true,
+      });
       if (res.data.success) {
         const { agentToken, osType, companyName, packageId } = res.data;
         const script = generateScript(agentToken, osType, companyName, packageId);
-        const ext = osType === 'windows' ? 'ps1' : 'sh';
-        const blob = new Blob([script], { type: 'text/plain' });
+        const ext = osType === "windows" ? "ps1" : "sh";
+        const blob = new Blob([script], { type: "text/plain" });
         const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
+        const a = document.createElement("a");
         a.href = url;
         a.download = `agent-${packageId}.${ext}`;
         document.body.appendChild(a);
@@ -144,7 +165,7 @@ const InstallationPackagesPage: React.FC = () => {
   };
 
   const generateScript = (token: string, osType: string, companyName: string, packageId: string): string => {
-    if (osType === 'windows') {
+    if (osType === "windows") {
       return `#Requires -RunAsAdministrator
 # ANATSCRAWLER Windows OS Audit Agent
 # Company: ${companyName}
@@ -524,278 +545,338 @@ echo "Audit complete for $COMPANY_NAME!"
   };
 
   const getCompanyName = (pkg: InstallPackage): string => {
-    if (typeof pkg.company === 'object' && pkg.company !== null) {
-      return (pkg.company as any).name || 'Unknown';
+    if (typeof pkg.company === "object" && pkg.company !== null) {
+      return (pkg.company as any).name || "Unknown";
     }
-    return 'Unknown';
+    return "Unknown";
   };
 
-  const linuxVersions = ['Ubuntu 20.04+', 'Ubuntu 22.04+', 'Debian 11+', 'Debian 12+', 'CentOS 8+', 'RHEL 8+', 'Fedora 36+', 'Arch Linux'];
-  const windowsVersions = ['Windows 10', 'Windows 11', 'Windows Server 2019', 'Windows Server 2022'];
+  // Filtered packages
+  const filteredPackages = useMemo(() => {
+    return packages.filter((p) => {
+      if (nameFilter && !p.name.toLowerCase().includes(nameFilter.toLowerCase())) return false;
+      if (descFilter) {
+        const desc = p.description || "N/A";
+        if (!desc.toLowerCase().includes(descFilter.toLowerCase())) return false;
+      }
+      if (companyFilter !== "All recursively") {
+        if (getCompanyName(p) !== companyFilter) return false;
+      }
+      return true;
+    });
+  }, [packages, nameFilter, descFilter, companyFilter]);
+
+  // Pagination
+  const totalItems = filteredPackages.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+  const paginatedPackages = filteredPackages.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+  const startItem = totalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
+  const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+
+  const allSelected =
+    paginatedPackages.length > 0 && paginatedPackages.every((p) => selectedIds.has(p._id));
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedPackages.map((p) => p._id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const resetFilters = () => {
+    setNameFilter("");
+    setDescFilter("");
+    setCompanyFilter("All recursively");
+  };
+
+  const hasFilters = nameFilter || descFilter || companyFilter !== "All recursively";
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-jetBlack flex items-center justify-center">
+      <div className="min-h-screen bg-[#1a1d23] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-coolWhite/10 border-t-crimsonRed rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-coolWhite/60">Loading packages...</p>
+          <div className="w-16 h-16 border-4 border-gray-700 border-t-cyan-500 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-400">Loading packages...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <motion.div initial="hidden" animate="visible" className="min-h-screen bg-jetBlack text-coolWhite p-6">
-      {/* Header */}
-      <motion.div variants={fadeIn} className="mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-3">
-              <Package className="text-cyan-400" size={36} />
-              Installation Packages
-            </h1>
-            <p className="text-gray-400 mt-2">Create and manage agent installation packages for companies</p>
-          </div>
-          <Button
-            onClick={() => {
-              setForm({ name: "", companyId: "", osType: "linux", description: "", supportedVersions: [] });
-              setShowCreateDialog(true);
-            }}
-            className="bg-crimsonRed hover:bg-crimsonRed/80 text-white"
+    <div className="min-h-screen bg-[#1a1d23] text-gray-200 flex flex-col">
+      {/* Page Header */}
+      <div className="px-6 pt-5 pb-2">
+        <h1 className="text-2xl font-bold text-white">Installation packages</h1>
+      </div>
+
+      {/* Action Bar */}
+      <div className="px-6 py-3 flex items-center gap-3 border-b border-gray-700/50">
+        <Button
+          onClick={() => {
+            setForm({ name: "", companyId: "", osType: "linux", description: "", supportedVersions: [] });
+            setShowCreateDialog(true);
+          }}
+          className="bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium h-9 px-5"
+        >
+          CREATE
+        </Button>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-700 text-sm font-medium h-9 px-4">
+              DOWNLOAD <ChevronDown className="ml-2 h-3.5 w-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="bg-[#2a2d35] border-gray-600 text-gray-200">
+            {selectedIds.size > 0 ? (
+              Array.from(selectedIds).map((id) => {
+                const pkg = packages.find((p) => p._id === id);
+                return pkg ? (
+                  <DropdownMenuItem
+                    key={id}
+                    onClick={() => handleDownloadScript(pkg)}
+                    className="hover:bg-gray-700 cursor-pointer text-xs"
+                  >
+                    <Download size={13} className="mr-2" /> {pkg.name}
+                  </DropdownMenuItem>
+                ) : null;
+              })
+            ) : (
+              <DropdownMenuItem disabled className="text-gray-500 text-xs">
+                Select packages to download
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <Button
+          onClick={handleBulkDelete}
+          disabled={selectedIds.size === 0}
+          className="bg-transparent border border-red-500 text-red-400 hover:bg-red-600 hover:text-white text-sm font-medium h-9 px-5 disabled:opacity-40"
+        >
+          DELETE
+        </Button>
+      </div>
+
+      {/* Filter Bar */}
+      <div className="px-6 py-3 flex items-center gap-3 flex-wrap border-b border-gray-700/50">
+        <div className="flex items-center gap-1">
+          <label className="text-[11px] text-gray-500 mr-1">Company</label>
+          <select
+            value={companyFilter}
+            onChange={(e) => { setCompanyFilter(e.target.value); setCurrentPage(1); }}
+            className="h-8 bg-[#2a2d35] border border-gray-600 rounded px-2 text-gray-300 text-xs min-w-[140px]"
           >
-            <Plus className="mr-2 h-4 w-4" />
-            New Package
-          </Button>
+            <option value="All recursively">All recursively</option>
+            {companies.map((c) => (
+              <option key={c._id} value={c.name}>{c.name}</option>
+            ))}
+          </select>
         </div>
-      </motion.div>
 
-      {/* Search Bar */}
-      <motion.div variants={fadeIn} className="mb-6">
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+        <div className="relative">
           <Input
-            placeholder="Search packages..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-gray-900/60 border-gray-700 text-coolWhite placeholder:text-gray-500"
+            placeholder="Name"
+            value={nameFilter}
+            onChange={(e) => { setNameFilter(e.target.value); setCurrentPage(1); }}
+            className="h-8 w-40 bg-[#2a2d35] border-gray-600 text-gray-300 text-xs placeholder:text-gray-500 pr-7"
           />
+          <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500" size={13} />
         </div>
-      </motion.div>
 
-      {/* Stats */}
-      <motion.div variants={staggerContainer} className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <motion.div variants={fadeIn} className="bg-gradient-to-br from-cyan-900/40 via-cyan-800/30 to-cyan-900/40 border border-cyan-700/50 rounded-xl p-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-cyan-400 text-sm font-semibold uppercase tracking-wide mb-1">Total Packages</p>
-              <h3 className="text-3xl font-bold text-white">{packages.length}</h3>
-            </div>
-            <div className="w-12 h-12 rounded-full bg-cyan-600/20 flex items-center justify-center">
-              <Package className="text-cyan-400" size={24} />
-            </div>
+        <div className="relative">
+          <Input
+            placeholder="Description"
+            value={descFilter}
+            onChange={(e) => { setDescFilter(e.target.value); setCurrentPage(1); }}
+            className="h-8 w-40 bg-[#2a2d35] border-gray-600 text-gray-300 text-xs placeholder:text-gray-500 pr-7"
+          />
+          <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500" size={13} />
+        </div>
+
+        {hasFilters && (
+          <button onClick={resetFilters} className="text-cyan-400 hover:text-cyan-300 text-xs ml-1">
+            Reset filters
+          </button>
+        )}
+      </div>
+
+      {/* Table */}
+      <div className="flex-1 overflow-auto">
+        <table className="w-full text-sm">
+          <thead className="sticky top-0 z-10">
+            <tr className="bg-[#1e2128] border-b border-gray-700/60 text-gray-400 text-xs">
+              <th className="w-10 px-3 py-2.5 text-center">
+                <Checkbox
+                  checked={allSelected}
+                  onCheckedChange={toggleSelectAll}
+                  className="border-gray-500 data-[state=checked]:bg-cyan-600"
+                />
+              </th>
+              <th className="px-3 py-2.5 text-left font-medium">Name</th>
+              <th className="px-3 py-2.5 text-left font-medium">Language</th>
+              <th className="px-3 py-2.5 text-left font-medium">Description</th>
+              <th className="px-3 py-2.5 text-left font-medium">Company</th>
+            </tr>
+          </thead>
+          <tbody>
+            {paginatedPackages.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="text-center py-16 text-gray-500">
+                  No installation packages found
+                </td>
+              </tr>
+            ) : (
+              paginatedPackages.map((pkg) => (
+                <tr
+                  key={pkg._id}
+                  className={`border-b border-gray-800/50 hover:bg-[#252830] transition-colors ${
+                    selectedIds.has(pkg._id) ? "bg-cyan-900/10" : ""
+                  }`}
+                >
+                  <td className="px-3 py-2.5 text-center">
+                    <Checkbox
+                      checked={selectedIds.has(pkg._id)}
+                      onCheckedChange={() => toggleSelect(pkg._id)}
+                      className="border-gray-500 data-[state=checked]:bg-cyan-600"
+                    />
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <button
+                      onClick={() => handleShowScript(pkg)}
+                      className="text-cyan-400 hover:text-cyan-300 hover:underline text-left font-medium"
+                    >
+                      {pkg.name}
+                    </button>
+                  </td>
+                  <td className="px-3 py-2.5 text-gray-300">English</td>
+                  <td className="px-3 py-2.5 text-gray-300">
+                    {pkg.description || "N/A"}
+                  </td>
+                  <td className="px-3 py-2.5 text-gray-300">{getCompanyName(pkg)}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      <div className="px-6 py-3 border-t border-gray-700/50 flex items-center justify-between text-xs text-gray-400">
+        <span>
+          {startItem}-{endItem} of {totalItems} items
+        </span>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span>Items per page:</span>
+            <select
+              value={itemsPerPage}
+              onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+              className="bg-[#2a2d35] border border-gray-600 rounded px-2 py-1 text-gray-300 text-xs"
+            >
+              {[25, 50, 100].map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
           </div>
-        </motion.div>
-
-        <motion.div variants={fadeIn} className="bg-gradient-to-br from-orange-900/40 via-orange-800/30 to-orange-900/40 border border-orange-700/50 rounded-xl p-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-orange-400 text-sm font-semibold uppercase tracking-wide mb-1">Linux Packages</p>
-              <h3 className="text-3xl font-bold text-white">{packages.filter(p => p.osType === 'linux').length}</h3>
-            </div>
-            <div className="w-12 h-12 rounded-full bg-orange-600/20 flex items-center justify-center">
-              <Server className="text-orange-400" size={24} />
-            </div>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1} className="px-1.5 py-1 rounded hover:bg-gray-700 disabled:opacity-30">«</button>
+            <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-1.5 py-1 rounded hover:bg-gray-700 disabled:opacity-30">‹</button>
+            <input
+              type="number"
+              min={1}
+              max={totalPages}
+              value={currentPage}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                if (v >= 1 && v <= totalPages) setCurrentPage(v);
+              }}
+              className="w-10 text-center bg-[#2a2d35] border border-gray-600 rounded py-1 text-gray-300 text-xs"
+            />
+            <span>of {totalPages} pages</span>
+            <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-1.5 py-1 rounded hover:bg-gray-700 disabled:opacity-30">›</button>
+            <button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} className="px-1.5 py-1 rounded hover:bg-gray-700 disabled:opacity-30">»</button>
           </div>
-        </motion.div>
+        </div>
+      </div>
 
-        <motion.div variants={fadeIn} className="bg-gradient-to-br from-blue-900/40 via-blue-800/30 to-blue-900/40 border border-blue-700/50 rounded-xl p-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-blue-400 text-sm font-semibold uppercase tracking-wide mb-1">Windows Packages</p>
-              <h3 className="text-3xl font-bold text-white">{packages.filter(p => p.osType === 'windows').length}</h3>
-            </div>
-            <div className="w-12 h-12 rounded-full bg-blue-600/20 flex items-center justify-center">
-              <Monitor className="text-blue-400" size={24} />
-            </div>
-          </div>
-        </motion.div>
-      </motion.div>
-
-      {/* Packages by OS Type */}
-      <Tabs defaultValue="all" className="mb-8">
-        <TabsList className="bg-gray-900/60 border border-gray-800 mb-6">
-          <TabsTrigger value="all" className="data-[state=active]:bg-cyan-600/20 data-[state=active]:text-cyan-400">
-            All ({packages.length})
-          </TabsTrigger>
-          <TabsTrigger value="linux" className="data-[state=active]:bg-orange-600/20 data-[state=active]:text-orange-400">
-            Linux ({packages.filter(p => p.osType === 'linux').length})
-          </TabsTrigger>
-          <TabsTrigger value="windows" className="data-[state=active]:bg-blue-600/20 data-[state=active]:text-blue-400">
-            Windows ({packages.filter(p => p.osType === 'windows').length})
-          </TabsTrigger>
-        </TabsList>
-
-        {['all', 'linux', 'windows'].map(tab => (
-          <TabsContent key={tab} value={tab}>
-            {(() => {
-              const filtered = tab === 'all' ? packages : packages.filter(p => p.osType === tab);
-              if (filtered.length === 0) {
-                return (
-                  <div className="bg-gray-900/60 rounded-xl border border-gray-800 p-12 text-center">
-                    <Package className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-gray-400 mb-2">No Packages</h3>
-                    <p className="text-gray-500">Create an installation package to get started</p>
-                  </div>
-                );
-              }
-              return (
-                <motion.div variants={staggerContainer} initial="hidden" animate="visible"
-                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filtered.map(pkg => (
-                    <motion.div key={pkg._id} variants={fadeIn}
-                      className="bg-gray-900/60 rounded-xl overflow-hidden border border-gray-800 hover:border-cyan-400/30 transition-all duration-300">
-                      <div className={`h-2 bg-gradient-to-r ${pkg.osType === 'linux' ? 'from-orange-500 to-yellow-600' : 'from-blue-500 to-cyan-600'}`}></div>
-                      <div className="p-6">
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <h3 className="font-semibold text-white">{pkg.name}</h3>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className={`px-2 py-0.5 text-xs rounded-full border ${
-                                pkg.osType === 'linux' ? 'text-orange-400 bg-orange-500/10 border-orange-500/20' : 'text-blue-400 bg-blue-500/10 border-blue-500/20'
-                              }`}>
-                                {pkg.osType === 'linux' ? 'Linux' : 'Windows'}
-                              </span>
-                            </div>
-                          </div>
-                          <button onClick={() => handleDelete(pkg._id)}
-                            className="p-1.5 rounded-lg hover:bg-gray-700 transition-colors text-gray-400 hover:text-red-400">
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-
-                        <div className="space-y-2 text-sm mb-4">
-                          <div className="flex items-center gap-2 text-gray-400">
-                            <Building2 size={14} />
-                            <span>{getCompanyName(pkg)}</span>
-                          </div>
-                          {pkg.description && (
-                            <p className="text-gray-500 text-xs">{pkg.description}</p>
-                          )}
-                        </div>
-
-                        <div className="mb-4">
-                          <span className="text-xs text-gray-500 block mb-2">Supported Versions:</span>
-                          <div className="flex flex-wrap gap-1">
-                            {pkg.supportedVersions.map((v, i) => (
-                              <span key={i} className="px-2 py-0.5 text-xs rounded bg-gray-800 text-gray-400 border border-gray-700">
-                                {v}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="flex gap-2 pt-3 border-t border-gray-800">
-                          <Button variant="outline" size="sm" onClick={() => handleDownloadScript(pkg)}
-                            className="border-gray-600 text-gray-300 hover:bg-gray-800 flex-1">
-                            <Download size={14} className="mr-1" /> Download
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => handleShowScript(pkg)}
-                            className="border-gray-600 text-gray-300 hover:bg-gray-800 flex-1">
-                            <Copy size={14} className="mr-1" /> Copy Script
-                          </Button>
-                        </div>
-
-                        <div className="mt-3 text-xs text-gray-500 text-center">
-                          {pkg.downloadCount} downloads
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
-                </motion.div>
-              );
-            })()}
-          </TabsContent>
-        ))}
-      </Tabs>
-
-      {/* Create Package Dialog */}
+      {/* Create Package Dialog - Full screen side panel style */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="bg-gray-900 border-gray-700 text-coolWhite max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-[#1e2128] border-gray-700 text-gray-200 max-w-xl">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold flex items-center gap-2">
-              <Package className="text-cyan-400" size={24} />
+            <DialogTitle className="text-xl font-bold text-white">
               Create Installation Package
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleCreate} className="space-y-4 mt-4">
-            <div>
-              <label className="text-sm text-gray-400 mb-1 block">Package Name *</label>
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required
-                className="bg-gray-800 border-gray-600 text-coolWhite" placeholder="e.g., Production Server Agent" />
+          <form onSubmit={handleCreate} className="mt-6 space-y-6">
+            <p className="text-gray-400 text-sm font-medium border-b border-gray-700/50 pb-2">General</p>
+
+            <div className="flex items-center gap-6">
+              <label className="text-sm text-gray-400 w-28 shrink-0">Name*:</label>
+              <Input
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                required
+                placeholder="Type here"
+                className="bg-[#2a2d35] border-gray-600 text-gray-200 placeholder:text-gray-500"
+              />
             </div>
-            <div>
-              <label className="text-sm text-gray-400 mb-1 block">Company *</label>
-              <select value={form.companyId} onChange={(e) => setForm({ ...form, companyId: e.target.value })} required
-                className="w-full rounded-md bg-gray-800 border border-gray-600 text-coolWhite px-3 py-2 text-sm">
-                <option value="">Select company</option>
-                {companies.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+
+            <div className="flex items-center gap-6">
+              <label className="text-sm text-gray-400 w-28 shrink-0">Description:</label>
+              <Input
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                placeholder="Type here"
+                className="bg-[#2a2d35] border-gray-600 text-gray-200 placeholder:text-gray-500"
+              />
+            </div>
+
+            <div className="flex items-center gap-6">
+              <label className="text-sm text-gray-400 w-28 shrink-0">Language:</label>
+              <select className="w-full rounded-md bg-[#2a2d35] border border-gray-600 text-gray-200 px-3 py-2 text-sm">
+                <option value="English">English</option>
               </select>
             </div>
-            <div>
-              <label className="text-sm text-gray-400 mb-1 block">OS Type *</label>
-              <div className="flex gap-4">
-                <label className={`flex-1 p-4 rounded-lg border cursor-pointer transition-all ${
-                  form.osType === 'linux' ? 'border-orange-400 bg-orange-500/10' : 'border-gray-700 hover:border-gray-600'
-                }`}>
-                  <input type="radio" value="linux" checked={form.osType === 'linux'}
-                    onChange={() => setForm({ ...form, osType: 'linux', supportedVersions: [] })} className="sr-only" />
-                  <div className="text-center">
-                    <Server className={`mx-auto mb-2 ${form.osType === 'linux' ? 'text-orange-400' : 'text-gray-500'}`} size={24} />
-                    <span className={`text-sm font-medium ${form.osType === 'linux' ? 'text-orange-400' : 'text-gray-400'}`}>Linux</span>
-                  </div>
-                </label>
-                <label className={`flex-1 p-4 rounded-lg border cursor-pointer transition-all ${
-                  form.osType === 'windows' ? 'border-blue-400 bg-blue-500/10' : 'border-gray-700 hover:border-gray-600'
-                }`}>
-                  <input type="radio" value="windows" checked={form.osType === 'windows'}
-                    onChange={() => setForm({ ...form, osType: 'windows', supportedVersions: [] })} className="sr-only" />
-                  <div className="text-center">
-                    <Monitor className={`mx-auto mb-2 ${form.osType === 'windows' ? 'text-blue-400' : 'text-gray-500'}`} size={24} />
-                    <span className={`text-sm font-medium ${form.osType === 'windows' ? 'text-blue-400' : 'text-gray-400'}`}>Windows</span>
-                  </div>
-                </label>
-              </div>
-            </div>
-            <div>
-              <label className="text-sm text-gray-400 mb-1 block">Supported Versions</label>
-              <div className="flex flex-wrap gap-2">
-                {(form.osType === 'linux' ? linuxVersions : windowsVersions).map(v => (
-                  <label key={v} className={`px-3 py-1.5 rounded-lg border text-xs cursor-pointer transition-all ${
-                    form.supportedVersions.includes(v) ? 'border-cyan-400 bg-cyan-500/10 text-cyan-400' : 'border-gray-700 text-gray-400 hover:border-gray-600'
-                  }`}>
-                    <input type="checkbox" checked={form.supportedVersions.includes(v)} className="sr-only"
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setForm({ ...form, supportedVersions: [...form.supportedVersions, v] });
-                        } else {
-                          setForm({ ...form, supportedVersions: form.supportedVersions.filter(sv => sv !== v) });
-                        }
-                      }} />
-                    {v}
-                  </label>
+
+            <div className="flex items-center gap-6">
+              <label className="text-sm text-gray-400 w-28 shrink-0">Company*:</label>
+              <select
+                value={form.companyId}
+                onChange={(e) => setForm({ ...form, companyId: e.target.value })}
+                required
+                className="w-full rounded-md bg-[#2a2d35] border border-gray-600 text-gray-200 px-3 py-2 text-sm"
+              >
+                <option value="" disabled className="text-gray-500">Choose company</option>
+                {companies.map((c) => (
+                  <option key={c._id} value={c._id}>{c.name}</option>
                 ))}
-              </div>
+              </select>
             </div>
-            <div>
-              <label className="text-sm text-gray-400 mb-1 block">Description</label>
-              <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
-                className="w-full rounded-md bg-gray-800 border border-gray-600 text-coolWhite px-3 py-2 text-sm min-h-[80px]"
-                placeholder="Package description..." />
-            </div>
-            <div className="flex justify-end gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}
-                className="border-gray-600 text-gray-300 hover:bg-gray-800">Cancel</Button>
-              <Button type="submit" className="bg-crimsonRed hover:bg-crimsonRed/80 text-white">
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-700/50">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowCreateDialog(false)}
+                className="border-gray-600 text-gray-300 hover:bg-gray-700"
+              >
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-cyan-600 hover:bg-cyan-700 text-white">
                 Create Package
               </Button>
             </div>
@@ -805,7 +886,7 @@ echo "Audit complete for $COMPANY_NAME!"
 
       {/* Script Preview Dialog */}
       <Dialog open={showScriptDialog} onOpenChange={setShowScriptDialog}>
-        <DialogContent className="bg-gray-900 border-gray-700 text-coolWhite max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="bg-[#1e2128] border-gray-700 text-gray-200 max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-2">
               <Copy className="text-cyan-400" size={24} />
@@ -816,21 +897,45 @@ echo "Audit complete for $COMPANY_NAME!"
             <div className="mt-4">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm text-gray-400">
-                  {selectedPackage.osType === 'linux' ? 'Bash Script (.sh)' : 'PowerShell Script (.ps1)'}
+                  {selectedPackage.osType === "linux" ? "Bash Script (.sh)" : "PowerShell Script (.ps1)"}
                 </span>
-                <Button size="sm" variant="outline"
-                  onClick={() => copyToClipboard(generateScript(
-                    selectedPackage.agentToken,
-                    selectedPackage.osType,
-                    getCompanyName(selectedPackage),
-                    selectedPackage.packageId
-                  ))}
-                  className="border-gray-600 text-gray-300 hover:bg-gray-800"
-                >
-                  {copied ? <><CheckCircle size={14} className="mr-1 text-emerald-400" /> Copied!</> : <><Copy size={14} className="mr-1" /> Copy</>}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleDownloadScript(selectedPackage)}
+                    className="border-gray-600 text-gray-300 hover:bg-gray-700"
+                  >
+                    <Download size={14} className="mr-1" /> Download
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      copyToClipboard(
+                        generateScript(
+                          selectedPackage.agentToken,
+                          selectedPackage.osType,
+                          getCompanyName(selectedPackage),
+                          selectedPackage.packageId
+                        )
+                      )
+                    }
+                    className="border-gray-600 text-gray-300 hover:bg-gray-700"
+                  >
+                    {copied ? (
+                      <>
+                        <CheckCircle size={14} className="mr-1 text-emerald-400" /> Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={14} className="mr-1" /> Copy
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
-              <pre className="bg-gray-950 border border-gray-800 rounded-lg p-4 text-xs text-gray-300 overflow-x-auto max-h-[50vh]">
+              <pre className="bg-[#0d0f12] border border-gray-800 rounded-lg p-4 text-xs text-gray-300 overflow-x-auto max-h-[50vh]">
                 {generateScript(
                   selectedPackage.agentToken,
                   selectedPackage.osType,
@@ -842,7 +947,7 @@ echo "Audit complete for $COMPANY_NAME!"
           )}
         </DialogContent>
       </Dialog>
-    </motion.div>
+    </div>
   );
 };
 
