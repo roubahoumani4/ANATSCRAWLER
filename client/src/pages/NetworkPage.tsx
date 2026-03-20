@@ -156,6 +156,16 @@ const NetworkPage: React.FC = () => {
     }
   };
 
+  const handlePermanentDelete = async (deviceId: string) => {
+    if (!window.confirm("Permanently delete this device and all its reports? This cannot be undone.")) return;
+    try {
+      await axios.delete(`/api/v1/os-audit/network/devices/${deviceId}`, { withCredentials: true });
+      if (selectedCompany) fetchDevices(selectedCompany.name);
+    } catch (error: any) {
+      alert(error.response?.data?.error || "Failed to delete device");
+    }
+  };
+
   const fetchReports = async (machineId: string) => {
     try {
       setLoadingReports(true);
@@ -275,10 +285,16 @@ const NetworkPage: React.FC = () => {
           </Button>
         )}
         {isDeleted ? (
-          <Button variant="outline" size="sm" onClick={() => handleRestore(device._id)}
-            className="border-emerald-600 text-emerald-400 hover:bg-emerald-900/30">
-            <RotateCcw size={14} className="mr-1" /> Restore
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => handleRestore(device._id)}
+              className="border-emerald-600 text-emerald-400 hover:bg-emerald-900/30">
+              <RotateCcw size={14} className="mr-1" /> Restore
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => handlePermanentDelete(device._id)}
+              className="border-red-600 text-red-400 hover:bg-red-900/30">
+              <Trash2 size={14} className="mr-1" /> Delete
+            </Button>
+          </div>
         ) : (
           <Button variant="outline" size="sm" onClick={() => handleSoftDelete(device._id)}
             className="border-red-600 text-red-400 hover:bg-red-900/30">

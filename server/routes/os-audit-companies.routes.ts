@@ -162,12 +162,24 @@ router.delete('/companies/:id', authenticate, async (req: AuthenticatedRequest, 
       return res.status(404).json({ success: false, error: 'Company not found' });
     }
 
+    // Find machines belonging to this company
+    const machines = await OSAuditMachine.find({ companyName: company.name, owner: userId });
+    const machineIds = machines.map(m => m._id);
+
+    // Delete all reports for those machines
+    if (machineIds.length > 0) {
+      await OSAuditReport.deleteMany({ machine: { $in: machineIds } });
+    }
+
+    // Delete all machines for this company
+    await OSAuditMachine.deleteMany({ companyName: company.name, owner: userId });
+
     // Delete associated packages
     await InstallationPackage.deleteMany({ company: company._id });
 
     await Company.deleteOne({ _id: company._id });
 
-    res.json({ success: true, message: 'Company and associated packages deleted' });
+    res.json({ success: true, message: 'Company, packages, devices, and reports deleted' });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -247,6 +259,31 @@ router.put('/network/devices/:machineId/restore', authenticate, async (req: Auth
     }
 
     res.json({ success: true, message: 'Device restored', machine });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route DELETE /api/v1/os-audit/network/devices/:machineId
+ * @desc Permanently delete a device and its reports
+ */
+router.delete('/network/devices/:machineId', authenticate, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const machine = await OSAuditMachine.findOne({ _id: req.params.machineId, owner: userId });
+
+    if (!machine) {
+      return res.status(404).json({ success: false, error: 'Device not found' });
+    }
+
+    // Delete all reports for this machine
+    await OSAuditReport.deleteMany({ machine: machine._id });
+
+    // Delete the machine
+    await OSAuditMachine.deleteOne({ _id: machine._id });
+
+    res.json({ success: true, message: 'Device and reports permanently deleted' });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -343,13 +380,28 @@ router.get('/packages', authenticate, async (req: AuthenticatedRequest, res: Res
 router.delete('/packages/:id', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?._id || req.user?.id;
-    const result = await InstallationPackage.deleteOne({ _id: req.params.id, owner: userId });
+    const pkg = await InstallationPackage.findOne({ _id: req.params.id, owner: userId });
 
-    if (result.deletedCount === 0) {
+    if (!pkg) {
       return res.status(404).json({ success: false, error: 'Package not found' });
     }
 
-    res.json({ success: true, message: 'Package deleted' });
+    // Find machines created from this package (matching agentToken)
+    const machines = await OSAuditMachine.find({ agentInstallationToken: pkg.agentToken });
+    const machineIds = machines.map(m => m._id);
+
+    // Delete all reports for those machines
+    if (machineIds.length > 0) {
+      await OSAuditReport.deleteMany({ machine: { $in: machineIds } });
+    }
+
+    // Delete the machines
+    await OSAuditMachine.deleteMany({ agentInstallationToken: pkg.agentToken });
+
+    // Delete the package
+    await InstallationPackage.deleteOne({ _id: pkg._id });
+
+    res.json({ success: true, message: 'Package, devices, and reports deleted' });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
