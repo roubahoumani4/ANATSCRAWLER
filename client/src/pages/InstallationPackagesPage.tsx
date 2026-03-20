@@ -150,37 +150,273 @@ const InstallationPackagesPage: React.FC = () => {
 # Company: ${companyName}
 # Package: ${packageId}
 
+$ErrorActionPreference = "Continue"
+
 $AGENT_TOKEN = "${token}"
 $SERVER_URL = "https://horus.anatsecurity.fr"
 $COMPANY_NAME = "${companyName}"
-
-Write-Host "=================================="
-Write-Host "ANATSCRAWLER OS Audit Agent Setup"
-Write-Host "Company: $COMPANY_NAME"
-Write-Host "=================================="
-
-# Register machine with company association
 $MACHINE_NAME = $env:COMPUTERNAME
-$IP_ADDRESS = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -ne '127.0.0.1' } | Select-Object -First 1).IPAddress
+$HOSTNAME = $env:COMPUTERNAME
 $OS_INFO = (Get-CimInstance Win32_OperatingSystem).Caption
+$KERNEL_VERSION = (Get-CimInstance Win32_OperatingSystem).Version
+$IP_ADDRESS = @((Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias Ethernet, Wi* -ErrorAction SilentlyContinue).IPAddress, (Get-NetIPAddress -AddressFamily IPv4).IPAddress)[0]
+$OWNER_NAME = $env:USERNAME
+$AGENT_DIR = "C:\\anat-os-audit"
+$KITTY_DIR = "$AGENT_DIR\\HardeningKitty"
+$REPORT_DIR = "$AGENT_DIR\\reports"
 
-$regPayload = @{
-    agentInstallationToken = $AGENT_TOKEN
-    machineName = $MACHINE_NAME
-    ipAddress = $IP_ADDRESS
-    ownerName = $env:USERNAME
-    companyName = $COMPANY_NAME
-} | ConvertTo-Json
-
-Write-Host "Registering with server..."
-try {
-    Invoke-RestMethod -Uri "$SERVER_URL/api/v1/os-audit/reports" -Method POST -ContentType "application/json" -Body $regPayload
-    Write-Host "Registration successful!"
-} catch {
-    Write-Host "Registration failed: $($_.Exception.Message)"
+function Write-Log {
+  param([string]$Message)
+  $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+  Write-Host "[$ts] $Message"
 }
 
-Write-Host "Agent setup complete for $COMPANY_NAME"
+function Install-AuditTool {
+  New-Item -ItemType Directory -Path $AGENT_DIR -Force | Out-Null
+  New-Item -ItemType Directory -Path $REPORT_DIR -Force | Out-Null
+
+  if (Test-Path $KITTY_DIR) {
+    Write-Log "Audit tool already installed"
+    return
+  }
+
+  $gitPath = Get-Command git -ErrorAction SilentlyContinue
+  if ($gitPath) {
+    Write-Log "Cloning audit tool repository..."
+    git clone https://github.com/scipag/HardeningKitty $KITTY_DIR | Out-Null
+  } else {
+    Write-Log "Git not found, downloading zip package..."
+    $zipPath = "$AGENT_DIR\\audit-tool.zip"
+    Invoke-WebRequest -Uri "https://github.com/scipag/HardeningKitty/archive/refs/heads/master.zip" -OutFile $zipPath
+    Expand-Archive -Path $zipPath -DestinationPath $AGENT_DIR -Force
+    Move-Item "$AGENT_DIR\\HardeningKitty-master" $KITTY_DIR -Force
+    Remove-Item $zipPath -Force
+  }
+}
+
+function Invoke-WindowsAudit {
+  Set-Location $KITTY_DIR
+  Import-Module .\\HardeningKitty.psm1 -Force
+  Write-Log "Starting HardeningKitty audit..."
+  try {
+    Invoke-HardeningKitty -Mode Audit -Log -LogFile "$REPORT_DIR\\audit.log" -Report -ReportFile "$REPORT_DIR\\audit.csv" -SkipMachineInformation
+  } catch {
+    Write-Log "HardeningKitty error: $_"
+  }
+  Write-Log "HardeningKitty execution finished."
+  $raw = ""
+  if (Test-Path "$REPORT_DIR\\audit.log") {
+    $raw = Get-Content "$REPORT_DIR\\audit.log" -Raw
+    Write-Log "Read audit log: $($raw.Length) chars"
+  } else {
+    Write-Log "WARNING: audit.log not found"
+  }
+  if (Test-Path "$REPORT_DIR\\audit.csv") {
+    Write-Log "CSV report found at $REPORT_DIR\\audit.csv"
+  } else {
+    Write-Log "WARNING: audit.csv not found"
+  }
+  return $raw
+}
+
+function Parse-Findings {
+  param([string]$RawOutput)
+
+  $findings = @()
+  $critical = 0
+  $high = 0
+  $medium = 0
+  $low = 0
+  $passed = 0
+
+  $csvPath = "$REPORT_DIR\\audit.csv"
+  if (Test-Path $csvPath) {
+    $csvData = Import-Csv -Path $csvPath -Delimiter ','
+    foreach ($row in $csvData) {
+      $testResult = $row.TestResult
+      $severity = if ($row.Severity) { $row.Severity.ToLower() } else { 'low' }
+      if ($severity -notin @('critical','high','medium','low')) { $severity = 'medium' }
+
+      if ($testResult -eq 'Passed') {
+        $passed += 1
+      } else {
+        switch ($severity) {
+          'critical' { $critical += 1 }
+          'high'     { $high += 1 }
+          'medium'   { $medium += 1 }
+          default    { $low += 1 }
+        }
+        $findings += @{
+          id = if ($row.ID) { $row.ID } else { [Guid]::NewGuid().ToString() }
+          test = if ($row.Category) { $row.Category } else { 'Windows Hardening' }
+          description = if ($row.Name) { $row.Name } else { $testResult }
+          result = 'WARNING'
+          severity = $severity
+          recommendation = if ($row.RecommendedValue) { "Set to: $($row.RecommendedValue)" } else { 'Apply recommended configuration.' }
+          currentValue = if ($row.DefaultValue) { $row.DefaultValue } else { '' }
+          recommendedValue = if ($row.RecommendedValue) { $row.RecommendedValue } else { '' }
+          category = if ($row.Category) { $row.Category } else { '' }
+          method = if ($row.Method) { $row.Method } else { '' }
+        }
+      }
+    }
+  } else {
+    foreach ($line in ($RawOutput -split [Environment]::NewLine)) {
+      if ($line -match '\\[PASS\\]') { $passed += 1; continue }
+      if ($line -notmatch '\\[FAIL\\]') { continue }
+      $sev = 'low'
+      if ($line -match 'Firewall|Defender|Credential|Admin|Password') { $sev = 'critical'; $critical += 1 }
+      elseif ($line -match 'UAC|SMB|RDP|WinRM|TLS|SSL|Encryption') { $sev = 'high'; $high += 1 }
+      elseif ($line -match 'Audit|Logging|Registry|Update|Patch') { $sev = 'medium'; $medium += 1 }
+      else { $low += 1 }
+      $findings += @{
+        id = [Guid]::NewGuid().ToString()
+        test = 'Windows Hardening Check'
+        description = $line.Trim()
+        result = 'WARNING'
+        severity = $sev
+        recommendation = 'Apply the recommended hardening configuration.'
+      }
+    }
+  }
+
+  $total = $passed + $critical + $high + $medium + $low
+  $score = if ($total -gt 0) { [math]::Round(($passed / $total) * 100) } else { 0 }
+
+  return @{
+    findings = $findings
+    critical = $critical
+    high = $high
+    medium = $medium
+    low = $low
+    passed = $passed
+    score = $score
+  }
+}
+
+function Submit-Report {
+  param(
+    [hashtable]$Parsed,
+    [string]$RawOutput
+  )
+
+  $hostname = $env:COMPUTERNAME
+  $ipAddress = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -ne '127.0.0.1' } | Select-Object -First 1 -ExpandProperty IPAddress)
+  if (-not $ipAddress) { $ipAddress = "Unknown" }
+  $osInfo = Get-CimInstance Win32_OperatingSystem
+  $os = $osInfo.Caption
+  $osBuild = $osInfo.BuildNumber
+  $osVersion = $osInfo.Version
+  $osArch = $osInfo.OSArchitecture
+  $domain = (Get-CimInstance Win32_ComputerSystem).Domain
+  $lastBoot = $osInfo.LastBootUpTime.ToString('yyyy-MM-dd HH:mm:ss')
+
+  $csvContent = ""
+  $csvPath = "$REPORT_DIR\\audit.csv"
+  if (Test-Path $csvPath) { $csvContent = [System.IO.File]::ReadAllText($csvPath) }
+
+  Write-Log "Building payload..."
+  $findingsArray = @()
+  foreach ($f in $Parsed.findings) {
+    $findingsArray += [PSCustomObject]@{
+      id = $f.id
+      test = $f.test
+      description = $f.description
+      result = $f.result
+      severity = $f.severity
+      recommendation = $f.recommendation
+      currentValue = $f.currentValue
+      recommendedValue = $f.recommendedValue
+      category = $f.category
+    }
+  }
+
+  $payloadObj = [PSCustomObject]@{
+    agentInstallationToken = $AGENT_TOKEN
+    machineName = $hostname
+    ipAddress = $ipAddress
+    ownerName = $OWNER_NAME
+    companyName = $COMPANY_NAME
+    auditData = [PSCustomObject]@{
+      operatingSystem = "$os (Build $osBuild)"
+      kernelVersion = $osVersion
+      hostname = $hostname
+      auditScore = $Parsed.score
+      warnings = $Parsed.high + $Parsed.critical
+      suggestions = $Parsed.medium + $Parsed.low
+      systemHardening = $Parsed.score
+      findings = $findingsArray
+      sections = [PSCustomObject]@{
+        critical = $Parsed.critical
+        high = $Parsed.high
+        medium = $Parsed.medium
+        low = $Parsed.low
+        passed = $Parsed.passed
+        osVersion = $osVersion
+        osBuild = $osBuild
+        osArch = $osArch
+        domain = $domain
+        lastBoot = $lastBoot
+      }
+      rawReport = ""
+      logFileContent = ""
+      reportFileContent = $csvContent
+      lynisVersion = "windows-audit"
+      auditDuration = 60
+    }
+  }
+
+  Write-Log "Converting to JSON..."
+  $payload = $payloadObj | ConvertTo-Json -Depth 5 -Compress
+  Write-Log "Payload ready: $($payload.Length) bytes"
+
+  try {
+    Write-Log "Sending report..."
+    $response = Invoke-RestMethod -Uri "$SERVER_URL/api/v1/os-audit/reports" -Method POST -ContentType "application/json; charset=utf-8" -Body ([System.Text.Encoding]::UTF8.GetBytes($payload)) -TimeoutSec 120
+    Write-Log "Report submitted successfully."
+  } catch {
+    Write-Log "ERROR submitting report: $($_.Exception.Message)"
+    if ($_.Exception.Response) {
+      try {
+        $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+        $body = $reader.ReadToEnd()
+        Write-Log "Server response: $body"
+      } catch { }
+    }
+    throw
+  }
+  try {
+    Invoke-RestMethod -Uri "$SERVER_URL/api/v1/os-audit/agent/heartbeat" -Method POST -ContentType "application/json" -Body (@{agentInstallationToken=$AGENT_TOKEN} | ConvertTo-Json) | Out-Null
+    Write-Log "Heartbeat sent."
+  } catch {
+    Write-Log "WARNING: Heartbeat failed: $($_.Exception.Message)"
+  }
+}
+
+Write-Log "Starting Windows audit setup..."
+try {
+  Install-AuditTool
+  Write-Log "Audit tool installed. Running audit..."
+  $raw = Invoke-WindowsAudit
+  Write-Log "Audit finished. Parsing findings..."
+  $parsed = Parse-Findings -RawOutput $raw
+  Write-Log "Parsed: Score=$($parsed.score) Passed=$($parsed.passed) Critical=$($parsed.critical) High=$($parsed.high) Medium=$($parsed.medium) Low=$($parsed.low)"
+  Write-Log "Submitting report to $SERVER_URL ..."
+  Submit-Report -Parsed $parsed -RawOutput $raw
+  Write-Log "Audit complete. Score: $($parsed.score)/100"
+} catch {
+  Write-Log "FATAL ERROR: $($_.Exception.Message)"
+  Write-Log "Stack: $($_.ScriptStackTrace)"
+  throw
+}
+
+$scriptPath = "$AGENT_DIR\\agent.ps1"
+Set-Content -Path $scriptPath -Value $MyInvocation.MyCommand.Definition -Force
+
+$action = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-ExecutionPolicy Bypass -File $scriptPath"
+$trigger = New-ScheduledTaskTrigger -Daily -At 2am
+Register-ScheduledTask -TaskName "ANATSCRAWLER-OSAudit" -Action $action -Trigger $trigger -RunLevel Highest -Force | Out-Null
+Write-Log "Scheduled task created (daily at 02:00)."
 `;
     }
 

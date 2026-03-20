@@ -266,21 +266,28 @@ router.post('/reports', async (req: AuthenticatedRequest, res: Response) => {
     console.log('  Machine name:', machineName);
     console.log('  IP address:', ipAddress);
 
-    // Find machine by token - try multiple approaches
-    let machine = await OSAuditMachine.findOne({
-      agentInstallationToken: agentInstallationToken
-    });
+    // Find machine by token + machineName to uniquely identify each machine
+    // This allows multiple machines to share the same package token
+    const trimmedToken = String(agentInstallationToken).trim();
+    let machine: any = null;
 
-    // If not found, try with string conversion in case of type mismatch
-    if (!machine) {
-      console.log('⚠️  First query failed, trying with explicit string conversion...');
+    if (machineName) {
       machine = await OSAuditMachine.findOne({
-        agentInstallationToken: String(agentInstallationToken).trim()
+        agentInstallationToken: trimmedToken,
+        machineName: machineName
+      });
+    }
+
+    // Also try matching by token + IP if machineName didn't match
+    if (!machine && ipAddress && ipAddress !== '0.0.0.0') {
+      machine = await OSAuditMachine.findOne({
+        agentInstallationToken: trimmedToken,
+        ipAddress: ipAddress
       });
     }
 
     // If still not found, check if this token is from an InstallationPackage
-    // and auto-register the machine
+    // and auto-register a new machine (allows unlimited machines per company)
     if (!machine) {
       console.log('🔍 Checking InstallationPackage for token...');
       const pkg = await InstallationPackage.findOne({
