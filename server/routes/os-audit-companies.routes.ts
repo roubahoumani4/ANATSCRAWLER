@@ -20,13 +20,13 @@ interface AuthenticatedRequest extends Request {
  */
 router.post('/companies', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { name, sector, phone, email, address, website, contactPerson, notes } = req.body;
+    const { name, companyType, country, industry, sector, phone, email, address, website, contactPerson, notes, managedEndpointSecurity, usedSeats, availableSeats, companyStatus, paymentPlan, productName, expiryDate } = req.body;
     const userId = req.user?._id || req.user?.id;
 
-    if (!name || !sector || !phone || !email) {
+    if (!name) {
       return res.status(400).json({
         success: false,
-        error: 'Name, sector, phone, and email are required'
+        error: 'Company name is required'
       });
     }
 
@@ -40,13 +40,23 @@ router.post('/companies', authenticate, async (req: AuthenticatedRequest, res: R
 
     const company = new Company({
       name: name.trim(),
-      sector: sector.trim(),
-      phone: phone.trim(),
-      email: email.trim(),
+      companyType: companyType || 'Customer',
+      country: country?.trim() || '',
+      industry: industry?.trim() || '',
+      sector: sector?.trim() || '',
+      phone: phone?.trim() || '',
+      email: email?.trim() || '',
       address: address?.trim() || '',
       website: website?.trim() || '',
       contactPerson: contactPerson?.trim() || '',
       notes: notes?.trim() || '',
+      managedEndpointSecurity: managedEndpointSecurity !== undefined ? managedEndpointSecurity : true,
+      usedSeats: usedSeats || 0,
+      availableSeats: availableSeats || 0,
+      companyStatus: companyStatus || 'Active',
+      paymentPlan: paymentPlan || 'Monthly',
+      productName: productName || 'Monthly Subscription',
+      expiryDate: expiryDate || 'Never',
       owner: userId
     });
 
@@ -76,8 +86,11 @@ router.get('/companies', authenticate, async (req: AuthenticatedRequest, res: Re
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
+        { companyType: { $regex: search, $options: 'i' } },
         { sector: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } }
+        { email: { $regex: search, $options: 'i' } },
+        { country: { $regex: search, $options: 'i' } },
+        { industry: { $regex: search, $options: 'i' } }
       ];
     }
 
@@ -131,11 +144,35 @@ router.get('/companies/:id', authenticate, async (req: AuthenticatedRequest, res
 router.put('/companies/:id', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?._id || req.user?.id;
-    const { name, sector, phone, email, address, website, contactPerson, notes } = req.body;
+    const { name, companyType, country, industry, sector, phone, email, address, website, contactPerson, notes, managedEndpointSecurity, usedSeats, availableSeats, companyStatus, paymentPlan, productName, expiryDate } = req.body;
+
+    const updateData: any = { updatedAt: new Date() };
+    if (name !== undefined) updateData.name = name;
+    if (companyType !== undefined) updateData.companyType = companyType;
+    if (country !== undefined) updateData.country = country;
+    if (industry !== undefined) updateData.industry = industry;
+    if (sector !== undefined) updateData.sector = sector;
+    if (phone !== undefined) updateData.phone = phone;
+    if (email !== undefined) updateData.email = email;
+    if (address !== undefined) updateData.address = address;
+    if (website !== undefined) updateData.website = website;
+    if (contactPerson !== undefined) updateData.contactPerson = contactPerson;
+    if (notes !== undefined) updateData.notes = notes;
+    if (managedEndpointSecurity !== undefined) updateData.managedEndpointSecurity = managedEndpointSecurity;
+    if (usedSeats !== undefined) updateData.usedSeats = usedSeats;
+    if (availableSeats !== undefined) updateData.availableSeats = availableSeats;
+    if (companyStatus !== undefined) updateData.companyStatus = companyStatus;
+    if (paymentPlan !== undefined) updateData.paymentPlan = paymentPlan;
+    if (productName !== undefined) updateData.productName = productName;
+    if (expiryDate !== undefined) updateData.expiryDate = expiryDate;
+    // Recalculate totalSeats
+    if (usedSeats !== undefined || availableSeats !== undefined) {
+      updateData.totalSeats = (usedSeats || 0) + (availableSeats || 0);
+    }
 
     const company = await Company.findOneAndUpdate(
       { _id: req.params.id, owner: userId },
-      { $set: { name, sector, phone, email, address, website, contactPerson, notes, updatedAt: new Date() } },
+      { $set: updateData },
       { new: true }
     );
 
