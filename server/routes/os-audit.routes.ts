@@ -396,6 +396,18 @@ router.post('/reports', async (req: AuthenticatedRequest, res: Response) => {
       machine.agentStatus = 'active';
       machine.agentInstalledDate = new Date();
     }
+
+    // Detect and correct osType from audit data (fixes machines registered
+    // before proper osType handling, where default 'linux' was stored)
+    const isWindowsAudit = (
+      auditData?.lynisVersion === 'windows-audit' ||
+      (auditData?.operatingSystem && String(auditData.operatingSystem).toLowerCase().includes('windows'))
+    );
+    if (isWindowsAudit && machine.osType !== 'windows') {
+      console.log(`[OS-AUDIT] Correcting osType from '${machine.osType}' to 'windows' for machine ${machine.machineName}`);
+      machine.osType = 'windows';
+    }
+
     await machine.save();
 
     // Validate audit data
@@ -460,7 +472,7 @@ router.post('/reports', async (req: AuthenticatedRequest, res: Response) => {
     // --- Background PDF pre-generation ---
     // Fire-and-forget: AI enrichment → PDF generation runs asynchronously
     // so the PDF is ready when the user clicks "Download PDF"
-    const isWindows = (machine.osType === 'windows');
+    const isWindows = isWindowsAudit || (machine.osType === 'windows');
     const reportDataForPdf = {
       reportId: savedReport.reportId,
       hostname: savedReport.hostname || savedReport.machineName,

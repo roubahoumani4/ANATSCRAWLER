@@ -276,11 +276,31 @@ const NetworkPage: React.FC = () => {
   const showDeleted = treeSelection?.folder === "deleted";
   const currentDevices = showDeleted ? deletedDevices : activeDevices;
 
+  const getManagementStatus = (device: Device) => {
+    if (device.agentStatus === "active" && device.lastSeen) {
+      const lastSeen = new Date(device.lastSeen);
+      const now = new Date();
+      const diffMs = now.getTime() - lastSeen.getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+      // If agent was seen within the last 48 hours, it's managed
+      if (diffHours <= 48) return "Managed";
+      return "Unmanaged";
+    }
+    if (device.agentStatus === "active") return "Managed";
+    return "Unmanaged";
+  };
+
+  const getSecurityIssues = (device: Device) => {
+    if (!device.lastAuditDate) return "-";
+    if ((device.latestWarnings ?? 0) > 0 || (device.latestAuditScore ?? 100) < 70) return "With issues";
+    return "Without issues";
+  };
+
   // Filtered devices
   const filteredDevices = useMemo(() => {
     return currentDevices.filter((d) => {
-      if (nameFilter && !d.machineName.toLowerCase().includes(nameFilter.toLowerCase())) return false;
-      if (ipFilter && !d.ipAddress.includes(ipFilter)) return false;
+      if (nameFilter && !d.machineName?.toLowerCase().includes(nameFilter.toLowerCase())) return false;
+      if (ipFilter && !d.ipAddress?.includes(ipFilter)) return false;
       if (statusFilter !== "All") {
         const managed = getManagementStatus(d);
         if (managed !== statusFilter) return false;
@@ -340,31 +360,44 @@ const NetworkPage: React.FC = () => {
     return `At ${timeStr}, on ${dateFormatted}`;
   };
 
-  const getManagementStatus = (device: Device) => {
-    if (device.agentStatus === "active" && device.lastSeen) {
-      const lastSeen = new Date(device.lastSeen);
-      const now = new Date();
-      const diffMs = now.getTime() - lastSeen.getTime();
-      const diffHours = diffMs / (1000 * 60 * 60);
-      // If agent was seen within the last 48 hours, it's managed
-      if (diffHours <= 48) return "Managed";
-      return "Unmanaged";
-    }
-    if (device.agentStatus === "active") return "Managed";
-    return "Unmanaged";
-  };
-
-  const getSecurityIssues = (device: Device) => {
-    if (!device.lastAuditDate) return "-";
-    if ((device.latestWarnings ?? 0) > 0 || (device.latestAuditScore ?? 100) < 70) return "With issues";
-    return "Without issues";
-  };
-
   const resetFilters = () => {
     setNameFilter("");
     setIpFilter("");
     setStatusFilter("All");
     setEntityTypeFilter("All");
+  };
+
+  const handleExportCSV = () => {
+    if (!treeSelection || filteredDevices.length === 0) return;
+    const headers = ["Name", "Company", "IP Address", "Last Seen", "Entity Type", "Management Status", "Security Issues", "OS", "Registration Date"];
+    const rows = filteredDevices.map((d) => {
+      const entityType = d.osType === "windows" ? "Physical machine" : "Virtual machine";
+      const managementStatus = getManagementStatus(d);
+      const securityIssues = getSecurityIssues(d);
+      const lastSeen = d.lastSeen || d.lastAuditDate || "";
+      return [
+        d.machineName || "",
+        d.companyName || treeSelection.company.name || "",
+        d.ipAddress || "",
+        lastSeen ? new Date(lastSeen).toLocaleString() : "",
+        entityType,
+        managementStatus,
+        securityIssues,
+        d.operatingSystem || d.osType || "",
+        d.registrationDate ? new Date(d.registrationDate).toLocaleDateString() : "",
+      ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",");
+    });
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const folderName = showDeleted ? "Deleted" : "Computers_and_Groups";
+    a.download = `${treeSelection.company.name}_${folderName}_export.csv`;
+    document.body.appendChild(a);
+    a.click();
+    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   };
 
   if (loading) {
@@ -545,6 +578,18 @@ const NetworkPage: React.FC = () => {
                   {showDeleted ? `${deletedDevices.length} deleted device(s)` : `${activeDevices.length} device(s)`}
                 </span>
               )}
+
+              <div className="ml-auto">
+                <Button
+                  onClick={handleExportCSV}
+                  disabled={filteredDevices.length === 0}
+                  variant="outline"
+                  className="border-gray-600 text-gray-300 hover:bg-gray-700 text-xs h-8 px-3"
+                >
+                  <Download size={13} className="mr-1.5" />
+                  Export
+                </Button>
+              </div>
             </div>
 
             {/* Filter Bar */}
