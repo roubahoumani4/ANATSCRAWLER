@@ -498,6 +498,112 @@ const OutputPage: React.FC = () => {
                     <p><span className="text-gray-400">MX Records:</span> {sectionData.dns?.mxRecords.join(', ') || 'N/A'}</p>
                     <p><span className="text-gray-400">SPF:</span> {sectionData.dns?.spfRecord || 'Not published'}</p>
                   </div>
+
+                  {/* checkdmarc enrichment */}
+                  {(sectionData.dns?.dmarcRecord || sectionData.dns?.dmarcPolicy || sectionData.dns?.spfValid != null || sectionData.dns?.mtaSts || sectionData.dns?.mxHosts) && (
+                    <div className="mt-5 border-t border-cyan-500/10 pt-4">
+                      <p className="text-xs font-semibold text-cyan-300 mb-3 tracking-wide">EMAIL SECURITY (checkdmarc)</p>
+
+                      {/* DMARC */}
+                      <div className="mb-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`inline-block w-2 h-2 rounded-full ${sectionData.dns?.dmarcValid ? 'bg-green-400' : 'bg-red-400'}`} />
+                          <span className="text-xs font-medium text-gray-200">DMARC</span>
+                          {sectionData.dns?.dmarcPolicy && (
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
+                              sectionData.dns.dmarcPolicy === 'reject' ? 'bg-green-500/20 text-green-300' :
+                              sectionData.dns.dmarcPolicy === 'quarantine' ? 'bg-yellow-500/20 text-yellow-300' :
+                              'bg-red-500/20 text-red-300'
+                            }`}>
+                              p={sectionData.dns.dmarcPolicy}
+                            </span>
+                          )}
+                        </div>
+                        {sectionData.dns?.dmarcRecord && (
+                          <p className="text-[11px] text-gray-400 break-all font-mono bg-gray-800/60 rounded px-2 py-1">{sectionData.dns.dmarcRecord}</p>
+                        )}
+                        {!sectionData.dns?.dmarcRecord && (
+                          <p className="text-[11px] text-red-400">No DMARC record found — domain is vulnerable to email spoofing</p>
+                        )}
+                        {sectionData.dns?.dmarcWarnings && sectionData.dns.dmarcWarnings.length > 0 && (
+                          <div className="mt-1 space-y-0.5">
+                            {sectionData.dns.dmarcWarnings.map((w, i) => (
+                              <p key={i} className="text-[10px] text-yellow-400">⚠ {w}</p>
+                            ))}
+                          </div>
+                        )}
+                        {sectionData.dns?.dmarcRua && sectionData.dns.dmarcRua.length > 0 && (
+                          <p className="text-[10px] text-gray-500 mt-0.5">Aggregate reports → {sectionData.dns.dmarcRua.map(r => typeof r === 'object' ? JSON.stringify(r) : r).join(', ')}</p>
+                        )}
+                      </div>
+
+                      {/* SPF enhanced */}
+                      <div className="mb-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`inline-block w-2 h-2 rounded-full ${sectionData.dns?.spfValid ? 'bg-green-400' : sectionData.dns?.spfValid === false ? 'bg-red-400' : 'bg-gray-500'}`} />
+                          <span className="text-xs font-medium text-gray-200">SPF</span>
+                          {sectionData.dns?.spfDnsLookups != null && (
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
+                              sectionData.dns.spfDnsLookups > 10 ? 'bg-red-500/20 text-red-300' :
+                              sectionData.dns.spfDnsLookups > 7 ? 'bg-yellow-500/20 text-yellow-300' :
+                              'bg-green-500/20 text-green-300'
+                            }`}>
+                              {sectionData.dns.spfDnsLookups}/10 lookups
+                            </span>
+                          )}
+                        </div>
+                        {sectionData.dns?.spfWarnings && sectionData.dns.spfWarnings.length > 0 && (
+                          <div className="space-y-0.5">
+                            {sectionData.dns.spfWarnings.map((w, i) => (
+                              <p key={i} className="text-[10px] text-yellow-400">⚠ {w}</p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* MTA-STS */}
+                      {sectionData.dns?.mtaSts && (
+                        <div className="mb-3">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`inline-block w-2 h-2 rounded-full ${sectionData.dns.mtaSts.valid ? 'bg-green-400' : 'bg-gray-500'}`} />
+                            <span className="text-xs font-medium text-gray-200">MTA-STS</span>
+                            {sectionData.dns.mtaSts.policy?.mode && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-blue-500/20 text-blue-300">
+                                mode={sectionData.dns.mtaSts.policy.mode}
+                              </span>
+                            )}
+                          </div>
+                          {sectionData.dns.mtaSts.warnings && sectionData.dns.mtaSts.warnings.length > 0 && (
+                            <div className="space-y-0.5">
+                              {sectionData.dns.mtaSts.warnings.map((w: string, i: number) => (
+                                <p key={i} className="text-[10px] text-yellow-400">⚠ {w}</p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* MX Hosts with TLS */}
+                      {sectionData.dns?.mxHosts && sectionData.dns.mxHosts.length > 0 && (
+                        <div>
+                          <p className="text-[11px] text-gray-400 mb-1">MX Hosts:</p>
+                          <div className="space-y-1">
+                            {sectionData.dns.mxHosts.map((mx, i) => (
+                              <div key={i} className="flex items-center gap-2 text-[11px]">
+                                <span className="text-gray-300 font-mono">{mx.hostname}</span>
+                                <span className={`px-1 py-0.5 rounded text-[9px] font-semibold ${mx.tls ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
+                                  {mx.tls ? 'TLS' : 'No TLS'}
+                                </span>
+                                <span className={`px-1 py-0.5 rounded text-[9px] font-semibold ${mx.starttls ? 'bg-green-500/20 text-green-300' : 'bg-yellow-500/20 text-yellow-300'}`}>
+                                  {mx.starttls ? 'STARTTLS' : 'No STARTTLS'}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* 3. Subdomains */}

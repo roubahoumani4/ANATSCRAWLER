@@ -817,6 +817,101 @@ class ProfessionalOSINT:
                 "source": "Local Database"
             })
 
+        # ── checkdmarc integration ──────────────────────────────────────
+        print(f"\n{Colors.BLUE}Running checkdmarc analysis...{Colors.END}")
+        try:
+            import subprocess, json as _json
+            proc = subprocess.run(
+                ["checkdmarc", self.domain, "-f", "json"],
+                capture_output=True, text=True, timeout=60
+            )
+            if proc.returncode == 0 and proc.stdout.strip():
+                cdm = _json.loads(proc.stdout)
+                dns_data["checkdmarc"] = cdm
+
+                # ── DMARC ──
+                dmarc_info = cdm.get("dmarc", {})
+                dns_data["analysis"]["dmarc_record"] = dmarc_info.get("record", "")
+                dns_data["analysis"]["dmarc_valid"] = dmarc_info.get("valid", False)
+                dmarc_tags = dmarc_info.get("tags", {})
+                dns_data["analysis"]["dmarc_policy"] = dmarc_tags.get("p", {}).get("value", "none") if isinstance(dmarc_tags, dict) else "none"
+                dns_data["analysis"]["dmarc_subdomain_policy"] = dmarc_tags.get("sp", {}).get("value", "") if isinstance(dmarc_tags, dict) else ""
+                dns_data["analysis"]["dmarc_pct"] = dmarc_tags.get("pct", {}).get("value", 100) if isinstance(dmarc_tags, dict) else 100
+                dns_data["analysis"]["dmarc_rua"] = dmarc_tags.get("rua", {}).get("value", []) if isinstance(dmarc_tags, dict) else []
+                dns_data["analysis"]["dmarc_ruf"] = dmarc_tags.get("ruf", {}).get("value", []) if isinstance(dmarc_tags, dict) else []
+                dns_data["analysis"]["dmarc_warnings"] = dmarc_info.get("warnings", [])
+
+                if dmarc_info.get("record"):
+                    self.print_success(f"DMARC Record: {dmarc_info['record']}")
+                    print(f"  Policy: {dns_data['analysis']['dmarc_policy']}")
+                    print(f"  Valid: {dmarc_info.get('valid', False)}")
+                else:
+                    self.print_warning("No DMARC record found")
+                    self.results["vulnerabilities"].append({
+                        "type": "Email Security",
+                        "severity": "HIGH",
+                        "description": "No DMARC record found - domain is vulnerable to email spoofing",
+                        "recommendation": "Publish a DMARC record with at least p=quarantine",
+                        "source": "checkdmarc"
+                    })
+
+                # ── Enhanced SPF from checkdmarc ──
+                spf_info = cdm.get("spf", {})
+                if spf_info.get("record"):
+                    dns_data["analysis"]["spf_record"] = spf_info["record"]
+                    dns_data["analysis"]["spf_valid"] = spf_info.get("valid", False)
+                    dns_data["analysis"]["spf_dns_lookups"] = spf_info.get("dns_lookups", 0)
+                    dns_data["analysis"]["spf_warnings"] = spf_info.get("warnings", [])
+                    self.print_success(f"SPF Record: {spf_info['record']}")
+                    print(f"  Valid: {spf_info.get('valid', False)}")
+                    print(f"  DNS Lookups: {spf_info.get('dns_lookups', 0)}/10")
+
+                # ── MTA-STS ──
+                mta_sts = cdm.get("mta_sts", {})
+                if mta_sts:
+                    dns_data["analysis"]["mta_sts"] = mta_sts
+                    if mta_sts.get("valid"):
+                        policy = mta_sts.get("policy", {})
+                        self.print_success(f"MTA-STS: mode={policy.get('mode', 'N/A')}")
+                    else:
+                        self.print_warning("MTA-STS not configured or invalid")
+
+                # ── MX with TLS info ──
+                mx_info = cdm.get("mx", {})
+                if mx_info.get("hosts"):
+                    dns_data["analysis"]["mx_hosts"] = mx_info["hosts"]
+                    dns_data["analysis"]["mx_warnings"] = mx_info.get("warnings", [])
+                    for host in mx_info["hosts"]:
+                        tls_status = "TLS" if host.get("tls") else "NO TLS"
+                        starttls = "STARTTLS" if host.get("starttls") else "no STARTTLS"
+                        print(f"  MX: {host.get('hostname', '')} [{tls_status}, {starttls}]")
+
+                # ── NS info ──
+                ns_info = cdm.get("ns", {})
+                if ns_info.get("hostnames"):
+                    dns_data["analysis"]["ns_hostnames"] = ns_info["hostnames"]
+                    dns_data["analysis"]["ns_warnings"] = ns_info.get("warnings", [])
+
+                # ── SOA ──
+                soa_info = cdm.get("soa", {})
+                if soa_info:
+                    dns_data["analysis"]["soa"] = soa_info
+
+                # ── DNSSEC from checkdmarc ──
+                if "dnssec" in cdm:
+                    dns_data["security"]["dnssec"] = cdm["dnssec"]
+
+                self.print_success("checkdmarc analysis complete")
+            else:
+                err_msg = proc.stderr.strip() if proc.stderr else "unknown error"
+                self.print_warning(f"checkdmarc returned no output: {err_msg}")
+        except FileNotFoundError:
+            self.print_warning("checkdmarc not installed (pip install checkdmarc)")
+        except subprocess.TimeoutExpired:
+            self.print_warning("checkdmarc timed out after 60s")
+        except Exception as e:
+            self.print_warning(f"checkdmarc failed: {str(e)}")
+
         self.results["domain_information"]["dns"] = dns_data
         self.save_artifact("dns_analysis.json", dns_data)
 

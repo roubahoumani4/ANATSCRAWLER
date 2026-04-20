@@ -24,6 +24,23 @@ type DnsSection = {
   txtRecords: string[];
   dnssecEnabled: boolean;
   spfRecord?: string;
+  // checkdmarc enrichment
+  dmarcRecord?: string;
+  dmarcValid?: boolean;
+  dmarcPolicy?: string;
+  dmarcSubdomainPolicy?: string;
+  dmarcPct?: number;
+  dmarcRua?: string[];
+  dmarcRuf?: string[];
+  dmarcWarnings?: string[];
+  spfValid?: boolean;
+  spfDnsLookups?: number;
+  spfWarnings?: string[];
+  mtaSts?: { valid?: boolean; id?: string; policy?: { mode?: string; max_age?: number; mx?: string[] }; warnings?: string[] };
+  mxHosts?: Array<{ preference?: number; hostname?: string; tls?: boolean; starttls?: boolean; addresses?: string[] }>;
+  mxWarnings?: string[];
+  soaRecord?: string;
+  soaValues?: Record<string, any>;
 };
 
 type SubdomainSection = {
@@ -550,13 +567,34 @@ const parseAssessmentSections = (plain: string | null, parsedExtras?: any): Sect
 
       // DNS
       if (dnsAnalysis) {
+        const analysis = dnsAnalysis.analysis || {};
+        const security = dnsAnalysis.security || {};
+        const cdm = dnsAnalysis.checkdmarc || {};
+        const records = dnsAnalysis.records || dnsAnalysis;
         data.dns = {
-          aRecords: dnsAnalysis.a || dnsAnalysis.aRecords || dnsAnalysis.A || [],
-          mxRecords: dnsAnalysis.mx || dnsAnalysis.mxRecords || [],
-          nsRecords: dnsAnalysis.ns || dnsAnalysis.nsRecords || [],
-          txtRecords: dnsAnalysis.txt || dnsAnalysis.txtRecords || [],
-          dnssecEnabled: dnsAnalysis.dnssec === true || dnsAnalysis.dnssecEnabled === true || false,
-          spfRecord: dnsAnalysis.spf || dnsAnalysis.spfRecord || dnsAnalysis.spf_record,
+          aRecords: records.A || records.a || dnsAnalysis.aRecords || [],
+          mxRecords: records.MX || records.mx || dnsAnalysis.mxRecords || [],
+          nsRecords: records.NS || records.ns || dnsAnalysis.nsRecords || [],
+          txtRecords: records.TXT || records.txt || dnsAnalysis.txtRecords || [],
+          dnssecEnabled: security.dnssec === true || dnsAnalysis.dnssec === true || cdm.dnssec === true || dnsAnalysis.dnssecEnabled === true || false,
+          spfRecord: analysis.spf_record || dnsAnalysis.spf || dnsAnalysis.spfRecord || cdm.spf?.record,
+          // checkdmarc enrichment
+          dmarcRecord: analysis.dmarc_record || cdm.dmarc?.record || undefined,
+          dmarcValid: analysis.dmarc_valid ?? cdm.dmarc?.valid ?? undefined,
+          dmarcPolicy: analysis.dmarc_policy || cdm.dmarc?.tags?.p?.value || undefined,
+          dmarcSubdomainPolicy: analysis.dmarc_subdomain_policy || cdm.dmarc?.tags?.sp?.value || undefined,
+          dmarcPct: analysis.dmarc_pct ?? cdm.dmarc?.tags?.pct?.value ?? undefined,
+          dmarcRua: analysis.dmarc_rua || cdm.dmarc?.tags?.rua?.value || undefined,
+          dmarcRuf: analysis.dmarc_ruf || cdm.dmarc?.tags?.ruf?.value || undefined,
+          dmarcWarnings: analysis.dmarc_warnings || cdm.dmarc?.warnings || undefined,
+          spfValid: analysis.spf_valid ?? cdm.spf?.valid ?? undefined,
+          spfDnsLookups: analysis.spf_dns_lookups ?? cdm.spf?.dns_lookups ?? undefined,
+          spfWarnings: analysis.spf_warnings || cdm.spf?.warnings || undefined,
+          mtaSts: analysis.mta_sts || cdm.mta_sts || undefined,
+          mxHosts: analysis.mx_hosts || cdm.mx?.hosts || undefined,
+          mxWarnings: analysis.mx_warnings || cdm.mx?.warnings || undefined,
+          soaRecord: cdm.soa?.record || analysis.soa?.record || undefined,
+          soaValues: cdm.soa?.values || analysis.soa?.values || undefined,
         };
       }
 
@@ -1564,7 +1602,22 @@ const AssessmentPage: React.FC = () => {
           addKeyValueList([
             { key: 'DNSSEC Enabled', value: dns.dnssecEnabled ? 'Yes' : 'No' },
             { key: 'SPF Record', value: dns.spfRecord || 'Not published' },
+            { key: 'SPF Valid', value: dns.spfValid != null ? (dns.spfValid ? 'Yes' : 'No') : 'N/A' },
+            { key: 'SPF DNS Lookups', value: dns.spfDnsLookups != null ? `${dns.spfDnsLookups}/10` : 'N/A' },
+            { key: 'DMARC Record', value: dns.dmarcRecord || 'Not published' },
+            { key: 'DMARC Valid', value: dns.dmarcValid != null ? (dns.dmarcValid ? 'Yes' : 'No') : 'N/A' },
+            { key: 'DMARC Policy', value: dns.dmarcPolicy || 'none' },
+            { key: 'MTA-STS', value: dns.mtaSts?.valid ? `Valid (mode: ${dns.mtaSts.policy?.mode || 'N/A'})` : 'Not configured' },
           ]);
+          if (dns.dmarcWarnings?.length) {
+            addBulletList('DMARC Warnings', dns.dmarcWarnings);
+          }
+          if (dns.spfWarnings?.length) {
+            addBulletList('SPF Warnings', dns.spfWarnings);
+          }
+          if (dns.mxHosts?.length) {
+            addBulletList('MX Hosts (TLS)', dns.mxHosts.map(h => `${h.hostname || ''} [${h.tls ? 'TLS' : 'No TLS'}, ${h.starttls ? 'STARTTLS' : 'No STARTTLS'}]`));
+          }
           addBulletList('A Records', dns.aRecords);
           addBulletList('MX Records', dns.mxRecords);
           addBulletList('NS Records', dns.nsRecords);
