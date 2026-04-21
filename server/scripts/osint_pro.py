@@ -3929,11 +3929,32 @@ Full technical details available in the JSON output files in the investigation d
         # Display vulnerability details
         self.display_vulnerability_details()
         
-        # Generate final report
+        # Generate final report (markdown)
         report_file = self.generate_professional_report()
         
         # Save complete results
         self.save_artifact("complete_results.json", self.results)
+
+        # Generate professional PDF report (reads every artifact above)
+        pdf_file = None
+        try:
+            import subprocess, sys as _sys
+            pdf_script = Path(__file__).resolve().parent / "generate_osint_pdf_report.py"
+            if pdf_script.exists():
+                cp = subprocess.run(
+                    [_sys.executable, str(pdf_script), str(self.output_dir)],
+                    capture_output=True, text=True, timeout=180,
+                )
+                if cp.returncode == 0 and cp.stdout.strip():
+                    pdf_file = cp.stdout.strip().splitlines()[-1]
+                    self.print_success(f"PDF report generated: {pdf_file}")
+                else:
+                    self.print_warning(
+                        f"PDF generation failed (rc={cp.returncode}): "
+                        f"{(cp.stderr or cp.stdout).strip()[:300]}"
+                    )
+        except Exception as e:
+            self.print_warning(f"PDF generation error: {e}")
         
         # Enhanced summary
         print(f"\n{Colors.BOLD}{Colors.GREEN}{'='*80}{Colors.END}")
@@ -3952,7 +3973,7 @@ Full technical details available in the JSON output files in the investigation d
         print(f"  Breached Accounts: {len(self.breached_accounts)}")
         print(f"  Live NVD Checks: {self.results['live_vulnerability_checks']['vulnerabilities_found']} vulnerabilities found")
         print(f"  Risk Level: {self.results['executive_summary']['risk_level']}")
-        print(f"\n{Colors.CYAN}Report Location: {report_file}{Colors.END}\n")
+        print(f"\n{Colors.CYAN}Report Location: {pdf_file or report_file}{Colors.END}\n")
         
         if critical_count > 0:
             print(f"{Colors.RED}{Colors.BOLD}🚨 {critical_count} CRITICAL vulnerabilities require immediate attention!{Colors.END}")

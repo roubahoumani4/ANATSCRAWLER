@@ -734,10 +734,30 @@ ${cleanedOutput}
       resolved = path.resolve(scriptsDir, rawLocation);
     }
 
-    // Ensure file exists and is underneath the scriptsDir for safety
+    // Path-traversal guard: the resolved file must live somewhere sane
+    // (under scriptsDir, the deploy root, or /tmp). We do NOT require it
+    // to be strictly under scriptsDir because osint_pro.py writes outputs
+    // to its current-working directory.
     const real = path.resolve(resolved);
-    if (!real.startsWith(path.resolve(scriptsDir))) {
+    const allowedRoots = [
+      path.resolve(scriptsDir),
+      path.resolve(process.cwd()),
+      '/var/www/anatscrawler',
+      '/tmp',
+    ];
+    const underAllowed = allowedRoots.some((root) => real.startsWith(root + path.sep) || real === root);
+    if (!underAllowed) {
       return res.status(400).json({ error: 'Invalid report path' });
+    }
+
+    // If the report file is a PDF we can just stream it
+    if (fs.existsSync(real) && real.toLowerCase().endsWith('.pdf')) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="OSINT_REPORT_${scan.target}_${jobId.slice(0, 8)}.pdf"`
+      );
+      return res.download(real, path.basename(real));
     }
 
     // If report file doesn't exist, generate report from scan data instead
