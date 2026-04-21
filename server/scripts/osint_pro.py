@@ -2958,18 +2958,66 @@ class ProfessionalOSINT:
             return
 
         # --- Discover candidate URLs with query parameters ---
+        # Aggression profile (set SQLMAP_PROFILE=aggressive or SQLMAP_PROFILE=deep
+        # to unlock higher levels/risks and wider crawling).
+        profile = (os.environ.get("SQLMAP_PROFILE") or "standard").lower().strip()
+        if profile in ("deep", "aggressive", "max"):
+            prof = {
+                "level": 5,
+                "risk": 3,
+                "technique": "BEUSTQ",     # Boolean, Error, Union, Stacked, Time, inline
+                "timeout": 30,
+                "retries": 2,
+                "threads": 5,
+                "per_url_timeout": 900,     # 15 min / URL
+                "max_urls": 25,
+                "per_host_quota": 8,
+                "test_forms": True,
+            }
+        elif profile in ("hard", "thorough"):
+            prof = {
+                "level": 3,
+                "risk": 2,
+                "technique": "BEUSTQ",
+                "timeout": 20,
+                "retries": 1,
+                "threads": 4,
+                "per_url_timeout": 600,
+                "max_urls": 20,
+                "per_host_quota": 6,
+                "test_forms": True,
+            }
+        else:  # "standard" (default — still stronger than v1)
+            prof = {
+                "level": 2,
+                "risk": 2,
+                "technique": "BEUST",       # skip slow inline Q
+                "timeout": 15,
+                "retries": 1,
+                "threads": 4,
+                "per_url_timeout": 360,     # 6 min / URL
+                "max_urls": 15,
+                "per_host_quota": 5,
+                "test_forms": True,
+            }
+
         seed_pages = []
         for scheme in ("https", "http"):
             seed_pages.append(f"{scheme}://{self.domain}")
-        for sub in list(self.discovered_subdomains.keys())[:2]:
+        # Include more subdomains to broaden attack surface
+        for sub in list(self.discovered_subdomains.keys())[:5]:
             seed_pages.append(f"https://{sub}")
+            seed_pages.append(f"http://{sub}")
 
         headers = {"User-Agent": "Mozilla/5.0 (ANATSCRAWLER/OSINT)"}
-        candidate_urls = []
-        seen = set()
+        candidate_urls = []        # URLs with query strings (GET)
+        form_targets = []          # POST forms -> {"url","data"}
+        seen_urls = set()
+        seen_forms = set()
+        host_counts = {}
 
         def add_url(u: str):
-            if not u or u in seen:
+            if not u or u in seen_urls:
                 return
             try:
                 parsed = urlparse(u)
@@ -2977,7 +3025,6 @@ class ProfessionalOSINT:
                 return
             if parsed.scheme not in ("http", "https"):
                 return
-            # Only keep URLs on the target domain (or subdomain of it)
             host = (parsed.hostname or "").lower()
             if not host:
                 return
@@ -2985,12 +3032,40 @@ class ProfessionalOSINT:
                 return
             if not parsed.query:
                 return
-            seen.add(u)
+            if host_counts.get(host, 0) >= prof["per_host_quota"]:
+                return
+            host_counts[host] = host_counts.get(host, 0) + 1
+            seen_urls.add(u)
             candidate_urls.append(u)
 
-        for page in seed_pages:
+        def add_form(action: str, data: str, method: str):
+            key = f"{method.upper()}::{action}::{data}"
+            if key in seen_forms:
+                return
             try:
-                self.print_debug(f"Fetching {page} to discover parameterized URLs")
+                parsed = urlparse(action)
+            except Exception:
+                return
+            if parsed.scheme not in ("http", "https"):
+                return
+            host = (parsed.hostname or "").lower()
+            if not (host == self.domain or host.endswith("." + self.domain)):
+                return
+            seen_forms.add(key)
+            form_targets.append({"url": action, "data": data, "method": method.upper()})
+
+        # BFS-style crawl: seed pages + 1-hop link discovery (same origin)
+        crawl_queue = list(seed_pages)
+        crawled = set()
+        crawl_limit = 25  # pages fetched total (protect against runaways)
+
+        while crawl_queue and len(crawled) < crawl_limit:
+            page = crawl_queue.pop(0)
+            if page in crawled:
+                continue
+            crawled.add(page)
+            try:
+                self.print_debug(f"Crawling {page} for SQLi candidates")
                 resp = requests.get(page, headers=headers, timeout=10, verify=False, allow_redirects=True)
             except Exception as e:
                 self.print_debug(f"Unable to fetch {page}: {e}")
@@ -2998,8 +3073,7 @@ class ProfessionalOSINT:
             if not resp.ok or not resp.text:
                 continue
 
-            # Seed itself if it already has a query string
-            add_url(resp.url)
+            add_url(resp.url)  # If the landing URL itself is parameterized
 
             try:
                 soup = BeautifulSoup(resp.text, "html.parser")
@@ -3007,42 +3081,74 @@ class ProfessionalOSINT:
                 self.print_debug(f"HTML parse failed for {page}: {e}")
                 continue
 
+            # Links
             for tag in soup.find_all("a", href=True):
                 abs_url = urljoin(resp.url, tag["href"])
                 add_url(abs_url)
-            for tag in soup.find_all("form", action=True):
-                abs_url = urljoin(resp.url, tag["action"])
-                # Only use GET forms as URLs with query string (best-effort)
-                method = (tag.get("method") or "get").lower()
-                if method == "get":
-                    inputs = tag.find_all(["input", "select", "textarea"])
-                    params = []
-                    for inp in inputs:
-                        name = inp.get("name")
-                        if not name:
-                            continue
-                        params.append(f"{name}={inp.get('value') or '1'}")
-                    if params:
-                        sep = "&" if "?" in abs_url else "?"
-                        add_url(f"{abs_url}{sep}{'&'.join(params)}")
+                # Queue same-origin pages for shallow crawl (no query → internal page)
+                try:
+                    p = urlparse(abs_url)
+                    host = (p.hostname or "").lower()
+                    if (
+                        p.scheme in ("http", "https")
+                        and (host == self.domain or host.endswith("." + self.domain))
+                        and abs_url not in crawled
+                        and len(crawl_queue) < crawl_limit
+                    ):
+                        crawl_queue.append(abs_url)
+                except Exception:
+                    pass
 
-            if len(candidate_urls) >= 10:
+            # Forms
+            for tag in soup.find_all("form"):
+                action = urljoin(resp.url, tag.get("action") or resp.url)
+                method = (tag.get("method") or "get").lower()
+                inputs = tag.find_all(["input", "select", "textarea"])
+                params = []
+                for inp in inputs:
+                    name = inp.get("name")
+                    if not name:
+                        continue
+                    val = inp.get("value") or "1"
+                    params.append(f"{name}={val}")
+                if not params:
+                    continue
+                qs = "&".join(params)
+                if method == "post" and prof["test_forms"]:
+                    add_form(action, qs, "POST")
+                else:
+                    sep = "&" if "?" in action else "?"
+                    add_url(f"{action}{sep}{qs}")
+
+            if len(candidate_urls) + len(form_targets) >= prof["max_urls"]:
                 break
 
-        if not candidate_urls:
-            self.print_warning("No parameterized URLs found to test for SQL injection")
+        total_targets = len(candidate_urls) + len(form_targets)
+        if not total_targets:
+            self.print_warning("No parameterized URLs or forms found to test for SQL injection")
             self.results["sql_injection"] = {
                 "tested_urls": [],
                 "findings": [],
                 "summary": {"injectable": 0, "tested": 0},
+                "profile": profile,
             }
             self.save_artifact("sql_injection.json", self.results["sql_injection"])
             return
 
-        candidate_urls = candidate_urls[:10]  # Safety cap
-        print(f"{Colors.CYAN}Discovered {len(candidate_urls)} parameterized URL(s) to test{Colors.END}")
+        candidate_urls = candidate_urls[:prof["max_urls"]]
+        form_targets = form_targets[: max(0, prof["max_urls"] - len(candidate_urls))]
+        targets = [{"url": u, "data": None, "method": "GET"} for u in candidate_urls] + form_targets
+        print(
+            f"{Colors.CYAN}sqlmap profile: {profile}  "
+            f"level={prof['level']} risk={prof['risk']} technique={prof['technique']} "
+            f"threads={prof['threads']} timeout/url={prof['per_url_timeout']}s{Colors.END}"
+        )
+        print(
+            f"{Colors.CYAN}Testing {len(candidate_urls)} GET URL(s) + "
+            f"{len(form_targets)} POST form(s) — {total_targets} target(s){Colors.END}"
+        )
 
-        # --- Run sqlmap against each URL ---
+        # --- Run sqlmap against each target ---
         tmpdir = tempfile.mkdtemp(prefix="sqlmap_")
         findings = []
         tested = []
@@ -3055,39 +3161,51 @@ class ProfessionalOSINT:
         dbms_re = re.compile(r"back-end DBMS:\s*(.+)", re.IGNORECASE)
         not_injectable_re = re.compile(r"all tested parameters do not appear to be injectable", re.IGNORECASE)
 
-        for idx, url in enumerate(candidate_urls, 1):
-            print(f"{Colors.CYAN}[{idx}/{len(candidate_urls)}] sqlmap -> {url}{Colors.END}")
+        for idx, tgt in enumerate(targets, 1):
+            url = tgt["url"]
+            method = tgt["method"]
+            label = f"{method} {url}" + (f"  data={tgt['data']}" if tgt["data"] else "")
+            print(f"{Colors.CYAN}[{idx}/{len(targets)}] sqlmap -> {label}{Colors.END}")
             output_dir = os.path.join(tmpdir, f"scan_{idx}")
             cmd = sqlmap_cmd + [
                 "-u", url,
                 "--batch",
                 "--disable-coloring",
                 "--random-agent",
-                "--level=1",
-                "--risk=1",
-                "--timeout=10",
-                "--retries=0",
-                "--threads=1",
+                f"--level={prof['level']}",
+                f"--risk={prof['risk']}",
+                f"--technique={prof['technique']}",
+                f"--timeout={prof['timeout']}",
+                f"--retries={prof['retries']}",
+                f"--threads={prof['threads']}",
                 "--smart",
+                "--keep-alive",
                 "--flush-session",
+                "--fresh-queries",
                 "--output-dir", output_dir,
                 "-v", "1",
             ]
+            if tgt["data"]:
+                cmd += ["--data", tgt["data"]]
+            # Probe DBMS banner/fingerprint on deeper profiles
+            if profile in ("deep", "aggressive", "max", "hard", "thorough"):
+                cmd += ["--banner", "--current-user", "--current-db", "--is-dba"]
+
             try:
-                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=prof["per_url_timeout"])
             except subprocess.TimeoutExpired:
-                self.print_warning(f"sqlmap timed out after 180s on {url}")
-                tested.append({"url": url, "status": "timeout"})
+                self.print_warning(f"sqlmap timed out after {prof['per_url_timeout']}s on {url}")
+                tested.append({"url": url, "method": method, "status": "timeout"})
                 continue
             except Exception as e:
                 self.print_error(f"sqlmap execution failed on {url}: {e}")
-                tested.append({"url": url, "status": "error", "error": str(e)})
+                tested.append({"url": url, "method": method, "status": "error", "error": str(e)})
                 continue
 
             out = (proc.stdout or "") + "\n" + (proc.stderr or "")
             if not_injectable_re.search(out):
                 print(f"{Colors.GREEN}  No injectable parameters detected{Colors.END}")
-                tested.append({"url": url, "status": "clean"})
+                tested.append({"url": url, "method": method, "status": "clean"})
                 continue
 
             # Extract "Parameter: X (METHOD)" blocks
@@ -3097,7 +3215,7 @@ class ProfessionalOSINT:
                 start = m.start()
                 end = matches[i + 1].start() if i + 1 < len(matches) else len(out)
                 block = out[start:end]
-                param_name, method = m.group(1), m.group(2).upper()
+                param_name, pmethod = m.group(1), m.group(2).upper()
                 techniques = []
                 # Within each parameter block, iterate "Type:" sub-blocks
                 type_matches = list(type_re.finditer(block))
@@ -3113,7 +3231,7 @@ class ProfessionalOSINT:
                     techniques.append(tech)
                 param_blocks.append({
                     "parameter": param_name,
-                    "method": method,
+                    "method": pmethod,
                     "techniques": techniques,
                 })
 
@@ -3121,9 +3239,11 @@ class ProfessionalOSINT:
             dbms = dbms_match.group(1).strip() if dbms_match else None
 
             if param_blocks:
-                tested.append({"url": url, "status": "vulnerable"})
+                tested.append({"url": url, "method": method, "status": "vulnerable"})
                 finding = {
                     "url": url,
+                    "method": method,
+                    "data": tgt["data"],
                     "dbms": dbms,
                     "parameters": param_blocks,
                 }
@@ -3154,7 +3274,7 @@ class ProfessionalOSINT:
                     "source": "sqlmap",
                 })
             else:
-                tested.append({"url": url, "status": "unknown"})
+                tested.append({"url": url, "method": method, "status": "unknown"})
 
         # --- Summary ---
         summary = {
@@ -3181,6 +3301,7 @@ class ProfessionalOSINT:
             "tested_urls": tested,
             "findings": findings,
             "summary": summary,
+            "profile": profile,
         }
         self.results["sql_injection"] = sql_result
         self.save_artifact("sql_injection.json", sql_result)
