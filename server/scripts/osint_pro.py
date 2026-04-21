@@ -3358,7 +3358,20 @@ class ProfessionalOSINT:
         amass_timeout = int(os.environ.get("AMASS_TIMEOUT") or ("2" if mode == "passive" else "5"))  # minutes
         proc_timeout = amass_timeout * 60 + 60  # subprocess timeout = amass-budget + 60s grace
 
-        tmpdir = tempfile.mkdtemp(prefix="amass_")
+        # Snap-confined amass (/snap/bin/amass) cannot read/write the host's real
+        # /tmp (it gets a private /tmp/snap-private-tmp/...). Place the work dir
+        # under $HOME so the snap "home" interface allows R/W access.
+        is_snap_amass = "/snap/" in amass_bin
+        tmp_parent = None
+        if is_snap_amass:
+            home_dir = os.path.expanduser("~")
+            if home_dir and os.path.isdir(home_dir):
+                tmp_parent = os.path.join(home_dir, ".cache", "anatscrawler", "amass")
+                try:
+                    os.makedirs(tmp_parent, exist_ok=True)
+                except Exception:
+                    tmp_parent = None
+        tmpdir = tempfile.mkdtemp(prefix="amass_", dir=tmp_parent)
         json_file = os.path.join(tmpdir, "amass.json")
         text_file = os.path.join(tmpdir, "amass.txt")
 
@@ -3516,7 +3529,14 @@ class ProfessionalOSINT:
         else:
             if proc_stderr.strip():
                 self.print_debug(f"Amass stderr: {proc_stderr.strip()[:400]}")
+            if proc_stdout.strip():
+                self.print_debug(f"Amass stdout: {proc_stdout.strip()[:400]}")
             self.print_warning("Amass returned no hosts")
+            if is_snap_amass:
+                self.print_warning(
+                    "Snap amass is sandboxed; if results stay empty, install the native binary "
+                    "(e.g. /usr/local/bin/amass) and set AMASS_BIN to its path."
+                )
 
         amass_result = {
             "enabled": True,
