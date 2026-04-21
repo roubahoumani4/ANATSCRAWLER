@@ -6,6 +6,11 @@ import { ChevronDown, ChevronUp, Download, FileText, History as HistoryIcon, Shi
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { parseAssessmentSections } from './AssessmentPage';
 import MatrixBackground from '@/components/ui/MatrixBackground';
+import {
+  fetchDarkWebBreachData,
+  extractDomainFromTarget,
+  type DarkWebBreachStats,
+} from '@/lib/darkwebBreach';
 
 // Helper function to clean unwanted footer lines from scan output
 const cleanScanOutput = (output: string): string => {
@@ -40,6 +45,8 @@ const OutputPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [scan, setScan] = useState<any | null>(null);
   const [outputExpanded, setOutputExpanded] = useState(false);
+  const [darkWebBreach, setDarkWebBreach] = useState<DarkWebBreachStats | null>(null);
+  const [darkWebLoading, setDarkWebLoading] = useState(false);
 
   // Parse section data first (same as AssessmentPage)
   const sectionData = useMemo(() => {
@@ -173,15 +180,15 @@ const OutputPage: React.FC = () => {
     })();
 
     const breachPie = (() => {
-      const summary = { clean: 0, error: 0 };
-      (sectionData.breach?.results || []).forEach((result: any) => {
-        if (result.status === 'clean') summary.clean += 1;
-        else summary.error += 1;
-      });
-      return [
-        { name: 'No Breaches', value: summary.clean },
-        { name: 'Errors', value: summary.error },
-      ];
+      if (!darkWebBreach || darkWebBreach.totalExposed === 0) return [];
+      const entries = Object.entries(darkWebBreach.databases);
+      if (entries.length) {
+        return entries
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 8)
+          .map(([name, value]) => ({ name, value }));
+      }
+      return [{ name: 'Exposed Accounts', value: darkWebBreach.totalExposed }];
     })();
 
     const geoBars = (() => {
@@ -218,7 +225,7 @@ const OutputPage: React.FC = () => {
       geoBars,
       businessBars,
     };
-  }, [sectionData]);
+  }, [sectionData, darkWebBreach]);
 
   useEffect(() => {
     if (!jobId) return;
@@ -266,6 +273,30 @@ const OutputPage: React.FC = () => {
       }
     })();
   }, [jobId]);
+
+  // Fetch Dark Web / Domain Monitoring breach data for this scan's target so
+  // the REAL DATA BREACH ANALYSIS card mirrors the Domain Monitoring page.
+  useEffect(() => {
+    const target = scan?.target;
+    if (!target) return;
+    const domain = extractDomainFromTarget(target);
+    if (!domain) return;
+    if (darkWebBreach && darkWebBreach.domain === domain) return;
+
+    let cancelled = false;
+    setDarkWebLoading(true);
+    (async () => {
+      const stats = await fetchDarkWebBreachData(target);
+      if (cancelled) return;
+      setDarkWebBreach(stats);
+      setDarkWebLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+      setDarkWebLoading(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scan?.target]);
 
   if (!jobId) {
     return (
@@ -774,36 +805,118 @@ const OutputPage: React.FC = () => {
                       <p className="text-xs tracking-wide text-red-400 font-semibold">
                         7. REAL DATA BREACH ANALYSIS
                       </p>
-                      <h3 className="text-xl font-semibold text-white">Breached Accounts</h3>
+                      <h3 className="text-xl font-semibold text-white">
+                        Dark Web Exposure
+                      </h3>
                       <p className="text-sm text-gray-400">
-                        HIBP Checks: {sectionData.breach?.results?.length || 0}
+                        {darkWebLoading
+                          ? 'Querying Domain Monitoring index...'
+                          : darkWebBreach
+                          ? `Domain: ${darkWebBreach.domain} • Exposed accounts: ${darkWebBreach.totalExposed} • Databases: ${Object.keys(darkWebBreach.databases).length}`
+                          : 'Pending Domain Monitoring lookup'}
                       </p>
                     </div>
                     <AlertTriangle className="text-red-400 w-8 h-8" />
                   </div>
+
+                  {darkWebBreach && (
+                    <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+                      <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                        <p className="text-gray-400">Risk Score</p>
+                        <p className="text-2xl font-bold text-red-400">
+                          {darkWebBreach.riskScore}/100
+                        </p>
+                      </div>
+                      <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
+                        <p className="text-gray-400">Total Exposed</p>
+                        <p className="text-2xl font-bold text-orange-400">
+                          {darkWebBreach.totalExposed}
+                        </p>
+                      </div>
+                      <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 col-span-2">
+                        <p className="text-gray-400 mb-1">Password Strength Distribution</p>
+                        <div className="flex gap-2 text-[11px]">
+                          <span className="text-red-400">Weak: {darkWebBreach.passwordStrength.weak}</span>
+                          <span className="text-yellow-400">Medium: {darkWebBreach.passwordStrength.medium}</span>
+                          <span className="text-green-400">Strong: {darkWebBreach.passwordStrength.strong}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="h-40 mt-4">
-                    {(visualization.breachPie.some((d) => d.value)) ? (
+                    {(visualization.breachPie.some((d: any) => d.value)) ? (
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie data={visualization.breachPie} dataKey="value" innerRadius={40} outerRadius={70} label>
-                            <Cell fill="#ef4444" />
-                            <Cell fill="#0f172a" />
+                            {visualization.breachPie.map((_, idx: number) => (
+                              <Cell
+                                key={idx}
+                                fill={[
+                                  '#ef4444',
+                                  '#f97316',
+                                  '#eab308',
+                                  '#84cc16',
+                                  '#22c55e',
+                                  '#06b6d4',
+                                  '#6366f1',
+                                  '#a855f7',
+                                ][idx % 8]}
+                              />
+                            ))}
                           </Pie>
                           <Tooltip />
                         </PieChart>
                       </ResponsiveContainer>
                     ) : (
-                      <p className="text-xs text-gray-500">No breach verdicts returned.</p>
+                      <p className="text-xs text-gray-500">
+                        {darkWebLoading ? 'Loading Domain Monitoring results...' : 'No breach data returned.'}
+                      </p>
                     )}
                   </div>
-                  <div className="mt-4 text-xs text-gray-300 space-y-1 max-h-24 overflow-y-auto">
-                    {sectionData.breach?.results?.length
-                      ? sectionData.breach.results.map((entry: any) => (
-                          <p key={entry.email}>
-                            {entry.email}: {entry.message}
-                          </p>
-                        ))
-                      : <p>No breach queries executed.</p>}
+
+                  {darkWebBreach && darkWebBreach.error && (
+                    <p className="text-xs text-amber-400 mt-2">
+                      Domain Monitoring error: {darkWebBreach.error}
+                    </p>
+                  )}
+
+                  {darkWebBreach && Object.keys(darkWebBreach.databases).length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-xs text-gray-400 mb-2">Breach Database Sources</p>
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(darkWebBreach.databases)
+                          .sort((a, b) => b[1] - a[1])
+                          .map(([src, cnt]) => (
+                            <span
+                              key={src}
+                              className="text-[11px] bg-red-500/10 border border-red-500/30 text-red-300 rounded-full px-2 py-0.5"
+                            >
+                              {src}: {cnt}
+                            </span>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mt-4 text-xs text-gray-300 space-y-1 max-h-40 overflow-y-auto">
+                    {darkWebBreach && darkWebBreach.results.length > 0 ? (
+                      darkWebBreach.results.slice(0, 25).map((entry, idx) => (
+                        <div
+                          key={`${entry.email}-${idx}`}
+                          className="flex items-center justify-between gap-2 border-b border-gray-800 py-1"
+                        >
+                          <span className="truncate text-red-300">{entry.email}</span>
+                          <span className="text-gray-500 text-[10px]">{entry.database_source}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <p>
+                        {darkWebLoading
+                          ? 'Searching Domain Monitoring databases...'
+                          : 'No exposed accounts found for this domain.'}
+                      </p>
+                    )}
                   </div>
                 </div>
 

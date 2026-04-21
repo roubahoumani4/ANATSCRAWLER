@@ -2494,10 +2494,10 @@ Full technical details available in the JSON output files in the investigation d
             self.cloud_infrastructure_detection,
         ]
         
-        # Add breach check if enabled and API key available
-        if self.check_breaches and self.hibp_api_key:
-            modules.insert(6, self.breach_data_check)
-        
+        # HIBP breach check removed — the REAL DATA BREACH ANALYSIS section is
+        # now powered by the Dark Web / Domain Monitoring index on the client.
+        # (Intentionally not scheduling self.breach_data_check.)
+
         # Add live vulnerability scanning
         modules.append(self.live_vulnerability_scan)
         
@@ -2597,7 +2597,8 @@ Examples:
     
     # Determine actual flags (default is ON, unless --no-flag is used)
     deep_scan = not args.no_deep_scan
-    check_breaches = not args.no_breaches
+    # HIBP breach checking has been removed — always disabled.
+    check_breaches = False
     
     # Prepare output directory
     output_dir = args.output_dir or f"osint_{args.target.replace('://', '_').replace('/', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"

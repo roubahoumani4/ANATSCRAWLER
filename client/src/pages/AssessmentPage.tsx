@@ -7,6 +7,11 @@ import jsPDF from 'jspdf';
 import anatLogo from '@/assets/anatlogo.png';
 import VulnerabilityGraphs from '@/components/VulnerabilityGraphs';
 import MatrixBackground from '@/components/ui/MatrixBackground';
+import {
+  fetchDarkWebBreachData,
+  extractDomainFromTarget,
+  type DarkWebBreachStats,
+} from '@/lib/darkwebBreach';
 
 type WhoisSection = {
   domain?: string;
@@ -117,6 +122,7 @@ type DocumentSection = {
 
 type BreachSection = {
   results: Array<{ email: string; status: 'clean' | 'error'; message: string }>;
+  darkWeb?: DarkWebBreachStats & { loading?: boolean };
 };
 
 type WafSection = {
@@ -771,20 +777,10 @@ const parseAssessmentSections = (plain: string | null, parsedExtras?: any): Sect
     }
 
     if (key === 'breach') {
-      const results: BreachSection['results'] = [];
-      const noBreachMatches = Array.from(block.matchAll(/\[\+\]\s+No breaches found for\s+([^\s]+)/gi));
-      noBreachMatches.forEach((m) =>
-        results.push({ email: m[1], status: 'clean', message: 'No breaches found' })
-      );
-      const errorMatches = Array.from(block.matchAll(/\[-\]\s+HIBP API error:\s*(\d+)/gi));
-      errorMatches.forEach((m, idx) => {
-        results[idx] = {
-          ...(results[idx] || { email: `request_${idx + 1}` }),
-          status: 'error',
-          message: `HIBP API error ${m[1]}`,
-        };
-      });
-      data.breach = { results };
+      // HIBP plaintext parsing removed. The REAL DATA BREACH ANALYSIS section
+      // is populated from the Dark Web / Domain Monitoring index by a separate
+      // effect that writes into `data.breach.darkWeb`.
+      data.breach = { results: [] };
       return;
     }
 
@@ -1079,6 +1075,67 @@ const AssessmentPage: React.FC = () => {
     localStorage.setItem('assessmentState', JSON.stringify(state));
   }, [target, running, jobId, lastJobId, statusMessage, elapsedSeconds, output, error, plainOutput, sections, sectionData]);
 
+  // Auto-fetch Dark Web / Domain Monitoring breach data whenever a scan has
+  // finished for a given target. This wires the REAL DATA BREACH ANALYSIS
+  // section to the Domain Monitoring index so the assessment mirrors what the
+  // user would see on the Domain Monitoring page for the same target.
+  useEffect(() => {
+    if (running) return;
+    if (!target) return;
+    if (!sectionData) return;
+    const domain = extractDomainFromTarget(target);
+    if (!domain) return;
+    // Already fetched for this domain — skip.
+    if (sectionData.breach?.darkWeb && sectionData.breach.darkWeb.domain === domain) {
+      return;
+    }
+
+    let cancelled = false;
+    // Mark loading so the UI can show a spinner state.
+    setSectionData((prev) => {
+      if (!prev) return prev;
+      const prevResults = prev.breach?.results || [];
+      return {
+        ...prev,
+        breach: {
+          results: prevResults,
+          darkWeb: {
+            domain,
+            totalExposed: 0,
+            databases: {},
+            results: [],
+            riskScore: 0,
+            passwordStrength: { weak: 0, medium: 0, strong: 0 },
+            loading: true,
+          },
+        },
+      };
+    });
+
+    (async () => {
+      const stats = await fetchDarkWebBreachData(target);
+      if (cancelled) return;
+      setSectionData((prev) => {
+        if (!prev) return prev;
+        const prevResults = prev.breach?.results || [];
+        return {
+          ...prev,
+          breach: {
+            results: prevResults,
+            darkWeb: { ...stats, loading: false },
+          },
+        };
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // We intentionally depend only on target + running + presence of sectionData
+    // (not the entire sectionData) to avoid refetch loops once we mutate it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target, running, Boolean(sectionData)]);
+
   const visualization = useMemo(() => {
     if (!sectionData) return null;
     const parseDate = (value?: string) => (value ? new Date(value) : null);
@@ -1167,15 +1224,16 @@ const AssessmentPage: React.FC = () => {
     })();
 
     const breachPie = (() => {
-      const summary = { clean: 0, error: 0 };
-      (sectionData.breach?.results || []).forEach((result) => {
-        if (result.status === 'clean') summary.clean += 1;
-        else summary.error += 1;
-      });
-      return [
-        { name: 'No Breaches', value: summary.clean },
-        { name: 'Errors', value: summary.error },
-      ];
+      const darkWeb = sectionData.breach?.darkWeb;
+      if (!darkWeb || darkWeb.totalExposed === 0) return [];
+      const entries = Object.entries(darkWeb.databases);
+      if (entries.length) {
+        return entries
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 8)
+          .map(([name, value]) => ({ name, value }));
+      }
+      return [{ name: 'Exposed Accounts', value: darkWeb.totalExposed }];
     })();
 
     const geoBars = (() => {
@@ -1701,21 +1759,55 @@ const AssessmentPage: React.FC = () => {
         }
 
         const breach = sectionData.breach;
-        if (breach?.results?.length) {
+        const darkWeb = breach?.darkWeb;
+        const hasDarkWeb = darkWeb && (darkWeb.totalExposed > 0 || Object.keys(darkWeb.databases || {}).length > 0);
+        if (hasDarkWeb && darkWeb) {
           addSectionTitle('REAL DATA BREACH ANALYSIS', 7);
+
           addTable(
-            'HIBP Lookups',
+            'Dark Web Exposure Summary',
             [
-              { header: 'Email / Identifier', width: maxWidth * 0.35 },
-              { header: 'Status', width: maxWidth * 0.15 },
-              { header: 'Details', width: maxWidth * 0.5 },
+              { header: 'Metric', width: maxWidth * 0.5 },
+              { header: 'Value', width: maxWidth * 0.5 },
             ],
-            breach.results.map((result) => [
-              result.email,
-              result.status.toUpperCase(),
-              result.message,
-            ])
+            [
+              ['Domain', darkWeb.domain],
+              ['Total Exposed Accounts', String(darkWeb.totalExposed)],
+              ['Risk Score', `${darkWeb.riskScore} / 100`],
+              ['Unique Breach Databases', String(Object.keys(darkWeb.databases).length)],
+              ['Weak Passwords', String(darkWeb.passwordStrength.weak)],
+              ['Medium Passwords', String(darkWeb.passwordStrength.medium)],
+              ['Strong Passwords', String(darkWeb.passwordStrength.strong)],
+            ]
           );
+
+          const dbEntries = Object.entries(darkWeb.databases).sort((a, b) => b[1] - a[1]);
+          if (dbEntries.length) {
+            addTable(
+              'Breach Database Breakdown',
+              [
+                { header: 'Database Source', width: maxWidth * 0.7 },
+                { header: 'Exposed', width: maxWidth * 0.3 },
+              ],
+              dbEntries.map(([name, count]) => [name, String(count)])
+            );
+          }
+
+          if (darkWeb.results.length) {
+            addTable(
+              'Exposed Accounts (sample)',
+              [
+                { header: 'Email', width: maxWidth * 0.45 },
+                { header: 'Password', width: maxWidth * 0.25 },
+                { header: 'Source', width: maxWidth * 0.3 },
+              ],
+              darkWeb.results.slice(0, 25).map((r) => [
+                r.email,
+                r.password ? '••••••••' : '—',
+                r.database_source,
+              ])
+            );
+          }
         }
 
         const waf = sectionData.waf;
