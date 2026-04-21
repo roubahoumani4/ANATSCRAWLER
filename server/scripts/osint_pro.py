@@ -2016,92 +2016,192 @@ class ProfessionalOSINT:
             return []
 
     def waf_detection(self):
-        """Detect Web Application Firewalls"""
+        """Web Application Firewall detection powered by EnableSecurity/wafw00f.
+
+        Runs the wafw00f CLI (https://github.com/EnableSecurity/wafw00f) against
+        the target URL(s) with JSON output and records the detected firewall
+        product + manufacturer per URL. Results are stored under
+        self.results['waf_detection']['detections'] with a shape the frontend
+        parser already understands.
+        """
         self.print_header("8. WEB APPLICATION FIREWALL DETECTION")
-        
-        waf_data = {}
+
+        import shutil
+        import tempfile
+
+        # --- Build the list of URLs to probe ---
         urls_to_check = []
-        
         if self.target_type == "url":
             urls_to_check.append(self.target)
         elif self.domain:
             urls_to_check.append(f"https://{self.domain}")
             urls_to_check.append(f"http://{self.domain}")
-        
-        print(f"{Colors.CYAN}Checking {len(urls_to_check)} URLs for WAF...{Colors.END}")
-        
+        urls_to_check = urls_to_check[:3]
+
+        if not urls_to_check:
+            self.print_warning("No URLs available for WAF detection")
+            return
+
+        # --- Locate wafw00f runner ---
+        candidate_paths = [
+            os.environ.get("WAFW00F_BIN"),
+            shutil.which("wafw00f"),
+            "/usr/local/bin/wafw00f",
+            "/usr/bin/wafw00f",
+            "/var/www/anatscrawler/wafw00f/wafw00f/main.py",
+            os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "..", "..", "wafw00f", "wafw00f", "main.py",
+            ),
+        ]
+        wafw00f_cmd = None
+        repo_root = None
+        for p in candidate_paths:
+            if not p or not os.path.isfile(p):
+                continue
+            if p.endswith(".py"):
+                py = shutil.which("python3") or shutil.which("python") or "python3"
+                wafw00f_cmd = [py, p]
+                repo_root = os.path.dirname(os.path.dirname(os.path.abspath(p)))
+                break
+            if os.access(p, os.X_OK):
+                wafw00f_cmd = [p]
+                break
+
+        # Last fallback: `python3 -m wafw00f` (works when pip-installed)
+        if wafw00f_cmd is None:
+            py = shutil.which("python3") or shutil.which("python")
+            if py:
+                wafw00f_cmd = [py, "-m", "wafw00f"]
+
+        if wafw00f_cmd is None:
+            self.print_warning(
+                "wafw00f not found. Install via `pip install wafw00f` or clone "
+                "EnableSecurity/wafw00f to /var/www/anatscrawler/wafw00f. "
+                "Checked: " + ", ".join(p for p in candidate_paths if p)
+            )
+            return
+
+        env = os.environ.copy()
+        if repo_root:
+            existing = env.get("PYTHONPATH", "")
+            env["PYTHONPATH"] = repo_root + (os.pathsep + existing if existing else "")
+
+        print(f"{Colors.CYAN}Running wafw00f against {len(urls_to_check)} URL(s)...{Colors.END}")
+
+        detections = []
         waf_detected_count = 0
-        
-        for url in urls_to_check[:3]:
+
+        for url in urls_to_check:
+            self.print_debug(f"wafw00f probing {url}")
+            tmp = tempfile.NamedTemporaryFile(prefix="wafw00f_", suffix=".json", delete=False)
+            tmp.close()
             try:
-                self.print_debug(f"Checking WAF for: {url}")
-                waf_info = self.detect_waf(url)
-                if waf_info:
-                    waf_data[url] = waf_info
-                    if waf_info['detected']:
+                cmd = wafw00f_cmd + [url, "-f", "json", "-o", tmp.name, "-a"]
+                try:
+                    proc = subprocess.run(
+                        cmd,
+                        capture_output=True,
+                        text=True,
+                        timeout=180,
+                        env=env,
+                    )
+                except subprocess.TimeoutExpired:
+                    self.print_warning(f"wafw00f timed out on {url}")
+                    detections.append({
+                        "target": url,
+                        "detected": False,
+                        "waf": None,
+                        "manufacturer": None,
+                        "message": "wafw00f timed out",
+                    })
+                    continue
+                except Exception as e:
+                    self.print_error(f"wafw00f execution failed on {url}: {e}")
+                    detections.append({
+                        "target": url,
+                        "detected": False,
+                        "waf": None,
+                        "manufacturer": None,
+                        "message": f"wafw00f error: {e}",
+                    })
+                    continue
+
+                parsed = None
+                try:
+                    if os.path.getsize(tmp.name) > 0:
+                        with open(tmp.name, "r") as f:
+                            parsed = json.load(f)
+                except Exception as e:
+                    self.print_debug(f"Failed to parse wafw00f JSON for {url}: {e}")
+
+                if parsed is None:
+                    combined = (proc.stdout or "") + (proc.stderr or "")
+                    start = combined.find("[")
+                    end = combined.rfind("]")
+                    if start != -1 and end != -1 and end > start:
+                        try:
+                            parsed = json.loads(combined[start:end + 1])
+                        except Exception:
+                            parsed = None
+
+                if not parsed:
+                    detections.append({
+                        "target": url,
+                        "detected": False,
+                        "waf": None,
+                        "manufacturer": None,
+                        "message": "No WAF detected",
+                    })
+                    print(f"{Colors.YELLOW}No WAF detected on {url}{Colors.END}")
+                    continue
+
+                # wafw00f returns a list of result dicts (one per URL)
+                if isinstance(parsed, dict):
+                    parsed = [parsed]
+
+                for item in parsed:
+                    if not isinstance(item, dict):
+                        continue
+                    detected = bool(item.get("detected"))
+                    firewall = item.get("firewall") or item.get("waf")
+                    manufacturer = item.get("manufacturer")
+                    item_url = item.get("url") or url
+                    if detected and firewall and firewall.lower() not in ("none", "no"):
                         waf_detected_count += 1
-                        self.print_success(f"WAF detected: {waf_info['waf']} on {url}")
                         self.waf_detected = True
+                        message = (
+                            f"WAF detected: {firewall}"
+                            + (f" ({manufacturer})" if manufacturer else "")
+                        )
+                        self.print_success(f"{message} on {item_url}")
                     else:
-                        print(f"{Colors.YELLOW}No WAF detected on {url}{Colors.END}")
-            except Exception as e:
-                self.print_error(f"WAF detection failed for {url}: {str(e)}")
-        
+                        message = "No WAF detected"
+                        print(f"{Colors.YELLOW}No WAF detected on {item_url}{Colors.END}")
+                    detections.append({
+                        "target": item_url,
+                        "detected": detected,
+                        "waf": firewall,
+                        "manufacturer": manufacturer,
+                        "message": message,
+                    })
+            finally:
+                try:
+                    os.unlink(tmp.name)
+                except Exception:
+                    pass
+
         if waf_detected_count == 0:
             self.print_warning("No WAF detected on any tested URLs")
-        
+
+        waf_data = {
+            "engine": "wafw00f",
+            "detections": detections,
+            "total": len(detections),
+            "waf_detected_count": waf_detected_count,
+        }
         self.results["waf_detection"] = waf_data
         self.save_artifact("waf_detection.json", waf_data)
-
-    def detect_waf(self, url):
-        """Detect WAF by analyzing HTTP responses"""
-        try:
-            response = requests.get(url, timeout=10, verify=False, allow_redirects=True)
-            headers = response.headers
-            
-            waf_indicators = {
-                'Cloudflare': ['cf-ray', 'cf-cache-status', 'server: cloudflare'],
-                'Akamai': ['akamai-origin-ops', 'x-akamai-transformed'],
-                'Imperva': ['x-cdn', 'incap_ses_', 'visid_incap_'],
-                'AWS WAF': ['x-aws-request-id', 'server: awswaf'],
-                'ModSecurity': ['server: mod_security'],
-                'F5 BIG-IP': ['x-wa-info', 'x-protected-by'],
-                'Barracuda': ['barracuda'],
-                'FortiWeb': ['fortiweb'],
-                'Sucuri': ['x-sucuri-id', 'x-sucuri-cache'],
-                'Wordfence': ['x-wf-', 'wordfence'],
-                'Comodo': ['protected-by-comodo-waf'],
-                'Juniper': ['server: vpngate'],
-                'Citrix Netscaler': ['ns_af', 'citrix_ns_id'],
-                'Radware': ['x-secured-by'],
-                'Reblaze': ['rbzid=']
-            }
-            
-            detected_waf = None
-            for waf, indicators in waf_indicators.items():
-                for indicator in indicators:
-                    if ':' in indicator:
-                        header, value = indicator.split(':', 1)
-                        if header.strip().lower() in headers and value.strip().lower() in headers[header.strip().lower()].lower():
-                            detected_waf = waf
-                            break
-                    else:
-                        if any(indicator.lower() in key.lower() or indicator.lower() in str(value).lower() 
-                              for key, value in headers.items()):
-                            detected_waf = waf
-                            break
-                if detected_waf:
-                    break
-            
-            return {
-                'detected': detected_waf is not None,
-                'waf': detected_waf,
-                'headers': dict(headers),
-                'status_code': response.status_code
-            }
-            
-        except Exception as e:
-            return {'detected': False, 'error': str(e)}
 
     def ip_geolocation_analysis(self):
         """Perform IP geolocation and ASN analysis"""
