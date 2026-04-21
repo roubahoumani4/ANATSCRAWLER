@@ -372,6 +372,7 @@ class ProfessionalOSINT:
             "digital_footprint": {},
             "geolocation_data": {},
             "document_metadata": {},
+            "javascript_libraries": {},
             # LIVE VULNERABILITY DATA
             "live_vulnerability_checks": {
                 "nvd_checked": False,
@@ -2508,6 +2509,303 @@ class ProfessionalOSINT:
         self.results["cloud_infrastructure"] = cloud_data
         self.save_artifact("cloud_infrastructure.json", cloud_data)
 
+    def javascript_library_scan(self):
+        """JS library vulnerability analysis powered by Retire.js.
+
+        Fetches the target's homepage, collects every <script src="..."> URL,
+        downloads each external JS file to a temp directory, and runs the
+        retire.js CLI (https://github.com/RetireJS/retire.js) with JSON output.
+        Findings are printed in a format the frontend parser understands and
+        also appended to self.results["vulnerabilities"].
+        """
+        self.print_header("15. JAVASCRIPT LIBRARY VULNERABILITY ANALYSIS")
+
+        if not self.domain:
+            self.print_warning("No domain for JS library scan")
+            return
+
+        import shutil
+        import tempfile
+
+        # --- Locate retire binary / runner ---
+        candidate_paths = [
+            os.environ.get("RETIRE_BIN"),
+            shutil.which("retire"),
+            "/usr/local/bin/retire",
+            "/usr/bin/retire",
+            "/var/www/anatscrawler/retire.js/node/bin/retire",
+            os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "..", "..", "retire.js", "node", "bin", "retire",
+            ),
+        ]
+        retire_cmd = None
+        for p in candidate_paths:
+            if p and os.path.isfile(p) and os.access(p, os.X_OK):
+                retire_cmd = [p]
+                break
+        if retire_cmd is None:
+            npx_path = shutil.which("npx")
+            if npx_path:
+                retire_cmd = [npx_path, "--yes", "retire"]
+            else:
+                self.print_warning(
+                    "retire.js not found. Install via `npm i -g retire` or build "
+                    "the cloned repo. Checked: "
+                    + ", ".join(p for p in candidate_paths if p)
+                )
+                return
+
+        # --- Collect candidate pages to scrape for <script src=...> URLs ---
+        pages = []
+        for scheme in ("https", "http"):
+            pages.append(f"{scheme}://{self.domain}")
+        for sub in list(self.discovered_subdomains.keys())[:2]:
+            pages.append(f"https://{sub}")
+
+        script_urls = set()
+        headers = {"User-Agent": "Mozilla/5.0 (ANATSCRAWLER/OSINT)"}
+
+        for page in pages:
+            try:
+                self.print_debug(f"Fetching {page} to extract <script> tags")
+                resp = requests.get(page, headers=headers, timeout=10, verify=False, allow_redirects=True)
+            except Exception as e:
+                self.print_debug(f"Unable to fetch {page}: {e}")
+                continue
+            if not resp.ok or not resp.text:
+                continue
+            try:
+                soup = BeautifulSoup(resp.text, "html.parser")
+            except Exception as e:
+                self.print_debug(f"HTML parse failed for {page}: {e}")
+                continue
+            for tag in soup.find_all("script"):
+                src = tag.get("src")
+                if not src:
+                    continue
+                abs_url = urljoin(resp.url, src)
+                if abs_url.lower().endswith(".js") or ".js?" in abs_url.lower():
+                    script_urls.add(abs_url)
+                elif "javascript" in (tag.get("type") or "").lower():
+                    script_urls.add(abs_url)
+                else:
+                    # Many CDNs omit .js extension; still include http(s) script srcs
+                    if abs_url.startswith(("http://", "https://")):
+                        script_urls.add(abs_url)
+
+        if not script_urls:
+            self.print_warning("No external JavaScript sources discovered on the target")
+            self.results["javascript_libraries"] = {
+                "scanned_files": 0,
+                "script_urls": [],
+                "findings": [],
+                "summary": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+            }
+            self.save_artifact("javascript_libraries.json", self.results["javascript_libraries"])
+            return
+
+        script_urls = list(script_urls)[:30]  # Safety cap on number of scripts
+        print(f"{Colors.CYAN}Discovered {len(script_urls)} JavaScript source(s){Colors.END}")
+
+        # --- Download scripts to a temp dir ---
+        tmpdir = tempfile.mkdtemp(prefix="retirejs_")
+        downloaded = {}
+        for idx, url in enumerate(script_urls):
+            try:
+                r = requests.get(url, headers=headers, timeout=10, verify=False, stream=True)
+                if not r.ok:
+                    self.print_debug(f"Skip {url}: HTTP {r.status_code}")
+                    continue
+                # Safe filename
+                parsed = urlparse(url)
+                base = os.path.basename(parsed.path) or f"script_{idx}.js"
+                base = re.sub(r"[^A-Za-z0-9._-]", "_", base)
+                if not base.lower().endswith(".js"):
+                    base += ".js"
+                fname = f"{idx:03d}_{base}"
+                fpath = os.path.join(tmpdir, fname)
+                max_bytes = 3 * 1024 * 1024  # 3 MB per file
+                total = 0
+                with open(fpath, "wb") as f:
+                    for chunk in r.iter_content(64 * 1024):
+                        if not chunk:
+                            break
+                        total += len(chunk)
+                        if total > max_bytes:
+                            break
+                        f.write(chunk)
+                downloaded[fpath] = url
+            except Exception as e:
+                self.print_debug(f"Skip {url}: {e}")
+                continue
+
+        if not downloaded:
+            self.print_warning("Could not download any JS files for scanning")
+            try:
+                shutil.rmtree(tmpdir, ignore_errors=True)
+            except Exception:
+                pass
+            return
+
+        print(f"{Colors.CYAN}Downloaded {len(downloaded)} JS file(s); running retire.js...{Colors.END}")
+
+        # --- Run retire.js ---
+        out_json = os.path.join(tmpdir, "_retire_output.json")
+        cmd = retire_cmd + [
+            "--path", tmpdir,
+            "--outputformat", "json",
+            "--outputpath", out_json,
+            "--exitwith", "0",
+        ]
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+        except subprocess.TimeoutExpired:
+            self.print_warning("retire.js timed out after 180s")
+            try:
+                shutil.rmtree(tmpdir, ignore_errors=True)
+            except Exception:
+                pass
+            return
+        except Exception as e:
+            self.print_error(f"retire.js execution failed: {e}")
+            try:
+                shutil.rmtree(tmpdir, ignore_errors=True)
+            except Exception:
+                pass
+            return
+
+        retire_output = {}
+        try:
+            if os.path.exists(out_json):
+                with open(out_json, "r") as f:
+                    retire_output = json.load(f)
+            elif proc.stdout and proc.stdout.strip().startswith("{"):
+                retire_output = json.loads(proc.stdout)
+        except Exception as e:
+            self.print_debug(f"Failed to parse retire.js JSON: {e}")
+
+        # --- Parse findings ---
+        findings = []
+        summary = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+        data_items = retire_output.get("data", []) if isinstance(retire_output, dict) else []
+
+        for item in data_items:
+            fpath = item.get("file", "")
+            url = downloaded.get(fpath, fpath)
+            for comp in item.get("results", []):
+                component = comp.get("component", "unknown")
+                version = comp.get("version", "unknown")
+                vulns = comp.get("vulnerabilities", []) or []
+                severities = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+                vuln_list = []
+                for v in vulns:
+                    sev = str(v.get("severity", "low")).lower()
+                    if sev not in severities:
+                        sev = "low"
+                    severities[sev] += 1
+                    summary[sev] += 1
+                    ids = v.get("identifiers", {}) or {}
+                    cves = ids.get("CVE") or []
+                    if isinstance(cves, str):
+                        cves = [cves]
+                    vuln_list.append({
+                        "severity": sev,
+                        "summary": ids.get("summary") or ids.get("githubID") or ids.get("retid") or "Vulnerability",
+                        "cves": cves,
+                        "github_id": ids.get("githubID"),
+                        "cwe": v.get("cwe", []) or [],
+                        "info": v.get("info", []) or [],
+                        "below": v.get("below"),
+                        "at_or_above": v.get("atOrAbove"),
+                    })
+                findings.append({
+                    "component": component,
+                    "version": version,
+                    "file": fpath,
+                    "url": url,
+                    "npmname": comp.get("npmname"),
+                    "licenses": comp.get("licenses", []) or [],
+                    "vulnerabilities": vuln_list,
+                    "counts": severities,
+                })
+
+        # --- Console output (parsed by the frontend) ---
+        if not findings:
+            self.print_success("No vulnerable JavaScript libraries detected by retire.js")
+        else:
+            self.print_critical(
+                f"Retire.js flagged {len(findings)} vulnerable library instance(s)"
+            )
+            for f in findings:
+                print()
+                print(f"{Colors.CYAN}Component: {f['component']}{Colors.END}")
+                print(f"  Version: {f['version']}")
+                print(f"  File: {f['url']}")
+                counts = f["counts"]
+                print(
+                    f"  Vulnerabilities: {sum(counts.values())} "
+                    f"(critical: {counts['critical']}, high: {counts['high']}, "
+                    f"medium: {counts['medium']}, low: {counts['low']})"
+                )
+                for v in f["vulnerabilities"][:10]:
+                    cve_str = ", ".join(v["cves"]) if v["cves"] else (v["github_id"] or "-")
+                    info_url = v["info"][0] if v["info"] else ""
+                    print(
+                        f"  - [{v['severity'].upper()}] {cve_str}: {v['summary']}"
+                        + (f" ({info_url})" if info_url else "")
+                    )
+
+                # Feed into the main vulnerability list
+                for v in f["vulnerabilities"]:
+                    severity_map = {
+                        "critical": "CRITICAL",
+                        "high": "HIGH",
+                        "medium": "MEDIUM",
+                        "low": "LOW",
+                    }
+                    self.results["vulnerabilities"].append({
+                        "type": "Vulnerable JavaScript Library",
+                        "severity": severity_map.get(v["severity"], "LOW"),
+                        "description": (
+                            f"{f['component']} {f['version']}: {v['summary']}"
+                            + (f" (CVE: {', '.join(v['cves'])})" if v["cves"] else "")
+                        ),
+                        "service": f["url"],
+                        "recommendation": (
+                            f"Upgrade {f['component']} to a version above {v['below']}"
+                            if v["below"] else f"Upgrade {f['component']} to the latest version"
+                        ),
+                        "source": "retire.js",
+                    })
+
+        print()
+        total_vulns = sum(summary.values())
+        print(f"{Colors.CYAN}Summary:{Colors.END}")
+        print(f"  Libraries Scanned: {len(downloaded)}")
+        print(f"  Vulnerable Libraries: {len(findings)}")
+        print(
+            f"  Total Vulnerabilities: {total_vulns} "
+            f"(critical: {summary['critical']}, high: {summary['high']}, "
+            f"medium: {summary['medium']}, low: {summary['low']})"
+        )
+
+        js_result = {
+            "scanned_files": len(downloaded),
+            "script_urls": list(downloaded.values()),
+            "findings": findings,
+            "summary": summary,
+            "retire_version": retire_output.get("version") if isinstance(retire_output, dict) else None,
+        }
+        self.results["javascript_libraries"] = js_result
+        self.save_artifact("javascript_libraries.json", js_result)
+
+        # Clean up temp download directory
+        try:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+        except Exception:
+            pass
+
     # =============================================================================
     # COMPREHENSIVE REPORT GENERATION
     # =============================================================================
@@ -2761,6 +3059,7 @@ Full technical details available in the JSON output files in the investigation d
             self.email_pattern_discovery,
             self.wappalyzer_integration,
             self.cloud_infrastructure_detection,
+            self.javascript_library_scan,
         ]
         
         # HIBP breach check removed — the REAL DATA BREACH ANALYSIS section is

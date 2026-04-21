@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '@/lib/api';
 import VulnerabilityGraphs from '@/components/VulnerabilityGraphs';
-import { ChevronDown, ChevronUp, Download, FileText, History as HistoryIcon, Shield, Radar, Globe, Server, Activity as ActivityIcon, Lock, AlertTriangle, Globe2, Building2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Download, FileText, History as HistoryIcon, Shield, Radar, Globe, Server, Activity as ActivityIcon, Lock, AlertTriangle, Globe2, Building2, Code2 } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { parseAssessmentSections } from './AssessmentPage';
 import MatrixBackground from '@/components/ui/MatrixBackground';
@@ -1013,6 +1013,90 @@ const OutputPage: React.FC = () => {
                     <p><span className="text-gray-400">Related Entities:</span> {sectionData.business?.relatedEntities?.join(', ') || 'N/A'}</p>
                     <p><span className="text-gray-400">Profile:</span> {JSON.stringify(sectionData.business?.companyProfile || {})}</p>
                   </div>
+                </div>
+
+                {/* 11. JavaScript Library Vulnerabilities (retire.js) */}
+                <div className="bg-gray-900/60 border border-orange-500/20 rounded-2xl p-6 xl:col-span-2">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs tracking-wide text-orange-400 font-semibold">
+                        11. JAVASCRIPT LIBRARY VULNERABILITY ANALYSIS
+                      </p>
+                      <h3 className="text-xl font-semibold text-white">Retire.js Client-side Library Scan</h3>
+                      <p className="text-sm text-gray-400">
+                        {sectionData.jslibs
+                          ? `${sectionData.jslibs.scannedFiles} file(s) scanned • ${sectionData.jslibs.findings?.length || 0} vulnerable libraries`
+                          : 'No JavaScript libraries analysed'}
+                      </p>
+                    </div>
+                    <Code2 className="text-orange-400 w-8 h-8" />
+                  </div>
+                  {sectionData.jslibs ? (
+                    <div className="mt-4 space-y-4">
+                      <div className="grid grid-cols-4 gap-3 text-center text-xs">
+                        <div className="bg-red-900/30 border border-red-500/30 rounded-lg p-3">
+                          <p className="text-lg font-bold text-red-400">{sectionData.jslibs.summary.critical}</p>
+                          <p className="text-gray-400">Critical</p>
+                        </div>
+                        <div className="bg-orange-900/30 border border-orange-500/30 rounded-lg p-3">
+                          <p className="text-lg font-bold text-orange-400">{sectionData.jslibs.summary.high}</p>
+                          <p className="text-gray-400">High</p>
+                        </div>
+                        <div className="bg-yellow-900/30 border border-yellow-500/30 rounded-lg p-3">
+                          <p className="text-lg font-bold text-yellow-400">{sectionData.jslibs.summary.medium}</p>
+                          <p className="text-gray-400">Medium</p>
+                        </div>
+                        <div className="bg-blue-900/30 border border-blue-500/30 rounded-lg p-3">
+                          <p className="text-lg font-bold text-blue-400">{sectionData.jslibs.summary.low}</p>
+                          <p className="text-gray-400">Low</p>
+                        </div>
+                      </div>
+                      {sectionData.jslibs.findings && sectionData.jslibs.findings.length > 0 ? (
+                        <div className="max-h-96 overflow-y-auto space-y-3">
+                          {sectionData.jslibs.findings.map((f: any, idx: number) => (
+                            <div key={idx} className="bg-gray-950/60 border border-gray-800 rounded-lg p-3">
+                              <div className="flex items-center justify-between flex-wrap gap-2">
+                                <div>
+                                  <span className="text-white font-semibold">{f.component}</span>
+                                  <span className="text-gray-400 ml-2">v{f.version}</span>
+                                </div>
+                                <div className="flex gap-1 text-xs">
+                                  {f.counts.critical > 0 && <span className="bg-red-500/20 text-red-300 px-2 py-0.5 rounded">C: {f.counts.critical}</span>}
+                                  {f.counts.high > 0 && <span className="bg-orange-500/20 text-orange-300 px-2 py-0.5 rounded">H: {f.counts.high}</span>}
+                                  {f.counts.medium > 0 && <span className="bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded">M: {f.counts.medium}</span>}
+                                  {f.counts.low > 0 && <span className="bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded">L: {f.counts.low}</span>}
+                                </div>
+                              </div>
+                              {f.url && <p className="text-xs text-gray-500 mt-1 truncate">{f.url}</p>}
+                              {f.vulnerabilities && f.vulnerabilities.length > 0 && (
+                                <ul className="mt-2 space-y-1 text-xs text-gray-300">
+                                  {f.vulnerabilities.slice(0, 5).map((v: any, vi: number) => (
+                                    <li key={vi} className="flex gap-2">
+                                      <span className={`font-semibold uppercase ${
+                                        v.severity === 'critical' ? 'text-red-400' :
+                                        v.severity === 'high' ? 'text-orange-400' :
+                                        v.severity === 'medium' ? 'text-yellow-400' : 'text-blue-400'
+                                      }`}>[{v.severity}]</span>
+                                      <span>
+                                        {v.cves && v.cves.length ? `${v.cves.join(', ')}: ` : ''}{v.summary}
+                                      </span>
+                                    </li>
+                                  ))}
+                                  {f.vulnerabilities.length > 5 && (
+                                    <li className="text-gray-500">+ {f.vulnerabilities.length - 5} more</li>
+                                  )}
+                                </ul>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-emerald-400">No vulnerable JavaScript libraries detected.</p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="mt-4 text-xs text-gray-500">Retire.js analysis not available for this scan.</p>
+                  )}
                 </div>
 
                 {/* Vulnerability graphs (live vs comprehensive) */}

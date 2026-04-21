@@ -120,6 +120,28 @@ type DocumentSection = {
   files: Array<{ path: string; findings: string[] }>
 };
 
+type JsLibraryFinding = {
+  component: string;
+  version: string;
+  file?: string;
+  url?: string;
+  counts: { critical: number; high: number; medium: number; low: number };
+  vulnerabilities: Array<{
+    severity: string;
+    summary: string;
+    cves: string[];
+    githubId?: string;
+    below?: string;
+    info?: string[];
+  }>;
+};
+
+type JsLibrariesSection = {
+  scannedFiles: number;
+  findings: JsLibraryFinding[];
+  summary: { critical: number; high: number; medium: number; low: number };
+};
+
 type BreachSection = {
   results: Array<{ email: string; status: 'clean' | 'error'; message: string }>;
   darkWeb?: DarkWebBreachStats & { loading?: boolean };
@@ -159,6 +181,7 @@ type SectionData = {
   email?: EmailSection;
   mobile?: MobileSection;
   documents?: DocumentSection;
+  jslibs?: JsLibrariesSection;
 };
 
 const SECTION_DEFS = [
@@ -181,6 +204,7 @@ const SECTION_DEFS = [
   { key: 'email', title: 'EMAIL SECURITY (SPF / DKIM / DMARC) ANALYSIS' },
   { key: 'mobile', title: 'MOBILE & API ENUMERATION' },
   { key: 'documents', title: 'DOCUMENT METADATA & PUBLIC FILE ANALYSIS' },
+  { key: 'jslibs', title: 'JAVASCRIPT LIBRARY VULNERABILITY ANALYSIS' },
 ];
 
 const sanitizeList = (block: string): string[] =>
@@ -524,8 +548,9 @@ const parseAssessmentSections = (plain: string | null, parsedExtras?: any): Sect
     const email = extras.email || extras.emailAnalysis || extras.email_security;
     const mobile = extras.mobile || extras.mobile_apps || extras.mobileApps;
     const documents = extras.documents || extras.document_metadata || extras.docs;
+    const jslibs = extras.jslibs || extras.javascript_libraries || extras.javascriptLibraries;
 
-    const hasStructured = [portScan, webAnalysis, wafDetection, sslAnalysis, dnsAnalysis, extras.completeResults, social, techstack, passiveDns, ipRanges, vulnerabilities, threatIntel, email, mobile, documents].some(Boolean);
+    const hasStructured = [portScan, webAnalysis, wafDetection, sslAnalysis, dnsAnalysis, extras.completeResults, social, techstack, passiveDns, ipRanges, vulnerabilities, threatIntel, email, mobile, documents, jslibs].some(Boolean);
     if (hasStructured) {
       const data: SectionData = {};
 
@@ -663,6 +688,30 @@ const parseAssessmentSections = (plain: string | null, parsedExtras?: any): Sect
       // Documents
       if (documents) {
         data.documents = { files: documents.files || documents };
+      }
+
+      // JavaScript library vulnerabilities (retire.js)
+      if (jslibs) {
+        const findings = (jslibs.findings || []).map((f: any) => ({
+          component: f.component || 'unknown',
+          version: f.version || 'unknown',
+          file: f.file,
+          url: f.url,
+          counts: f.counts || { critical: 0, high: 0, medium: 0, low: 0 },
+          vulnerabilities: (f.vulnerabilities || []).map((v: any) => ({
+            severity: String(v.severity || 'low').toLowerCase(),
+            summary: v.summary || '',
+            cves: v.cves || [],
+            githubId: v.github_id || v.githubId,
+            below: v.below,
+            info: v.info || [],
+          })),
+        }));
+        data.jslibs = {
+          scannedFiles: jslibs.scanned_files ?? jslibs.scannedFiles ?? 0,
+          findings,
+          summary: jslibs.summary || { critical: 0, high: 0, medium: 0, low: 0 },
+        };
       }
 
       return data;
@@ -946,6 +995,50 @@ const parseAssessmentSections = (plain: string | null, parsedExtras?: any): Sect
     if (key === 'documents') {
       const files = sanitizeList(block).map((f) => ({ path: f, findings: [] as string[] }));
       data.documents = { files };
+      return;
+    }
+
+    // JavaScript library vulnerabilities (retire.js)
+    if (key === 'jslibs') {
+      const findings: JsLibraryFinding[] = [];
+      const summary = { critical: 0, high: 0, medium: 0, low: 0 };
+      let scannedFiles = 0;
+      const scannedMatch = block.match(/Libraries Scanned:\s*(\d+)/i);
+      if (scannedMatch) scannedFiles = Number(scannedMatch[1]);
+      const sumMatch = block.match(/Total Vulnerabilities:\s*\d+\s*\(critical:\s*(\d+),\s*high:\s*(\d+),\s*medium:\s*(\d+),\s*low:\s*(\d+)\)/i);
+      if (sumMatch) {
+        summary.critical = Number(sumMatch[1]);
+        summary.high = Number(sumMatch[2]);
+        summary.medium = Number(sumMatch[3]);
+        summary.low = Number(sumMatch[4]);
+      }
+      const compRegex = /Component:\s*(.+?)\n\s*Version:\s*(.+?)\n\s*File:\s*(.+?)\n\s*Vulnerabilities:\s*\d+\s*\(critical:\s*(\d+),\s*high:\s*(\d+),\s*medium:\s*(\d+),\s*low:\s*(\d+)\)([\s\S]*?)(?=\n\s*Component:|\nSummary:|$)/gi;
+      let m: RegExpExecArray | null;
+      while ((m = compRegex.exec(block)) !== null) {
+        const [, comp, ver, file, c, h, med, lo, body] = m;
+        const vulnLines = Array.from(body.matchAll(/-\s*\[(CRITICAL|HIGH|MEDIUM|LOW)\]\s*([^:]+):\s*([^\n]+)/gi));
+        const vulns = vulnLines.map((vm) => {
+          const sev = vm[1].toLowerCase();
+          const ids = vm[2].trim();
+          const rest = vm[3].trim();
+          const urlMatch = rest.match(/\((https?:\/\/[^\s)]+)\)/);
+          return {
+            severity: sev,
+            summary: rest.replace(/\s*\(https?:\/\/[^\s)]+\)\s*$/, ''),
+            cves: ids.split(/[\s,]+/).filter((s) => /^CVE-/i.test(s)),
+            info: urlMatch ? [urlMatch[1]] : [],
+          };
+        });
+        findings.push({
+          component: comp.trim(),
+          version: ver.trim(),
+          file: file.trim(),
+          url: file.trim(),
+          counts: { critical: Number(c), high: Number(h), medium: Number(med), low: Number(lo) },
+          vulnerabilities: vulns,
+        });
+      }
+      data.jslibs = { scannedFiles, findings, summary };
       return;
     }
   });
@@ -1851,6 +1944,41 @@ const AssessmentPage: React.FC = () => {
           }
           addBulletList('Infrastructure Providers', business.infrastructureProviders);
           addBulletList('Related Entities', business.relatedEntities);
+        }
+
+        const jslibs = sectionData.jslibs;
+        if (jslibs && (jslibs.findings?.length || jslibs.scannedFiles)) {
+          addSectionTitle('JAVASCRIPT LIBRARY VULNERABILITY ANALYSIS', 11);
+          addText(
+            `Libraries scanned: ${jslibs.scannedFiles} • Vulnerable: ${jslibs.findings.length} • ` +
+              `Critical: ${jslibs.summary.critical}, High: ${jslibs.summary.high}, ` +
+              `Medium: ${jslibs.summary.medium}, Low: ${jslibs.summary.low}`,
+            9,
+            false,
+            [60, 60, 60]
+          );
+          if (jslibs.findings.length) {
+            addTable(
+              'Retire.js Findings',
+              [
+                { header: 'Component', width: maxWidth * 0.18 },
+                { header: 'Version', width: maxWidth * 0.1 },
+                { header: 'Sev (C/H/M/L)', width: maxWidth * 0.14 },
+                { header: 'Top CVEs', width: maxWidth * 0.28 },
+                { header: 'File', width: maxWidth * 0.30 },
+              ],
+              jslibs.findings.map((f) => [
+                f.component,
+                f.version,
+                `${f.counts.critical}/${f.counts.high}/${f.counts.medium}/${f.counts.low}`,
+                f.vulnerabilities
+                  .flatMap((v) => v.cves)
+                  .slice(0, 4)
+                  .join(', ') || '—',
+                f.url || f.file || '—',
+              ])
+            );
+          }
         }
         // If the UI has `sections` (used by the collapsible "Full scan output" panel),
         // include them in the PDF only when `plainOutput` is absent to avoid duplication.
