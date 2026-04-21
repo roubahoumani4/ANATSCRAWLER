@@ -1468,8 +1468,9 @@ class ProfessionalOSINT:
             cert_el = ssl_test.find("certificate") or ssl_test.find("certificates/certificate")
             cert_info = {}
             if cert_el is not None:
+                cert_node = cert_el  # local binding for type narrowing
                 def _val(tag):
-                    node = cert_el.find(tag)
+                    node = cert_node.find(tag)
                     if node is None or not node.text:
                         return None
                     text = node.text.strip()
@@ -3029,7 +3030,8 @@ class ProfessionalOSINT:
             host = (parsed.hostname or "").lower()
             if not host:
                 return
-            if not (host == self.domain or host.endswith("." + self.domain)):
+            domain = self.domain or ""
+            if not (host == domain or (domain and host.endswith("." + domain))):
                 return
             if not parsed.query:
                 return
@@ -3050,7 +3052,8 @@ class ProfessionalOSINT:
             if parsed.scheme not in ("http", "https"):
                 return
             host = (parsed.hostname or "").lower()
-            if not (host == self.domain or host.endswith("." + self.domain)):
+            domain = self.domain or ""
+            if not (host == domain or (domain and host.endswith("." + domain))):
                 return
             seen_forms.add(key)
             form_targets.append({"url": action, "data": data, "method": method.upper()})
@@ -3224,10 +3227,12 @@ class ProfessionalOSINT:
                     tstart = tm.start()
                     tend = type_matches[j + 1].start() if j + 1 < len(type_matches) else len(block)
                     sub = block[tstart:tend]
+                    title_m = title_re.search(sub)
+                    payload_m = payload_re.search(sub)
                     tech = {
                         "type": tm.group(1).strip(),
-                        "title": (title_re.search(sub).group(1).strip() if title_re.search(sub) else None),
-                        "payload": (payload_re.search(sub).group(1).strip() if payload_re.search(sub) else None),
+                        "title": title_m.group(1).strip() if title_m else None,
+                        "payload": payload_m.group(1).strip() if payload_m else None,
                     }
                     techniques.append(tech)
                 param_blocks.append({
@@ -3315,6 +3320,53 @@ class ProfessionalOSINT:
     # =============================================================================
     # OWASP AMASS — ATTACK-SURFACE / SUBDOMAIN ENUMERATION
     # =============================================================================
+
+    def _team_cymru_asn_lookup(self, ips):
+        """Bulk-lookup ASN/prefix/AS-name for a list of IPs via Team Cymru whois.
+
+        Uses the netcat-style interface on whois.cymru.com:43. One TCP
+        connection, one request batch, typically < 2 seconds for < 500 IPs.
+        Returns: {ip: {"asn": str, "prefix": str, "as_name": str}}.
+        """
+        import socket as _socket
+        result = {}
+        if not ips:
+            return result
+        try:
+            payload_lines = ["begin", "verbose"] + list(ips) + ["end", ""]
+            payload = ("\n".join(payload_lines)).encode("utf-8")
+            with _socket.create_connection(("whois.cymru.com", 43), timeout=8) as s:
+                s.sendall(payload)
+                chunks = []
+                s.settimeout(8)
+                while True:
+                    try:
+                        buf = s.recv(8192)
+                    except _socket.timeout:
+                        break
+                    if not buf:
+                        break
+                    chunks.append(buf)
+            raw = b"".join(chunks).decode("utf-8", errors="ignore")
+            for line in raw.splitlines():
+                line = line.strip()
+                if not line or line.lower().startswith("bulk mode") or line.startswith("AS "):
+                    continue
+                parts = [p.strip() for p in line.split("|")]
+                # verbose format: AS | IP | BGP Prefix | CC | Registry | Allocated | AS Name
+                if len(parts) < 7:
+                    continue
+                asn, ip, prefix, _cc, _reg, _alloc, as_name = parts[:7]
+                if not ip or asn.upper() == "NA":
+                    continue
+                result[ip] = {
+                    "asn": asn if asn and asn.upper() != "NA" else None,
+                    "prefix": prefix if prefix and prefix.upper() != "NA" else None,
+                    "as_name": as_name or None,
+                }
+        except Exception as e:
+            self.print_debug(f"Team Cymru ASN lookup failed: {e}")
+        return result
 
     def amass_enumeration(self):
         """Run OWASP Amass to expand the attack surface (subdomains, IPs, ASNs)."""
@@ -3492,6 +3544,47 @@ class ProfessionalOSINT:
             if name.endswith("." + self.domain) and name not in self.discovered_subdomains:
                 self.discovered_subdomains[name] = "amass"
                 new_subs += 1
+
+        # --- Post-enumeration DNS resolution (passive mode leaves addresses empty) ---
+        hosts_needing_resolve = [n for n, d in hosts.items() if not d["addresses"]]
+        if hosts_needing_resolve:
+            print(f"{Colors.CYAN}Resolving {len(hosts_needing_resolve)} host(s) to IPs...{Colors.END}")
+
+            def _resolve_host(hname):
+                ips = set()
+                for rtype in ("A", "AAAA"):
+                    try:
+                        answers = dns.resolver.resolve(hname, rtype, lifetime=4)
+                        for rr in answers:
+                            ips.add(str(rr).strip())
+                    except Exception:
+                        pass
+                return hname, ips
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=20) as ex:
+                for hname, ips in ex.map(_resolve_host, hosts_needing_resolve):
+                    entry = hosts[hname]
+                    for ip in ips:
+                        all_ips.add(ip)
+                        entry["addresses"].append({
+                            "ip": ip, "cidr": None, "asn": None, "desc": None,
+                        })
+
+        # --- ASN / CIDR enrichment via Team Cymru whois (bulk) ---
+        if all_ips:
+            cymru_map = self._team_cymru_asn_lookup(sorted(all_ips))
+            if cymru_map:
+                for hdata in hosts.values():
+                    for addr in hdata["addresses"]:
+                        ip = addr.get("ip")
+                        info = cymru_map.get(ip)
+                        if info:
+                            addr["asn"] = info.get("asn")
+                            addr["cidr"] = info.get("prefix")
+                            addr["desc"] = info.get("as_name")
+                            if info.get("asn"):
+                                all_asns.add(str(info["asn"]))
+
         for ip in all_ips:
             self.discovered_ips.add(ip)
 
