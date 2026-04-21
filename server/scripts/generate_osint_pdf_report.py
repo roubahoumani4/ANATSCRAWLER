@@ -87,6 +87,33 @@ def _load_json(path: Path) -> Optional[Any]:
         return None
 
 
+def _join_any(value: Any, sep: str = ", ") -> str:
+    """Render a list/tuple/scalar as a comma-separated string regardless of
+    whether the items are strings, dicts, or other objects. Returns empty
+    string for falsy/None."""
+    if value is None or value == "":
+        return ""
+    if isinstance(value, (list, tuple, set)):
+        parts = []
+        for item in value:
+            if item is None or item == "":
+                continue
+            if isinstance(item, dict):
+                # prefer common human-readable keys
+                pick = (
+                    item.get("name")
+                    or item.get("protocol")
+                    or item.get("cipher")
+                    or item.get("version")
+                    or item.get("value")
+                )
+                parts.append(str(pick) if pick else json.dumps(item, default=str))
+            else:
+                parts.append(str(item))
+        return sep.join(parts)
+    return str(value)
+
+
 def _find_logo() -> Optional[str]:
     here = Path(__file__).resolve().parent
     candidates = [
@@ -552,7 +579,7 @@ def _render_vulnerabilities(story: list, data: ReportData):
             ("Asset", v.get("service") or v.get("host") or v.get("port") or data.target),
             ("Description", v.get("description")),
             ("Evidence", v.get("evidence") or v.get("banner")),
-            ("CVE / Reference", ", ".join(v.get("cves", [])) if isinstance(v.get("cves"), list) else v.get("cve")),
+            ("CVE / Reference", _join_any(v.get("cves")) or v.get("cve")),
             ("Recommendation", v.get("recommendation") or v.get("remediation")),
         ]
         kv = [(k, val) for k, val in kv if val]
@@ -584,8 +611,8 @@ def _render_recon(story: list, data: ReportData):
             ("Created", dates.get("created") or dates.get("creation_date")),
             ("Updated", dates.get("updated") or dates.get("updated_date")),
             ("Expires", dates.get("expires") or dates.get("expiration_date")),
-            ("Name Servers", ", ".join(ns) if isinstance(ns, list) else ns),
-            ("Status", ", ".join(whois.get("status") or []) if isinstance(whois.get("status"), list) else whois.get("status")),
+            ("Name Servers", _join_any(ns)),
+            ("Status", _join_any(whois.get("status"))),
         ]
         story.append(_kv_table([(k, v) for k, v in rows if v]))
         story.append(Spacer(1, 6))
@@ -742,11 +769,9 @@ def _render_attack_surface(story: list, data: ReportData):
                     ("Valid Until", cert.get("not_after") or cert.get("valid_until")),
                     ("Signature Algorithm", cert.get("signature_algorithm")),
                     ("Key Strength", cert.get("key_strength") or cert.get("public_key")),
-                    ("SANs", ", ".join(cert.get("san", [])) if isinstance(cert.get("san"), list) else cert.get("san")),
-                    ("Protocols",
-                     ", ".join(info.get("protocols", [])) if isinstance(info.get("protocols"), list) else info.get("protocols")),
-                    ("Weak Ciphers",
-                     ", ".join(info.get("weak_ciphers", [])) if isinstance(info.get("weak_ciphers"), list) else info.get("weak_ciphers")),
+                    ("SANs", _join_any(cert.get("san"))),
+                    ("Protocols", _join_any(info.get("protocols"))),
+                    ("Weak Ciphers", _join_any(info.get("weak_ciphers"))),
                 ]
                 rows = [(k, v) for k, v in rows if v]
                 if rows:
@@ -784,7 +809,7 @@ def _render_attack_surface(story: list, data: ReportData):
                     u.get("url"),
                     u.get("status_code") or u.get("status"),
                     u.get("server") or u.get("headers", {}).get("Server", "") if isinstance(u.get("headers"), dict) else "",
-                    ", ".join(u.get("technologies", [])) if isinstance(u.get("technologies"), list) else "",
+                    _join_any(u.get("technologies")),
                 ])
             if rows:
                 story.append(Spacer(1, 4))
@@ -890,7 +915,7 @@ def _render_intelligence(story: list, data: ReportData):
         rows = [
             ("Pattern", email.get("pattern")),
             ("Confidence", email.get("confidence")),
-            ("Sources", ", ".join(email.get("sources", [])) if isinstance(email.get("sources"), list) else email.get("sources")),
+            ("Sources", _join_any(email.get("sources"))),
         ]
         rows = [(k, v) for k, v in rows if v]
         if rows:
@@ -919,7 +944,7 @@ def _render_intelligence(story: list, data: ReportData):
                 b.get("name") or b.get("source"),
                 b.get("date") or b.get("breach_date"),
                 b.get("pwn_count") or b.get("count"),
-                ", ".join(b.get("data_classes", [])) if isinstance(b.get("data_classes"), list) else "",
+                _join_any(b.get("data_classes")),
             ])
         story.append(_grid_table(
             ["Breach", "Date", "Count", "Compromised Data"], rows,
