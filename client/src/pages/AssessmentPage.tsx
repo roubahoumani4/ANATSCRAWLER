@@ -142,6 +142,27 @@ type JsLibrariesSection = {
   summary: { critical: number; high: number; medium: number; low: number };
 };
 
+type SqlInjectionTechnique = {
+  type: string;
+  title?: string | null;
+  payload?: string | null;
+};
+
+type SqlInjectionFinding = {
+  url: string;
+  dbms?: string | null;
+  parameters: Array<{
+    parameter: string;
+    method: string;
+    techniques: SqlInjectionTechnique[];
+  }>;
+};
+
+type SqlInjectionSection = {
+  findings: SqlInjectionFinding[];
+  summary: { tested: number; injectable: number; clean: number; timeout?: number; error?: number };
+};
+
 type BreachSection = {
   results: Array<{ email: string; status: 'clean' | 'error'; message: string }>;
   darkWeb?: DarkWebBreachStats & { loading?: boolean };
@@ -182,6 +203,7 @@ type SectionData = {
   mobile?: MobileSection;
   documents?: DocumentSection;
   jslibs?: JsLibrariesSection;
+  sqli?: SqlInjectionSection;
 };
 
 const SECTION_DEFS = [
@@ -205,6 +227,7 @@ const SECTION_DEFS = [
   { key: 'mobile', title: 'MOBILE & API ENUMERATION' },
   { key: 'documents', title: 'DOCUMENT METADATA & PUBLIC FILE ANALYSIS' },
   { key: 'jslibs', title: 'JAVASCRIPT LIBRARY VULNERABILITY ANALYSIS' },
+  { key: 'sqli', title: 'SQL INJECTION ANALYSIS' },
 ];
 
 const sanitizeList = (block: string): string[] =>
@@ -549,8 +572,9 @@ const parseAssessmentSections = (plain: string | null, parsedExtras?: any): Sect
     const mobile = extras.mobile || extras.mobile_apps || extras.mobileApps;
     const documents = extras.documents || extras.document_metadata || extras.docs;
     const jslibs = extras.jslibs || extras.javascript_libraries || extras.javascriptLibraries;
+    const sqli = extras.sqli || extras.sql_injection || extras.sqlInjection;
 
-    const hasStructured = [portScan, webAnalysis, wafDetection, sslAnalysis, dnsAnalysis, extras.completeResults, social, techstack, passiveDns, ipRanges, vulnerabilities, threatIntel, email, mobile, documents, jslibs].some(Boolean);
+    const hasStructured = [portScan, webAnalysis, wafDetection, sslAnalysis, dnsAnalysis, extras.completeResults, social, techstack, passiveDns, ipRanges, vulnerabilities, threatIntel, email, mobile, documents, jslibs, sqli].some(Boolean);
     if (hasStructured) {
       const data: SectionData = {};
 
@@ -711,6 +735,27 @@ const parseAssessmentSections = (plain: string | null, parsedExtras?: any): Sect
           scannedFiles: jslibs.scanned_files ?? jslibs.scannedFiles ?? 0,
           findings,
           summary: jslibs.summary || { critical: 0, high: 0, medium: 0, low: 0 },
+        };
+      }
+
+      // SQL Injection (sqlmap)
+      if (sqli) {
+        const findings = (sqli.findings || []).map((f: any) => ({
+          url: f.url,
+          dbms: f.dbms,
+          parameters: (f.parameters || []).map((p: any) => ({
+            parameter: p.parameter,
+            method: p.method || 'GET',
+            techniques: (p.techniques || []).map((t: any) => ({
+              type: t.type,
+              title: t.title,
+              payload: t.payload,
+            })),
+          })),
+        }));
+        data.sqli = {
+          findings,
+          summary: sqli.summary || { tested: 0, injectable: findings.length, clean: 0 },
         };
       }
 
@@ -1039,6 +1084,38 @@ const parseAssessmentSections = (plain: string | null, parsedExtras?: any): Sect
         });
       }
       data.jslibs = { scannedFiles, findings, summary };
+      return;
+    }
+
+    // SQL Injection (sqlmap)
+    if (key === 'sqli') {
+      const findings: SqlInjectionFinding[] = [];
+      let tested = 0;
+      let injectable = 0;
+      let clean = 0;
+      const testedMatch = block.match(/URLs Tested:\s*(\d+)/i);
+      if (testedMatch) tested = Number(testedMatch[1]);
+      const injMatch = block.match(/Injectable:\s*(\d+)/i);
+      if (injMatch) injectable = Number(injMatch[1]);
+      const cleanMatch = block.match(/Clean:\s*(\d+)/i);
+      if (cleanMatch) clean = Number(cleanMatch[1]);
+
+      const injRegex = /SQL INJECTION on (\S+):[^\n]*?(?:\(DBMS:\s*([^)]+)\))?\n([\s\S]*?)(?=\n\s*SQL INJECTION on |\nSummary:|$)/gi;
+      let m: RegExpExecArray | null;
+      while ((m = injRegex.exec(block)) !== null) {
+        const [, url, dbms, body] = m;
+        const paramLines = Array.from(body.matchAll(/-\s*Parameter:\s*(\S+)\s*\((GET|POST|COOKIE|HEADER)\)\s*Techniques:\s*([^\n]+)/gi));
+        const parameters = paramLines.map((pm) => ({
+          parameter: pm[1],
+          method: pm[2].toUpperCase(),
+          techniques: pm[3].split(',').map((s) => ({ type: s.trim(), title: null, payload: null })),
+        }));
+        findings.push({ url: url.trim(), dbms: dbms ? dbms.trim() : null, parameters });
+      }
+      data.sqli = {
+        findings,
+        summary: { tested, injectable: injectable || findings.length, clean },
+      };
       return;
     }
   });
@@ -1978,6 +2055,38 @@ const AssessmentPage: React.FC = () => {
                 f.url || f.file || '—',
               ])
             );
+          }
+        }
+
+        const sqli = sectionData.sqli;
+        if (sqli && (sqli.findings?.length || sqli.summary?.tested)) {
+          addSectionTitle('SQL INJECTION ANALYSIS (sqlmap)', 12);
+          addText(
+            `URLs tested: ${sqli.summary.tested} • Injectable: ${sqli.summary.injectable} • Clean: ${sqli.summary.clean}`,
+            9,
+            false,
+            [60, 60, 60]
+          );
+          if (sqli.findings.length) {
+            addTable(
+              'sqlmap Findings',
+              [
+                { header: 'URL', width: maxWidth * 0.4 },
+                { header: 'Parameter (Method)', width: maxWidth * 0.22 },
+                { header: 'DBMS', width: maxWidth * 0.15 },
+                { header: 'Techniques', width: maxWidth * 0.23 },
+              ],
+              sqli.findings.flatMap((f) =>
+                f.parameters.map((p) => [
+                  f.url,
+                  `${p.parameter} (${p.method})`,
+                  f.dbms || '—',
+                  p.techniques.map((t) => t.type).join(', ') || '—',
+                ])
+              )
+            );
+          } else {
+            addText('No SQL injection vulnerabilities detected by sqlmap.', 9, false, [60, 60, 60]);
           }
         }
         // If the UI has `sections` (used by the collapsible "Full scan output" panel),

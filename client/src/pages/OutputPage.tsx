@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '@/lib/api';
 import VulnerabilityGraphs from '@/components/VulnerabilityGraphs';
-import { ChevronDown, ChevronUp, Download, FileText, History as HistoryIcon, Shield, Radar, Globe, Server, Activity as ActivityIcon, Lock, AlertTriangle, Globe2, Building2, Code2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Download, FileText, History as HistoryIcon, Shield, Radar, Globe, Server, Activity as ActivityIcon, Lock, AlertTriangle, Globe2, Building2, Code2, Database } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { parseAssessmentSections } from './AssessmentPage';
 import MatrixBackground from '@/components/ui/MatrixBackground';
@@ -1096,6 +1096,82 @@ const OutputPage: React.FC = () => {
                     </div>
                   ) : (
                     <p className="mt-4 text-xs text-gray-500">Retire.js analysis not available for this scan.</p>
+                  )}
+                </div>
+
+                {/* 12. SQL Injection Analysis (sqlmap) */}
+                <div className="bg-gray-900/60 border border-red-500/20 rounded-2xl p-6 xl:col-span-2">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs tracking-wide text-red-400 font-semibold">
+                        12. SQL INJECTION ANALYSIS (sqlmap)
+                      </p>
+                      <h3 className="text-xl font-semibold text-white">SQLmap Parameter Injection Scan</h3>
+                      <p className="text-sm text-gray-400">
+                        {sectionData.sqli
+                          ? `${sectionData.sqli.summary.tested} URL(s) tested • ${sectionData.sqli.summary.injectable} injectable`
+                          : 'No parameterized URLs tested'}
+                      </p>
+                    </div>
+                    <Database className="text-red-400 w-8 h-8" />
+                  </div>
+                  {sectionData.sqli ? (
+                    <div className="mt-4 space-y-4">
+                      <div className="grid grid-cols-3 gap-3 text-center text-xs">
+                        <div className="bg-red-900/30 border border-red-500/30 rounded-lg p-3">
+                          <p className="text-lg font-bold text-red-400">{sectionData.sqli.summary.injectable}</p>
+                          <p className="text-gray-400">Injectable</p>
+                        </div>
+                        <div className="bg-emerald-900/30 border border-emerald-500/30 rounded-lg p-3">
+                          <p className="text-lg font-bold text-emerald-400">{sectionData.sqli.summary.clean}</p>
+                          <p className="text-gray-400">Clean</p>
+                        </div>
+                        <div className="bg-gray-800/60 border border-gray-600/30 rounded-lg p-3">
+                          <p className="text-lg font-bold text-gray-300">{sectionData.sqli.summary.tested}</p>
+                          <p className="text-gray-400">Tested</p>
+                        </div>
+                      </div>
+                      {sectionData.sqli.findings && sectionData.sqli.findings.length > 0 ? (
+                        <div className="max-h-96 overflow-y-auto space-y-3">
+                          {sectionData.sqli.findings.map((f: any, idx: number) => (
+                            <div key={idx} className="bg-gray-950/60 border border-red-800/40 rounded-lg p-3">
+                              <div className="flex items-center justify-between flex-wrap gap-2">
+                                <div className="min-w-0">
+                                  <p className="text-white font-semibold truncate">{f.url}</p>
+                                  {f.dbms && (
+                                    <p className="text-xs text-gray-400">DBMS: <span className="text-yellow-300">{f.dbms}</span></p>
+                                  )}
+                                </div>
+                                <span className="bg-red-500/20 text-red-300 text-xs px-2 py-0.5 rounded">
+                                  {f.parameters.length} param{f.parameters.length === 1 ? '' : 's'}
+                                </span>
+                              </div>
+                              {f.parameters && f.parameters.length > 0 && (
+                                <ul className="mt-2 space-y-1 text-xs text-gray-300">
+                                  {f.parameters.map((p: any, pi: number) => (
+                                    <li key={pi} className="flex flex-col border-l-2 border-red-500/40 pl-2">
+                                      <span>
+                                        <span className="text-red-300 font-semibold">{p.parameter}</span>
+                                        <span className="text-gray-500"> ({p.method})</span>
+                                      </span>
+                                      {p.techniques && p.techniques.length > 0 && (
+                                        <span className="text-gray-400">
+                                          {p.techniques.map((t: any) => t.type).join(' • ')}
+                                        </span>
+                                      )}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-emerald-400">No SQL injection vulnerabilities detected.</p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="mt-4 text-xs text-gray-500">sqlmap analysis not available for this scan.</p>
                   )}
                 </div>
 

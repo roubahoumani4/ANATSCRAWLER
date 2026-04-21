@@ -373,6 +373,7 @@ class ProfessionalOSINT:
             "geolocation_data": {},
             "document_metadata": {},
             "javascript_libraries": {},
+            "sql_injection": {},
             # LIVE VULNERABILITY DATA
             "live_vulnerability_checks": {
                 "nvd_checked": False,
@@ -2806,6 +2807,289 @@ class ProfessionalOSINT:
         except Exception:
             pass
 
+    def sql_injection_scan(self):
+        """SQL injection analysis powered by sqlmap.
+
+        Discovers candidate URLs with query parameters from the target homepage
+        and top subdomains, then runs sqlmap (https://github.com/sqlmapproject/sqlmap)
+        against each with the safest, batch-mode profile. Findings are printed
+        and added to self.results["vulnerabilities"].
+        """
+        self.print_header("16. SQL INJECTION ANALYSIS (sqlmap)")
+
+        if not self.domain:
+            self.print_warning("No domain for SQL injection scan")
+            return
+
+        import shutil
+        import tempfile
+
+        # --- Locate sqlmap runner ---
+        candidate_paths = [
+            os.environ.get("SQLMAP_BIN"),
+            shutil.which("sqlmap"),
+            "/usr/local/bin/sqlmap",
+            "/usr/bin/sqlmap",
+            "/var/www/anatscrawler/sqlmap/sqlmap.py",
+            os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "..", "..", "sqlmap", "sqlmap.py",
+            ),
+        ]
+        sqlmap_cmd = None
+        for p in candidate_paths:
+            if not p:
+                continue
+            if not os.path.isfile(p):
+                continue
+            if p.endswith(".py"):
+                py = shutil.which("python3") or shutil.which("python") or "python3"
+                sqlmap_cmd = [py, p]
+                break
+            if os.access(p, os.X_OK):
+                sqlmap_cmd = [p]
+                break
+        if sqlmap_cmd is None:
+            self.print_warning(
+                "sqlmap not found. Install via `apt install sqlmap` or clone to "
+                "/var/www/anatscrawler/sqlmap. Checked: "
+                + ", ".join(p for p in candidate_paths if p)
+            )
+            return
+
+        # --- Discover candidate URLs with query parameters ---
+        seed_pages = []
+        for scheme in ("https", "http"):
+            seed_pages.append(f"{scheme}://{self.domain}")
+        for sub in list(self.discovered_subdomains.keys())[:2]:
+            seed_pages.append(f"https://{sub}")
+
+        headers = {"User-Agent": "Mozilla/5.0 (ANATSCRAWLER/OSINT)"}
+        candidate_urls = []
+        seen = set()
+
+        def add_url(u: str):
+            if not u or u in seen:
+                return
+            try:
+                parsed = urlparse(u)
+            except Exception:
+                return
+            if parsed.scheme not in ("http", "https"):
+                return
+            # Only keep URLs on the target domain (or subdomain of it)
+            host = (parsed.hostname or "").lower()
+            if not host:
+                return
+            if not (host == self.domain or host.endswith("." + self.domain)):
+                return
+            if not parsed.query:
+                return
+            seen.add(u)
+            candidate_urls.append(u)
+
+        for page in seed_pages:
+            try:
+                self.print_debug(f"Fetching {page} to discover parameterized URLs")
+                resp = requests.get(page, headers=headers, timeout=10, verify=False, allow_redirects=True)
+            except Exception as e:
+                self.print_debug(f"Unable to fetch {page}: {e}")
+                continue
+            if not resp.ok or not resp.text:
+                continue
+
+            # Seed itself if it already has a query string
+            add_url(resp.url)
+
+            try:
+                soup = BeautifulSoup(resp.text, "html.parser")
+            except Exception as e:
+                self.print_debug(f"HTML parse failed for {page}: {e}")
+                continue
+
+            for tag in soup.find_all("a", href=True):
+                abs_url = urljoin(resp.url, tag["href"])
+                add_url(abs_url)
+            for tag in soup.find_all("form", action=True):
+                abs_url = urljoin(resp.url, tag["action"])
+                # Only use GET forms as URLs with query string (best-effort)
+                method = (tag.get("method") or "get").lower()
+                if method == "get":
+                    inputs = tag.find_all(["input", "select", "textarea"])
+                    params = []
+                    for inp in inputs:
+                        name = inp.get("name")
+                        if not name:
+                            continue
+                        params.append(f"{name}={inp.get('value') or '1'}")
+                    if params:
+                        sep = "&" if "?" in abs_url else "?"
+                        add_url(f"{abs_url}{sep}{'&'.join(params)}")
+
+            if len(candidate_urls) >= 10:
+                break
+
+        if not candidate_urls:
+            self.print_warning("No parameterized URLs found to test for SQL injection")
+            self.results["sql_injection"] = {
+                "tested_urls": [],
+                "findings": [],
+                "summary": {"injectable": 0, "tested": 0},
+            }
+            self.save_artifact("sql_injection.json", self.results["sql_injection"])
+            return
+
+        candidate_urls = candidate_urls[:10]  # Safety cap
+        print(f"{Colors.CYAN}Discovered {len(candidate_urls)} parameterized URL(s) to test{Colors.END}")
+
+        # --- Run sqlmap against each URL ---
+        tmpdir = tempfile.mkdtemp(prefix="sqlmap_")
+        findings = []
+        tested = []
+
+        # Regex patterns used to parse sqlmap output
+        param_re = re.compile(r"Parameter:\s*([^\s(]+)\s*\((GET|POST|COOKIE|HEADER)\)", re.IGNORECASE)
+        type_re = re.compile(r"^\s*Type:\s*(.+)$", re.MULTILINE)
+        title_re = re.compile(r"^\s*Title:\s*(.+)$", re.MULTILINE)
+        payload_re = re.compile(r"^\s*Payload:\s*(.+)$", re.MULTILINE)
+        dbms_re = re.compile(r"back-end DBMS:\s*(.+)", re.IGNORECASE)
+        not_injectable_re = re.compile(r"all tested parameters do not appear to be injectable", re.IGNORECASE)
+
+        for idx, url in enumerate(candidate_urls, 1):
+            print(f"{Colors.CYAN}[{idx}/{len(candidate_urls)}] sqlmap -> {url}{Colors.END}")
+            output_dir = os.path.join(tmpdir, f"scan_{idx}")
+            cmd = sqlmap_cmd + [
+                "-u", url,
+                "--batch",
+                "--disable-coloring",
+                "--random-agent",
+                "--level=1",
+                "--risk=1",
+                "--timeout=10",
+                "--retries=0",
+                "--threads=1",
+                "--smart",
+                "--flush-session",
+                "--output-dir", output_dir,
+                "-v", "1",
+            ]
+            try:
+                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+            except subprocess.TimeoutExpired:
+                self.print_warning(f"sqlmap timed out after 180s on {url}")
+                tested.append({"url": url, "status": "timeout"})
+                continue
+            except Exception as e:
+                self.print_error(f"sqlmap execution failed on {url}: {e}")
+                tested.append({"url": url, "status": "error", "error": str(e)})
+                continue
+
+            out = (proc.stdout or "") + "\n" + (proc.stderr or "")
+            if not_injectable_re.search(out):
+                print(f"{Colors.GREEN}  No injectable parameters detected{Colors.END}")
+                tested.append({"url": url, "status": "clean"})
+                continue
+
+            # Extract "Parameter: X (METHOD)" blocks
+            param_blocks = []
+            matches = list(param_re.finditer(out))
+            for i, m in enumerate(matches):
+                start = m.start()
+                end = matches[i + 1].start() if i + 1 < len(matches) else len(out)
+                block = out[start:end]
+                param_name, method = m.group(1), m.group(2).upper()
+                techniques = []
+                # Within each parameter block, iterate "Type:" sub-blocks
+                type_matches = list(type_re.finditer(block))
+                for j, tm in enumerate(type_matches):
+                    tstart = tm.start()
+                    tend = type_matches[j + 1].start() if j + 1 < len(type_matches) else len(block)
+                    sub = block[tstart:tend]
+                    tech = {
+                        "type": tm.group(1).strip(),
+                        "title": (title_re.search(sub).group(1).strip() if title_re.search(sub) else None),
+                        "payload": (payload_re.search(sub).group(1).strip() if payload_re.search(sub) else None),
+                    }
+                    techniques.append(tech)
+                param_blocks.append({
+                    "parameter": param_name,
+                    "method": method,
+                    "techniques": techniques,
+                })
+
+            dbms_match = dbms_re.search(out)
+            dbms = dbms_match.group(1).strip() if dbms_match else None
+
+            if param_blocks:
+                tested.append({"url": url, "status": "vulnerable"})
+                finding = {
+                    "url": url,
+                    "dbms": dbms,
+                    "parameters": param_blocks,
+                }
+                findings.append(finding)
+                self.print_critical(
+                    f"SQL INJECTION on {url}: {len(param_blocks)} parameter(s) injectable"
+                    + (f" (DBMS: {dbms})" if dbms else "")
+                )
+                for pb in param_blocks:
+                    techs = ", ".join(t["type"] for t in pb["techniques"]) or "unknown"
+                    print(f"  - Parameter: {pb['parameter']} ({pb['method']})  Techniques: {techs}")
+
+                # Feed into main vulnerability list
+                self.results["vulnerabilities"].append({
+                    "type": "SQL Injection",
+                    "severity": "CRITICAL",
+                    "description": (
+                        f"sqlmap confirmed SQL injection on {url} via "
+                        f"{', '.join(pb['parameter'] for pb in param_blocks)}"
+                        + (f" (DBMS: {dbms})" if dbms else "")
+                    ),
+                    "service": url,
+                    "recommendation": (
+                        "Use parameterized queries / prepared statements, validate and "
+                        "encode all user input, apply least-privilege DB accounts, and "
+                        "deploy a WAF with SQLi rules."
+                    ),
+                    "source": "sqlmap",
+                })
+            else:
+                tested.append({"url": url, "status": "unknown"})
+
+        # --- Summary ---
+        summary = {
+            "tested": len(tested),
+            "injectable": len(findings),
+            "clean": len([t for t in tested if t.get("status") == "clean"]),
+            "timeout": len([t for t in tested if t.get("status") == "timeout"]),
+            "error": len([t for t in tested if t.get("status") == "error"]),
+        }
+        print()
+        print(f"{Colors.CYAN}Summary:{Colors.END}")
+        print(f"  URLs Tested: {summary['tested']}")
+        print(f"  Injectable: {summary['injectable']}")
+        print(f"  Clean: {summary['clean']}")
+        if summary["timeout"]:
+            print(f"  Timed out: {summary['timeout']}")
+        if summary["error"]:
+            print(f"  Errors: {summary['error']}")
+
+        if not findings:
+            self.print_success("No SQL injection vulnerabilities detected by sqlmap")
+
+        sql_result = {
+            "tested_urls": tested,
+            "findings": findings,
+            "summary": summary,
+        }
+        self.results["sql_injection"] = sql_result
+        self.save_artifact("sql_injection.json", sql_result)
+
+        try:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+        except Exception:
+            pass
+
     # =============================================================================
     # COMPREHENSIVE REPORT GENERATION
     # =============================================================================
@@ -3060,6 +3344,7 @@ Full technical details available in the JSON output files in the investigation d
             self.wappalyzer_integration,
             self.cloud_infrastructure_detection,
             self.javascript_library_scan,
+            self.sql_injection_scan,
         ]
         
         # HIBP breach check removed — the REAL DATA BREACH ANALYSIS section is
