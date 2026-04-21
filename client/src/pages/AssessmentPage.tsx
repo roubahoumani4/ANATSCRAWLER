@@ -882,9 +882,32 @@ const parseAssessmentSections = (plain: string | null, parsedExtras?: any): Sect
       const detections: WafSection['detections'] = [];
       const lines = block.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
       lines.forEach((line) => {
-        const match = line.match(/(No WAF detected on|WAF detected on)\s+(.+)/i);
-        if (match) {
-          detections.push({ target: match[2].trim(), message: match[1] });
+        // wafw00f-style: "[+] WAF detected: Cloudflare (Cloudflare Inc.) on https://example.com"
+        const wafw00f = line.match(
+          /WAF detected:\s*([^(\n]+?)(?:\s*\(([^)]+)\))?\s+on\s+(https?:\/\/\S+)/i
+        );
+        if (wafw00f) {
+          const product = wafw00f[1].trim();
+          const manufacturer = wafw00f[2] ? wafw00f[2].trim() : null;
+          const target = wafw00f[3].trim();
+          detections.push({
+            target,
+            message:
+              `WAF detected: ${product}` +
+              (manufacturer ? ` (${manufacturer})` : ''),
+          });
+          return;
+        }
+        // wafw00f "No WAF detected by the signature on https://example.com"
+        const noWafw00f = line.match(/No WAF[^\n]*on\s+(https?:\/\/\S+)/i);
+        if (noWafw00f) {
+          detections.push({ target: noWafw00f[1].trim(), message: 'No WAF detected' });
+          return;
+        }
+        // Legacy format: "WAF detected on <target>" / "No WAF detected on <target>"
+        const legacy = line.match(/^(No WAF detected on|WAF detected on)\s+(.+)$/i);
+        if (legacy) {
+          detections.push({ target: legacy[2].trim(), message: legacy[1] });
         }
       });
       data.waf = { detections };

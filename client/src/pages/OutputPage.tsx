@@ -928,18 +928,36 @@ const OutputPage: React.FC = () => {
                         8. WEB APPLICATION FIREWALL DETECTION
                       </p>
                       <h3 className="text-xl font-semibold text-white">Perimeter Shielding</h3>
-                      <p className="text-sm text-gray-400">Detection insights per endpoint</p>
+                      <p className="text-sm text-gray-400">Detection insights per endpoint (wafw00f)</p>
                     </div>
                     <Shield className="text-indigo-400 w-8 h-8" />
                   </div>
-                  <div className="mt-4 text-xs text-gray-300 space-y-2">
-                    {sectionData.waf?.detections.length
-                      ? sectionData.waf.detections.map((det: any) => (
-                          <p key={det.target}>
-                            {det.message} • {det.target}
-                          </p>
-                        ))
-                      : <p>No WAF signals identified.</p>}
+                  <div className="mt-4 text-xs space-y-2">
+                    {sectionData.waf?.detections.length ? (
+                      sectionData.waf.detections.map((det: any, idx: number) => {
+                        const isDetected = /^WAF detected/i.test(det.message || '');
+                        return (
+                          <div
+                            key={`${det.target}-${idx}`}
+                            className={`flex items-start gap-2 border-l-2 pl-2 ${
+                              isDetected
+                                ? 'border-emerald-500/60 text-emerald-300'
+                                : 'border-gray-600 text-gray-400'
+                            }`}
+                          >
+                            <span className="font-semibold">
+                              {isDetected ? '✔' : '✖'}
+                            </span>
+                            <span>
+                              <span className="block">{det.message}</span>
+                              <span className="block text-gray-500 truncate">{det.target}</span>
+                            </span>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="text-gray-300">No WAF signals identified.</p>
+                    )}
                   </div>
                 </div>
 
