@@ -648,7 +648,86 @@ router.get('/download/:jobId', async (req: Request, res: Response) => {
     
     // Check if there's a report file location
     let reportLocation: string | undefined = scan.parsed?.reportLocation;
-    
+
+    const scriptsDirEarly = process.env.SCRIPTS_DIR || '/var/www/anatscrawler/scripts';
+    const pythonBinEarly =
+      process.env.PYTHON_BIN ||
+      process.env.SCRIPTS_PYTHON ||
+      '/var/www/anatscrawler/.venv/bin/python';
+
+    // If no report location, try to locate the artifact directory on disk
+    // (osint_pro.py writes outputs to `osint_<target>` under its cwd) and
+    // generate a PDF on the fly. Only fall back to a plain-text dump when
+    // the artifact directory truly no longer exists.
+    if (!reportLocation) {
+      const sanitizedTarget = String(scan.target || '')
+        .replace('://', '_')
+        .replace(/\//g, '_');
+      const candidateDirs = [
+        path.join(scriptsDirEarly, `osint_${sanitizedTarget}`),
+        path.join(scriptsDirEarly, '..', `osint_${sanitizedTarget}`),
+        path.join('/var/www/anatscrawler', `osint_${sanitizedTarget}`),
+        path.join(process.cwd(), `osint_${sanitizedTarget}`),
+      ];
+      const artifactDir = candidateDirs.find(
+        (d) => fs.existsSync(d) && fs.statSync(d).isDirectory()
+      );
+
+      if (artifactDir) {
+        const pdfScriptCandidates = [
+          path.join(scriptsDirEarly, 'generate_osint_pdf_report.py'),
+          path.join(__dirname, '..', '..', 'scripts', 'generate_osint_pdf_report.py'),
+          path.join(__dirname, '..', 'scripts', 'generate_osint_pdf_report.py'),
+        ];
+        const pdfScript = pdfScriptCandidates.find((p) => fs.existsSync(p));
+        if (pdfScript) {
+          try {
+            const generatedPath = await new Promise<string>((resolve, reject) => {
+              const child = spawn(pythonBinEarly, [pdfScript, artifactDir], {
+                stdio: ['ignore', 'pipe', 'pipe'],
+              });
+              let out = '';
+              let err = '';
+              child.stdout.on('data', (d) => (out += d.toString()));
+              child.stderr.on('data', (d) => (err += d.toString()));
+              child.on('error', reject);
+              child.on('close', (code) => {
+                if (code === 0 && out.trim()) {
+                  const last = out.trim().split('\n').pop() as string;
+                  return resolve(last.trim());
+                }
+                reject(new Error(err || `PDF generator exited with code ${code}`));
+              });
+              setTimeout(() => {
+                try {
+                  child.kill('SIGKILL');
+                } catch {}
+                reject(new Error('PDF generator timed out'));
+              }, 120000);
+            });
+
+            if (generatedPath && fs.existsSync(generatedPath)) {
+              try {
+                await Scan.findOneAndUpdate(
+                  { jobId },
+                  { $set: { 'parsed.reportLocation': generatedPath, reportLocation: generatedPath } }
+                ).catch(() => {});
+              } catch {}
+              res.setHeader('Content-Type', 'application/pdf');
+              res.setHeader(
+                'Content-Disposition',
+                `attachment; filename="OSINT_REPORT_${scan.target}_${jobId.slice(0, 8)}.pdf"`
+              );
+              return res.download(generatedPath, path.basename(generatedPath));
+            }
+          } catch (genErr) {
+            console.error('On-demand PDF generation (no reportLocation) failed:', genErr);
+            // fall through to text dump
+          }
+        }
+      }
+    }
+
     // If no report location, generate a comprehensive report from scan data
     if (!reportLocation) {
       // Generate comprehensive report content
@@ -758,6 +837,87 @@ ${cleanedOutput}
         `attachment; filename="OSINT_REPORT_${scan.target}_${jobId.slice(0, 8)}.pdf"`
       );
       return res.download(real, path.basename(real));
+    }
+
+    // reportLocation points to a .md (legacy) — prefer a sibling PDF if present,
+    // otherwise generate one on the fly from the artifact directory.
+    const artifactDir = path.dirname(real);
+    const siblingPdfCandidates = [
+      path.join(artifactDir, path.basename(real, path.extname(real)) + '.pdf'),
+      ...(fs.existsSync(artifactDir)
+        ? fs.readdirSync(artifactDir)
+            .filter((f) => f.toLowerCase().endsWith('.pdf'))
+            .map((f) => path.join(artifactDir, f))
+        : []),
+    ];
+    const siblingPdf = siblingPdfCandidates.find((p) => fs.existsSync(p));
+    if (siblingPdf) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="OSINT_REPORT_${scan.target}_${jobId.slice(0, 8)}.pdf"`
+      );
+      return res.download(siblingPdf, path.basename(siblingPdf));
+    }
+
+    // No sibling PDF — try to generate it if the artifact directory still exists
+    if (fs.existsSync(artifactDir) && fs.statSync(artifactDir).isDirectory()) {
+      const pdfScriptCandidates = [
+        path.join(scriptsDir, 'generate_osint_pdf_report.py'),
+        path.join(__dirname, '..', '..', 'scripts', 'generate_osint_pdf_report.py'),
+        path.join(__dirname, '..', 'scripts', 'generate_osint_pdf_report.py'),
+      ];
+      const pdfScript = pdfScriptCandidates.find((p) => fs.existsSync(p));
+      const pythonBin =
+        process.env.PYTHON_BIN ||
+        process.env.SCRIPTS_PYTHON ||
+        '/var/www/anatscrawler/.venv/bin/python';
+
+      if (pdfScript) {
+        try {
+          const generatedPath = await new Promise<string>((resolve, reject) => {
+            const child = spawn(pythonBin, [pdfScript, artifactDir], { stdio: ['ignore', 'pipe', 'pipe'] });
+            let out = '';
+            let err = '';
+            child.stdout.on('data', (d) => (out += d.toString()));
+            child.stderr.on('data', (d) => (err += d.toString()));
+            child.on('error', reject);
+            child.on('close', (code) => {
+              if (code === 0 && out.trim()) {
+                const last = out.trim().split('\n').pop() as string;
+                return resolve(last.trim());
+              }
+              reject(new Error(err || `PDF generator exited with code ${code}`));
+            });
+            // safety timeout
+            setTimeout(() => {
+              try {
+                child.kill('SIGKILL');
+              } catch {}
+              reject(new Error('PDF generator timed out'));
+            }, 120000);
+          });
+
+          if (generatedPath && fs.existsSync(generatedPath)) {
+            // Persist the new reportLocation so future downloads are instant
+            try {
+              await Scan.findOneAndUpdate(
+                { jobId },
+                { $set: { 'parsed.reportLocation': generatedPath, reportLocation: generatedPath } }
+              ).catch(() => {});
+            } catch {}
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader(
+              'Content-Disposition',
+              `attachment; filename="OSINT_REPORT_${scan.target}_${jobId.slice(0, 8)}.pdf"`
+            );
+            return res.download(generatedPath, path.basename(generatedPath));
+          }
+        } catch (genErr) {
+          console.error('On-demand PDF generation failed:', genErr);
+          // fall through to legacy markdown/pandoc path
+        }
+      }
     }
 
     // If report file doesn't exist, generate report from scan data instead
