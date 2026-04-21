@@ -1208,6 +1208,13 @@ ${cleanedOutput}
       return res.download(real, path.basename(real));
     }
   } catch (err) {
-    return res.status(500).json({ error: (err as Error).message || 'Unknown error' });
+    const e = err as Error;
+    console.error('[/download/:jobId] fatal error:', e);
+    if (res.headersSent) return;
+    return res.status(500).json({
+      error: e.message || 'Unknown error',
+      name: e.name,
+      stack: (e.stack || '').split('\n').slice(0, 6).join(' | '),
+    });
   }
 });
