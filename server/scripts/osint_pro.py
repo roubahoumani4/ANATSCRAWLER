@@ -333,7 +333,7 @@ class ProfessionalOSINT:
         self.censys_id = CENSYS_API_ID
         self.censys_secret = CENSYS_API_SECRET
         self.output_dir = output_dir or f"osint_{target.replace('://', '_').replace('/', '_')}"
-        Path(self.output_dir).mkdir(exist_ok=True)
+        Path(self.output_dir).mkdir(parents=True, exist_ok=True)
         
         # Comprehensive results structure
         self.results = {

@@ -70,10 +70,35 @@ function runAssessmentBackground(jobId: string, target: string) {
 
   const scriptsDir = process.env.SCRIPTS_DIR || '/var/www/anatscrawler/scripts';
   const scriptPath = path.join(scriptsDir, 'osint_pro.py');
-  const args = [scriptPath, target];
+
+  // Deterministic, absolute output directory per job so the download route
+  // can locate artifacts reliably (no more cwd-dependent relative paths).
+  const scansRoot = process.env.SCANS_DIR || '/var/www/anatscrawler/scans';
+  const sanitizedTarget = String(target).replace('://', '_').replace(/\//g, '_');
+  const artifactDir = path.join(scansRoot, `osint_${sanitizedTarget}_${jobId}`);
+  try {
+    fs.mkdirSync(artifactDir, { recursive: true });
+  } catch (e) {
+    console.error('Failed to create artifact dir', artifactDir, e);
+  }
+
+  const args = [scriptPath, target, '-o', artifactDir];
 
   const python = process.env.PYTHON_BIN || process.env.SCRIPTS_PYTHON || '/var/www/anatscrawler/.venv/bin/python' || 'python3';
-  const child = spawn(python, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(python, args, {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    cwd: scriptsDir,
+  });
+
+  // Persist the artifact dir upfront so diagnose/download can always find it,
+  // even if the scan crashes mid-run.
+  try {
+    Scan.findOneAndUpdate(
+      { jobId },
+      { $set: { 'parsed.artifactDir': artifactDir } },
+      { upsert: true }
+    ).catch(() => {});
+  } catch {}
 
   let stdout = '';
   let stderr = '';
@@ -105,6 +130,7 @@ function runAssessmentBackground(jobId: string, target: string) {
       totalVulnerabilities: null,
       riskLevel: null,
       reportLocation: null,
+      artifactDir,
       summaryLines: [] as string[],
       plainOutput: plain,
       sections: [] as Array<{ title: string; content: string }>,
@@ -649,9 +675,13 @@ router.get('/diagnose/:jobId', async (req: Request, res: Response) => {
     '/var/www/anatscrawler/.venv/bin/python';
 
   const reportLocation: string | undefined = scan.parsed?.reportLocation;
+  const savedArtifactDir: string | undefined = scan.parsed?.artifactDir;
   const sanitizedTarget = String(scan.target || '').replace('://', '_').replace(/\//g, '_');
+  const scansRoot = process.env.SCANS_DIR || '/var/www/anatscrawler/scans';
   const candidateArtifactDirs = [
+    savedArtifactDir,
     reportLocation ? path.dirname(reportLocation) : undefined,
+    path.join(scansRoot, `osint_${sanitizedTarget}_${jobId}`),
     path.join(scriptsDir, `osint_${sanitizedTarget}`),
     path.join(scriptsDir, '..', `osint_${sanitizedTarget}`),
     path.join('/var/www/anatscrawler', `osint_${sanitizedTarget}`),
@@ -767,12 +797,16 @@ router.get('/download/:jobId', async (req: Request, res: Response) => {
       const sanitizedTarget = String(scan.target || '')
         .replace('://', '_')
         .replace(/\//g, '_');
+      const savedArtifactDir: string | undefined = scan.parsed?.artifactDir;
+      const scansRoot = process.env.SCANS_DIR || '/var/www/anatscrawler/scans';
       const candidateDirs = [
+        savedArtifactDir,
+        path.join(scansRoot, `osint_${sanitizedTarget}_${jobId}`),
         path.join(scriptsDirEarly, `osint_${sanitizedTarget}`),
         path.join(scriptsDirEarly, '..', `osint_${sanitizedTarget}`),
         path.join('/var/www/anatscrawler', `osint_${sanitizedTarget}`),
         path.join(process.cwd(), `osint_${sanitizedTarget}`),
-      ];
+      ].filter(Boolean) as string[];
       const artifactDir = candidateDirs.find(
         (d) => fs.existsSync(d) && fs.statSync(d).isDirectory()
       );
