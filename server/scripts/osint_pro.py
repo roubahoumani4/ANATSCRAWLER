@@ -1356,54 +1356,308 @@ class ProfessionalOSINT:
                     self.print_warning(f"Vulnerable {detected_software} {detected_version} detected on {ip}:{port}")
 
     def ssl_certificate_analysis(self):
-        """Comprehensive SSL/TLS certificate analysis"""
+        """SSL/TLS analysis powered by rbsec sslscan (https://github.com/rbsec/sslscan).
+
+        We invoke sslscan with XML output (`--xml=-`) and parse the results to
+        extract certificate details, supported protocol versions, enabled cipher
+        suites, and known-weak flags. Output is rendered in the same human
+        readable format the frontend expects (Subject/Issuer/Valid From/etc.)
+        so the existing parsers continue to work, and the raw sslscan XML is
+        preserved under `ssl_certificates` for advanced consumers.
+        """
         self.print_header("5. SSL/TLS CERTIFICATE ANALYSIS")
-        
+
         if not self.domain:
             self.print_warning("No domain for SSL analysis")
             return
-        
+
+        import shutil
+        import xml.etree.ElementTree as ET
+
+        sslscan_bin = shutil.which("sslscan") or "/usr/bin/sslscan"
+        if not os.path.exists(sslscan_bin):
+            self.print_warning(
+                "sslscan binary not found (expected at /usr/bin/sslscan). "
+                "Install from https://github.com/rbsec/sslscan or via apt."
+            )
+            return
+
+        ports_to_check = [443]
+        # If earlier modules detected additional open HTTPS-ish ports, include them.
+        try:
+            open_ports = self.results.get("open_ports", []) or []
+            alt_https_ports = {8443, 9443, 10443, 11443, 12443}
+            for entry in open_ports:
+                if isinstance(entry, dict):
+                    p = entry.get("port")
+                    svc = str(entry.get("service", "")).lower()
+                    if p in alt_https_ports and ("https" in svc or "ssl" in svc or "tls" in svc or svc == ""):
+                        if p not in ports_to_check:
+                            ports_to_check.append(p)
+        except Exception:
+            pass
+
+        print(
+            f"{Colors.CYAN}Running sslscan on {self.domain} "
+            f"across {len(ports_to_check)} port(s): {ports_to_check}{Colors.END}"
+        )
+
         ssl_data = {}
-        ports_to_check = [443, 8443, 9443, 10443, 11443, 12443]
-        
-        print(f"{Colors.CYAN}Checking SSL certificates on {len(ports_to_check)} ports...{Colors.END}")
-        
         certificates_found = 0
-        
+        primary_cert_printed = False
+
         for port in ports_to_check:
+            target = f"{self.domain}:{port}"
             try:
-                self.print_debug(f"Checking SSL certificate on port {port}")
-                cert_info = self.get_ssl_certificate(self.domain, port)
-                if cert_info:
-                    certificates_found += 1
-                    ssl_data[f"port_{port}"] = cert_info
-                    print(f"\n{Colors.CYAN}SSL Certificate (Port {port}):{Colors.END}")
-                    print(f"  Subject: {cert_info.get('subject', {}).get('CN', 'N/A')}")
-                    print(f"  Issuer: {cert_info.get('issuer', {}).get('O', 'N/A')}")
-                    print(f"  Valid From: {cert_info.get('not_before', 'N/A')}")
-                    print(f"  Valid Until: {cert_info.get('not_after', 'N/A')}")
-                    print(f"  Signature Algorithm: {cert_info.get('signature_algorithm', 'N/A')}")
-                    
-                    # Check certificate expiration
-                    if cert_info.get('days_until_expiry', 0) < 30:
-                        self.print_critical(f"SSL certificate expires in {cert_info['days_until_expiry']} days!")
+                self.print_debug(f"sslscan {target}")
+                proc = subprocess.run(
+                    [
+                        sslscan_bin,
+                        "--no-colour",
+                        "--connect-timeout=5",
+                        "--sleep=0",
+                        "--show-certificate",
+                        "--xml=-",
+                        target,
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=180,
+                )
+            except subprocess.TimeoutExpired:
+                self.print_warning(f"sslscan timeout on port {port}")
+                continue
+            except Exception as e:
+                self.print_debug(f"sslscan error on port {port}: {e}")
+                continue
+
+            xml_text = (proc.stdout or "").strip()
+            if not xml_text:
+                self.print_debug(f"Empty sslscan output on port {port}")
+                continue
+
+            try:
+                root = ET.fromstring(xml_text)
+            except ET.ParseError as e:
+                self.print_debug(f"Failed to parse sslscan XML for port {port}: {e}")
+                continue
+
+            ssl_test = root.find("ssltest") if root.tag != "ssltest" else root
+            if ssl_test is None:
+                continue
+
+            # --- Certificate details ---
+            cert_el = ssl_test.find("certificate") or ssl_test.find("certificates/certificate")
+            cert_info = {}
+            if cert_el is not None:
+                def _val(tag):
+                    node = cert_el.find(tag)
+                    if node is None or not node.text:
+                        return None
+                    text = node.text.strip()
+                    # sslscan sometimes prefixes element text with its own label
+                    # (e.g. "Signature Algorithm: ecdsa-with-SHA256"). Strip it.
+                    import re as _re
+                    text = _re.sub(
+                        r"^(Signature Algorithm|Serial Number|Not Valid Before|Not Valid After)\s*:\s*",
+                        "",
+                        text,
+                        flags=_re.IGNORECASE,
+                    )
+                    return text.strip() or None
+
+                subject_full = _val("subject")
+                issuer_full = _val("issuer")
+                not_before = _val("not-valid-before")
+                not_after = _val("not-valid-after")
+                signature_algorithm = _val("signature-algorithm")
+                self_signed = _val("self-signed")
+                expired = _val("expired")
+                pk_node = cert_el.find("pk")
+                public_key = {
+                    "type": pk_node.get("type") if pk_node is not None else None,
+                    "bits": pk_node.get("bits") if pk_node is not None else None,
+                }
+
+                # Parse Subject CN out of the full DN for the UI.
+                cn_match = None
+                if subject_full:
+                    import re as _re
+                    cn_match = _re.search(r"CN\s*=\s*([^,/]+)", subject_full)
+                subject_cn = cn_match.group(1).strip() if cn_match else subject_full
+
+                issuer_cn_match = None
+                if issuer_full:
+                    import re as _re
+                    issuer_cn_match = _re.search(r"CN\s*=\s*([^,/]+)", issuer_full)
+                issuer_cn = issuer_cn_match.group(1).strip() if issuer_cn_match else issuer_full
+
+                # Days until expiry.
+                days_until_expiry = None
+                if not_after:
+                    import re as _re
+                    normalized = _re.sub(r"\s+", " ", not_after.strip())
+                    for fmt in (
+                        "%b %d %H:%M:%S %Y GMT",
+                        "%b %d %H:%M:%S %Y %Z",
+                        "%b %d %H:%M:%S %Y",
+                    ):
+                        try:
+                            expiry_dt = datetime.strptime(normalized, fmt)
+                            days_until_expiry = (expiry_dt - datetime.utcnow()).days
+                            break
+                        except ValueError:
+                            continue
+
+                cert_info = {
+                    "subject": subject_cn,
+                    "subject_full": subject_full,
+                    "issuer": issuer_cn,
+                    "issuer_full": issuer_full,
+                    "not_before": not_before,
+                    "not_after": not_after,
+                    "signature_algorithm": signature_algorithm,
+                    "self_signed": self_signed,
+                    "expired": expired,
+                    "public_key": public_key,
+                    "days_until_expiry": days_until_expiry,
+                }
+
+            # --- Protocols ---
+            protocols = []
+            for p in ssl_test.findall("protocol"):
+                protocols.append({
+                    "type": p.get("type"),
+                    "version": p.get("version"),
+                    "enabled": p.get("enabled") == "1",
+                })
+            enabled_protocols = [
+                f"{pr['type'].upper()}{pr['version']}"
+                for pr in protocols
+                if pr["enabled"]
+            ]
+
+            # --- Ciphers ---
+            ciphers = []
+            for c in ssl_test.findall("cipher"):
+                ciphers.append({
+                    "status": c.get("status"),
+                    "sslversion": c.get("sslversion"),
+                    "bits": c.get("bits"),
+                    "cipher": c.get("cipher"),
+                    "strength": c.get("strength"),
+                })
+            accepted_ciphers = [c for c in ciphers if c.get("status") in ("accepted", "preferred")]
+            weak_ciphers = [c for c in accepted_ciphers if c.get("strength") in ("weak", "medium")]
+
+            # --- Known weak-protocol flags ---
+            weak_flags = []
+            if any(
+                pr["enabled"] and pr["type"].lower() == "ssl" and pr["version"] in ("2", "3")
+                for pr in protocols
+            ):
+                weak_flags.append("SSLv2/SSLv3 enabled")
+            if any(
+                pr["enabled"] and pr["type"].lower() == "tls" and pr["version"] in ("1.0", "1.1")
+                for pr in protocols
+            ):
+                weak_flags.append("TLS 1.0/1.1 enabled")
+
+            heartbleed_vulns = []
+            for hb in ssl_test.findall("heartbleed"):
+                if hb.get("vulnerable") == "1":
+                    heartbleed_vulns.append(hb.get("sslversion"))
+
+            port_record = {
+                "port": port,
+                "certificate": cert_info,
+                "protocols": protocols,
+                "enabled_protocols": enabled_protocols,
+                "ciphers": ciphers,
+                "accepted_ciphers_count": len(accepted_ciphers),
+                "weak_ciphers_count": len(weak_ciphers),
+                "weak_flags": weak_flags,
+                "heartbleed": heartbleed_vulns,
+                "raw_xml": xml_text,
+            }
+
+            if not cert_info and not accepted_ciphers:
+                # nothing interesting on this port
+                continue
+
+            certificates_found += 1
+            ssl_data[f"port_{port}"] = port_record
+
+            # --- Console output ---
+            print(f"\n{Colors.CYAN}SSL Scan (Port {port}):{Colors.END}")
+            if cert_info:
+                print(f"  Subject: {cert_info.get('subject') or 'N/A'}")
+                print(f"  Issuer: {cert_info.get('issuer') or 'N/A'}")
+                print(f"  Valid From: {cert_info.get('not_before') or 'N/A'}")
+                print(f"  Valid Until: {cert_info.get('not_after') or 'N/A'}")
+                print(f"  Signature Algorithm: {cert_info.get('signature_algorithm') or 'N/A'}")
+                pk = cert_info.get("public_key") or {}
+                if pk.get("type") or pk.get("bits"):
+                    print(f"  Public Key: {pk.get('type')} {pk.get('bits')} bits")
+
+                dte = cert_info.get("days_until_expiry")
+                if dte is not None:
+                    if dte < 0:
+                        self.print_critical(f"SSL certificate expired {abs(dte)} days ago!")
+                    elif dte < 30:
+                        self.print_critical(f"SSL certificate expires in {dte} days!")
                         self.results["vulnerabilities"].append({
                             "type": "SSL Certificate Expiry",
                             "severity": "HIGH",
-                            "description": f"SSL certificate on port {port} expires in {cert_info['days_until_expiry']} days",
+                            "description": f"SSL certificate on port {port} expires in {dte} days",
                             "service": f"HTTPS on port {port}",
                             "recommendation": "Renew SSL certificate immediately",
-                            "source": "Local Database"
+                            "source": "sslscan",
                         })
                     else:
-                        self.print_success(f"Certificate valid for {cert_info['days_until_expiry']} days")
-            except Exception as e:
-                self.print_debug(f"No SSL certificate on port {port}: {e}")
-                continue
-        
+                        self.print_success(f"Certificate valid for {dte} days")
+
+            if enabled_protocols:
+                print(f"  Enabled Protocols: {', '.join(enabled_protocols)}")
+            if accepted_ciphers:
+                print(f"  Accepted Ciphers: {len(accepted_ciphers)} (weak/medium: {len(weak_ciphers)})")
+            for flag in weak_flags:
+                self.print_critical(f"{flag} on port {port}")
+                self.results["vulnerabilities"].append({
+                    "type": "Weak SSL/TLS Protocol",
+                    "severity": "HIGH",
+                    "description": f"{flag} on port {port}",
+                    "service": f"HTTPS on port {port}",
+                    "recommendation": "Disable legacy SSL/TLS protocol versions",
+                    "source": "sslscan",
+                })
+            if heartbleed_vulns:
+                self.print_critical(
+                    f"Heartbleed vulnerability detected on port {port} ({', '.join(heartbleed_vulns)})"
+                )
+                self.results["vulnerabilities"].append({
+                    "type": "Heartbleed (CVE-2014-0160)",
+                    "severity": "CRITICAL",
+                    "description": f"Heartbleed detected on port {port}",
+                    "service": f"HTTPS on port {port}",
+                    "recommendation": "Upgrade OpenSSL and re-issue certificates",
+                    "source": "sslscan",
+                })
+
+            # Populate the flat fields the frontend currently reads (first cert wins).
+            if cert_info and not primary_cert_printed:
+                self.ssl_cert_info = {
+                    "Subject": cert_info.get("subject"),
+                    "Issuer": cert_info.get("issuer"),
+                    "Valid From": cert_info.get("not_before"),
+                    "Valid Until": cert_info.get("not_after"),
+                    "Signature Algorithm": cert_info.get("signature_algorithm"),
+                }
+                primary_cert_printed = True
+
         if certificates_found == 0:
-            self.print_warning("No SSL certificates found on common ports")
-        
+            self.print_warning("No SSL/TLS services responded on common ports")
+
         self.results["ssl_certificates"] = ssl_data
         self.save_artifact("ssl_analysis.json", ssl_data)
 
