@@ -635,6 +635,107 @@ setInterval(() => {
 
 export default router;
 
+// GET /diagnose/:jobId - Return a JSON report of PDF-generation readiness
+// (used when the download button unexpectedly returns a .txt).
+router.get('/diagnose/:jobId', async (req: Request, res: Response) => {
+  const { jobId } = req.params;
+  const scan = await Scan.findOne({ jobId }).lean();
+  if (!scan) return res.status(404).json({ error: 'Scan not found' });
+
+  const scriptsDir = process.env.SCRIPTS_DIR || '/var/www/anatscrawler/scripts';
+  const pythonBin =
+    process.env.PYTHON_BIN ||
+    process.env.SCRIPTS_PYTHON ||
+    '/var/www/anatscrawler/.venv/bin/python';
+
+  const reportLocation: string | undefined = scan.parsed?.reportLocation;
+  const sanitizedTarget = String(scan.target || '').replace('://', '_').replace(/\//g, '_');
+  const candidateArtifactDirs = [
+    reportLocation ? path.dirname(reportLocation) : undefined,
+    path.join(scriptsDir, `osint_${sanitizedTarget}`),
+    path.join(scriptsDir, '..', `osint_${sanitizedTarget}`),
+    path.join('/var/www/anatscrawler', `osint_${sanitizedTarget}`),
+    path.join(process.cwd(), `osint_${sanitizedTarget}`),
+  ].filter(Boolean) as string[];
+
+  const pdfScriptCandidates = [
+    path.join(scriptsDir, 'generate_osint_pdf_report.py'),
+    path.join(__dirname, '..', '..', 'scripts', 'generate_osint_pdf_report.py'),
+    path.join(__dirname, '..', 'scripts', 'generate_osint_pdf_report.py'),
+  ];
+
+  const info = {
+    jobId,
+    target: scan.target,
+    scan: {
+      status: scan.status,
+      reportLocation: reportLocation || null,
+      reportLocationExists: reportLocation ? fs.existsSync(reportLocation) : false,
+      reportLocationIsPdf: reportLocation ? reportLocation.toLowerCase().endsWith('.pdf') : false,
+    },
+    env: { scriptsDir, pythonBin, cwd: process.cwd() },
+    pdfScript: {
+      candidates: pdfScriptCandidates.map((p) => ({ path: p, exists: fs.existsSync(p) })),
+      resolved: pdfScriptCandidates.find((p) => fs.existsSync(p)) || null,
+    },
+    artifactDirs: candidateArtifactDirs.map((d) => ({
+      path: d,
+      exists: fs.existsSync(d),
+      files: fs.existsSync(d) && fs.statSync(d).isDirectory()
+        ? fs.readdirSync(d).slice(0, 30)
+        : null,
+    })),
+    python: { reportlabVersion: null as string | null, pythonOk: false, pythonError: null as string | null },
+    generator: { stdout: null as string | null, stderr: null as string | null, exitCode: null as number | null },
+  };
+
+  // Check python / reportlab availability
+  try {
+    const { stdout, stderr, code } = await new Promise<{ stdout: string; stderr: string; code: number }>((resolve) => {
+      const child = spawn(pythonBin, ['-c', 'import reportlab, sys; print(reportlab.Version); print(sys.version)'], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let so = '';
+      let se = '';
+      child.stdout.on('data', (d) => (so += d.toString()));
+      child.stderr.on('data', (d) => (se += d.toString()));
+      child.on('close', (c) => resolve({ stdout: so, stderr: se, code: c ?? -1 }));
+      child.on('error', (e) => resolve({ stdout: '', stderr: String(e), code: -1 }));
+      setTimeout(() => { try { child.kill('SIGKILL'); } catch {} resolve({ stdout: so, stderr: se + '\n[TIMEOUT]', code: -1 }); }, 10000);
+    });
+    info.python.pythonOk = code === 0;
+    info.python.reportlabVersion = stdout.trim().split('\n')[0] || null;
+    if (stderr) info.python.pythonError = stderr.trim();
+  } catch (e: any) {
+    info.python.pythonError = String(e?.message || e);
+  }
+
+  // Try to actually run the generator
+  const pdfScript = info.pdfScript.resolved;
+  const artifactDir = info.artifactDirs.find((d) => d.exists && d.files && d.files.length > 0)?.path;
+  if (pdfScript && artifactDir) {
+    try {
+      const { stdout, stderr, code } = await new Promise<{ stdout: string; stderr: string; code: number }>((resolve) => {
+        const child = spawn(pythonBin, [pdfScript, artifactDir], { stdio: ['ignore', 'pipe', 'pipe'] });
+        let so = '';
+        let se = '';
+        child.stdout.on('data', (d) => (so += d.toString()));
+        child.stderr.on('data', (d) => (se += d.toString()));
+        child.on('close', (c) => resolve({ stdout: so, stderr: se, code: c ?? -1 }));
+        child.on('error', (e) => resolve({ stdout: '', stderr: String(e), code: -1 }));
+        setTimeout(() => { try { child.kill('SIGKILL'); } catch {} resolve({ stdout: so, stderr: se + '\n[TIMEOUT]', code: -1 }); }, 60000);
+      });
+      info.generator.stdout = stdout.trim() || null;
+      info.generator.stderr = stderr.trim() || null;
+      info.generator.exitCode = code;
+    } catch (e: any) {
+      info.generator.stderr = String(e?.message || e);
+    }
+  }
+
+  return res.json(info);
+});
+
 // GET /download/:jobId - Download the report artifact for a completed job (if available)
 router.get('/download/:jobId', async (req: Request, res: Response) => {
   try {
@@ -654,6 +755,9 @@ router.get('/download/:jobId', async (req: Request, res: Response) => {
       process.env.PYTHON_BIN ||
       process.env.SCRIPTS_PYTHON ||
       '/var/www/anatscrawler/.venv/bin/python';
+
+    // Collect diagnostic reasons so callers can inspect why a PDF wasn't served
+    const pdfFailureReasons: string[] = [];
 
     // If no report location, try to locate the artifact directory on disk
     // (osint_pro.py writes outputs to `osint_<target>` under its cwd) and
@@ -722,14 +826,22 @@ router.get('/download/:jobId', async (req: Request, res: Response) => {
             }
           } catch (genErr) {
             console.error('On-demand PDF generation (no reportLocation) failed:', genErr);
+            pdfFailureReasons.push(`no-reportLocation-generation-failed: ${(genErr as Error).message}`);
             // fall through to text dump
           }
+        } else {
+          pdfFailureReasons.push(`no-reportLocation: pdf-script-not-found in ${pdfScriptCandidates.join(', ')}`);
         }
+      } else {
+        pdfFailureReasons.push(`no-reportLocation: artifact-dir-not-found (tried: ${candidateDirs.join(', ')})`);
       }
     }
 
     // If no report location, generate a comprehensive report from scan data
     if (!reportLocation) {
+      if (pdfFailureReasons.length) {
+        res.setHeader('X-PDF-Failure-Reason', pdfFailureReasons.join(' | ').slice(0, 500));
+      }
       // Generate comprehensive report content
       let reportContent = `
 ================================================================================
@@ -915,8 +1027,11 @@ ${cleanedOutput}
           }
         } catch (genErr) {
           console.error('On-demand PDF generation failed:', genErr);
+          pdfFailureReasons.push(`md-path-generation-failed: ${(genErr as Error).message}`);
           // fall through to legacy markdown/pandoc path
         }
+      } else {
+        pdfFailureReasons.push(`md-path: pdf-script-not-found`);
       }
     }
 
@@ -994,6 +1109,9 @@ ${cleanedOutput}
 `;
       
       res.setHeader('Content-Type', 'text/plain');
+      if (pdfFailureReasons.length) {
+        res.setHeader('X-PDF-Failure-Reason', pdfFailureReasons.join(' | ').slice(0, 500));
+      }
       res.setHeader('Content-Disposition', `attachment; filename="assessment_${scan.target}_${jobId.slice(0, 8)}.txt"`);
       return res.send(reportContent);
     }

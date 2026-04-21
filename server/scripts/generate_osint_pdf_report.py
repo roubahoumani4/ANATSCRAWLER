@@ -88,12 +88,17 @@ def _load_json(path: Path) -> Optional[Any]:
 
 
 def _find_logo() -> Optional[str]:
+    here = Path(__file__).resolve().parent
     candidates = [
         os.environ.get("ANAT_LOGO"),
+        # Logo shipped alongside this script (preferred in prod)
+        str(here / "anatlogo.png"),
+        str(here.parent / "anatlogo.png"),
+        # Dev repo layouts
         "/var/www/anatscrawler/current/client/src/assets/anatlogo.png",
         "/var/www/anatscrawler/client/src/assets/anatlogo.png",
-        str(Path(__file__).resolve().parent.parent.parent / "client" / "src" / "assets" / "anatlogo.png"),
-        str(Path(__file__).resolve().parent.parent / "client" / "src" / "assets" / "anatlogo.png"),
+        str(here.parent.parent / "client" / "src" / "assets" / "anatlogo.png"),
+        str(here.parent / "client" / "src" / "assets" / "anatlogo.png"),
     ]
     for c in candidates:
         if c and os.path.isfile(c):
