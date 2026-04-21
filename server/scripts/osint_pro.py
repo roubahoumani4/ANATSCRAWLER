@@ -1374,11 +1374,26 @@ class ProfessionalOSINT:
         import shutil
         import xml.etree.ElementTree as ET
 
-        sslscan_bin = shutil.which("sslscan") or "/usr/bin/sslscan"
-        if not os.path.exists(sslscan_bin):
+        # Look for the sslscan binary in a few common locations so both dev
+        # machines (apt-installed) and the production VM (cloned rbsec/sslscan
+        # repo under /var/www/anatscrawler/sslscan) are supported.
+        candidate_paths = [
+            os.environ.get("SSLSCAN_BIN"),
+            shutil.which("sslscan"),
+            "/usr/bin/sslscan",
+            "/usr/local/bin/sslscan",
+            "/var/www/anatscrawler/sslscan/sslscan",
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "sslscan", "sslscan"),
+        ]
+        sslscan_bin = next(
+            (p for p in candidate_paths if p and os.path.isfile(p) and os.access(p, os.X_OK)),
+            None,
+        )
+        if not sslscan_bin:
             self.print_warning(
-                "sslscan binary not found (expected at /usr/bin/sslscan). "
-                "Install from https://github.com/rbsec/sslscan or via apt."
+                "sslscan binary not found. Build it from the cloned repo "
+                "(cd sslscan && make static) or install via apt. Checked: "
+                + ", ".join(p for p in candidate_paths if p)
             )
             return
 
