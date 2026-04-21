@@ -3318,6 +3318,7 @@ class ProfessionalOSINT:
 
     def amass_enumeration(self):
         """Run OWASP Amass to expand the attack surface (subdomains, IPs, ASNs)."""
+        import shutil, tempfile, json, re, subprocess, os
         self.print_header("OWASP AMASS ATTACK SURFACE MAPPING")
 
         if not self.domain:
