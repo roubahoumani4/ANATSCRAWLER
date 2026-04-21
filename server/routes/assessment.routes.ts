@@ -31,6 +31,19 @@ function generateJobId(): string {
   return `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
+// Sanitise arbitrary strings (e.g. python stderr) for use as HTTP header values.
+// Strips ANSI escapes and any other control characters Node will reject, and
+// truncates to a conservative length.
+function sanitizeHeaderValue(raw: string, maxLen = 500): string {
+  return raw
+    .replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '') // ANSI CSI sequences
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\x00-\x1f\x7f]/g, ' ')          // any remaining control chars
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLen);
+}
+
 // Helper to clean unwanted lines from scan output
 function cleanScanOutput(output: string): string {
   const lines = output.split('\n');
@@ -874,7 +887,7 @@ router.get('/download/:jobId', async (req: Request, res: Response) => {
     // If no report location, generate a comprehensive report from scan data
     if (!reportLocation) {
       if (pdfFailureReasons.length) {
-        res.setHeader('X-PDF-Failure-Reason', pdfFailureReasons.join(' | ').slice(0, 500));
+        res.setHeader('X-PDF-Failure-Reason', sanitizeHeaderValue(pdfFailureReasons.join(' | ')));
       }
       // Generate comprehensive report content
       let reportContent = `
@@ -1144,7 +1157,7 @@ ${cleanedOutput}
       
       res.setHeader('Content-Type', 'text/plain');
       if (pdfFailureReasons.length) {
-        res.setHeader('X-PDF-Failure-Reason', pdfFailureReasons.join(' | ').slice(0, 500));
+        res.setHeader('X-PDF-Failure-Reason', sanitizeHeaderValue(pdfFailureReasons.join(' | ')));
       }
       res.setHeader('Content-Disposition', `attachment; filename="assessment_${scan.target}_${jobId.slice(0, 8)}.txt"`);
       return res.send(reportContent);
