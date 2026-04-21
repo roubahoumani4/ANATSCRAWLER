@@ -1193,6 +1193,78 @@ const OutputPage: React.FC = () => {
                   )}
                 </div>
 
+                {/* 13. OWASP Amass — Attack Surface Mapping */}
+                <div className="bg-gray-900/60 border border-cyan-500/20 rounded-2xl p-6 xl:col-span-2">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs tracking-wide text-cyan-400 font-semibold">
+                        13. OWASP AMASS ATTACK SURFACE MAPPING
+                      </p>
+                      <h3 className="text-xl font-semibold text-white">Amass Subdomain & Infrastructure Enumeration</h3>
+                      <p className="text-sm text-gray-400">
+                        {sectionData.amass
+                          ? `${sectionData.amass.summary.hosts} host(s) • ${sectionData.amass.summary.new_subdomains} new • ${sectionData.amass.summary.ips} IPs • ${sectionData.amass.summary.asns} ASNs${sectionData.amass.mode ? `  •  mode: ${sectionData.amass.mode}` : ''}`
+                          : 'Amass did not run'}
+                      </p>
+                    </div>
+                    <Radar className="text-cyan-400 w-8 h-8" />
+                  </div>
+                  {sectionData.amass ? (
+                    <div className="mt-4 space-y-4">
+                      <div className="grid grid-cols-4 gap-3 text-center text-xs">
+                        <div className="bg-cyan-900/30 border border-cyan-500/30 rounded-lg p-3">
+                          <p className="text-lg font-bold text-cyan-300">{sectionData.amass.summary.hosts}</p>
+                          <p className="text-gray-400">Hosts</p>
+                        </div>
+                        <div className="bg-emerald-900/30 border border-emerald-500/30 rounded-lg p-3">
+                          <p className="text-lg font-bold text-emerald-400">{sectionData.amass.summary.new_subdomains}</p>
+                          <p className="text-gray-400">New Subs</p>
+                        </div>
+                        <div className="bg-blue-900/30 border border-blue-500/30 rounded-lg p-3">
+                          <p className="text-lg font-bold text-blue-300">{sectionData.amass.summary.ips}</p>
+                          <p className="text-gray-400">IPs</p>
+                        </div>
+                        <div className="bg-purple-900/30 border border-purple-500/30 rounded-lg p-3">
+                          <p className="text-lg font-bold text-purple-300">{sectionData.amass.summary.asns}</p>
+                          <p className="text-gray-400">ASNs</p>
+                        </div>
+                      </div>
+                      {sectionData.amass.hosts && sectionData.amass.hosts.length > 0 ? (
+                        <div className="max-h-96 overflow-y-auto space-y-2">
+                          {sectionData.amass.hosts.map((h: any, idx: number) => (
+                            <div key={idx} className="bg-gray-950/60 border border-cyan-800/40 rounded-lg p-3">
+                              <div className="flex items-center justify-between flex-wrap gap-2">
+                                <p className="text-white font-mono text-sm truncate">{h.name}</p>
+                                {h.sources && h.sources.length > 0 && (
+                                  <span className="bg-cyan-500/10 text-cyan-300 text-[10px] px-2 py-0.5 rounded">
+                                    {h.sources.slice(0, 4).join(', ')}{h.sources.length > 4 ? ` +${h.sources.length - 4}` : ''}
+                                  </span>
+                                )}
+                              </div>
+                              {h.addresses && h.addresses.length > 0 && (
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                  {h.addresses.slice(0, 6).map((a: any, ai: number) => (
+                                    <span key={ai} className="text-[11px] text-gray-300 bg-gray-900 border border-gray-700 rounded px-1.5 py-0.5">
+                                      {a.ip}{a.asn ? ` · AS${a.asn}` : ''}
+                                    </span>
+                                  ))}
+                                  {h.addresses.length > 6 && (
+                                    <span className="text-[11px] text-gray-500">+{h.addresses.length - 6}</span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-400">Amass did not return any hosts for this target.</p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="mt-4 text-xs text-gray-500">Amass enumeration not available for this scan.</p>
+                  )}
+                </div>
+
                 {/* Vulnerability graphs (live vs comprehensive) */}
                 <div className="xl:col-span-2">
                   <VulnerabilityGraphs sectionData={scan.parsed} plainOutput={scan.parsed?.plainOutput || scan.stdout || null} />

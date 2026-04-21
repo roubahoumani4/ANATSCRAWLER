@@ -374,6 +374,7 @@ class ProfessionalOSINT:
             "document_metadata": {},
             "javascript_libraries": {},
             "sql_injection": {},
+            "amass": {},
             # LIVE VULNERABILITY DATA
             "live_vulnerability_checks": {
                 "nvd_checked": False,
@@ -3312,6 +3313,224 @@ class ProfessionalOSINT:
             pass
 
     # =============================================================================
+    # OWASP AMASS — ATTACK-SURFACE / SUBDOMAIN ENUMERATION
+    # =============================================================================
+
+    def amass_enumeration(self):
+        """Run OWASP Amass to expand the attack surface (subdomains, IPs, ASNs)."""
+        self.print_header("OWASP AMASS ATTACK SURFACE MAPPING")
+
+        if not self.domain:
+            self.print_warning("No domain to enumerate with Amass")
+            self.results["amass"] = {
+                "enabled": False,
+                "reason": "no-domain",
+                "hosts": [],
+                "summary": {"hosts": 0, "new_subdomains": 0, "ips": 0, "asns": 0},
+            }
+            return
+
+        # Locate amass binary
+        candidate_paths = [
+            os.environ.get("AMASS_BIN"),
+            shutil.which("amass"),
+            "/snap/bin/amass",
+            "/usr/local/bin/amass",
+            "/usr/bin/amass",
+            "/var/www/anatscrawler/amass/amass",
+        ]
+        amass_bin = next((p for p in candidate_paths if p and os.path.exists(p)), None)
+        if not amass_bin and candidate_paths[1]:  # shutil.which returned something but path check failed
+            amass_bin = candidate_paths[1]
+        if not amass_bin:
+            self.print_warning("Amass binary not found (install: snap install amass)")
+            self.results["amass"] = {
+                "enabled": False,
+                "reason": "not-installed",
+                "hosts": [],
+                "summary": {"hosts": 0, "new_subdomains": 0, "ips": 0, "asns": 0},
+            }
+            return
+
+        # Mode / profile
+        mode = (os.environ.get("AMASS_MODE") or "passive").lower().strip()
+        amass_timeout = int(os.environ.get("AMASS_TIMEOUT") or ("2" if mode == "passive" else "5"))  # minutes
+        proc_timeout = amass_timeout * 60 + 60  # subprocess timeout = amass-budget + 60s grace
+
+        tmpdir = tempfile.mkdtemp(prefix="amass_")
+        json_file = os.path.join(tmpdir, "amass.json")
+        text_file = os.path.join(tmpdir, "amass.txt")
+
+        cmd = [
+            amass_bin, "enum",
+            "-d", self.domain,
+            "-timeout", str(amass_timeout),
+            "-json", json_file,
+            "-o", text_file,
+            "-nocolor",
+            "-silent",
+        ]
+        if mode == "passive":
+            cmd.append("-passive")
+
+        print(f"{Colors.CYAN}Amass mode: {mode}  timeout: {amass_timeout}m  target: {self.domain}{Colors.END}")
+        print(f"{Colors.CYAN}Running: {' '.join(cmd)}{Colors.END}")
+
+        proc_stdout = ""
+        proc_stderr = ""
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=proc_timeout)
+            proc_stdout = proc.stdout or ""
+            proc_stderr = proc.stderr or ""
+        except subprocess.TimeoutExpired:
+            self.print_warning(f"Amass exceeded subprocess timeout of {proc_timeout}s; using partial output")
+        except Exception as e:
+            self.print_error(f"Amass execution failed: {e}")
+            self.results["amass"] = {
+                "enabled": True,
+                "mode": mode,
+                "reason": f"error:{e}",
+                "hosts": [],
+                "summary": {"hosts": 0, "new_subdomains": 0, "ips": 0, "asns": 0},
+            }
+            shutil.rmtree(tmpdir, ignore_errors=True)
+            return
+
+        # --- Parse JSON output (one object per line) ---
+        hosts = {}        # name -> {addresses, sources, tags}
+        all_ips = set()
+        all_asns = set()
+        if os.path.exists(json_file):
+            try:
+                with open(json_file, "r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            rec = json.loads(line)
+                        except Exception:
+                            continue
+                        name = (rec.get("name") or "").lower().strip().rstrip(".")
+                        if not name:
+                            continue
+                        entry = hosts.setdefault(name, {
+                            "name": name,
+                            "addresses": [],
+                            "sources": set(),
+                            "tag": rec.get("tag"),
+                        })
+                        for addr in rec.get("addresses") or []:
+                            ip = addr.get("ip")
+                            if ip:
+                                all_ips.add(ip)
+                                asn = addr.get("asn")
+                                if asn:
+                                    all_asns.add(str(asn))
+                                entry["addresses"].append({
+                                    "ip": ip,
+                                    "cidr": addr.get("cidr"),
+                                    "asn": asn,
+                                    "desc": addr.get("desc"),
+                                })
+                        src = rec.get("source") or rec.get("sources")
+                        if isinstance(src, str):
+                            entry["sources"].add(src)
+                        elif isinstance(src, list):
+                            entry["sources"].update(str(s) for s in src)
+            except Exception as e:
+                self.print_warning(f"Failed to parse Amass JSON: {e}")
+
+        # --- Fallback: plain-text file or stdout if JSON empty ---
+        if not hosts:
+            text_blob = ""
+            if os.path.exists(text_file):
+                try:
+                    with open(text_file, "r", encoding="utf-8", errors="ignore") as f:
+                        text_blob = f.read()
+                except Exception:
+                    pass
+            text_blob = text_blob or proc_stdout
+            for raw in text_blob.splitlines():
+                line = raw.strip()
+                if not line:
+                    continue
+                # Amass may print lines like "www.example.com" or
+                # "www.example.com (FQDN) --> a_record --> 1.2.3.4 (IPAddress)"
+                name_match = re.match(r"([A-Za-z0-9_.-]+\.[A-Za-z]{2,})", line)
+                if not name_match:
+                    continue
+                name = name_match.group(1).lower().rstrip(".")
+                if not (name == self.domain or name.endswith("." + self.domain)):
+                    continue
+                entry = hosts.setdefault(name, {
+                    "name": name, "addresses": [], "sources": set(), "tag": None,
+                })
+                for ip in re.findall(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", line):
+                    all_ips.add(ip)
+                    entry["addresses"].append({"ip": ip, "cidr": None, "asn": None, "desc": None})
+
+        # Promote discovered hosts / IPs into global state
+        new_subs = 0
+        for name in hosts.keys():
+            if name == self.domain:
+                continue
+            if name.endswith("." + self.domain) and name not in self.discovered_subdomains:
+                self.discovered_subdomains[name] = "amass"
+                new_subs += 1
+        for ip in all_ips:
+            self.discovered_ips.add(ip)
+
+        # Serialize sources set -> sorted list
+        host_list = []
+        for name, data in sorted(hosts.items()):
+            host_list.append({
+                "name": name,
+                "addresses": data["addresses"],
+                "sources": sorted(list(data["sources"])),
+                "tag": data["tag"],
+            })
+
+        summary = {
+            "hosts": len(host_list),
+            "new_subdomains": new_subs,
+            "ips": len(all_ips),
+            "asns": len(all_asns),
+        }
+
+        print()
+        print(f"{Colors.CYAN}Summary:{Colors.END}")
+        print(f"  Hosts discovered: {summary['hosts']}")
+        print(f"  New subdomains added: {summary['new_subdomains']}")
+        print(f"  Unique IPs: {summary['ips']}")
+        print(f"  Unique ASNs: {summary['asns']}")
+        if host_list:
+            self.print_success(f"Amass enumerated {summary['hosts']} host(s) ({summary['new_subdomains']} new)")
+            for h in host_list[:15]:
+                ips = ", ".join(a["ip"] for a in h["addresses"] if a.get("ip")) or "no-ip"
+                srcs = ", ".join(h["sources"]) if h["sources"] else "—"
+                print(f"  - {h['name']}  [{ips}]  sources: {srcs}")
+            if len(host_list) > 15:
+                print(f"  ... and {len(host_list) - 15} more")
+        else:
+            if proc_stderr.strip():
+                self.print_debug(f"Amass stderr: {proc_stderr.strip()[:400]}")
+            self.print_warning("Amass returned no hosts")
+
+        amass_result = {
+            "enabled": True,
+            "mode": mode,
+            "timeout_minutes": amass_timeout,
+            "hosts": host_list,
+            "asns": sorted(list(all_asns)),
+            "summary": summary,
+        }
+        self.results["amass"] = amass_result
+        self.save_artifact("amass.json", amass_result)
+
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+    # =============================================================================
     # COMPREHENSIVE REPORT GENERATION
     # =============================================================================
 
@@ -3552,6 +3771,7 @@ Full technical details available in the JSON output files in the investigation d
             self.comprehensive_whois_lookup,
             self.enhanced_dns_enumeration,
             self.comprehensive_subdomain_enumeration,
+            self.amass_enumeration,
             self.advanced_port_scanning,
             self.ssl_certificate_analysis,
             self.comprehensive_web_analysis,

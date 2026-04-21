@@ -163,6 +163,21 @@ type SqlInjectionSection = {
   summary: { tested: number; injectable: number; clean: number; timeout?: number; error?: number };
 };
 
+type AmassHost = {
+  name: string;
+  addresses: Array<{ ip: string; cidr?: string | null; asn?: number | string | null; desc?: string | null }>;
+  sources: string[];
+  tag?: string | null;
+};
+
+type AmassSection = {
+  enabled: boolean;
+  mode?: string;
+  hosts: AmassHost[];
+  asns?: string[];
+  summary: { hosts: number; new_subdomains: number; ips: number; asns: number };
+};
+
 type BreachSection = {
   results: Array<{ email: string; status: 'clean' | 'error'; message: string }>;
   darkWeb?: DarkWebBreachStats & { loading?: boolean };
@@ -204,6 +219,7 @@ type SectionData = {
   documents?: DocumentSection;
   jslibs?: JsLibrariesSection;
   sqli?: SqlInjectionSection;
+  amass?: AmassSection;
 };
 
 const SECTION_DEFS = [
@@ -228,6 +244,7 @@ const SECTION_DEFS = [
   { key: 'documents', title: 'DOCUMENT METADATA & PUBLIC FILE ANALYSIS' },
   { key: 'jslibs', title: 'JAVASCRIPT LIBRARY VULNERABILITY ANALYSIS' },
   { key: 'sqli', title: 'SQL INJECTION ANALYSIS' },
+  { key: 'amass', title: 'OWASP AMASS ATTACK SURFACE MAPPING' },
 ];
 
 const sanitizeList = (block: string): string[] =>
@@ -573,8 +590,9 @@ const parseAssessmentSections = (plain: string | null, parsedExtras?: any): Sect
     const documents = extras.documents || extras.document_metadata || extras.docs;
     const jslibs = extras.jslibs || extras.javascript_libraries || extras.javascriptLibraries;
     const sqli = extras.sqli || extras.sql_injection || extras.sqlInjection;
+    const amass = extras.amass || extras.amassEnumeration || extras.amass_enumeration;
 
-    const hasStructured = [portScan, webAnalysis, wafDetection, sslAnalysis, dnsAnalysis, extras.completeResults, social, techstack, passiveDns, ipRanges, vulnerabilities, threatIntel, email, mobile, documents, jslibs, sqli].some(Boolean);
+    const hasStructured = [portScan, webAnalysis, wafDetection, sslAnalysis, dnsAnalysis, extras.completeResults, social, techstack, passiveDns, ipRanges, vulnerabilities, threatIntel, email, mobile, documents, jslibs, sqli, amass].some(Boolean);
     if (hasStructured) {
       const data: SectionData = {};
 
@@ -756,6 +774,33 @@ const parseAssessmentSections = (plain: string | null, parsedExtras?: any): Sect
         data.sqli = {
           findings,
           summary: sqli.summary || { tested: 0, injectable: findings.length, clean: 0 },
+        };
+      }
+
+      // OWASP Amass
+      if (amass) {
+        const hosts: AmassHost[] = (amass.hosts || []).map((h: any) => ({
+          name: h.name || h.fqdn || '',
+          addresses: (h.addresses || []).map((a: any) => ({
+            ip: a.ip || '',
+            cidr: a.cidr || null,
+            asn: a.asn ?? null,
+            desc: a.desc || null,
+          })),
+          sources: Array.isArray(h.sources) ? h.sources : (h.source ? [String(h.source)] : []),
+          tag: h.tag || null,
+        }));
+        data.amass = {
+          enabled: amass.enabled !== false,
+          mode: amass.mode,
+          hosts,
+          asns: amass.asns || [],
+          summary: amass.summary || {
+            hosts: hosts.length,
+            new_subdomains: 0,
+            ips: hosts.reduce((n, h) => n + h.addresses.length, 0),
+            asns: (amass.asns || []).length,
+          },
         };
       }
 
@@ -1138,6 +1183,42 @@ const parseAssessmentSections = (plain: string | null, parsedExtras?: any): Sect
       data.sqli = {
         findings,
         summary: { tested, injectable: injectable || findings.length, clean },
+      };
+      return;
+    }
+
+    // OWASP Amass (text fallback)
+    if (key === 'amass') {
+      const summary = { hosts: 0, new_subdomains: 0, ips: 0, asns: 0 };
+      const hm = block.match(/Hosts discovered:\s*(\d+)/i);
+      if (hm) summary.hosts = Number(hm[1]);
+      const nm = block.match(/New subdomains added:\s*(\d+)/i);
+      if (nm) summary.new_subdomains = Number(nm[1]);
+      const im = block.match(/Unique IPs:\s*(\d+)/i);
+      if (im) summary.ips = Number(im[1]);
+      const am = block.match(/Unique ASNs:\s*(\d+)/i);
+      if (am) summary.asns = Number(am[1]);
+
+      const hosts: AmassHost[] = [];
+      const hostLineRe = /^\s*-\s*([A-Za-z0-9_.-]+)\s*\[([^\]]+)\]\s*sources:\s*(.+)$/gm;
+      let hm2: RegExpExecArray | null;
+      while ((hm2 = hostLineRe.exec(block)) !== null) {
+        const ips = hm2[2] === 'no-ip' ? [] : hm2[2].split(',').map((s) => s.trim()).filter(Boolean);
+        const sources = hm2[3] === '—' ? [] : hm2[3].split(',').map((s) => s.trim()).filter(Boolean);
+        hosts.push({
+          name: hm2[1],
+          addresses: ips.map((ip) => ({ ip, cidr: null, asn: null, desc: null })),
+          sources,
+          tag: null,
+        });
+      }
+      const modeMatch = block.match(/Amass mode:\s*(\w+)/i);
+      data.amass = {
+        enabled: true,
+        mode: modeMatch ? modeMatch[1] : undefined,
+        hosts,
+        asns: [],
+        summary,
       };
       return;
     }
